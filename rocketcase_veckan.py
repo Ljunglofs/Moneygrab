@@ -74,6 +74,8 @@ SE = [
     "MIPS.ST","TRUE-B.ST","STILL.ST","XBRANE.ST","CANTA.ST","IMMNOV.ST",
     "G5EN.ST","STAR-B.ST","DESK.ST","ARISE.ST","CRAD-B.ST","ENGCON-B.ST",
     "BEIA-B.ST","VITR.ST","FNOX.ST","NETI-B.ST","SVOL-B.ST",
+    # Tillagda av användaren (First North-microcaps att bevaka)
+    "SHT-B.ST","SMOL.ST","OBDU-B.ST","SUBGEN.ST",
 ]
 
 FR_EU = [
