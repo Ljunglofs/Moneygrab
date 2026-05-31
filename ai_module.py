@@ -1,13 +1,13 @@
 # ============================================================
-#  🤖 AI ANALYS  —  drop-in module for MoneyGrab
+#  AI ANALYS  —  drop-in module for MoneyGrab
 #  AI-assistent som svarar på aktierelaterade frågor.
 #  Kan ta emot kontext från SÖK-fliken (vald aktie + score).
 # ============================================================
 #
 #  SÅ HÄR KOPPLAR DU IN DEN:
 #
-#  1) Lägg "🤖 ANALYS" i din tabs-rad:
-#       tabs = st.tabs([..., "🔍 SÖK", "🤖 ANALYS", ...])
+#  1) Lägg "ANALYS" i din tabs-rad:
+#       tabs = st.tabs([..., "SÖK", "ANALYS", ...])
 #
 #  2) Importera överst i app.py:
 #       from ai_module import render_ai_tab
@@ -32,7 +32,7 @@ import streamlit as st
 #  SYSTEM PROMPT — håller AI:n på rätt sida om juridiken.
 #  Den UTBILDAR och ANALYSERAR, men ger inga köprekommendationer.
 # ----------------------------------------------------------
-SYSTEM_PROMPT = """Du är analysassistenten i appen MoneyGrab, ett verktyg för teknisk \
+SYSTEM_PROMPT = """Du är Grabit, AI-analytikern i appen MoneyGrab, ett verktyg för teknisk \
 aktieanalys. Du svarar på svenska, koncist och pedagogiskt.
 
 DINA REGLER (viktiga):
@@ -86,15 +86,15 @@ def _context_block():
 
 
 def render_ai_tab():
-    st.subheader("🤖 ANALYS — fråga AI:n om aktier")
+    st.subheader("Ask Grabit — din AI-analytiker")
 
     ctx = st.session_state.get("sok_context")
     if ctx:
-        st.caption(f"💡 Kopplad till din senaste sökning: **{ctx.get('ticker')}** "
+        st.caption(f"Kopplad till din senaste sökning: **{ctx.get('ticker')}** "
                    f"({ctx.get('label')}, {ctx.get('score10')}/10). "
                    f"Fråga t.ex. \"förklara setupen\" eller \"vad betyder RSI här?\"")
     else:
-        st.caption("Ställ vilken aktierelaterad fråga som helst. Sök på en aktie i 🔍 SÖK "
+        st.caption("Ställ vilken aktierelaterad fråga som helst. Sök på en aktie i SÖK "
                    "först, så kan AI:n svara i kontext om just den.")
 
     # förslag på frågor
@@ -121,7 +121,7 @@ def render_ai_tab():
             st.markdown(msg["content"])
 
     # input
-    prompt = st.chat_input("Skriv din fråga…")
+    prompt = st.chat_input("Fråga Grabit…")
     if "ai_pending" in st.session_state:
         prompt = st.session_state.pop("ai_pending")
 

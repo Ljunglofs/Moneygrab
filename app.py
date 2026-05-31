@@ -1,8 +1,7 @@
 # =====================================================================
 #  MONEYGRAB  —  huvudfil
-#  Binder ihop dina moduler (sok_module, ai_module) med screener-
-#  flikarna, loggan och temat. Återanvänder din analyze/fetch-motor
-#  så hela appen rankar likadant överallt.
+#  Screener-flikar + klickbar detaljvy + Ask Grabit.
+#  Binder ihop dina moduler (sok_module, ai_module).
 #  Inget av detta är finansiell rådgivning.
 # =====================================================================
 
@@ -11,48 +10,52 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
-# Dina moduler -------------------------------------------------------
-from sok_module import render_sok_tab, fetch, analyze
+from sok_module import render_sok_tab, fetch, analyze, tradingview_chart, guess_tv_symbol
 from ai_module import render_ai_tab
 
-# ---------------------------------------------------------------------
-#  SIDKONFIG
-# ---------------------------------------------------------------------
-st.set_page_config(
-    page_title="MoneyGrab",
-    page_icon="📈",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
+st.set_page_config(page_title="MoneyGrab", page_icon="📈",
+                   layout="wide", initial_sidebar_state="expanded")
 
 # ---------------------------------------------------------------------
-#  TEMA  —  blått, matchar loggan (#2b7fff på svart)
+#  FÄRGER / TEMA-TILLÄGG  (grundtemat sätts i .streamlit/config.toml)
 # ---------------------------------------------------------------------
-ACCENT      = "#2b7fff"
-ACCENT_SOFT = "#1e62cc"
-NEUTRAL     = "#8a93a6"
+BG, PANEL, LINE = "#0a0d12", "#11151d", "#1c2330"
+ACCENT, POS, NEG, MUTED, TXT = "#2b7fff", "#3d8bff", "#ff5468", "#7b8698", "#e8edf5"
 
 st.markdown(f"""
 <style>
-.stApp {{ background:#000000; color:#e9edf5; }}
-section[data-testid="stSidebar"] {{ background:#070a10; border-right:1px solid #141a26; }}
-h1,h2,h3,h4 {{ color:#ffffff; letter-spacing:.4px; }}
-hr {{ border-color:#141a26; }}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+html, body, [class*="css"] {{ font-family:'Inter',-apple-system,sans-serif; }}
+h1,h2,h3,h4 {{ color:#fff; font-weight:700; letter-spacing:-.2px; }}
+.stApp h2, .stApp h3 {{ font-size:1.15rem; }}
 
-.stTabs [data-baseweb="tab-list"] {{ gap:4px; border-bottom:1px solid #141a26; flex-wrap:wrap; }}
-.stTabs [data-baseweb="tab"] {{
-    background:#0b0f17; color:#8a93a6; border-radius:8px 8px 0 0;
-    padding:8px 14px; font-weight:600;
-}}
-.stTabs [aria-selected="true"] {{ background:{ACCENT}; color:#ffffff; }}
+.stTabs [data-baseweb="tab-list"] {{ gap:2px; border-bottom:1px solid {LINE}; }}
+.stTabs [data-baseweb="tab"] {{ background:transparent; color:{MUTED}; border-radius:0;
+    padding:10px 16px; font-weight:600; font-size:.9rem; border-bottom:2px solid transparent; }}
+.stTabs [aria-selected="true"] {{ color:#fff; border-bottom:2px solid {ACCENT}; }}
 
-.stButton>button {{
-    background:{ACCENT}; color:#fff; border:0; border-radius:8px; font-weight:700;
-}}
-.stButton>button:hover {{ background:{ACCENT_SOFT}; }}
+.pill {{ display:inline-block; padding:4px 12px; border-radius:6px;
+        font-size:.75rem; font-weight:700; letter-spacing:.5px; }}
 
-.pill {{ display:inline-block; padding:3px 12px; border-radius:999px;
-        font-size:.78rem; font-weight:800; letter-spacing:.5px; }}
+/* rad-rubriker */
+.lhead {{ color:{MUTED}; font-size:.7rem; font-weight:600; text-transform:uppercase;
+         letter-spacing:.6px; padding:4px 0; border-bottom:1px solid {LINE}; }}
+.cell {{ padding-top:6px; font-size:.92rem; }}
+.lab  {{ font-weight:600; font-size:.82rem; letter-spacing:.3px; }}
+
+/* ticker-knapp som rad-länk */
+div[data-testid="column"] .stButton>button {{
+    background:transparent; border:1px solid transparent; color:#fff;
+    font-weight:700; text-align:left; padding:2px 6px; }}
+div[data-testid="column"] .stButton>button:hover {{
+    border-color:{ACCENT}; color:{ACCENT}; }}
+
+/* metric-kort i detaljvyn */
+.mgrid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr));
+         gap:8px; margin:12px 0; }}
+.mcard {{ background:{PANEL}; border:1px solid {LINE}; border-radius:10px; padding:10px 12px; }}
+.ml {{ color:{MUTED}; font-size:.68rem; text-transform:uppercase; letter-spacing:.5px; }}
+.mv {{ font-size:1.1rem; font-weight:700; margin-top:3px; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -65,13 +68,11 @@ with lc1:
     if os.path.exists(LOGO_PATH):
         st.image(LOGO_PATH, use_container_width=True)
     else:
-        st.markdown(
-            f"<h1 style='margin:0'>MONEY<span style='color:{ACCENT}'>GRAB</span></h1>",
-            unsafe_allow_html=True,
-        )
+        st.markdown(f"<h1 style='margin:0'>MONEY<span style='color:{ACCENT}'>GRAB</span></h1>",
+                    unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------
-#  AKTIE-UNIVERSUM  (dina teman)
+#  UNIVERSUM
 # ---------------------------------------------------------------------
 UNIVERSE = {
     "AI-infra":     ["NVDA","NBIS","CRDO","ALAB","MRVL","AVGO","AMD","SMCI","VRT","DGXX"],
@@ -89,25 +90,21 @@ UNIVERSE = {
 # ---------------------------------------------------------------------
 #  SIDOPANEL
 # ---------------------------------------------------------------------
-st.sidebar.markdown("### ⚙️ Inställningar")
-
+st.sidebar.markdown("### Inställningar")
 WATCHLIST_DEFAULT = "NVDA, QUBT, USAR, OUST, OKLO, NBIS, CRDO, SIVE.ST, IONQ, RKLB, ASTS, ONDS"
-wl_raw = st.sidebar.text_area("⭐ Min watchlist", WATCHLIST_DEFAULT, height=120)
+wl_raw = st.sidebar.text_area("Min watchlist", WATCHLIST_DEFAULT, height=120)
 watchlist = [t.strip().upper() for t in wl_raw.replace("\n", ",").split(",") if t.strip()]
-
 theme_sel = st.sidebar.multiselect("Filtrera teman", list(UNIVERSE.keys()),
                                    default=list(UNIVERSE.keys()))
 selected = sorted({t for k in theme_sel for t in UNIVERSE[k]})
-
-if st.sidebar.button("🔄 Tvinga refresh av data"):
+if st.sidebar.button("Tvinga refresh av data", type="primary"):
     st.cache_data.clear()
     st.rerun()
 
 # ---------------------------------------------------------------------
-#  HJÄLPARE  —  kör din analyze-motor på en ticker
+#  HJÄLPARE
 # ---------------------------------------------------------------------
 def scan(ticker: str):
-    """Returnerar din analyze()-dict + ticker, eller None."""
     try:
         df, _ = fetch(ticker)
     except Exception:
@@ -122,7 +119,67 @@ def scan(ticker: str):
     return a
 
 
-def render_list(tickers, keep_labels=None, sort_desc=True):
+def pct_span(v):
+    return f"<span style='color:{POS if v >= 0 else NEG}'>{v:+.1f}%</span>"
+
+# ---------------------------------------------------------------------
+#  DETALJVY  (modal när man klickar på en aktie)
+# ---------------------------------------------------------------------
+@st.dialog(" ", width="large")
+def show_detail(ticker):
+    a = scan(ticker)
+    if not a:
+        st.error(f"Hittade ingen data för {ticker}.")
+        return
+
+    # spara kontext så Ask Grabit vet vilken aktie det gäller
+    st.session_state["sok_context"] = {
+        "ticker": ticker, "label": a["label"], "score10": a["score10"],
+        "last": a["last"], "rsi": a["rsi"], "pct_from_high": a["pct_from_high"],
+        "ret_20": a["ret_20"], "rel_vol": a["rel_vol"],
+        "strength": a["strength"], "momentum": a["momentum"], "setup": a["setup"],
+    }
+
+    top = st.columns([2, 1, 1])
+    top[0].markdown(f"## {ticker}")
+    top[0].markdown(
+        f"<span class='pill' style='background:{a['color']}22;color:{a['color']};"
+        f"border:1px solid {a['color']}55'>{a['label']}</span>", unsafe_allow_html=True)
+    top[1].metric("Pris", f"{a['last']:.2f}")
+    top[2].metric("Lyftchans", f"{a['score10']}/10")
+
+    items = [
+        ("RSI (14)", f"{a['rsi']:.0f}", TXT),
+        ("20d", f"{a['ret_20']:+.1f}%", POS if a['ret_20'] >= 0 else NEG),
+        ("5d", f"{a['ret_5']:+.1f}%", POS if a['ret_5'] >= 0 else NEG),
+        ("Mot 52v-topp", f"{a['pct_from_high']:+.1f}%", MUTED),
+        ("52v-range", f"{a['rng_pos']:.0f}%", TXT),
+        ("Rel. volym", f"{a['rel_vol']:.2f}x", TXT),
+        ("Volatilitet", f"{a['atr_pct']:.1f}%", TXT),
+        ("EMA50", "över" if a['last'] > a['ema50'] else "under",
+         POS if a['last'] > a['ema50'] else NEG),
+        ("EMA200", "över" if a['last'] > a['ema200'] else "under",
+         POS if a['last'] > a['ema200'] else NEG),
+    ]
+    cells = "".join(f"<div class='mcard'><div class='ml'>{l}</div>"
+                    f"<div class='mv' style='color:{c}'>{v}</div></div>" for l, v, c in items)
+    st.markdown(f"<div class='mgrid'>{cells}</div>", unsafe_allow_html=True)
+
+    st.progress(min(a["total"] / 100, 1.0),
+                text=f"Score {a['total']:.0f}/100  ·  Styrka {a['strength']:.0f}/40 · "
+                     f"Momentum {a['momentum']:.0f}/35 · Setup {a['setup']:.0f}/25")
+
+    tradingview_chart(guess_tv_symbol(ticker), height=360)
+    st.caption(f"Öppna **Ask Grabit**-fliken för att fråga AI:n om {ticker} — "
+               f"den vet redan att du tittar på den.")
+
+# ---------------------------------------------------------------------
+#  LIST-RENDERARE  (klickbara rader)
+# ---------------------------------------------------------------------
+RATIOS = [1.1, 1.5, 0.9, 1, 0.8, 1, 1, 0.9]
+HEADS  = ["Ticker", "Läge", "Poäng", "Pris", "RSI", "20d", "Mot topp", "Vol"]
+
+def render_list(tickers, prefix, keep_labels=None):
     rows = []
     prog = st.progress(0.0)
     for i, t in enumerate(tickers):
@@ -134,24 +191,29 @@ def render_list(tickers, keep_labels=None, sort_desc=True):
     if not rows:
         st.info("Inga namn matchar just nu.")
         return
-    rows.sort(key=lambda x: x["score10"], reverse=sort_desc)
+    rows.sort(key=lambda x: x["score10"], reverse=True)
+
+    hc = st.columns(RATIOS)
+    for col, head in zip(hc, HEADS):
+        col.markdown(f"<div class='lhead'>{head}</div>", unsafe_allow_html=True)
+
     for a in rows:
-        c = st.columns([1.4, 0.9, 1.7, 1, 1, 1, 1])
-        c[0].markdown(f"**{a['ticker']}**")
-        c[1].markdown(
-            f"<span style='color:{a['color']};font-weight:800'>{a['score10']}/10</span>",
-            unsafe_allow_html=True)
-        c[2].markdown(
-            f"<span class='pill' style='background:{a['color']}22;color:{a['color']};"
-            f"border:1px solid {a['color']}'>{a['emoji']} {a['label']}</span>",
-            unsafe_allow_html=True)
-        c[3].write(f"{a['last']:.2f}")
-        c[4].write(f"RSI {a['rsi']:.0f}")
-        c[5].write(f"{a['pct_from_high']:+.0f}%")
-        c[6].write(f"{a['rel_vol']:.1f}x")
+        c = st.columns(RATIOS)
+        if c[0].button(a["ticker"], key=f"{prefix}_{a['ticker']}"):
+            show_detail(a["ticker"])
+        c[1].markdown(f"<div class='cell lab' style='color:{a['color']}'>{a['label']}</div>",
+                      unsafe_allow_html=True)
+        c[2].markdown(f"<div class='cell' style='color:{a['color']};font-weight:800'>{a['score10']}/10</div>",
+                      unsafe_allow_html=True)
+        c[3].markdown(f"<div class='cell'>{a['last']:.2f}</div>", unsafe_allow_html=True)
+        c[4].markdown(f"<div class='cell'>{a['rsi']:.0f}</div>", unsafe_allow_html=True)
+        c[5].markdown(f"<div class='cell'>{pct_span(a['ret_20'])}</div>", unsafe_allow_html=True)
+        c[6].markdown(f"<div class='cell' style='color:{MUTED}'>{a['pct_from_high']:+.0f}%</div>",
+                      unsafe_allow_html=True)
+        c[7].markdown(f"<div class='cell'>{a['rel_vol']:.1f}x</div>", unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------
-#  MARKNADSLÄGE  (S&P 500 vs 200-dagars)
+#  MARKNADSLÄGE
 # ---------------------------------------------------------------------
 @st.cache_data(ttl=1800, show_spinner=False)
 def market_regime():
@@ -170,33 +232,30 @@ def market_regime():
     return "BLANDAD", pct
 
 mkt, mkt_pct = market_regime()
-mcol = {"BULL":"#21c45d", "BEAR":"#ff4b4b", "BLANDAD":NEUTRAL}[mkt]
+mcol = {"BULL": POS, "BEAR": NEG, "BLANDAD": MUTED}[mkt]
 st.markdown(
     f"<div style='margin:.4rem 0 1rem'>"
-    f"<span class='pill' style='background:{mcol}22;color:{mcol};border:1px solid {mcol}'>"
+    f"<span class='pill' style='background:{mcol}22;color:{mcol};border:1px solid {mcol}55'>"
     f"MARKNAD: {mkt}</span> "
-    f"<span style='color:#8a93a6;font-size:.85rem'>S&P 500 {mkt_pct:+.1f}% mot 200-dagars</span>"
-    f"</div>", unsafe_allow_html=True)
+    f"<span style='color:{MUTED};font-size:.85rem;margin-left:8px'>"
+    f"S&P 500 {mkt_pct:+.1f}% mot 200-dagars</span></div>", unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------
-#  FLIKAR   (ordning matchar dina moduler: SÖK=4, ANALYS=5)
+#  FLIKAR   (SÖK=4, ASK GRABIT=5)
 # ---------------------------------------------------------------------
-tabs = st.tabs(["🔥 HETA NU", "📈 BYGGER UPP", "⚠️ VARNINGAR", "⭐ Watchlist",
-                "🔍 SÖK", "🤖 ANALYS", "📊 MACRO", "🛢 RÅVAROR"])
+tabs = st.tabs(["HETA NU", "BYGGER UPP", "VARNINGAR", "WATCHLIST",
+                "SÖK", "ASK GRABIT", "MACRO", "RÅVAROR"])
 
-# ===== 0. HETA NU ====================================================
 with tabs[0]:
-    st.subheader("🔥 Heta nu — starka lägen i ditt universum")
-    render_list(selected, keep_labels={"BULL", "SOON TO FLY"})
+    st.subheader("Heta nu — starka lägen i ditt universum")
+    render_list(selected, "hot", keep_labels={"BULL", "Rocketcase"})
 
-# ===== 1. BYGGER UPP =================================================
 with tabs[1]:
-    st.subheader("📈 Bygger upp — laddade setups")
-    render_list(selected, keep_labels={"SOON TO FLY", "NEUTRAL/BYGGER"})
+    st.subheader("Bygger upp — laddade setups")
+    render_list(selected, "build", keep_labels={"Rocketcase", "NEUTRAL/BYGGER"})
 
-# ===== 2. VARNINGAR ==================================================
 with tabs[2]:
-    st.subheader("⚠️ Varningar — svaga eller överhettade")
+    st.subheader("Varningar — svaga eller överhettade")
     rows = []
     prog = st.progress(0.0)
     for i, t in enumerate(selected):
@@ -207,30 +266,35 @@ with tabs[2]:
     prog.empty()
     if not rows:
         st.info("Inga röda flaggor just nu.")
-    for a in rows:
-        if a["label"] == "BEAR":      flag = "🔻 BEAR"
-        elif a["rsi"] > 78:           flag = "⚠️ ÖVERKÖPT"
-        elif a["ret_20"] > 35:        flag = "🚨 PARABOL"
-        else:                         flag = "🟠 SVAG"
-        st.markdown(f"**{a['ticker']}** — {flag} · RSI {a['rsi']:.0f} · "
-                    f"20d {a['ret_20']:+.0f}% · {a['last']:.2f}")
+    else:
+        hc = st.columns([1.1, 1.4, 0.8, 0.9, 1])
+        for col, head in zip(hc, ["Ticker", "Flagga", "RSI", "20d", "Pris"]):
+            col.markdown(f"<div class='lhead'>{head}</div>", unsafe_allow_html=True)
+        for a in rows:
+            if a["label"] == "BEAR":   flag, col_ = "BEAR", NEG
+            elif a["rsi"] > 78:        flag, col_ = "ÖVERKÖPT", "#f5a623"
+            elif a["ret_20"] > 35:     flag, col_ = "PARABOL", "#f5a623"
+            else:                      flag, col_ = "SVAG", MUTED
+            c = st.columns([1.1, 1.4, 0.8, 0.9, 1])
+            if c[0].button(a["ticker"], key=f"warn_{a['ticker']}"):
+                show_detail(a["ticker"])
+            c[1].markdown(f"<div class='cell lab' style='color:{col_}'>{flag}</div>", unsafe_allow_html=True)
+            c[2].markdown(f"<div class='cell'>{a['rsi']:.0f}</div>", unsafe_allow_html=True)
+            c[3].markdown(f"<div class='cell'>{pct_span(a['ret_20'])}</div>", unsafe_allow_html=True)
+            c[4].markdown(f"<div class='cell'>{a['last']:.2f}</div>", unsafe_allow_html=True)
 
-# ===== 3. WATCHLIST ==================================================
 with tabs[3]:
-    st.subheader("⭐ Watchlist — dina kärnnamn")
-    render_list(watchlist)
+    st.subheader("Watchlist — dina kärnnamn")
+    render_list(watchlist, "wl")
 
-# ===== 4. SÖK  (din modul) ==========================================
 with tabs[4]:
     render_sok_tab()
 
-# ===== 5. ANALYS  (din modul) =======================================
 with tabs[5]:
     render_ai_tab()
 
-# ===== 6. MACRO ======================================================
 with tabs[6]:
-    st.subheader("📊 Macro")
+    st.subheader("Macro")
     macro = {"S&P 500":"^GSPC", "Nasdaq 100":"^NDX", "VIX":"^VIX",
              "US 10y":"^TNX", "Dollar (DXY)":"DX-Y.NYB"}
     cols = st.columns(len(macro))
@@ -246,9 +310,8 @@ with tabs[6]:
         else:
             col.metric(name, "—")
 
-# ===== 7. RÅVAROR ====================================================
 with tabs[7]:
-    st.subheader("🛢 Råvaror")
+    st.subheader("Råvaror")
     comm = {"Guld":"GC=F", "Silver":"SI=F", "Koppar":"HG=F",
             "Olja (WTI)":"CL=F", "Uran (URA)":"URA"}
     cols = st.columns(len(comm))

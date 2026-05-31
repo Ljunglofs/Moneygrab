@@ -1,19 +1,19 @@
 # ============================================================
-#  🔍 SÖK  —  drop-in module for MoneyGrab
-#  Sök valfri aktie → TradingView-graf → BEAR/BULL/SOON-TO-FLY
+#  SÖK  —  drop-in module for MoneyGrab
+#  Sök valfri aktie → TradingView-graf → BEAR/BULL/Rocketcase
 #  + 1–10 ranking (styrka + momentum + setup)
 # ============================================================
 #
 #  SÅ HÄR KOPPLAR DU IN DEN I app.py:
 #
-#  1) Lägg "🔍 SÖK" i din tabs-rad, t.ex:
-#       tabs = st.tabs(["🔥 HETA NU", "📈 BYGGER UPP", "⚠️ VARNINGAR",
-#                       "⭐ Watchlist", "🔍 SÖK", "📊 MACRO", "🛢 RÅVAROR"])
+#  1) Lägg "SÖK" i din tabs-rad, t.ex:
+#       tabs = st.tabs(["HETA NU", "BYGGER UPP", "VARNINGAR",
+#                       "Watchlist", "SÖK", "MACRO", "RÅVAROR"])
 #
 #  2) Importera överst i app.py:
 #       from sok_module import render_sok_tab
 #
-#  3) Rendera fliken (matcha index till var du la "🔍 SÖK"):
+#  3) Rendera fliken (matcha index till var du la "SÖK"):
 #       with tabs[4]:
 #           render_sok_tab()
 #
@@ -138,15 +138,15 @@ def analyze(df):
 
     # ---------- ETIKETT ----------
     if last < ema50 and last < ema200 and ret_20 < -5:
-        label, emoji, color = "BEAR", "🔻", "#ff4b4b"
+        label, emoji, color = "BEAR", "", "#ff4b4b"
     elif (-8 <= pct_from_high <= 1) and tight < 5 and rsi < 72 and last > ema50:
-        label, emoji, color = "SOON TO FLY", "🚀", "#f5a623"
+        label, emoji, color = "Rocketcase", "", "#f5a623"
     elif last > ema50 and last > ema200 and momentum > 18:
-        label, emoji, color = "BULL", "🟢", "#21c45d"
+        label, emoji, color = "BULL", "", "#21c45d"
     elif last > ema50:
-        label, emoji, color = "NEUTRAL/BYGGER", "🟡", "#f5d142"
+        label, emoji, color = "NEUTRAL/BYGGER", "", "#f5d142"
     else:
-        label, emoji, color = "SVAG", "🟠", "#ff9f43"
+        label, emoji, color = "SVAG", "", "#ff9f43"
 
     return {
         "last": last, "rsi": rsi, "atr_pct": atr_pct,
@@ -202,7 +202,7 @@ def guess_tv_symbol(raw):
 #  HUVUDFLIK
 # ----------------------------------------------------------
 def render_sok_tab():
-    st.subheader("🔍 SÖK — analysera valfri aktie")
+    st.subheader("SÖK — analysera valfri aktie")
     st.caption("Data ~15 min fördröjd (Yahoo Finance). Skriv ticker, t.ex. NVDA, OKLO, RKLB, eller svensk: SIVE.ST")
 
     col_in, col_btn = st.columns([4, 1])
@@ -223,7 +223,7 @@ def render_sok_tab():
 
     a = analyze(df)
 
-    # spara kontext så 🤖 ANALYS-fliken vet vad användaren tittar på
+    # spara kontext så ANALYS-fliken vet vad användaren tittar på
     st.session_state["sok_context"] = {
         "ticker": ticker, "label": a["label"], "score10": a["score10"],
         "last": a["last"], "rsi": a["rsi"], "pct_from_high": a["pct_from_high"],
@@ -242,7 +242,7 @@ def render_sok_tab():
             f"border:1px solid {a['color']}'>"
             f"<span style='font-size:13px;opacity:.7'>BEDÖMNING</span><br>"
             f"<span style='font-size:30px;font-weight:800;color:{a['color']}'>"
-            f"{a['emoji']} {a['label']}</span></div>",
+            f"{a['label']}</span></div>",
             unsafe_allow_html=True)
     with c2:
         st.metric("Ranking", f"{a['score10']} / 10")
@@ -258,7 +258,7 @@ def render_sok_tab():
     st.progress(min(a["total"] / 100, 1.0), text=f"Totalscore: {a['total']:.0f} / 100")
 
     # ---- nyckeltal ----
-    with st.expander("📊 Detaljerade nyckeltal"):
+    with st.expander("Detaljerade nyckeltal"):
         m = pd.DataFrame({
             "Mått": ["RSI(14)", "Från 52v-topp", "52v-range pos", "Avkastn. 20d",
                      "Rel. volym", "Volatilitet (ATR%)", "Konsolidering (10d std%)",
@@ -271,8 +271,8 @@ def render_sok_tab():
                 f"{a['rel_vol']:.2f}x",
                 f"{a['atr_pct']:.1f}%",
                 f"{a['tight']:.1f}%",
-                "över ✅" if a['last'] > a['ema50'] else "under ❌",
-                "över ✅" if a['last'] > a['ema200'] else "under ❌",
+                "över " if a['last'] > a['ema50'] else "under ",
+                "över " if a['last'] > a['ema200'] else "under ",
             ],
         })
         st.dataframe(m, hide_index=True, use_container_width=True)
@@ -280,24 +280,24 @@ def render_sok_tab():
     # ---- tolkning i klartext ----
     st.markdown("##### Tolkning")
     notes = []
-    if a["label"] == "SOON TO FLY":
-        notes.append("🚀 **Laddad setup** — nära 52v-topp, tight konsolidering och inte överköpt. "
+    if a["label"] == "Rocketcase":
+        notes.append("**Laddad setup** — nära 52v-topp, tight konsolidering och inte överköpt. "
                      "Den typ av läge som föregår breakouts. Bekräftelse: utbrott på hög volym.")
     elif a["label"] == "BULL":
-        notes.append("🟢 **Stark trend** — över EMA50 & EMA200 med levande momentum. Trend-följa, inte jaga toppar.")
+        notes.append("**Stark trend** — över EMA50 & EMA200 med levande momentum. Trend-följa, inte jaga toppar.")
     elif a["label"] == "BEAR":
-        notes.append("🔻 **Nedtrend** — under nyckelmedelvärden och negativ 20d. Vänta på vändning, inte 'köp dippen' än.")
+        notes.append("**Nedtrend** — under nyckelmedelvärden och negativ 20d. Vänta på vändning, inte 'köp dippen' än.")
     elif a["label"] == "NEUTRAL/BYGGER":
-        notes.append("🟡 **Bygger** — över EMA50 men momentum saknas. Kan bli setup om volym kommer in.")
+        notes.append("**Bygger** — över EMA50 men momentum saknas. Kan bli setup om volym kommer in.")
     else:
-        notes.append("🟠 **Svag** — under nyckelnivåer. Låg prioritet.")
+        notes.append("**Svag** — under nyckelnivåer. Låg prioritet.")
 
     if a["rsi"] > 78:
-        notes.append(f"⚠️ RSI {a['rsi']:.0f} — överköpt, risk för rekyl på kort sikt.")
+        notes.append(f"RSI {a['rsi']:.0f} — överköpt, risk för rekyl på kort sikt.")
     if a["rel_vol"] >= 1.5:
-        notes.append(f"📈 Volym {a['rel_vol']:.1f}x snittet — något händer just nu.")
+        notes.append(f"Volym {a['rel_vol']:.1f}x snittet — något händer just nu.")
     if a["pct_from_high"] > -3 and a["label"] != "BEAR":
-        notes.append("🎯 Mindre än 3% från 52v-topp — breakout-zon.")
+        notes.append("Mindre än 3% från 52v-topp — breakout-zon.")
     for n in notes:
         st.markdown(f"- {n}")
 
@@ -305,6 +305,6 @@ def render_sok_tab():
                "momentum och setup — den säger inget om bolagets fundamenta eller nyhetsrisk.")
 
     # ---- TRADINGVIEW-GRAF ----
-    st.markdown("##### 📈 TradingView")
+    st.markdown("##### TradingView")
     st.caption("Du kan byta symbol direkt i grafen (klicka på tickern uppe till vänster).")
     tradingview_chart(guess_tv_symbol(ticker))
