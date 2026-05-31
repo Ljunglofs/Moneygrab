@@ -147,6 +147,20 @@ def analyze(df):
     pull5 = (last / hi5 - 1) * 100 if hi5 else 0
     rolling_over = bool(ret_2 <= -8 or (pull5 <= -10 and ret_2 < 0))
 
+    # ---------- MACD-VÄNDNING + RSI NER (dagsgraf) ----------
+    # Regel: när MACD vänder mot/under signallinjen OCH RSI börjar dyka,
+    # är läget inte längre bullish — det svalnar.
+    ema12_ser = _ema(close, 12)
+    ema26_ser = _ema(close, 26)
+    macd_line = ema12_ser - ema26_ser
+    signal_line = macd_line.ewm(span=9, adjust=False).mean()
+    histo = macd_line - signal_line
+    macd_below = bool(macd_line.iloc[-1] < signal_line.iloc[-1])      # MACD under signal
+    macd_falling = bool(len(histo) > 2 and histo.iloc[-1] < histo.iloc[-2])  # histogram krymper/vänder
+    rsi_falling = bool(len(rsi_ser) > 2 and rsi_ser.iloc[-1] < rsi_ser.iloc[-2])  # RSI vänder ner
+    # "cooling" = din regel: MACD vänder ner mot signal + RSI dyker
+    cooling = bool((macd_falling or macd_below) and rsi_falling)
+
     # entry-bonus: lyfter färska lägen som annars straffas för att de är under EMA200
     bonus = 0
     if reclaimed50: bonus += 4
@@ -154,20 +168,21 @@ def analyze(df):
     if rel_vol >= 1.5: bonus += 3
     if thrust: bonus += 3
     if rolling_over: bonus -= 6
+    if cooling: bonus -= 7          # MACD vänder + RSI ner = dra ner poängen
 
     total = min(strength + momentum + setup + bonus, 100)   # 0–100
     score10 = max(1, min(10, round(total / 10)))
 
     # ---------- ETIKETT  (prioriterar entry-lägen) ----------
-    if rolling_over and (last > ema50 or ret_20 > 0):
+    if (rolling_over or cooling) and (last > ema50 or ret_20 > 0):
         label, emoji, color = "AVSVALNING", "", "#ff6b3d"
-    elif (-8 <= pct_from_high <= 1) and tight < 5 and rsi < 72 and last > ema50:
+    elif (-8 <= pct_from_high <= 1) and tight < 5 and rsi < 72 and last > ema50 and not cooling:
         label, emoji, color = "Rocketcase", "", "#f5a623"
-    elif turnaround:
+    elif turnaround and not cooling:
         label, emoji, color = "VÄNDNING", "", "#00c2c2"
-    elif last > ema50 and last > ema200 and momentum > 18:
+    elif last > ema50 and last > ema200 and momentum > 18 and not cooling:
         label, emoji, color = "BULL", "", "#21c45d"
-    elif thrust:
+    elif thrust and not cooling:
         label, emoji, color = "MOMENTUM", "", "#b06bff"
     elif last < ema50 and last < ema200 and ret_20 < -5 and ret_5 <= 0:
         label, emoji, color = "BEAR", "", "#ff4b4b"
@@ -183,6 +198,8 @@ def analyze(df):
         "ret_5": ret_5, "ret_20": ret_20, "rel_vol": rel_vol, "tight": tight,
         "strength": strength, "momentum": momentum, "setup": setup,
         "total": total, "score10": score10,
+        "macd_below": macd_below, "macd_falling": macd_falling,
+        "rsi_falling": rsi_falling, "cooling": cooling,
         "label": label, "emoji": emoji, "color": color,
     }
 
