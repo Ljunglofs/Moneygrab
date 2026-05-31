@@ -23,6 +23,8 @@ from yfinance import EquityQuery as EQ
 import pandas as pd
 import numpy as np
 from datetime import datetime, timezone, date
+from concurrent.futures import ThreadPoolExecutor
+import re
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -63,6 +65,10 @@ INDICES = {
     "OMXS30":     "^OMX",
 }
 
+# Standard-watchlist (kan ändras direkt i appens sidopanel; spara permanent genom att
+# redigera den här listan på GitHub). Komma/mellanslag/radbrytning funkar i rutan.
+WATCHLIST_DEFAULT = "NVDA, QUBT, USAR, OUST, OKLO, NBIS, CRDO, SIVE.ST, IONQ, RKLB, ASTS, ONDS"
+
 # MACRO-fliken. Hämta din officiella kod på financialjuice.com/widgets/get-widget.aspx
 # (välj Headlines = Dark) och klistra in <iframe>/<script> nedan om standard är tom.
 FJ_HEADLINES_EMBED = (
@@ -71,6 +77,19 @@ FJ_HEADLINES_EMBED = (
     'newsType=latest&backColor=0a0a0a&fontColor=e8e8e8&innerBackColor=141414&'
     'subColor=ffd60a&newsCount=40"></iframe>'
 )
+
+# Direkt symbol→tema för namn där bolagsnamnet inte avslöjar temat
+SYMBOL_THEME = {
+    "OKLO":"Nuclear","NNE":"Nuclear","SMR":"Nuclear","UEC":"Nuclear","UUUU":"Nuclear","CCJ":"Nuclear",
+    "IONQ":"Quantum","QUBT":"Quantum","RGTI":"Quantum","XNDU":"Quantum","QBTS":"Quantum",
+    "USAR":"Rare earth","MP":"Rare earth","TMC":"Rare earth",
+    "RKLB":"Space","ASTS":"Space","RDW":"Space","LUNR":"Space","PL":"Space",
+    "ONDS":"Defense","KTOS":"Defense","AVAV":"Defense","PLTR":"Defense",
+    "OUST":"Robotik","SERV":"Robotik",
+    "NVDA":"AI infra","CRDO":"AI infra","ALAB":"AI infra","MRVL":"AI infra","NBIS":"AI infra",
+    "SIVE":"AI infra","POET":"AI infra","LWLG":"AI infra","SIVE.ST":"AI infra",
+    "VST":"Energi",
+}
 
 THEME_KEYWORDS = [
     ("Nuclear",    ["uranium","nuclear","atomic","reactor"]),
@@ -113,6 +132,7 @@ div[data-testid="stMetricValue"]{font-family:'JetBrains Mono',monospace;color:#e
 .pill{font-family:'Bebas Neue',sans-serif;letter-spacing:1px;padding:2px 10px;border-radius:20px;font-size:14px;}
 .pill.open{background:#103a1a;color:#3ad96b;border:1px solid #1d6b34;}
 .pill.closed{background:#3a1010;color:#ff5b5b;border:1px solid #6b1d1d;}
+.pill.warn{background:#3a3210;color:#ffd60a;border:1px solid #6b5d1d;}
 img{border-radius:8px;}
 </style>
 """, unsafe_allow_html=True)
@@ -152,7 +172,7 @@ def quotes_to_df(quotes,src=""):
         pfh=(price/hi-1)*100 if (np.isfinite(price) and np.isfinite(hi) and hi>0) else np.nan
         pal=(price/lo-1)*100 if (np.isfinite(price) and np.isfinite(lo) and lo>0) else np.nan
         rv=vol/avg if (np.isfinite(vol) and np.isfinite(avg) and avg>0) else np.nan
-        rows.append(dict(symbol=sym,name=_name(q),theme=_theme(_name(q),sec,ind),
+        rows.append(dict(symbol=sym,name=_name(q),theme=(SYMBOL_THEME.get(sym) or _theme(_name(q),sec,ind)),
             price=price,pct_today=pct,rel_vol=rv,mcap=mcap,pct_from_high=pfh,
             pct_above_low=pal,avg_vol=avg,currency=cur,source=src))
     df=pd.DataFrame(rows)
@@ -309,6 +329,79 @@ def fetch_series(items):
             continue
     return out
 
+@st.cache_data(ttl=43200,show_spinner=False)
+def fetch_sectors(symbols):
+    """Hämtar riktig sektor/industri för topp-kandidater (parallellt, cachas 12h)."""
+    out={}
+    syms=[s for s in symbols if s][:35]
+    if not syms: return out
+    def one(s):
+        try:
+            info=yf.Ticker(s).get_info()
+            return s,(info.get("sector") or "", info.get("industry") or "")
+        except Exception:
+            return s,("","")
+    try:
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            for s,si in ex.map(one,syms):
+                if si[0] or si[1]: out[s]=si
+    except Exception:
+        pass
+    return out
+
+@st.cache_data(ttl=1800,show_spinner=False)
+def market_regime():
+    """Bull/Bear-regim från S&P 500 vs 200-dagars medel."""
+    try:
+        d=yf.download("^GSPC",period="1y",interval="1d",progress=False,auto_adjust=True)
+        c=d["Close"].dropna()
+        if len(c)<200: return None
+        price=float(c.iloc[-1]); ma200=float(c.rolling(200).mean().iloc[-1])
+        ma50=float(c.rolling(50).mean().iloc[-1])
+        pct=(price/ma200-1)*100
+        if price>ma200 and ma50>=ma200: return ("BULL",pct)
+        if price<ma200:                 return ("BEAR",pct)
+        return ("BLANDAD",pct)
+    except Exception:
+        return None
+
+@st.cache_data(ttl=1800,show_spinner=False)
+def fetch_watchlist(symbols):
+    syms=[s for s in symbols if s]
+    if not syms: return pd.DataFrame()
+    try:
+        data=yf.download(syms,period="1y",interval="1d",group_by="ticker",
+                         progress=False,threads=True,auto_adjust=True)
+    except Exception:
+        return pd.DataFrame()
+    rows=[]
+    for s in syms:
+        try:
+            sub=data[s] if len(syms)>1 else data
+            close=sub["Close"].dropna(); vol=sub["Volume"].dropna()
+            if len(close)<30: continue
+            price=float(close.iloc[-1]); prev=float(close.iloc[-2])
+            pct=(price/prev-1)*100
+            hi=float(close.max()); lo=float(close.min())
+            pfh=(price/hi-1)*100; pal=(price/lo-1)*100
+            v=float(vol.iloc[-1]); av=float(vol.tail(60).mean()) if len(vol)>=20 else np.nan
+            rv=v/av if (np.isfinite(av) and av>0) else np.nan
+            sig=trend_signals(close)
+            fl=[]
+            if price<2: fl.append("PENNY")
+            if pct>35: fl.append("PARABOL")
+            if np.isfinite(pal) and pal>300: fl.append("UTSTRÄCKT")
+            flags=" ".join(fl)
+            rows.append(dict(symbol=s,theme=SYMBOL_THEME.get(s,""),
+                price=price,pct_today=pct,rel_vol=rv,
+                rsi=round(sig["rsi"],0) if sig else np.nan,pct_from_high=pfh,
+                ob="⚠️ÖK" if overbought(sig) else "",flags=flags,
+                bucket=classify(pct,pfh,rv,flags,sig),
+                spark=sig["spark"] if sig else None))
+        except Exception:
+            continue
+    return pd.DataFrame(rows)
+
 # ============================================================
 # HEADER + HERO (bilder)
 # ============================================================
@@ -321,9 +414,13 @@ else:
 _now=datetime.now(timezone.utc)
 _h=_now.hour + _now.minute/60          # US-börs öppen ca 13:30–20:00 UTC, vardag
 _open=(_now.weekday()<5) and (13.5<=_h<20.0)
+_reg=market_regime()
+_rc={"BULL":"open","BEAR":"closed","BLANDAD":"warn"}.get(_reg[0] if _reg else "","warn")
+_rt=(f'MARKNAD: {_reg[0]} ({_reg[1]:+.1f}% vs 200d)' if _reg else 'MARKNAD: ?')
 st.markdown(
     f'<div class="pulsebar"><span class="pill {"open" if _open else "closed"}">'
-    f'{"MARKNAD ÖPPEN" if _open else "MARKNAD STÄNGD"}</span>'
+    f'{"BÖRS ÖPPEN" if _open else "BÖRS STÄNGD"}</span>'
+    f'<span class="pill {_rc}">{_rt}</span>'
     f'<span>MARKET PULSE · uppdaterad {_now.strftime("%H:%M UTC")}</span></div>',
     unsafe_allow_html=True)
 _comms=fetch_series(tuple(COMMODITIES.items()))
@@ -369,14 +466,22 @@ with st.sidebar:
 
     st.markdown("### 🔎 Filter")
     only_new=st.checkbox("Visa bara NYA",value=False)
-    theme_filter=st.multiselect("Tema",[t[0] for t in THEME_KEYWORDS])
+    theme_filter=st.multiselect("Tema",
+        [t[0] for t in THEME_KEYWORDS]+
+        ["Technology","Healthcare","Financial Services","Industrials","Consumer Cyclical",
+         "Consumer Defensive","Communication Services","Real Estate","Utilities","Övrigt"])
+    st.markdown("### ⭐ Min watchlist")
+    wl_text=st.text_area("Egna tickers (komma/radbrytning)",value=WATCHLIST_DEFAULT,height=90,
+                         help="Lägg till dina egna bolag. Svenska: lägg .ST efter (ex SIVE.ST).")
+    watchlist=[t.strip().upper() for t in re.split(r"[,\s]+",wl_text) if t.strip()]
+
     if st.button("🔄 Tvinga refresh"):
         st.cache_data.clear(); st.rerun()
 
 df,errors=fetch_candidates(tuple(regions),min_pct,min_mcap,price_min,price_max,tuple(presets))
 ts=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
-tabs=st.tabs(["🚀 READY TO FLY","🔥 BULL RUN","🐻 SOON BEAR","📅 TRIGGERS","📰 MACRO","🛢️ RÅVAROR"])
+tabs=st.tabs(["🚀 READY TO FLY","🔥 BULL RUN","🐻 SOON BEAR","⭐ WATCHLIST","📅 TRIGGERS","📰 MACRO","🛢️ RÅVAROR"])
 
 if df.empty:
     for t in tabs[:3]:
@@ -392,6 +497,13 @@ else:
                (20+df["pct_from_high"].fillna(-99)).clip(0,20)).round(1)
     top=df.sort_values("pre",ascending=False).head(45)
     sig=enrich(tuple(top["symbol"].tolist()))
+    meta=fetch_sectors(tuple(top["symbol"].tolist()))
+    if meta:
+        def _refine(row):
+            if row["theme"]!="Övrigt": return row["theme"]
+            se=meta.get(row["symbol"])
+            return _theme(row["name"],se[0],se[1]) if se else row["theme"]
+        df["theme"]=df.apply(_refine,axis=1)
 
     cls,ob,spk,rsis=[],[],[],[]
     for _,r in df.iterrows():
@@ -437,8 +549,37 @@ else:
         show(view[view["bucket"]=="BEAR"].sort_values("pct_today",ascending=False).head(30),
              "🐻 SOON BEAR / WARNING","Under EMA20 (rullar över) · överköpt · parabol/penny/tunn. Försiktigt — eller blanka-case.")
 
-# ---- TRIGGERS ----
+# ---- WATCHLIST ----
 with tabs[3]:
+    st.markdown('<div class="sec">⭐ Min watchlist</div>'
+                '<div class="sub">Dina egna bolag (redigeras i sidopanelen). Samma trend/RSI/flaggor som discovery — '
+                'oberoende av %-filtren.</div>', unsafe_allow_html=True)
+    if not watchlist:
+        st.caption("Lägg till tickers i sidopanelen under ⭐ Min watchlist.")
+    else:
+        wdf=fetch_watchlist(tuple(watchlist))
+        if wdf.empty:
+            st.info("Kunde inte hämta watchlist-data. Kontrollera tickers (svenska behöver .ST) "
+                    "eller tryck 🔄 Tvinga refresh.")
+        else:
+            order={"BULL":0,"READY":1,"BEAR":2}
+            wdf["_o"]=wdf["bucket"].map(order).fillna(3)
+            wdf=wdf.sort_values(["_o","pct_today"],ascending=[True,False])
+            WC=["symbol","theme","bucket","spark","price","pct_today","rel_vol","rsi","pct_from_high","ob","flags"]
+            WCFG={"symbol":"Ticker","theme":"Tema","bucket":"Läge",
+                  "spark":st.column_config.LineChartColumn("30d",width="small"),
+                  "price":st.column_config.NumberColumn("Pris",format="%.2f"),
+                  "pct_today":st.column_config.NumberColumn("% idag",format="%.1f%%"),
+                  "rel_vol":st.column_config.NumberColumn("Rel.vol",format="%.1fx"),
+                  "rsi":st.column_config.NumberColumn("RSI",format="%.0f"),
+                  "pct_from_high":st.column_config.NumberColumn("vs 52v-högsta",format="%.0f%%"),
+                  "ob":"","flags":"Flaggor"}
+            st.dataframe(wdf[WC],column_config=WCFG,hide_index=True,use_container_width=True)
+            miss=[s for s in watchlist if s not in set(wdf["symbol"])]
+            if miss: st.caption("Hittade ingen data för: "+", ".join(miss))
+
+# ---- TRIGGERS ----
+with tabs[4]:
     st.markdown('<div class="sec">📅 Katalysatorer & event</div>'
                 '<div class="sub">Kommande triggers du bevakar (redigeras i CATALYSTS i app.py).</div>',
                 unsafe_allow_html=True)
@@ -467,7 +608,7 @@ with tabs[3]:
             st.caption("Inga nyheter hittades.")
 
 # ---- MACRO ----
-with tabs[4]:
+with tabs[5]:
     st.markdown('<div class="sec">📰 FinancialJuice — live macro-flöde</div>'
                 '<div class="sub">Realtids marknadsrubriker. Tom ruta? Klistra in din egen embed från '
                 'financialjuice.com/widgets/get-widget.aspx i FJ_HEADLINES_EMBED i app.py.</div>',
@@ -479,7 +620,7 @@ with tabs[4]:
     st.caption("Tips: lägg även in deras 'Economic Calendar'-widget här för makro-event (Fed, CPI, NFP).")
 
 # ---- RÅVAROR ----
-with tabs[5]:
+with tabs[6]:
     st.markdown('<div class="sec">🛢️ Råvaror</div>'
                 '<div class="sub">Guld · Silver · Olja (Brent) · Koppar · Naturgas · Uran. '
                 'Trend = pris vs EMA20/EMA50. Uran via URA-ETF som proxy.</div>',
