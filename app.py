@@ -19,6 +19,11 @@ except Exception:
 from sok_module import render_sok_tab, fetch, analyze, tradingview_chart, guess_tv_symbol
 from ai_module import render_ai_tab
 
+try:
+    from dagens_bull import render_dagens_bull
+except Exception:
+    render_dagens_bull = None
+
 st.set_page_config(page_title="MoneyGrab", page_icon="📈",
                    layout="wide", initial_sidebar_state="expanded")
 
@@ -285,6 +290,9 @@ def collect(tickers, keep_labels=None, warn=False):
     return out
 
 with tabs[0]:
+    if render_dagens_bull is not None:
+        render_dagens_bull()
+        st.divider()
     st.subheader("Heta nu — fart & breakout-lägen")
     r = collect(selected, keep_labels={"MOMENTUM", "BULL", "Rocketcase"})
     render_stats(r); render_grid(r, "hot")
