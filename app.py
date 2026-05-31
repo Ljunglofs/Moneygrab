@@ -11,15 +11,20 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
+try:
+    import yfinance as yf
+except Exception:
+    yf = None
+
 from sok_module import render_sok_tab, fetch, analyze, tradingview_chart, guess_tv_symbol
 from ai_module import render_ai_tab
 
 st.set_page_config(page_title="MoneyGrab", page_icon="📈",
                    layout="wide", initial_sidebar_state="expanded")
 
-BG, PANEL, LINE = "#0a0d12", "#11151d", "#1c2330"
-ACCENT, POS, NEG, MUTED, TXT = "#2b7fff", "#3d8bff", "#ff5468", "#7b8698", "#e8edf5"
-BULL_C, ROCK_C = "#21c45d", "#f5a623"
+BG, PANEL, LINE = "#0b0e16", "#161a23", "#252b38"
+ACCENT, POS, NEG, MUTED, TXT = "#1199fa", "#16c784", "#f6465d", "#848e9c", "#eaecef"
+BULL_C, ROCK_C = "#16c784", "#f0a020"
 
 # tema-färg per ticker (för logo-ikonerna) -> ger variation som riktiga loggor
 THEME_COLOR = {
@@ -45,8 +50,8 @@ st.markdown(f"""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 html, body, [class*="css"] {{ font-family:'Inter',-apple-system,sans-serif; }}
-h1,h2,h3,h4 {{ color:#fff; font-weight:700; letter-spacing:-.2px; }}
-.stApp h2, .stApp h3 {{ font-size:1.1rem; }}
+h1,h2,h3,h4 {{ color:#fff; font-weight:800; letter-spacing:-.4px; }}
+.stApp h2, .stApp h3 {{ font-size:1.35rem; }}
 .stTabs [data-baseweb="tab-list"] {{ gap:2px; border-bottom:1px solid {LINE}; }}
 .stTabs [data-baseweb="tab"] {{ background:transparent; color:{MUTED}; border-radius:0;
     padding:9px 15px; font-weight:600; font-size:.85rem; border-bottom:2px solid transparent; }}
@@ -56,7 +61,7 @@ h1,h2,h3,h4 {{ color:#fff; font-weight:700; letter-spacing:-.2px; }}
 /* nyckeltalsstrip */
 .sstrip {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr));
           gap:10px; margin:6px 0 14px; }}
-.scard {{ background:{PANEL}; border:1px solid {LINE}; border-radius:10px; padding:10px 14px; }}
+.scard {{ background:{PANEL}; border:1px solid {LINE}; border-radius:14px; padding:12px 16px; }}
 .sl {{ color:{MUTED}; font-size:.68rem; text-transform:uppercase; letter-spacing:.6px; }}
 .sv {{ font-size:1.35rem; font-weight:800; margin-top:2px; }}
 /* metric-kort i detaljvyn */
@@ -110,6 +115,31 @@ def scan(ticker: str):
         return None
     a["ticker"] = ticker
     return a
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def market_movers(source_key):
+    """Hämtar dagens rörare från Yahoos screener. Returnerar ticker-lista."""
+    if yf is None:
+        return []
+    res = None
+    try:
+        res = yf.screen(source_key)
+    except Exception:
+        try:
+            from yfinance import Screener
+            s = Screener()
+            s.set_predefined_body(source_key)
+            res = s.response
+        except Exception:
+            return []
+    quotes = res.get("quotes", []) if isinstance(res, dict) else []
+    syms = []
+    for q in quotes:
+        sym = q.get("symbol", "") if isinstance(q, dict) else ""
+        if sym and all(ch not in sym for ch in (".", "-", "=", "^")):
+            syms.append(sym.upper())
+    return syms[:35]
 
 
 def logo_url(ticker: str):
@@ -236,7 +266,7 @@ st.markdown(
 #  FLIKAR
 # ---------------------------------------------------------------------
 tabs = st.tabs(["HETA NU", "VÄNDNINGAR", "VARNINGAR", "WATCHLIST",
-                "SÖK", "ASK GRABIT", "MACRO", "RÅVAROR"])
+                "MARKNAD", "SÖK", "ASK GRABIT", "MACRO", "RÅVAROR"])
 
 def collect(tickers, keep_labels=None, warn=False):
     out = []
@@ -300,12 +330,47 @@ with tabs[3]:
     render_stats(r); render_grid(r, "wl")
 
 with tabs[4]:
-    render_sok_tab()
+    st.subheader("Marknad — det som rör sig idag")
+    SOURCES = {
+        "Dagens vinnare": "day_gainers",
+        "Mest omsatta": "most_actives",
+        "Small-cap raketer": "small_cap_gainers",
+        "Tillväxt-tech": "growth_technology_stocks",
+        "Dagens förlorare": "day_losers",
+    }
+    csrc, cflt = st.columns([3, 2])
+    src_name = csrc.radio("Källa", list(SOURCES.keys()), horizontal=True, key="mkt_src")
+    only_entry = cflt.checkbox("Visa bara entry-lägen", value=True, key="mkt_entry")
+    if yf is None:
+        st.error("yfinance saknas — kan inte scanna marknaden.")
+    else:
+        syms = market_movers(SOURCES[src_name])
+        if not syms:
+            st.warning("Kunde inte hämta marknadsdata just nu (Yahoo-screenern svarade inte). "
+                       "Prova en annan källa eller tryck refresh.")
+        else:
+            r = []
+            prog = st.progress(0.0)
+            for i, sym in enumerate(syms):
+                a = scan(sym)
+                prog.progress((i + 1) / len(syms))
+                if a:
+                    r.append(a)
+            prog.empty()
+            if only_entry:
+                r = [a for a in r if a["label"] in {"MOMENTUM", "BULL", "Rocketcase", "VÄNDNING"}]
+            st.caption(f"{src_name} · {len(r)} träffar efter din motor. "
+                       f"Tryck på en ticker för detaljer.")
+            render_stats(r)
+            render_grid(r, "market")
 
 with tabs[5]:
-    render_ai_tab()
+    render_sok_tab()
 
 with tabs[6]:
+    render_ai_tab()
+
+with tabs[7]:
     st.subheader("Macro")
     macro = {"S&P 500":"^GSPC", "Nasdaq 100":"^NDX", "VIX":"^VIX",
              "US 10y":"^TNX", "Dollar (DXY)":"DX-Y.NYB"}
@@ -322,7 +387,7 @@ with tabs[6]:
         else:
             col.metric(name, "—")
 
-with tabs[7]:
+with tabs[8]:
     st.subheader("Råvaror")
     comm = {"Guld":"GC=F", "Silver":"SI=F", "Koppar":"HG=F",
             "Olja (WTI)":"CL=F", "Uran (URA)":"URA"}
