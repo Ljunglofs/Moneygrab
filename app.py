@@ -58,9 +58,9 @@ COMMODITIES = {
 
 # Index för Market Pulse-strippen
 INDICES = {
-    "S&P 500": "^GSPC",
-    "Nasdaq":  "^IXIC",
-    "OMXS30":  "^OMX",
+    "S&P 500":    "^GSPC",
+    "Nasdaq 100": "^NDX",
+    "OMXS30":     "^OMX",
 }
 
 # MACRO-fliken. Hämta din officiella kod på financialjuice.com/widgets/get-widget.aspx
@@ -229,7 +229,7 @@ def fetch_candidates(regions,min_pct,min_mcap_musd,price_min,price_max,presets):
             frames.append(quotes_to_df(res.get("quotes",[]),f"custom-{reg}"))
         except Exception as ex:
             errors.append(f"Custom {reg}: {ex}")
-    for key in presets:
+    for key in (presets if "us" in regions else []):
         try:
             res=yf.screen(key,size=100)
             frames.append(quotes_to_df(res.get("quotes",[]),key))
@@ -362,6 +362,8 @@ with st.sidebar:
     price_max=cc2.number_input("Pris max (0=av)",0.0,value=0.0,step=10.0)
 
     st.markdown("### 📡 Färdiga screeners (US)")
+    if "us" not in regions:
+        st.caption("⚠️ Inaktiva — USA är urbockat.")
     presets=[k for k,lbl in PRESETS.items()
              if st.checkbox(lbl,value=(k in ("day_gainers","small_cap_gainers")),key=k)]
 
