@@ -135,11 +135,11 @@ CFG = {
 
 def render_stats(rows):
     n = len(rows)
-    nb = sum(1 for a in rows if a["label"] == "BULL")
-    nr = sum(1 for a in rows if a["label"] == "Rocketcase")
+    nm = sum(1 for a in rows if a["label"] == "MOMENTUM")
+    nv = sum(1 for a in rows if a["label"] == "VÄNDNING")
     avg = (sum(a["score10"] for a in rows) / n) if n else 0
-    cards = [("Träffar", f"{n}", TXT), ("Bull", f"{nb}", BULL_C),
-             ("Rocketcase", f"{nr}", ROCK_C), ("Snittpoäng", f"{avg:.1f}", ACCENT)]
+    cards = [("Träffar", f"{n}", TXT), ("Momentum", f"{nm}", "#b06bff"),
+             ("Vändning", f"{nv}", "#00c2c2"), ("Snittpoäng", f"{avg:.1f}", ACCENT)]
     cells = "".join(f"<div class='scard'><div class='sl'>{l}</div>"
                     f"<div class='sv' style='color:{c}'>{v}</div></div>" for l, v, c in cards)
     st.markdown(f"<div class='sstrip'>{cells}</div>", unsafe_allow_html=True)
@@ -235,7 +235,7 @@ st.markdown(
 # ---------------------------------------------------------------------
 #  FLIKAR
 # ---------------------------------------------------------------------
-tabs = st.tabs(["HETA NU", "BYGGER UPP", "VARNINGAR", "WATCHLIST",
+tabs = st.tabs(["HETA NU", "VÄNDNINGAR", "VARNINGAR", "WATCHLIST",
                 "SÖK", "ASK GRABIT", "MACRO", "RÅVAROR"])
 
 def collect(tickers, keep_labels=None, warn=False):
@@ -255,14 +255,14 @@ def collect(tickers, keep_labels=None, warn=False):
     return out
 
 with tabs[0]:
-    st.subheader("Heta nu — starka lägen")
-    r = collect(selected, keep_labels={"BULL", "Rocketcase"})
+    st.subheader("Heta nu — fart & breakout-lägen")
+    r = collect(selected, keep_labels={"MOMENTUM", "BULL", "Rocketcase"})
     render_stats(r); render_grid(r, "hot")
 
 with tabs[1]:
-    st.subheader("Bygger upp — laddade setups")
-    r = collect(selected, keep_labels={"Rocketcase", "NEUTRAL/BYGGER"})
-    render_stats(r); render_grid(r, "build")
+    st.subheader("Vändningar — turnarounds & tidiga lägen")
+    r = collect(selected, keep_labels={"VÄNDNING", "NEUTRAL/BYGGER"})
+    render_stats(r); render_grid(r, "turn")
 
 with tabs[2]:
     st.subheader("Varningar — svaga eller överhettade")

@@ -133,16 +133,35 @@ def analyze(df):
     if rng_pos >= 70: su += 3
     setup = min(su, 25)
 
-    total = strength + momentum + setup     # 0–100
+    # ---------- ENTRY-SIGNALER (snabba entrys, vändningar, momentum) ----------
+    ema50_ser = _ema(close, 50)
+    rsi_ser = _rsi(close)
+    reclaimed50 = bool(len(close) > 6 and close.iloc[-6] < ema50_ser.iloc[-6] and last > ema50)
+    rsi_rising = bool(len(close) > 6 and rsi > rsi_ser.iloc[-6])
+    thrust = bool(ret_5 >= 4 and ret_20 >= 8 and rel_vol >= 1.2 and last > ema20 and rsi < 75)
+    turnaround = bool(last < ema200 and last > ema50 and ret_20 > 0 and rsi_rising and rsi >= 45)
+
+    # entry-bonus: lyfter färska lägen som annars straffas för att de är under EMA200
+    bonus = 0
+    if reclaimed50: bonus += 4
+    if rsi_rising and 45 <= rsi <= 65: bonus += 3
+    if rel_vol >= 1.5: bonus += 3
+    if thrust: bonus += 3
+
+    total = min(strength + momentum + setup + bonus, 100)   # 0–100
     score10 = max(1, min(10, round(total / 10)))
 
-    # ---------- ETIKETT ----------
-    if last < ema50 and last < ema200 and ret_20 < -5:
-        label, emoji, color = "BEAR", "", "#ff4b4b"
-    elif (-8 <= pct_from_high <= 1) and tight < 5 and rsi < 72 and last > ema50:
+    # ---------- ETIKETT  (prioriterar entry-lägen) ----------
+    if (-8 <= pct_from_high <= 1) and tight < 5 and rsi < 72 and last > ema50:
         label, emoji, color = "Rocketcase", "", "#f5a623"
+    elif turnaround:
+        label, emoji, color = "VÄNDNING", "", "#00c2c2"
     elif last > ema50 and last > ema200 and momentum > 18:
         label, emoji, color = "BULL", "", "#21c45d"
+    elif thrust:
+        label, emoji, color = "MOMENTUM", "", "#b06bff"
+    elif last < ema50 and last < ema200 and ret_20 < -5 and ret_5 <= 0:
+        label, emoji, color = "BEAR", "", "#ff4b4b"
     elif last > ema50:
         label, emoji, color = "NEUTRAL/BYGGER", "", "#f5d142"
     else:
@@ -283,10 +302,17 @@ def render_sok_tab():
     if a["label"] == "Rocketcase":
         notes.append("**Laddad setup** — nära 52v-topp, tight konsolidering och inte överköpt. "
                      "Den typ av läge som föregår breakouts. Bekräftelse: utbrott på hög volym.")
+    elif a["label"] == "VÄNDNING":
+        notes.append("**Turnaround** — har återtagit EMA50 underifrån med stigande RSI och positiv 20d, "
+                     "men ligger ännu under EMA200. Tidig vändning: hög potential, men obekräftad — "
+                     "risk för att det är en studs. Vill se att EMA200 återtas för bekräftelse.")
+    elif a["label"] == "MOMENTUM":
+        notes.append("**Snabb fart** — stark 5d/20d-rörelse på stigande volym över EMA20. "
+                     "Klassiskt momentum-entry. Akta överköpt och sätt stop tight — fart kan vända snabbt.")
     elif a["label"] == "BULL":
         notes.append("**Stark trend** — över EMA50 & EMA200 med levande momentum. Trend-följa, inte jaga toppar.")
     elif a["label"] == "BEAR":
-        notes.append("**Nedtrend** — under nyckelmedelvärden och negativ 20d. Vänta på vändning, inte 'köp dippen' än.")
+        notes.append("**Nedtrend** — under nyckelmedelvärden och fortfarande fallande. Vänta på vändning, inte 'köp dippen' än.")
     elif a["label"] == "NEUTRAL/BYGGER":
         notes.append("**Bygger** — över EMA50 men momentum saknas. Kan bli setup om volym kommer in.")
     else:
