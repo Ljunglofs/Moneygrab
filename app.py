@@ -35,7 +35,7 @@ BULL_C, ROCK_C = "#16c784", "#f0a020"
 THEME_COLOR = {
     "AI-infra":"2b7fff","Photonics":"00c2c2","Quantum":"b06bff","Rare earth":"f5a623",
     "Defense/Drone":"ff5468","Lidar/Phys.AI":"21c45d","Nuclear":"ffd23f","Space":"ff7ab8",
-    "Koppar":"d2691e","Silver/Guld":"9aa7b5",
+    "Koppar":"d2691e","Silver/Guld":"9aa7b5","Sverige":"006aa7",
 }
 UNIVERSE = {
     "AI-infra":     ["NVDA","NBIS","CRDO","ALAB","MRVL","AVGO","AMD","SMCI","VRT","DGXX"],
@@ -48,6 +48,7 @@ UNIVERSE = {
     "Space":        ["RKLB","ASTS","RDW"],
     "Koppar":       ["FCX","HBM"],
     "Silver/Guld":  ["AG","PAAS","GAU"],
+    "Sverige":      ["SUBGEN.ST","SMOL.ST","SHT-B.ST","ACCON.ST","SIVE.ST","OBD.F"],
 }
 TICKER_THEME = {t: k for k, v in UNIVERSE.items() for t in v}
 
@@ -243,9 +244,9 @@ def show_detail(ticker):
 #  MARKNADSLÄGE
 # ---------------------------------------------------------------------
 @st.cache_data(ttl=1800, show_spinner=False)
-def market_regime():
+def regime_of(ticker):
     try:
-        df, _ = fetch("^GSPC")
+        df, _ = fetch(ticker)
     except Exception:
         return "BLANDAD", 0.0
     if df is None or len(df) < 200:
@@ -258,14 +259,18 @@ def market_regime():
     if last < ma200:                   return "BEAR", pct
     return "BLANDAD", pct
 
-mkt, mkt_pct = market_regime()
-mcol = {"BULL": POS, "BEAR": NEG, "BLANDAD": MUTED}[mkt]
-st.markdown(
-    f"<div style='margin:.3rem 0 1rem'>"
-    f"<span class='pill' style='background:{mcol}22;color:{mcol};border:1px solid {mcol}55'>"
-    f"MARKNAD: {mkt}</span> "
-    f"<span style='color:{MUTED};font-size:.85rem;margin-left:8px'>"
-    f"S&P 500 {mkt_pct:+.1f}% mot 200-dagars</span></div>", unsafe_allow_html=True)
+INDICES = [("S&P 500", "^GSPC"), ("Nasdaq", "^IXIC"), ("Stockholm", "^OMX")]
+pills = []
+for iname, itk in INDICES:
+    lbl, pct = regime_of(itk)
+    col = {"BULL": POS, "BEAR": NEG, "BLANDAD": MUTED}[lbl]
+    pills.append(
+        f"<span class='pill' style='background:{col}22;color:{col};border:1px solid {col}55'>"
+        f"{iname}: {lbl}</span>"
+        f"<span style='color:{MUTED};font-size:.78rem;margin:0 16px 0 6px'>{pct:+.1f}% mot 200d</span>")
+st.markdown("<div style='margin:.3rem 0 1.1rem;display:flex;flex-wrap:wrap;"
+            "gap:4px 0;align-items:center'>" + "".join(pills) + "</div>",
+            unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------
 #  FLIKAR
