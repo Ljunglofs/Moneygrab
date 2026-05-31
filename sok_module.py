@@ -141,18 +141,27 @@ def analyze(df):
     thrust = bool(ret_5 >= 4 and ret_20 >= 8 and rel_vol >= 1.2 and last > ema20 and rsi < 75)
     turnaround = bool(last < ema200 and last > ema50 and ret_20 > 0 and rsi_rising and rsi >= 45)
 
+    # rullar över: rasat hårt senaste dagarna trots att längre trend ser fin ut
+    ret_2 = (last / close.iloc[-3] - 1) * 100 if len(close) > 3 else 0
+    hi5 = close.tail(5).max()
+    pull5 = (last / hi5 - 1) * 100 if hi5 else 0
+    rolling_over = bool(ret_2 <= -8 or (pull5 <= -10 and ret_2 < 0))
+
     # entry-bonus: lyfter färska lägen som annars straffas för att de är under EMA200
     bonus = 0
     if reclaimed50: bonus += 4
     if rsi_rising and 45 <= rsi <= 65: bonus += 3
     if rel_vol >= 1.5: bonus += 3
     if thrust: bonus += 3
+    if rolling_over: bonus -= 6
 
     total = min(strength + momentum + setup + bonus, 100)   # 0–100
     score10 = max(1, min(10, round(total / 10)))
 
     # ---------- ETIKETT  (prioriterar entry-lägen) ----------
-    if (-8 <= pct_from_high <= 1) and tight < 5 and rsi < 72 and last > ema50:
+    if rolling_over and (last > ema50 or ret_20 > 0):
+        label, emoji, color = "AVSVALNING", "", "#ff6b3d"
+    elif (-8 <= pct_from_high <= 1) and tight < 5 and rsi < 72 and last > ema50:
         label, emoji, color = "Rocketcase", "", "#f5a623"
     elif turnaround:
         label, emoji, color = "VÄNDNING", "", "#00c2c2"
@@ -299,7 +308,10 @@ def render_sok_tab():
     # ---- tolkning i klartext ----
     st.markdown("##### Tolkning")
     notes = []
-    if a["label"] == "Rocketcase":
+    if a["label"] == "AVSVALNING":
+        notes.append("**Rullar över** — har fallit hårt de senaste dagarna trots att den längre trenden "
+                     "ser stark ut. Ofta toppbildning eller distribution. Undvik nya köp tills det stabiliseras.")
+    elif a["label"] == "Rocketcase":
         notes.append("**Laddad setup** — nära 52v-topp, tight konsolidering och inte överköpt. "
                      "Den typ av läge som föregår breakouts. Bekräftelse: utbrott på hög volym.")
     elif a["label"] == "VÄNDNING":

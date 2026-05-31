@@ -247,7 +247,7 @@ def collect(tickers, keep_labels=None, warn=False):
         if not a:
             continue
         if warn:
-            if a["label"] in {"BEAR", "SVAG"} or a["rsi"] > 78 or a["ret_20"] > 35:
+            if a["label"] in {"BEAR", "SVAG", "AVSVALNING"} or a["rsi"] > 78 or a["ret_20"] > 35:
                 out.append(a)
         elif keep_labels is None or a["label"] in keep_labels:
             out.append(a)
@@ -271,6 +271,7 @@ with tabs[2]:
         st.info("Inga röda flaggor just nu.")
     else:
         def warnflag(a):
+            if a["label"] == "AVSVALNING": return "RULLAR ÖVER"
             if a["label"] == "BEAR": return "BEAR"
             if a["rsi"] > 78:        return "ÖVERKÖPT"
             if a["ret_20"] > 35:     return "PARABOL"
