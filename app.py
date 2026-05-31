@@ -93,7 +93,7 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap');
 .stApp{background:#0a0a0a;}
-.block-container{padding-top:1.0rem;max-width:1550px;}
+.block-container{padding-top:1.0rem;max-width:100%;padding-left:2.5rem;padding-right:2.5rem;}
 h1.mg{font-family:'Bebas Neue',sans-serif;font-size:58px;letter-spacing:3px;color:#ffd60a;
  line-height:1;margin:0;padding-bottom:6px;border-bottom:3px solid #ffd60a;}
 h1.mg span{color:#e8e8e8;}
@@ -312,14 +312,10 @@ def fetch_series(items):
 # ============================================================
 # HEADER + HERO (bilder)
 # ============================================================
-if os.path.exists("logo.png"):
-    st.image("logo.png", width=140)
+if os.path.exists("banner.png"):
+    st.image("banner.png", width=720)
 else:
     st.markdown('<h1 class="mg">MONEY<span>GRAB</span></h1>', unsafe_allow_html=True)
-
-if os.path.exists("bull_bear.jpg"):
-    c1,c2,c3=st.columns([1,2,1])
-    with c2: st.image("bull_bear.jpg", use_container_width=True)
 
 # ---- MARKET PULSE (råvaru-strip i monitor-stil) ----
 _now=datetime.now(timezone.utc)
