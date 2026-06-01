@@ -202,11 +202,51 @@ def render_grid(rows, key):
 #  DETALJVY  (modal)
 # ---------------------------------------------------------------------
 @st.dialog(" ", width="large")
+@st.cache_data(ttl=3600, show_spinner=False)
+def company_info(ticker):
+    """Hämtar bolagsnamn, sektor, börsvärde m.m. från Yahoo. Cachas 1h."""
+    if yf is None:
+        return {}
+    try:
+        info = yf.Ticker(ticker).info
+        return {
+            "name": info.get("longName") or info.get("shortName") or ticker,
+            "sector": info.get("sector") or info.get("industry") or "—",
+            "mcap": info.get("marketCap"),
+            "currency": info.get("currency") or "",
+            "summary": info.get("longBusinessSummary") or "",
+            "country": info.get("country") or "",
+        }
+    except Exception:
+        return {}
+
+
+def _fmt_mcap(v):
+    if not v:
+        return "—"
+    if v >= 1e12: return f"{v/1e12:.1f}T"
+    if v >= 1e9:  return f"{v/1e9:.1f}B"
+    if v >= 1e6:  return f"{v/1e6:.0f}M"
+    return f"{v:,.0f}"
+
+
+def price_chart(df, color):
+    """Ritar en snabb kursgraf (90 dagar) från Yahoo-datan med Streamlits area_chart."""
+    try:
+        closes = df["Close"].tail(90)
+        chart_df = pd.DataFrame({"Pris": closes.values}, index=closes.index)
+        st.area_chart(chart_df, color=color, height=220)
+    except Exception:
+        pass
+
+
 def show_detail(ticker):
     a = scan(ticker)
     if not a:
         st.error(f"Hittade ingen data för {ticker}.")
         return
+    info = company_info(ticker)
+    df_full, _ = fetch(ticker)
     st.session_state["sok_context"] = {
         "ticker": ticker, "label": a["label"], "score10": a["score10"],
         "last": a["last"], "rsi": a["rsi"], "pct_from_high": a["pct_from_high"],
@@ -215,11 +255,36 @@ def show_detail(ticker):
     }
     top = st.columns([2, 1, 1])
     top[0].markdown(f"## {ticker}")
+    if info.get("name") and info["name"] != ticker:
+        top[0].caption(f"{info['name']} · {info.get('sector','—')}")
     top[0].markdown(
         f"<span class='pill' style='background:{a['color']}22;color:{a['color']};"
         f"border:1px solid {a['color']}55'>{a['label']}</span>", unsafe_allow_html=True)
     top[1].metric("Pris", f"{a['last']:.2f}")
     top[2].metric("Lyftchans", f"{a['score10']}/10")
+
+    # ---- STOR, TYDLIG 5-DAGARS-RÖRELSE ----
+    r5 = a["ret_5"]
+    r5_color = POS if r5 >= 0 else NEG
+    arrow = "▲" if r5 >= 0 else "▼"
+    st.markdown(
+        f"<div style='display:flex;gap:24px;align-items:baseline;margin:8px 0 4px;flex-wrap:wrap'>"
+        f"<div><div style='font-size:12px;color:{MUTED};letter-spacing:1px'>SENASTE 5 DAGARNA</div>"
+        f"<div style='font-size:40px;font-weight:800;line-height:1;color:{r5_color}'>"
+        f"{arrow} {r5:+.1f}%</div></div>"
+        f"<div style='align-self:flex-end'><span style='font-size:13px;color:{MUTED}'>20 dagar: </span>"
+        f"<span style='font-size:18px;font-weight:700;color:{POS if a['ret_20']>=0 else NEG}'>"
+        f"{a['ret_20']:+.1f}%</span></div>"
+        f"<div style='align-self:flex-end'><span style='font-size:13px;color:{MUTED}'>Börsvärde: </span>"
+        f"<span style='font-size:18px;font-weight:700;color:{TXT}'>"
+        f"{_fmt_mcap(info.get('mcap'))} {info.get('currency','')}</span></div>"
+        f"</div>",
+        unsafe_allow_html=True)
+
+    # ---- KURSGRAF (90 dagar, snabb) ----
+    if df_full is not None:
+        price_chart(df_full, a["color"])
+
     items = [
         ("RSI", f"{a['rsi']:.0f}", TXT),
         ("20d", f"{a['ret_20']:+.1f}%", POS if a['ret_20'] >= 0 else NEG),
@@ -237,6 +302,13 @@ def show_detail(ticker):
     st.progress(min(a["total"] / 100, 1.0),
                 text=f"Score {a['total']:.0f}/100 · Styrka {a['strength']:.0f}/40 · "
                      f"Momentum {a['momentum']:.0f}/35 · Setup {a['setup']:.0f}/25")
+    # ---- OM BOLAGET (hopfällbart) ----
+    if info.get("summary"):
+        with st.expander(f"Om {info.get('name', ticker)}"):
+            land = f" · {info['country']}" if info.get("country") else ""
+            st.caption(f"{info.get('sector','—')}{land}")
+            st.write(info["summary"])
+
     tradingview_chart(guess_tv_symbol(ticker), height=360)
     st.caption(f"Öppna **Ask Grabit**-fliken för att fråga AI:n om {ticker}.")
 
