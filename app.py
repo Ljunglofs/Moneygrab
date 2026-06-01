@@ -192,8 +192,10 @@ def company_info(ticker: str) -> dict:
         info = yf.Ticker(ticker).info or {}
         if not isinstance(info, dict):
             return {}
+        name = (info.get("longName") or info.get("shortName")
+                or info.get("displayName") or "")
         return {
-            "name":     info.get("longName") or info.get("shortName") or "",
+            "name":     name,
             "sector":   info.get("sector") or info.get("industry") or "",
             "mcap":     info.get("marketCap"),
             "currency": info.get("currency") or "",
@@ -202,6 +204,21 @@ def company_info(ticker: str) -> dict:
         }
     except Exception:
         return {}
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def live_price(ticker: str):
+    """Senaste handelspris. Cachas 1 min. Returnerar None vid fel."""
+    if yf is None:
+        return None
+    try:
+        info = yf.Ticker(ticker).info or {}
+        p = (info.get("regularMarketPrice")
+             or info.get("currentPrice")
+             or info.get("previousClose"))
+        return float(p) if p else None
+    except Exception:
+        return None
 
 # =====================================================================
 #  SCAN + HJÄLPARE
@@ -520,22 +537,25 @@ def show_detail(ticker: str, info: dict):
         "strength": a["strength"], "momentum": a["momentum"], "setup": a["setup"],
     }
 
-    # ---- RUBRIK med fullständigt bolagsnamn ----
-    name    = info.get("name", "")
-    sector  = info.get("sector", "—")
+    # ---- RUBRIK: bolagsnamn + ticker + live-kurs ----
+    name   = info.get("name", "")
+    sector = info.get("sector", "") or ""
+    # Live-kurs (1 min cache) — faller tillbaka på daglig stängning
+    _live = live_price(ticker)
+    price_display = _live if _live else a["last"]
+    price_label   = "Live" if _live else "Stängning"
     top = st.columns([2, 1, 1])
     if name and name.upper() != ticker.upper():
         top[0].markdown(f"## {name}")
-        top[0].caption(f"{ticker} · {sector}")
+        top[0].caption(f"{ticker} · {sector}" if sector else ticker)
     else:
         top[0].markdown(f"## {ticker}")
-        top[0].caption(sector)
+        if sector: top[0].caption(sector)
     top[0].markdown(
         f"<span class='pill' style='background:{a['color']}22;color:{a['color']};"
         f"border:1px solid {a['color']}55'>{a['label']}</span>", unsafe_allow_html=True)
-    top[1].metric("Pris", f"{a['last']:.2f}")
+    top[1].metric(price_label, f"{price_display:.2f}")
     top[2].metric("Lyftchans", f"{a['score10']}/10")
-
     # ---- STOR 5D-RÖRELSE ----
     r5 = a["ret_5"]
     r5_color = POS if r5 >= 0 else NEG
