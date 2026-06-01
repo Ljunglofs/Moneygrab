@@ -1,23 +1,49 @@
 # =====================================================================
-#  dagens_bull.py  —  Dagens Bull + Veckans Bull för MoneyGrab
-#  Renderas direkt i tabs[0] — inga egna tabs eller st.tabs() här.
-#  Hetta-score = score10 * 10 viktat med relativ volym (0–100).
+#  dagens_bull.py  —  Dagens Bull + Veckans Bull
+#  Två kort sida vid sida. Dagens = blå, Veckans = lila.
+#  Bolagsnamn hämtas via yfinance och visas under ticker.
+#  Ingen st.tabs() här — renderas direkt i tabs[0] i app.py.
 # =====================================================================
 
 import streamlit as st
-import pandas as pd
+
+try:
+    import yfinance as yf
+except Exception:
+    yf = None
+
 from sok_module import fetch, analyze
 
-ACCENT = "#1199fa"
-POS    = "#16c784"
-NEG    = "#f6465d"
-MUTED  = "#848e9c"
-TXT    = "#eaecef"
-ROCK_C = "#f0a020"
+ACCENT  = "#1199fa"   # blå  — Dagens Bull
+WEEK_C  = "#b06bff"   # lila — Veckans Bull
+POS     = "#16c784"
+NEG     = "#f6465d"
+MUTED   = "#848e9c"
+TXT     = "#eaecef"
+ROCK_C  = "#f0a020"
 
-def _get_universe():    return st.session_state.get("_mg_universe", {})
-def _get_ticker_theme():return st.session_state.get("_mg_ticker_theme", {})
-def _get_theme_color(): return st.session_state.get("_mg_theme_color", {})
+def _get_universe():     return st.session_state.get("_mg_universe", {})
+def _get_ticker_theme(): return st.session_state.get("_mg_ticker_theme", {})
+def _get_theme_color():  return st.session_state.get("_mg_theme_color", {})
+
+
+# ---------------------------------------------------------------
+#  BOLAGSNAMN
+# ---------------------------------------------------------------
+@st.cache_data(ttl=86400, show_spinner=False)
+def _company_name(ticker: str) -> str:
+    """Hämtar kortnamn. Cachas 24h. Returnerar '' vid fel."""
+    if yf is None:
+        return ""
+    try:
+        info = yf.Ticker(ticker).info or {}
+        name = info.get("shortName") or info.get("longName") or ""
+        # Förkorta vid behov
+        if len(name) > 28:
+            name = name[:26].rstrip() + "…"
+        return name
+    except Exception:
+        return ""
 
 
 # ---------------------------------------------------------------
@@ -52,9 +78,7 @@ def _bull_data(ticker: str):
         score10 = float(a.get("score10", 0))
         label   = a.get("label", "—")
         rsi     = float(a.get("rsi", 0))
-
-        # Hetta = score viktat med volym, skala 0-100
-        hetta = round(min(100, score10 * 10 * min(rel_vol, 2.0)), 1)
+        hetta   = round(min(100, score10 * 10 * min(rel_vol, 2.0)), 1)
 
         return {
             "ticker":   ticker,
@@ -72,7 +96,7 @@ def _bull_data(ticker: str):
 
 
 # ---------------------------------------------------------------
-#  SCAN ALLA + SORTERA
+#  SCAN + SORTERA
 # ---------------------------------------------------------------
 def _scan_all(tickers: list) -> list:
     results = []
@@ -82,108 +106,133 @@ def _scan_all(tickers: list) -> list:
             results.append(d)
     return results
 
-
 def _top_day(results: list, n=10) -> list:
-    """Dagens: positiv dag-ret + rel_vol >= 1.1, sorterat på hetta."""
     f = [r for r in results if r["day_ret"] > 0 and r["rel_vol"] >= 1.1]
     return sorted(f, key=lambda x: x["hetta"], reverse=True)[:n]
 
-
 def _top_week(results: list, n=10) -> list:
-    """Veckan: positiv vecko-ret + score >= 5, sorterat på hetta."""
     f = [r for r in results if r["week_ret"] > 0 and r["score10"] >= 5]
     return sorted(f, key=lambda x: x["hetta"], reverse=True)[:n]
 
 
 # ---------------------------------------------------------------
-#  BULL-KORT  (toppa listan)
+#  HERO-KORT
 # ---------------------------------------------------------------
-def _render_hero_card(winner: dict, period: str, theme_color: dict, ticker_theme: dict):
-    period_label = "DAGENS BULL" if period == "day" else "VECKANS BULL"
-    ret_val      = winner["day_ret"] if period == "day" else winner["week_ret"]
-    ret_days     = "idag" if period == "day" else "5 dagar"
+def _render_hero(winner: dict, period: str):
+    is_day   = period == "day"
+    color    = ACCENT if is_day else WEEK_C
+    title    = "DAGENS BULL" if is_day else "VECKANS BULL"
+    ret_val  = winner["day_ret"] if is_day else winner["week_ret"]
+    ret_lbl  = "5 DAGAR" if is_day else "5 DAGAR"   # båda visar 5d i screenshoten
 
-    theme  = ticker_theme.get(winner["ticker"], "")
-    color  = "#" + theme_color.get(theme, "1199fa")
-    rsi    = winner["rsi"]
-    rsi_col= NEG if rsi > 75 else (ROCK_C if rsi > 65 else TXT)
-    vol_col= POS if winner["rel_vol"] >= 1.5 else (ROCK_C if winner["rel_vol"] >= 1.1 else MUTED)
+    name     = _company_name(winner["ticker"])
+    rsi      = winner["rsi"]
+    rsi_col  = NEG if rsi > 75 else (ROCK_C if rsi > 65 else TXT)
+    vol_col  = POS if winner["rel_vol"] >= 1.5 else (ROCK_C if winner["rel_vol"] >= 1.1 else MUTED)
 
     st.markdown(f"""
     <div style="
-        background:linear-gradient(135deg,rgba(17,153,250,.08),rgba(13,17,24,.96));
-        border:1px solid {color}55;
-        border-radius:24px;
-        padding:22px 26px 18px;
-        margin-bottom:4px;
+        background: linear-gradient(160deg, {color}12 0%, rgba(11,14,22,.97) 60%);
+        border: 1px solid {color}60;
+        border-radius: 24px;
+        padding: 20px 22px 18px;
+        margin-bottom: 2px;
     ">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <!-- Rubrik-rad -->
+        <div style="display:flex;align-items:center;gap:7px;margin-bottom:12px">
             <span style="width:8px;height:8px;border-radius:50%;
-                background:{color};display:inline-block"></span>
-            <span style="font-size:.68rem;font-weight:700;letter-spacing:1.2px;
-                color:{MUTED};text-transform:uppercase">{period_label}</span>
+                background:{color};display:inline-block;
+                box-shadow:0 0 6px {color}"></span>
+            <span style="font-size:.65rem;font-weight:700;letter-spacing:1.4px;
+                color:{MUTED};text-transform:uppercase">{title}</span>
         </div>
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+
+        <!-- Ticker + Hetta -->
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
             <div>
-                <div style="font-size:2.4rem;font-weight:800;color:#fff;
-                    font-family:'Space Grotesk',sans-serif;line-height:1">{winner['ticker']}</div>
-                <div style="margin-top:8px">
-                    <span style="padding:3px 12px;border-radius:999px;font-size:.72rem;
-                        font-weight:700;background:{color}22;color:{color};
-                        border:1px solid {color}44">{winner['label']}</span>
+                <div style="font-size:2.6rem;font-weight:800;color:#fff;
+                    font-family:'Space Grotesk',sans-serif;line-height:1;
+                    letter-spacing:-1px">{winner['ticker']}</div>
+                {"" if not name else f"<div style='font-size:.78rem;color:{MUTED};margin-top:3px;font-weight:500'>{name}</div>"}
+                <div style="margin-top:9px">
+                    <span style="padding:4px 13px;border-radius:999px;font-size:.72rem;
+                        font-weight:700;background:{color}20;color:{color};
+                        border:1px solid {color}50">{winner['label']}</span>
                 </div>
             </div>
             <div style="text-align:right">
                 <div style="font-size:.62rem;color:{MUTED};text-transform:uppercase;
-                    letter-spacing:.8px">HETTA</div>
-                <div style="font-size:2.8rem;font-weight:800;color:{color};
-                    font-family:'Space Grotesk',sans-serif;line-height:1">{int(winner['hetta'])}</div>
+                    letter-spacing:.8px;font-weight:600">HETTA</div>
+                <div style="font-size:3rem;font-weight:800;color:{color};
+                    font-family:'Space Grotesk',sans-serif;line-height:1">
+                    {int(winner['hetta'])}</div>
             </div>
         </div>
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:16px">
+
+        <!-- Nyckeltal-rad -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);
+            gap:10px;margin-top:16px">
             <div>
-                <div style="font-size:.62rem;color:{MUTED};text-transform:uppercase;letter-spacing:.6px">PRIS</div>
-                <div style="font-size:1.15rem;font-weight:700;color:{TXT}">{winner['last']:.2f}</div>
+                <div style="font-size:.60rem;color:{MUTED};text-transform:uppercase;
+                    letter-spacing:.6px;font-weight:600">PRIS</div>
+                <div style="font-size:1.05rem;font-weight:700;color:{TXT};
+                    margin-top:2px">{winner['last']:.2f}</div>
             </div>
             <div>
-                <div style="font-size:.62rem;color:{MUTED};text-transform:uppercase;letter-spacing:.6px">REL. VOLYM</div>
-                <div style="font-size:1.15rem;font-weight:700;color:{vol_col}">{winner['rel_vol']:.2f}x</div>
+                <div style="font-size:.60rem;color:{MUTED};text-transform:uppercase;
+                    letter-spacing:.6px;font-weight:600">REL. VOLYM</div>
+                <div style="font-size:1.05rem;font-weight:700;color:{vol_col};
+                    margin-top:2px">{winner['rel_vol']:.1f}x</div>
             </div>
             <div>
-                <div style="font-size:.62rem;color:{MUTED};text-transform:uppercase;letter-spacing:.6px">{ret_days.upper()}</div>
-                <div style="font-size:1.15rem;font-weight:700;color:{POS}">+{ret_val:.1f}%</div>
+                <div style="font-size:.60rem;color:{MUTED};text-transform:uppercase;
+                    letter-spacing:.6px;font-weight:600">{ret_lbl}</div>
+                <div style="font-size:1.05rem;font-weight:700;color:{POS};
+                    margin-top:2px">+{ret_val:.1f}%</div>
             </div>
             <div>
-                <div style="font-size:.62rem;color:{MUTED};text-transform:uppercase;letter-spacing:.6px">RANKING</div>
-                <div style="font-size:1.15rem;font-weight:700;color:{ACCENT}">{int(winner['score10'])}/10</div>
+                <div style="font-size:.60rem;color:{MUTED};text-transform:uppercase;
+                    letter-spacing:.6px;font-weight:600">RANKING</div>
+                <div style="font-size:1.05rem;font-weight:700;color:{ACCENT};
+                    margin-top:2px">{int(winner['score10'])}/10</div>
             </div>
         </div>
+
+        <!-- RSI -->
         <div style="margin-top:12px">
-            <div style="font-size:.62rem;color:{MUTED};text-transform:uppercase;letter-spacing:.6px">RSI</div>
-            <div style="font-size:1.15rem;font-weight:700;color:{rsi_col}">{rsi:.0f}</div>
+            <div style="font-size:.60rem;color:{MUTED};text-transform:uppercase;
+                letter-spacing:.6px;font-weight:600">RSI</div>
+            <div style="font-size:1.05rem;font-weight:700;color:{rsi_col};
+                margin-top:2px">{rsi:.0f}</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    if st.button("Öppna detaljer", key=f"hero_{period}_{winner['ticker']}"):
+    if st.button("Öppna detaljer", key=f"bull_btn_{period}_{winner['ticker']}",
+                 use_container_width=True):
         st.session_state["detail_req"] = winner["ticker"]
 
 
 # ---------------------------------------------------------------
-#  RANKINGTABELL  (under kortet)
+#  RANKINGTABELL
 # ---------------------------------------------------------------
 def _render_table(rows: list, period: str):
     if not rows:
         return
-    ret_key   = "day_ret"  if period == "day"  else "week_ret"
-    ret_label = "Dag %"    if period == "day"  else "Vecka %"
+    color     = ACCENT if period == "day" else WEEK_C
+    ret_key   = "day_ret" if period == "day" else "week_ret"
+    ret_label = "5d %" 
+
+    title = "Hetast just nu" if period == "day" else "Starkast denna vecka"
+    st.markdown(f"<div style='font-size:1rem;font-weight:700;color:#fff;"
+                f"margin:14px 0 6px'>{title}</div>", unsafe_allow_html=True)
 
     table_rows = "".join(
         f"<tr style='border-bottom:1px solid rgba(255,255,255,.04)'>"
         f"<td style='padding:7px 10px;font-weight:700;color:{TXT}'>{r['ticker']}</td>"
         f"<td style='padding:7px 10px;color:{MUTED};font-size:.82rem'>{r['label']}</td>"
-        f"<td style='padding:7px 10px;font-weight:700;color:{ACCENT}'>{r['hetta']:.0f}</td>"
-        f"<td style='padding:7px 10px;color:{'#1199fa' if r['rel_vol']>=1.3 else TXT}'>{r['rel_vol']:.2f}</td>"
+        f"<td style='padding:7px 10px;font-weight:700;color:{color}'>{r['hetta']:.0f}</td>"
+        f"<td style='padding:7px 10px;color:{POS if r['rel_vol']>=1.3 else TXT}'>{r['rel_vol']:.2f}</td>"
         f"<td style='padding:7px 10px;color:{POS}'>+{r[ret_key]:.1f}%</td>"
         f"<td style='padding:7px 10px;color:{ACCENT}'>{int(r['score10'])}</td>"
         f"</tr>"
@@ -191,22 +240,17 @@ def _render_table(rows: list, period: str):
     )
 
     st.markdown(f"""
-    <div style="border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,.06);margin-top:10px">
-        <table style="width:100%;border-collapse:collapse;font-size:.85rem">
+    <div style="border-radius:16px;overflow:hidden;
+        border:1px solid rgba(255,255,255,.06)">
+        <table style="width:100%;border-collapse:collapse;font-size:.84rem">
             <thead>
                 <tr style="background:rgba(255,255,255,.04)">
-                    <th style="padding:8px 10px;text-align:left;color:{MUTED};font-size:.68rem;
-                        text-transform:uppercase;letter-spacing:.7px;font-weight:600">Ticker</th>
-                    <th style="padding:8px 10px;text-align:left;color:{MUTED};font-size:.68rem;
-                        text-transform:uppercase;letter-spacing:.7px;font-weight:600">Läge</th>
-                    <th style="padding:8px 10px;text-align:left;color:{MUTED};font-size:.68rem;
-                        text-transform:uppercase;letter-spacing:.7px;font-weight:600">Hetta</th>
-                    <th style="padding:8px 10px;text-align:left;color:{MUTED};font-size:.68rem;
-                        text-transform:uppercase;letter-spacing:.7px;font-weight:600">Rel.vol</th>
-                    <th style="padding:8px 10px;text-align:left;color:{MUTED};font-size:.68rem;
-                        text-transform:uppercase;letter-spacing:.7px;font-weight:600">{ret_label}</th>
-                    <th style="padding:8px 10px;text-align:left;color:{MUTED};font-size:.68rem;
-                        text-transform:uppercase;letter-spacing:.7px;font-weight:600">Rank</th>
+                    {"".join(
+                        f"<th style='padding:8px 10px;text-align:left;color:{MUTED};"
+                        f"font-size:.65rem;text-transform:uppercase;letter-spacing:.7px;"
+                        f"font-weight:600'>{h}</th>"
+                        for h in ["Ticker","Läge","Hetta","Rel.vol","5d %","Rank"]
+                    )}
                 </tr>
             </thead>
             <tbody style="background:rgba(13,17,24,.85)">
@@ -221,21 +265,14 @@ def _render_table(rows: list, period: str):
 #  PUBLIK ENTRY-PUNKT
 # ---------------------------------------------------------------
 def render_dagens_bull():
-    """
-    Kallas från app.py i tabs[0].
-    Kräver att app.py har satt:
-        st.session_state["_mg_universe"]
-        st.session_state["_mg_ticker_theme"]
-        st.session_state["_mg_theme_color"]
-    """
-    universe     = _get_universe()
-    theme_color  = _get_theme_color()
-    ticker_theme = _get_ticker_theme()
-
+    universe = _get_universe()
     if not universe:
         return
 
-    # Bygg unik ticker-lista
+    theme_color  = _get_theme_color()
+    ticker_theme = _get_ticker_theme()
+
+    # Unik ticker-lista
     seen = set(); tickers = []
     for ts in universe.values():
         for t in ts:
@@ -248,33 +285,30 @@ def render_dagens_bull():
     day_top  = _top_day(all_data)
     week_top = _top_week(all_data)
 
-    total_scanned = len(all_data)
-
-    # Två kolumner: Dagens | Veckans
     c1, c2 = st.columns(2)
 
     with c1:
         if day_top:
-            _render_hero_card(day_top[0], "day", theme_color, ticker_theme)
+            _render_hero(day_top[0], "day")
             _render_table(day_top, "day")
         else:
             st.markdown(
-                f"<div style='padding:20px;border-radius:20px;border:1px solid {MUTED}33;"
-                f"color:{MUTED};text-align:center;font-size:.9rem'>"
-                f"Ingen tydlig dagsvinnare just nu</div>",
+                f"<div style='padding:20px;border-radius:20px;"
+                f"border:1px solid {MUTED}33;color:{MUTED};"
+                f"text-align:center'>Ingen dagsvinnare just nu</div>",
                 unsafe_allow_html=True)
 
     with c2:
         if week_top:
-            _render_hero_card(week_top[0], "week", theme_color, ticker_theme)
+            _render_hero(week_top[0], "week")
             _render_table(week_top, "week")
         else:
             st.markdown(
-                f"<div style='padding:20px;border-radius:20px;border:1px solid {MUTED}33;"
-                f"color:{MUTED};text-align:center;font-size:.9rem'>"
-                f"Ingen tydlig veckavinnare just nu</div>",
+                f"<div style='padding:20px;border-radius:20px;"
+                f"border:1px solid {MUTED}33;color:{MUTED};"
+                f"text-align:center'>Ingen veckavinnare just nu</div>",
                 unsafe_allow_html=True)
 
     st.caption(
-        f"Skannade {total_scanned} aktier · uppdateras var 10:e minut · data ~15 min fördröjd. "
-        f"Hetta = ranking viktat med relativ volym.")
+        f"Skannade {len(all_data)} aktier · uppdateras var 10:e minut · "
+        f"data ~15 min fördröjd. Hetta = ranking viktat med relativ volym.")
