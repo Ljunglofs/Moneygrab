@@ -1,7 +1,7 @@
 # =====================================================================
 #  dagens_bull.py  —  Dagens Bull + Veckans Bull
-#  Staplade vertikalt — båda syns på startsidan.
-#  Dagens = blå, Veckans = lila. Bolagsnamn visas under ticker.
+#  Staplade vertikalt. Dagens = blå, Veckans = lila.
+#  Bolagsnamn under ticker. Inga walrus-operators (Python 3.7 safe).
 # =====================================================================
 
 import streamlit as st
@@ -13,38 +13,35 @@ except Exception:
 
 from sok_module import fetch, analyze
 
-ACCENT  = "#1199fa"   # blå  — Dagens Bull
-WEEK_C  = "#b06bff"   # lila — Veckans Bull
-POS     = "#16c784"
-NEG     = "#f6465d"
-MUTED   = "#848e9c"
-TXT     = "#eaecef"
-ROCK_C  = "#f0a020"
+ACCENT = "#1199fa"
+WEEK_C = "#b06bff"
+POS    = "#16c784"
+NEG    = "#f6465d"
+MUTED  = "#848e9c"
+TXT    = "#eaecef"
+ROCK_C = "#f0a020"
 
 
-def _get_universe():     return st.session_state.get("_mg_universe", {})
+def _get_universe():
+    return st.session_state.get("_mg_universe", {})
 
 
-# ---------------------------------------------------------------
-#  BOLAGSNAMN  (cachas 24h)
-# ---------------------------------------------------------------
 @st.cache_data(ttl=86400, show_spinner=False)
-def _company_name(ticker: str) -> str:
+def _company_name(ticker):
     if yf is None:
         return ""
     try:
         info = yf.Ticker(ticker).info or {}
         name = info.get("shortName") or info.get("longName") or ""
-        return name[:28].rstrip() + ("…" if len(name) > 28 else "")
+        if len(name) > 28:
+            name = name[:26].rstrip() + "…"
+        return name
     except Exception:
         return ""
 
 
-# ---------------------------------------------------------------
-#  DATA PER TICKER  (cachas 10 min)
-# ---------------------------------------------------------------
 @st.cache_data(ttl=600, show_spinner=False)
-def _bull_data(ticker: str):
+def _bull_data(ticker):
     try:
         df, _ = fetch(ticker)
     except Exception:
@@ -55,12 +52,12 @@ def _bull_data(ticker: str):
         c = df["Close"].dropna()
         v = df["Volume"].dropna() if "Volume" in df.columns else None
 
-        last       = float(c.iloc[-1])
-        prev_day   = float(c.iloc[-2])
-        prev_week  = float(c.iloc[-6]) if len(c) >= 6 else float(c.iloc[0])
+        last      = float(c.iloc[-1])
+        prev_day  = float(c.iloc[-2])
+        prev_week = float(c.iloc[-6]) if len(c) >= 6 else float(c.iloc[0])
 
-        day_ret    = (last / prev_day  - 1) * 100
-        week_ret   = (last / prev_week - 1) * 100
+        day_ret  = (last / prev_day  - 1) * 100
+        week_ret = (last / prev_week - 1) * 100
 
         rel_vol = 1.0
         if v is not None and len(v) >= 20:
@@ -75,44 +72,42 @@ def _bull_data(ticker: str):
         hetta   = round(min(100, score10 * 10 * min(rel_vol, 2.0)), 1)
 
         return {
-            "ticker":  ticker,
-            "last":    last,
-            "day_ret": day_ret,
-            "week_ret":week_ret,
-            "rel_vol": rel_vol,
-            "label":   label,
-            "score10": score10,
-            "hetta":   hetta,
-            "rsi":     rsi,
+            "ticker":   ticker,
+            "last":     last,
+            "day_ret":  day_ret,
+            "week_ret": week_ret,
+            "rel_vol":  rel_vol,
+            "label":    label,
+            "score10":  score10,
+            "hetta":    hetta,
+            "rsi":      rsi,
         }
     except Exception:
         return None
 
 
-# ---------------------------------------------------------------
-#  SCAN
-# ---------------------------------------------------------------
-def _scan_all(tickers: list) -> list:
-    return [d for t in tickers if (d := _bull_data(t))]
+def _scan_all(tickers):
+    results = []
+    for t in tickers:
+        d = _bull_data(t)
+        if d is not None:
+            results.append(d)
+    return results
 
 
-def _top_day(results: list, n=10) -> list:
-    """Positiv dag-rörelse + volym-bekräftad."""
+def _top_day(results, n=10):
     f = [r for r in results if r["day_ret"] > 0 and r["rel_vol"] >= 1.1]
     return sorted(f, key=lambda x: x["hetta"], reverse=True)[:n]
 
 
-def _top_week(results: list, n=10) -> list:
-    """Starkaste vecko-rörelse — mjukare filter än dagen."""
+def _top_week(results, n=10):
+    # Inget rel_vol-krav — bara positiv veckorörelse
     f = [r for r in results if r["week_ret"] > 0]
     return sorted(f, key=lambda x: x["week_ret"], reverse=True)[:n]
 
 
-# ---------------------------------------------------------------
-#  HERO-KORT
-# ---------------------------------------------------------------
-def _render_hero(winner: dict, period: str):
-    is_day  = period == "day"
+def _hero_card(winner, period):
+    is_day  = (period == "day")
     color   = ACCENT if is_day else WEEK_C
     title   = "DAGENS BULL" if is_day else "VECKANS BULL"
     ret_val = winner["day_ret"] if is_day else winner["week_ret"]
@@ -123,13 +118,16 @@ def _render_hero(winner: dict, period: str):
     rsi_col = NEG if rsi > 75 else (ROCK_C if rsi > 65 else TXT)
     vol_col = POS if winner["rel_vol"] >= 1.5 else (ROCK_C if winner["rel_vol"] >= 1.1 else MUTED)
 
+    name_html = (f'<div style="font-size:.78rem;color:{MUTED};margin-top:4px">{name}</div>'
+                 if name else "")
+
     st.markdown(f"""
     <div style="
-        background: linear-gradient(160deg, {color}10 0%, rgba(11,14,22,.97) 55%);
-        border: 1px solid {color}55;
-        border-radius: 24px;
-        padding: 20px 22px 18px;
-        margin-bottom: 12px;
+        background:linear-gradient(160deg,{color}10 0%,rgba(11,14,22,.97) 55%);
+        border:1px solid {color}55;
+        border-radius:24px;
+        padding:20px 22px 18px;
+        margin-bottom:12px;
     ">
         <div style="display:flex;align-items:center;gap:7px;margin-bottom:10px">
             <span style="width:8px;height:8px;border-radius:50%;background:{color};
@@ -142,7 +140,7 @@ def _render_hero(winner: dict, period: str):
                 <div style="font-size:2.5rem;font-weight:800;color:#fff;
                     font-family:'Space Grotesk',sans-serif;line-height:1;
                     letter-spacing:-1px">{winner['ticker']}</div>
-                {"" if not name else f'<div style="font-size:.78rem;color:{MUTED};margin-top:4px">{name}</div>'}
+                {name_html}
                 <div style="margin-top:9px">
                     <span style="padding:4px 13px;border-radius:999px;font-size:.72rem;
                         font-weight:700;background:{color}20;color:{color};
@@ -153,7 +151,8 @@ def _render_hero(winner: dict, period: str):
                 <div style="font-size:.62rem;color:{MUTED};text-transform:uppercase;
                     letter-spacing:.8px;font-weight:600">HETTA</div>
                 <div style="font-size:3rem;font-weight:800;color:{color};
-                    font-family:'Space Grotesk',sans-serif;line-height:1">{int(winner['hetta'])}</div>
+                    font-family:'Space Grotesk',sans-serif;line-height:1">
+                    {int(winner['hetta'])}</div>
             </div>
         </div>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:16px">
@@ -196,59 +195,65 @@ def _render_hero(winner: dict, period: str):
         st.session_state["detail_req"] = winner["ticker"]
 
 
-# ---------------------------------------------------------------
-#  RANKINGTABELL
-# ---------------------------------------------------------------
-def _render_table(rows: list, period: str):
+def _ranking_table(rows, period):
     if not rows:
         return
     color     = ACCENT if period == "day" else WEEK_C
     ret_key   = "day_ret" if period == "day" else "week_ret"
     title     = "Hetast just nu" if period == "day" else "Starkast denna vecka"
 
-    st.markdown(f"<div style='font-size:1rem;font-weight:700;color:#fff;"
-                f"margin:14px 0 6px'>{title}</div>", unsafe_allow_html=True)
+    st.markdown(
+        f"<div style='font-size:1rem;font-weight:700;color:#fff;"
+        f"margin:14px 0 6px'>{title}</div>",
+        unsafe_allow_html=True)
 
-    rows_html = "".join(
-        f"<tr style='border-bottom:1px solid rgba(255,255,255,.04)'>"
-        f"<td style='padding:7px 10px;font-weight:700;color:{TXT}'>{r['ticker']}</td>"
-        f"<td style='padding:7px 10px;color:{MUTED};font-size:.82rem'>{r['label']}</td>"
-        f"<td style='padding:7px 10px;font-weight:700;color:{color}'>{r['hetta']:.0f}</td>"
-        f"<td style='padding:7px 10px;color:{POS if r['rel_vol']>=1.3 else TXT}'>{r['rel_vol']:.2f}</td>"
-        f"<td style='padding:7px 10px;color:{POS}'>+{r[ret_key]:.1f}%</td>"
-        f"<td style='padding:7px 10px;color:{ACCENT}'>{int(r['score10'])}</td>"
-        f"</tr>"
-        for r in rows
-    )
-    headers = "".join(
-        f"<th style='padding:8px 10px;text-align:left;color:{MUTED};font-size:.65rem;"
-        f"text-transform:uppercase;letter-spacing:.7px;font-weight:600'>{h}</th>"
-        for h in ["Ticker", "Läge", "Hetta", "Rel.vol", "5d %", "Rank"]
-    )
+    rows_html = ""
+    for r in rows:
+        rows_html += (
+            f"<tr style='border-bottom:1px solid rgba(255,255,255,.04)'>"
+            f"<td style='padding:7px 10px;font-weight:700;color:{TXT}'>{r['ticker']}</td>"
+            f"<td style='padding:7px 10px;color:{MUTED};font-size:.82rem'>{r['label']}</td>"
+            f"<td style='padding:7px 10px;font-weight:700;color:{color}'>{r['hetta']:.0f}</td>"
+            f"<td style='padding:7px 10px;color:{POS if r['rel_vol']>=1.3 else TXT}'>"
+            f"{r['rel_vol']:.2f}</td>"
+            f"<td style='padding:7px 10px;color:{POS}'>+{r[ret_key]:.1f}%</td>"
+            f"<td style='padding:7px 10px;color:{ACCENT}'>{int(r['score10'])}</td>"
+            f"</tr>"
+        )
+
+    headers_html = ""
+    for h in ["Ticker", "Läge", "Hetta", "Rel.vol", "5d %", "Rank"]:
+        headers_html += (
+            f"<th style='padding:8px 10px;text-align:left;color:{MUTED};"
+            f"font-size:.65rem;text-transform:uppercase;letter-spacing:.7px;"
+            f"font-weight:600'>{h}</th>"
+        )
+
     st.markdown(f"""
     <div style="border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,.06)">
         <table style="width:100%;border-collapse:collapse;font-size:.84rem">
-            <thead><tr style="background:rgba(255,255,255,.04)">{headers}</tr></thead>
+            <thead>
+                <tr style="background:rgba(255,255,255,.04)">{headers_html}</tr>
+            </thead>
             <tbody style="background:rgba(13,17,24,.85)">{rows_html}</tbody>
         </table>
     </div>
     """, unsafe_allow_html=True)
 
 
-# ---------------------------------------------------------------
-#  PUBLIK ENTRY-PUNKT — anropas från app.py i tabs[0]
-# ---------------------------------------------------------------
 def render_dagens_bull():
     universe = _get_universe()
     if not universe:
+        st.warning("Universe ej laddat — kontrollera att app.py sätter session_state.")
         return
 
-    # Unik ticker-lista
-    seen = set(); tickers = []
+    seen = set()
+    tickers = []
     for ts in universe.values():
         for t in ts:
             if t not in seen:
-                seen.add(t); tickers.append(t)
+                seen.add(t)
+                tickers.append(t)
 
     with st.spinner(f"Scannar {len(tickers)} aktier..."):
         all_data = _scan_all(tickers)
@@ -256,27 +261,22 @@ def render_dagens_bull():
     day_top  = _top_day(all_data)
     week_top = _top_week(all_data)
 
-    # ---- DAGENS BULL ----
+    # DAGENS BULL
     if day_top:
-        _render_hero(day_top[0], "day")
-        _render_table(day_top, "day")
+        _hero_card(day_top[0], "day")
+        _ranking_table(day_top, "day")
     else:
-        st.markdown(
-            f"<div style='padding:18px;border-radius:20px;border:1px solid {MUTED}33;"
-            f"color:{MUTED};text-align:center;margin-bottom:12px'>"
-            f"Ingen dagsvinnare just nu</div>", unsafe_allow_html=True)
+        st.info("Ingen dagsvinnare matchade filtret just nu.")
 
-    st.markdown("<div style='margin:20px 0 4px'></div>", unsafe_allow_html=True)
+    st.markdown("<hr style='border:none;border-top:1px solid rgba(255,255,255,.06);"
+                "margin:24px 0'>", unsafe_allow_html=True)
 
-    # ---- VECKANS BULL ----
+    # VECKANS BULL
     if week_top:
-        _render_hero(week_top[0], "week")
-        _render_table(week_top, "week")
+        _hero_card(week_top[0], "week")
+        _ranking_table(week_top, "week")
     else:
-        st.markdown(
-            f"<div style='padding:18px;border-radius:20px;border:1px solid {MUTED}33;"
-            f"color:{MUTED};text-align:center'>"
-            f"Ingen veckavinnare just nu</div>", unsafe_allow_html=True)
+        st.info("Ingen veckavinnare matchade filtret just nu.")
 
     st.caption(
         f"Skannade {len(all_data)} aktier · uppdateras var 10:e minut · "
