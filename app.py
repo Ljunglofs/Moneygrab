@@ -186,17 +186,30 @@ def render_grid(rows, key):
         st.info("Inga namn matchar just nu.")
         return
     rows.sort(key=lambda x: x["score10"], reverse=True)
-    df = pd.DataFrame([{
-        "Logo": logo_url(a["ticker"]), "Ticker": a["ticker"], "Läge": a["label"],
-        "Poäng": int(a["score10"]), "Pris": float(a["last"]), "RSI": int(round(a["rsi"])),
-        "20d": float(a["ret_20"]), "Topp": float(a["pct_from_high"]), "Vol": float(a["rel_vol"]),
-    } for a in rows])
-    h = min(len(df) * 36 + 40, 560)
-    ev = st.dataframe(df, column_config=CFG, hide_index=True, use_container_width=True,
-                      height=h, on_select="rerun", selection_mode="single-row", key=key)
-    rowsel = ev.selection.rows if (ev and ev.selection) else []
-    if rowsel:
-        show_detail(df.iloc[rowsel[0]]["Ticker"])
+
+    # rubrikrad
+    head = st.columns([2.2, 2, 1, 1.2, 1])
+    for col, txt in zip(head, ["Ticker", "Läge", "Poäng", "5d", "Rel.vol"]):
+        col.markdown(f"<div style='font-size:11px;color:{MUTED};letter-spacing:1px;"
+                     f"text-transform:uppercase'>{txt}</div>", unsafe_allow_html=True)
+
+    for a in rows:
+        c = st.columns([2.2, 2, 1, 1.2, 1])
+        # klickbar ticker-knapp (öppnar detaljvyn)
+        if c[0].button(a["ticker"], key=f"{key}_{a['ticker']}", use_container_width=True):
+            show_detail(a["ticker"])
+        # läge med färg
+        c[1].markdown(
+            f"<div style='padding-top:6px'><span class='pill' style='background:{a['color']}22;"
+            f"color:{a['color']};border:1px solid {a['color']}55'>{a['label']}</span></div>",
+            unsafe_allow_html=True)
+        c[2].markdown(f"<div style='padding-top:6px;font-weight:700'>{int(a['score10'])}/10</div>",
+                      unsafe_allow_html=True)
+        r5 = a.get("ret_5", 0)
+        c[3].markdown(f"<div style='padding-top:6px;font-weight:700;"
+                      f"color:{POS if r5>=0 else NEG}'>{r5:+.1f}%</div>", unsafe_allow_html=True)
+        c[4].markdown(f"<div style='padding-top:6px'>{a['rel_vol']:.2f}x</div>",
+                      unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------
 #  DETALJVY  (modal)
@@ -204,14 +217,17 @@ def render_grid(rows, key):
 @st.dialog(" ", width="large")
 @st.cache_data(ttl=3600, show_spinner=False)
 def company_info(ticker):
-    """Hämtar bolagsnamn, sektor, börsvärde m.m. från Yahoo. Cachas 1h."""
+    """Hämtar bolagsnamn, sektor, börsvärde m.m. från Yahoo. Cachas 1h.
+    Returnerar ALLTID en dict — kraschar aldrig."""
     if yf is None:
         return {}
     try:
-        info = yf.Ticker(ticker).info
+        info = yf.Ticker(ticker).info or {}
+        if not isinstance(info, dict):
+            return {}
         return {
-            "name": info.get("longName") or info.get("shortName") or ticker,
-            "sector": info.get("sector") or info.get("industry") or "—",
+            "name": info.get("longName") or info.get("shortName") or "",
+            "sector": info.get("sector") or info.get("industry") or "",
             "mcap": info.get("marketCap"),
             "currency": info.get("currency") or "",
             "summary": info.get("longBusinessSummary") or "",
@@ -245,8 +261,11 @@ def show_detail(ticker):
     if not a:
         st.error(f"Hittade ingen data för {ticker}.")
         return
-    info = company_info(ticker)
-    df_full, _ = fetch(ticker)
+    info = company_info(ticker) or {}
+    try:
+        df_full, _ = fetch(ticker)
+    except Exception:
+        df_full = None
     st.session_state["sok_context"] = {
         "ticker": ticker, "label": a["label"], "score10": a["score10"],
         "last": a["last"], "rsi": a["rsi"], "pct_from_high": a["pct_from_high"],
