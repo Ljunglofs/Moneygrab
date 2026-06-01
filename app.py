@@ -71,6 +71,11 @@ UNIVERSE = {
 }
 TICKER_THEME = {t: k for k, v in UNIVERSE.items() for t in v}
 
+# Gör UNIVERSE + färger tillgängliga för dagens_bull.py utan cirkulär import
+st.session_state["_mg_universe"]     = UNIVERSE
+st.session_state["_mg_ticker_theme"] = TICKER_THEME
+st.session_state["_mg_theme_color"]  = THEME_COLOR
+
 # =====================================================================
 #  CSS
 # =====================================================================
