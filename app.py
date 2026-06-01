@@ -67,28 +67,59 @@ TICKER_THEME = {t: k for k, v in UNIVERSE.items() for t in v}
 
 st.markdown(f"""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
 html, body, [class*="css"] {{ font-family:'Inter',-apple-system,sans-serif; }}
-h1,h2,h3,h4 {{ color:#fff; font-weight:800; letter-spacing:-.4px; }}
+h1,h2,h3,h4 {{ font-family:'Space Grotesk','Inter',sans-serif; color:#fff; font-weight:700; letter-spacing:-.5px; }}
 .stApp h2, .stApp h3 {{ font-size:1.35rem; }}
-.stTabs [data-baseweb="tab-list"] {{ gap:2px; border-bottom:1px solid {LINE}; }}
-.stTabs [data-baseweb="tab"] {{ background:transparent; color:{MUTED}; border-radius:0;
-    padding:9px 15px; font-weight:600; font-size:.85rem; border-bottom:2px solid transparent; }}
-.stTabs [aria-selected="true"] {{ color:#fff; border-bottom:2px solid {ACCENT}; }}
-.pill {{ display:inline-block; padding:4px 12px; border-radius:6px;
-        font-size:.75rem; font-weight:700; letter-spacing:.5px; }}
-/* nyckeltalsstrip */
-.sstrip {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr));
-          gap:10px; margin:6px 0 14px; }}
-.scard {{ background:{PANEL}; border:1px solid {LINE}; border-radius:14px; padding:12px 16px; }}
-.sl {{ color:{MUTED}; font-size:.68rem; text-transform:uppercase; letter-spacing:.6px; }}
-.sv {{ font-size:1.35rem; font-weight:800; margin-top:2px; }}
-/* metric-kort i detaljvyn */
-.mgrid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(96px,1fr));
-         gap:8px; margin:12px 0; }}
-.mcard {{ background:{BG}; border:1px solid {LINE}; border-radius:10px; padding:9px 11px; }}
-.ml {{ color:{MUTED}; font-size:.66rem; text-transform:uppercase; letter-spacing:.5px; }}
-.mv {{ font-size:1.05rem; font-weight:700; margin-top:3px; }}
+
+/* future-tech bakgrund */
+.stApp {{
+  background:
+    radial-gradient(900px 520px at 100% -5%, rgba(17,153,250,.10), transparent 55%),
+    radial-gradient(700px 420px at -5% 0%, rgba(88,213,224,.06), transparent 50%),
+    linear-gradient(180deg, #0b0f16 0%, #0c1018 100%);
+  background-attachment: fixed;
+}}
+section[data-testid="stSidebar"] {{ background:rgba(8,11,17,.92); border-right:1px solid rgba(255,255,255,.05); }}
+
+/* premium pill-flikar */
+.stTabs [data-baseweb="tab-list"] {{ gap:6px; border-bottom:0; flex-wrap:wrap; }}
+.stTabs [data-baseweb="tab"] {{ background:rgba(19,25,34,.7); color:{MUTED}; border-radius:999px;
+    padding:7px 16px; font-weight:600; font-size:.82rem; border:1px solid rgba(255,255,255,.05); }}
+.stTabs [aria-selected="true"] {{ background:linear-gradient(135deg,{ACCENT},#58d5e0);
+    color:#04121f; border:1px solid transparent; }}
+
+.pill {{ display:inline-block; padding:4px 12px; border-radius:999px;
+        font-size:.74rem; font-weight:700; letter-spacing:.4px; }}
+
+/* glass nyckeltalsstrip */
+.sstrip {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:12px; margin:8px 0 16px; }}
+.scard {{ background:rgba(19,25,34,.92); border:1px solid rgba(255,255,255,.05); border-radius:20px;
+    padding:16px 18px; backdrop-filter:blur(16px);
+    box-shadow:0 8px 24px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.04);
+    transition:transform .2s ease, box-shadow .2s ease, border-color .2s ease; }}
+.scard:hover {{ transform:translateY(-2px); border-color:rgba(17,153,250,.25);
+    box-shadow:0 14px 38px rgba(0,0,0,.45), 0 0 22px rgba(17,153,250,.10); }}
+.sl {{ color:{MUTED}; font-size:.66rem; text-transform:uppercase; letter-spacing:.7px; }}
+.sv {{ font-size:1.5rem; font-weight:800; margin-top:3px; font-family:'Space Grotesk',sans-serif; }}
+
+/* glass metric-kort */
+.mgrid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(100px,1fr)); gap:10px; margin:14px 0; }}
+.mcard {{ background:rgba(13,17,24,.85); border:1px solid rgba(255,255,255,.05); border-radius:16px;
+    padding:11px 13px; box-shadow:inset 0 1px 0 rgba(255,255,255,.03); }}
+.ml {{ color:{MUTED}; font-size:.64rem; text-transform:uppercase; letter-spacing:.6px; }}
+.mv {{ font-size:1.1rem; font-weight:700; margin-top:3px; font-family:'Space Grotesk',sans-serif; }}
+
+/* score-ring */
+.ring {{ width:94px; height:94px; border-radius:50%; display:flex; align-items:center;
+        justify-content:center; flex:none; }}
+.ring-inner {{ width:76px; height:76px; border-radius:50%; background:#0c1018;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; }}
+.ring-num {{ font-family:'Space Grotesk',sans-serif; font-size:1.5rem; font-weight:700; line-height:1; }}
+.ring-lab {{ font-size:.56rem; color:{MUTED}; text-transform:uppercase; letter-spacing:.5px; margin-top:2px; }}
+
+/* rundat datagrid */
+[data-testid="stDataFrame"] {{ border-radius:16px; overflow:hidden; border:1px solid rgba(255,255,255,.05); }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -221,7 +252,7 @@ def render_grid(rows, key):
         })
     sel = ev.selection.rows if (ev and ev.selection) else []
     if sel:
-        show_detail(df.iloc[sel[0]]["Ticker"])
+        st.session_state["detail_req"] = df.iloc[sel[0]]["Ticker"]
 
 def _escore_col(v, good_high=True):
     if good_high:
@@ -232,13 +263,28 @@ def _escore_col(v, good_high=True):
 def render_engine(e):
     st.markdown("#### Trade-motor")
     ent, ex = e["entry"], e["exit"]
-    cards = [("Breakout", f"{e['breakout_score']}", _escore_col(e['breakout_score'])),
-             ("Exit-risk", f"{ex['risk']}", _escore_col(ex['risk'], False)),
-             ("Swing", f"{e['swing_score']}", _escore_col(e['swing_score'])),
-             ("Confidence", f"{e['confidence']}%", _escore_col(e['confidence']))]
-    cells = "".join(f"<div class='mcard'><div class='ml'>{l}</div>"
-                    f"<div class='mv' style='color:{c}'>{v}</div></div>" for l, v, c in cards)
-    st.markdown(f"<div class='mgrid'>{cells}</div>", unsafe_allow_html=True)
+    bcol = _escore_col(e["breakout_score"])
+    ccol = _escore_col(e["confidence"])
+    ecol = _escore_col(ex["risk"], False)
+    scol = _escore_col(e["swing_score"])
+
+    def _ring(v, lab, col):
+        deg = int(max(0, min(100, v)) / 100 * 360)
+        return (f"<div class='ring' style='background:conic-gradient({col} {deg}deg,"
+                f"rgba(255,255,255,.06) {deg}deg)'><div class='ring-inner'>"
+                f"<div class='ring-num' style='color:{col}'>{v}</div>"
+                f"<div class='ring-lab'>{lab}</div></div></div>")
+
+    st.markdown(
+        f"<div style='display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin:6px 0 14px'>"
+        f"{_ring(e['breakout_score'], 'Breakout', bcol)}"
+        f"{_ring(e['confidence'], 'Confidence', ccol)}"
+        f"<div style='flex:1;min-width:220px;display:grid;grid-template-columns:1fr 1fr;gap:10px'>"
+        f"<div class='mcard'><div class='ml'>Exit-risk</div>"
+        f"<div class='mv' style='color:{ecol}'>{ex['risk']}/100</div></div>"
+        f"<div class='mcard'><div class='ml'>Swing</div>"
+        f"<div class='mv' style='color:{scol}'>{e['swing_score']}/100</div></div>"
+        f"</div></div>", unsafe_allow_html=True)
 
     fcol = {"HÖG": NEG, "MEDEL": ROCK_C, "LÅG": POS}[e["fake_risk"]]
     st.markdown(f"<div style='margin:2px 0 10px'>Setup: <b>{e['setup']}</b> · "
@@ -509,7 +555,7 @@ with tabs[2]:
                           on_select="rerun", selection_mode="single-row", key="warn")
         sel = ev.selection.rows if (ev and ev.selection) else []
         if sel:
-            show_detail(df.iloc[sel[0]]["Ticker"])
+            st.session_state["detail_req"] = df.iloc[sel[0]]["Ticker"]
 
 with tabs[3]:
     st.subheader("Watchlist — dina kärnnamn")
@@ -593,3 +639,11 @@ with tabs[8]:
 
 st.divider()
 st.caption("MoneyGrab · teknisk signalering på pris/volym, ingen finansiell rådgivning.")
+
+# ---------------------------------------------------------------------
+#  DETALJVY ÖPPNAS EN ENDA GÅNG (undviker dubbel-dialog från flera grids)
+# ---------------------------------------------------------------------
+_req = st.session_state.get("detail_req")
+if _req and _req != st.session_state.get("detail_shown"):
+    st.session_state["detail_shown"] = _req
+    show_detail(_req)
