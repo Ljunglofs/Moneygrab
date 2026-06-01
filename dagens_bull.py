@@ -1,7 +1,7 @@
 # =====================================================================
 #  dagens_bull.py  —  Dagens Bull + Veckans Bull
-#  Staplade vertikalt. Dagens = blå, Veckans = lila.
-#  Bolagsnamn under ticker. Inga walrus-operators (Python 3.7 safe).
+#  Använder fetch() + analyze() från sok_module direkt.
+#  Ingen dubbel-fetch. Staplade vertikalt. Blå / Lila.
 # =====================================================================
 
 import streamlit as st
@@ -42,6 +42,11 @@ def _company_name(ticker):
 
 @st.cache_data(ttl=600, show_spinner=False)
 def _bull_data(ticker):
+    """
+    Hämtar data via fetch() (cachat 5 min i sok_module).
+    Beräknar dag-rörelse direkt från df.
+    Vecko-rörelse = ret_5 från analyze() — samma beräkning, ingen extra fetch.
+    """
     try:
         df, _ = fetch(ticker)
     except Exception:
@@ -49,27 +54,21 @@ def _bull_data(ticker):
     if df is None or len(df) < 10:
         return None
     try:
-        c = df["Close"].dropna()
-        v = df["Volume"].dropna() if "Volume" in df.columns else None
+        a = analyze(df)
 
-        last      = float(c.iloc[-1])
-        prev_day  = float(c.iloc[-2])
-        prev_week = float(c.iloc[-6]) if len(c) >= 6 else float(c.iloc[0])
+        close    = df["Close"].dropna()
+        last     = float(close.iloc[-1])
+        prev_day = float(close.iloc[-2])
+        day_ret  = (last / prev_day - 1) * 100
 
-        day_ret  = (last / prev_day  - 1) * 100
-        week_ret = (last / prev_week - 1) * 100
+        # week_ret = ret_5 redan beräknat av analyze
+        week_ret = float(a.get("ret_5", 0))
 
-        rel_vol = 1.0
-        if v is not None and len(v) >= 20:
-            avg = float(v.iloc[-21:-1].mean())
-            if avg > 0:
-                rel_vol = float(v.iloc[-1]) / avg
-
-        a       = analyze(df)
-        score10 = float(a.get("score10", 0))
-        label   = a.get("label", "—")
-        rsi     = float(a.get("rsi", 0))
-        hetta   = round(min(100, score10 * 10 * min(rel_vol, 2.0)), 1)
+        rel_vol  = float(a.get("rel_vol", 1.0))
+        score10  = float(a.get("score10", 0))
+        label    = a.get("label", "—")
+        rsi      = float(a.get("rsi", 0))
+        hetta    = round(min(100, score10 * 10 * min(rel_vol, 2.0)), 1)
 
         return {
             "ticker":   ticker,
@@ -101,7 +100,7 @@ def _top_day(results, n=10):
 
 
 def _top_week(results, n=10):
-    # Inget rel_vol-krav — bara positiv veckorörelse
+    # Sorterar på week_ret (= ret_5), inget hårt filter
     f = [r for r in results if r["week_ret"] > 0]
     return sorted(f, key=lambda x: x["week_ret"], reverse=True)[:n]
 
@@ -117,9 +116,10 @@ def _hero_card(winner, period):
     rsi     = winner["rsi"]
     rsi_col = NEG if rsi > 75 else (ROCK_C if rsi > 65 else TXT)
     vol_col = POS if winner["rel_vol"] >= 1.5 else (ROCK_C if winner["rel_vol"] >= 1.1 else MUTED)
-
-    name_html = (f'<div style="font-size:.78rem;color:{MUTED};margin-top:4px">{name}</div>'
-                 if name else "")
+    name_html = (
+        f'<div style="font-size:.78rem;color:{MUTED};margin-top:4px">{name}</div>'
+        if name else ""
+    )
 
     st.markdown(f"""
     <div style="
@@ -198,9 +198,9 @@ def _hero_card(winner, period):
 def _ranking_table(rows, period):
     if not rows:
         return
-    color     = ACCENT if period == "day" else WEEK_C
-    ret_key   = "day_ret" if period == "day" else "week_ret"
-    title     = "Hetast just nu" if period == "day" else "Starkast denna vecka"
+    color   = ACCENT if period == "day" else WEEK_C
+    ret_key = "day_ret" if period == "day" else "week_ret"
+    title   = "Hetast just nu" if period == "day" else "Starkast denna vecka"
 
     st.markdown(
         f"<div style='font-size:1rem;font-weight:700;color:#fff;"
@@ -221,13 +221,12 @@ def _ranking_table(rows, period):
             f"</tr>"
         )
 
-    headers_html = ""
-    for h in ["Ticker", "Läge", "Hetta", "Rel.vol", "5d %", "Rank"]:
-        headers_html += (
-            f"<th style='padding:8px 10px;text-align:left;color:{MUTED};"
-            f"font-size:.65rem;text-transform:uppercase;letter-spacing:.7px;"
-            f"font-weight:600'>{h}</th>"
-        )
+    headers_html = "".join(
+        f"<th style='padding:8px 10px;text-align:left;color:{MUTED};"
+        f"font-size:.65rem;text-transform:uppercase;letter-spacing:.7px;"
+        f"font-weight:600'>{h}</th>"
+        for h in ["Ticker", "Läge", "Hetta", "Rel.vol", "5d %", "Rank"]
+    )
 
     st.markdown(f"""
     <div style="border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,.06)">
@@ -244,7 +243,7 @@ def _ranking_table(rows, period):
 def render_dagens_bull():
     universe = _get_universe()
     if not universe:
-        st.warning("Universe ej laddat — kontrollera att app.py sätter session_state.")
+        st.warning("Universe ej laddat.")
         return
 
     seen = set()
@@ -261,17 +260,18 @@ def render_dagens_bull():
     day_top  = _top_day(all_data)
     week_top = _top_week(all_data)
 
-    # DAGENS BULL
+    # ---- DAGENS BULL ----
     if day_top:
         _hero_card(day_top[0], "day")
         _ranking_table(day_top, "day")
     else:
         st.info("Ingen dagsvinnare matchade filtret just nu.")
 
-    st.markdown("<hr style='border:none;border-top:1px solid rgba(255,255,255,.06);"
-                "margin:24px 0'>", unsafe_allow_html=True)
+    st.markdown(
+        "<hr style='border:none;border-top:1px solid rgba(255,255,255,.06);margin:28px 0'>",
+        unsafe_allow_html=True)
 
-    # VECKANS BULL
+    # ---- VECKANS BULL ----
     if week_top:
         _hero_card(week_top[0], "week")
         _ranking_table(week_top, "week")
