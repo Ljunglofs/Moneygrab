@@ -139,7 +139,10 @@ with lc1:
 #  SIDOPANEL
 # ---------------------------------------------------------------------
 st.sidebar.markdown("### Inställningar")
-WATCHLIST_DEFAULT = "NVDA, QUBT, USAR, OUST, OKLO, NBIS, CRDO, SIVE.ST, IONQ, RKLB, ASTS, ONDS"
+WATCHLIST_DEFAULT = ("NVDA, QUBT, USAR, OUST, OKLO, NBIS, CRDO, SIVE.ST, IONQ, RKLB, ASTS, "
+                     "ONDS, PLTR, TSLA, RDW, IREN, CRWV, SMR, AAOI, RXRX, SMCI, AEVA, "
+                     "DNN, UEC, NVTS, HIMS, DGXX, SHT-B.ST, SMOL.ST, OBDU-B.ST, SUBGEN.ST, "
+                     "XOM-B.ST, XFAB.PA, SKYT, TERRNT-B.ST, VISC.ST, ENAFF")
 wl_raw = st.sidebar.text_area("Min watchlist", WATCHLIST_DEFAULT, height=120)
 watchlist = [t.strip().upper() for t in wl_raw.replace("\n", ",").split(",") if t.strip()]
 theme_sel = st.sidebar.multiselect("Filtrera teman", list(UNIVERSE.keys()),
@@ -233,7 +236,7 @@ def render_grid(rows, key):
     df = pd.DataFrame([{
         "Logo": logo_url(a["ticker"]), "Ticker": a["ticker"], "Läge": a["label"],
         "Poäng": int(a["score10"]), "Pris": float(a["last"]),
-        "5d": float(a.get("ret_5", 0)), "20d": float(a["ret_20"]),
+        "5d": float(a.get("ret_5", 0)), "1mån": float(a["ret_20"]),
         "Vol": float(a["rel_vol"]),
     } for a in rows])
     h = min(len(df) * 35 + 38, 560)
@@ -247,7 +250,7 @@ def render_grid(rows, key):
             "Poäng": st.column_config.NumberColumn("Poäng", format="%d/10"),
             "Pris": st.column_config.NumberColumn("Pris", format="%.2f"),
             "5d": st.column_config.NumberColumn("5d", format="%+.1f%%"),
-            "20d": st.column_config.NumberColumn("20d", format="%+.1f%%"),
+            "1mån": st.column_config.NumberColumn("1mån", format="%+.1f%%"),
             "Vol": st.column_config.NumberColumn("Vol", format="%.1fx"),
         })
     sel = ev.selection.rows if (ev and ev.selection) else []
