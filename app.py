@@ -1,8 +1,8 @@
 # =====================================================================
 #  MONEYGRAB  —  huvudfil
-#  Bas: app.py (senaste design + universum + breakout_engine)
-#  Pro-tillägg: ai_score_components, trade_motor_v2, news_ticker
-#  från moneygrab_pro_v4 — fullt integrerade, inga lösa kommentarsblock.
+#  Bas: app.py + moneygrab_pro_v4 pro-tillägg fullt integrerade.
+#  Buggfixar: company_info cachas separat och anropas utanför dialog,
+#             bolagsnamn visas i grid + detaljvy.
 #  Inget av detta är finansiell rådgivning.
 # =====================================================================
 
@@ -72,7 +72,7 @@ UNIVERSE = {
 TICKER_THEME = {t: k for k, v in UNIVERSE.items() for t in v}
 
 # =====================================================================
-#  CSS — trading-terminal-layout (Space Grotesk + glassmorphism)
+#  CSS
 # =====================================================================
 st.markdown(f"""
 <style>
@@ -80,7 +80,6 @@ st.markdown(f"""
 html, body, [class*="css"] {{ font-family:'Inter',-apple-system,sans-serif; }}
 h1,h2,h3,h4 {{ font-family:'Space Grotesk','Inter',sans-serif; color:#fff; font-weight:700; letter-spacing:-.5px; }}
 .stApp h2, .stApp h3 {{ font-size:1.35rem; }}
-
 .stApp {{
   background:
     radial-gradient(900px 520px at 100% -5%, rgba(17,153,250,.10), transparent 55%),
@@ -89,16 +88,13 @@ h1,h2,h3,h4 {{ font-family:'Space Grotesk','Inter',sans-serif; color:#fff; font-
   background-attachment: fixed;
 }}
 section[data-testid="stSidebar"] {{ background:rgba(8,11,17,.92); border-right:1px solid rgba(255,255,255,.05); }}
-
 .stTabs [data-baseweb="tab-list"] {{ gap:6px; border-bottom:0; flex-wrap:wrap; }}
 .stTabs [data-baseweb="tab"] {{ background:rgba(19,25,34,.7); color:{MUTED}; border-radius:999px;
     padding:7px 16px; font-weight:600; font-size:.82rem; border:1px solid rgba(255,255,255,.05); }}
 .stTabs [aria-selected="true"] {{ background:linear-gradient(135deg,{ACCENT},#58d5e0);
     color:#04121f; border:1px solid transparent; }}
-
 .pill {{ display:inline-block; padding:4px 12px; border-radius:999px;
         font-size:.74rem; font-weight:700; letter-spacing:.4px; }}
-
 .sstrip {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:12px; margin:8px 0 16px; }}
 .scard {{ background:rgba(19,25,34,.92); border:1px solid rgba(255,255,255,.05); border-radius:20px;
     padding:16px 18px; backdrop-filter:blur(16px);
@@ -108,26 +104,23 @@ section[data-testid="stSidebar"] {{ background:rgba(8,11,17,.92); border-right:1
     box-shadow:0 14px 38px rgba(0,0,0,.45), 0 0 22px rgba(17,153,250,.10); }}
 .sl {{ color:{MUTED}; font-size:.66rem; text-transform:uppercase; letter-spacing:.7px; }}
 .sv {{ font-size:1.5rem; font-weight:800; margin-top:3px; font-family:'Space Grotesk',sans-serif; }}
-
 .mgrid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(100px,1fr)); gap:10px; margin:14px 0; }}
 .mcard {{ background:rgba(13,17,24,.85); border:1px solid rgba(255,255,255,.05); border-radius:16px;
     padding:11px 13px; box-shadow:inset 0 1px 0 rgba(255,255,255,.03); }}
 .ml {{ color:{MUTED}; font-size:.64rem; text-transform:uppercase; letter-spacing:.6px; }}
 .mv {{ font-size:1.1rem; font-weight:700; margin-top:3px; font-family:'Space Grotesk',sans-serif; }}
-
 .ring {{ width:94px; height:94px; border-radius:50%; display:flex; align-items:center;
         justify-content:center; flex:none; }}
 .ring-inner {{ width:76px; height:76px; border-radius:50%; background:#0c1018;
     display:flex; flex-direction:column; align-items:center; justify-content:center; }}
 .ring-num {{ font-family:'Space Grotesk',sans-serif; font-size:1.5rem; font-weight:700; line-height:1; }}
 .ring-lab {{ font-size:.56rem; color:{MUTED}; text-transform:uppercase; letter-spacing:.5px; margin-top:2px; }}
-
 [data-testid="stDataFrame"] {{ border-radius:16px; overflow:hidden; border:1px solid rgba(255,255,255,.05); }}
 </style>
 """, unsafe_allow_html=True)
 
 # =====================================================================
-#  NEWS TICKER  (feedparser — syns överst om feedparser är installerat)
+#  NEWS TICKER
 # =====================================================================
 @st.cache_data(ttl=300, show_spinner=False)
 def _get_market_news():
@@ -183,7 +176,30 @@ if st.sidebar.button("Tvinga refresh av data", type="primary"):
     st.rerun()
 
 # =====================================================================
-#  HJÄLPARE
+#  COMPANY INFO — cachas utanför dialog (Streamlit krav)
+# =====================================================================
+@st.cache_data(ttl=3600, show_spinner=False)
+def company_info(ticker: str) -> dict:
+    """Hämtar bolagsnamn, sektor, börsvärde. Cachas 1h. Kraschar aldrig."""
+    if yf is None:
+        return {}
+    try:
+        info = yf.Ticker(ticker).info or {}
+        if not isinstance(info, dict):
+            return {}
+        return {
+            "name":     info.get("longName") or info.get("shortName") or "",
+            "sector":   info.get("sector") or info.get("industry") or "",
+            "mcap":     info.get("marketCap"),
+            "currency": info.get("currency") or "",
+            "summary":  info.get("longBusinessSummary") or "",
+            "country":  info.get("country") or "",
+        }
+    except Exception:
+        return {}
+
+# =====================================================================
+#  SCAN + HJÄLPARE
 # =====================================================================
 def scan(ticker: str):
     try:
@@ -232,10 +248,32 @@ def logo_url(ticker: str):
     return f"https://ui-avatars.com/api/?{q}"
 
 
+def get_short_name(ticker: str) -> str:
+    """Returnerar kortnamn för bolaget, max 22 tecken. Tomt om ej hittat."""
+    info = company_info(ticker)
+    name = info.get("name", "")
+    if not name or name.upper() == ticker.upper():
+        return ""
+    # Förkorta långa namn
+    if len(name) > 22:
+        name = name[:20].rstrip() + "…"
+    return name
+
+
+def _fmt_mcap(v):
+    if not v:       return "—"
+    if v >= 1e12:   return f"{v/1e12:.1f}T"
+    if v >= 1e9:    return f"{v/1e9:.1f}B"
+    if v >= 1e6:    return f"{v/1e6:.0f}M"
+    return f"{v:,.0f}"
+
+# =====================================================================
+#  GRID + STATS
+# =====================================================================
 def render_stats(rows):
-    n = len(rows)
-    nm = sum(1 for a in rows if a["label"] == "MOMENTUM")
-    nv = sum(1 for a in rows if a["label"] == "VÄNDNING")
+    n   = len(rows)
+    nm  = sum(1 for a in rows if a["label"] == "MOMENTUM")
+    nv  = sum(1 for a in rows if a["label"] == "VÄNDNING")
     avg = (sum(a["score10"] for a in rows) / n) if n else 0
     cards = [("Träffar", f"{n}", TXT), ("Momentum", f"{nm}", "#b06bff"),
              ("Vändning", f"{nv}", "#00c2c2"), ("Snittpoäng", f"{avg:.1f}", ACCENT)]
@@ -249,110 +287,130 @@ def render_grid(rows, key):
         st.info("Inga namn matchar just nu.")
         return
     rows.sort(key=lambda x: x["score10"], reverse=True)
-    df = pd.DataFrame([{
-        "Logo": logo_url(a["ticker"]), "Ticker": a["ticker"], "Läge": a["label"],
-        "Poäng": int(a["score10"]), "Pris": float(a["last"]),
-        "5d": float(a.get("ret_5", 0)), "1mån": float(a["ret_20"]),
-        "Vol": float(a["rel_vol"]),
-    } for a in rows])
-    h = min(len(df) * 35 + 38, 560)
+
+    # Hämta bolagsnamn för alla rader (cachat — snabbt för redan kända)
+    grid_data = []
+    for a in rows:
+        short = get_short_name(a["ticker"])
+        display = f"{a['ticker']}  {short}" if short else a["ticker"]
+        grid_data.append({
+            "Logo":   logo_url(a["ticker"]),
+            "Bolag":  display,
+            "Läge":   a["label"],
+            "Poäng":  int(a["score10"]),
+            "Pris":   float(a["last"]),
+            "5d":     float(a.get("ret_5", 0)),
+            "1mån":   float(a["ret_20"]),
+            "Vol":    float(a["rel_vol"]),
+            "_ticker": a["ticker"],   # intern nyckel för detaljvy
+        })
+
+    df = pd.DataFrame(grid_data)
+    h  = min(len(df) * 35 + 38, 560)
+
     ev = st.dataframe(
-        df, hide_index=True, use_container_width=True, height=h,
+        df.drop(columns=["_ticker"]),
+        hide_index=True, use_container_width=True, height=h,
         on_select="rerun", selection_mode="single-row", key=f"grid_{key}",
         column_config={
-            "Logo": st.column_config.ImageColumn("", width="small"),
-            "Ticker": st.column_config.TextColumn("Ticker", width="small"),
-            "Läge": st.column_config.TextColumn("Läge"),
+            "Logo":  st.column_config.ImageColumn("", width="small"),
+            "Bolag": st.column_config.TextColumn("Bolag"),
+            "Läge":  st.column_config.TextColumn("Läge"),
             "Poäng": st.column_config.NumberColumn("Poäng", format="%d/10"),
-            "Pris": st.column_config.NumberColumn("Pris", format="%.2f"),
-            "5d": st.column_config.NumberColumn("5d", format="%+.1f%%"),
-            "1mån": st.column_config.NumberColumn("1mån", format="%+.1f%%"),
-            "Vol": st.column_config.NumberColumn("Vol", format="%.1fx"),
+            "Pris":  st.column_config.NumberColumn("Pris", format="%.2f"),
+            "5d":    st.column_config.NumberColumn("5d", format="%+.1f%%"),
+            "1mån":  st.column_config.NumberColumn("1mån", format="%+.1f%%"),
+            "Vol":   st.column_config.NumberColumn("Vol", format="%.1fx"),
         })
     sel = ev.selection.rows if (ev and ev.selection) else []
     if sel:
-        st.session_state["detail_req"] = df.iloc[sel[0]]["Ticker"]
-
+        st.session_state["detail_req"] = grid_data[sel[0]]["_ticker"]
 
 # =====================================================================
-#  AI SCORE COMPONENTS  (Danelfin-stil, från moneygrab_pro_v4)
+#  AI SCORE + TRADE MOTOR
 # =====================================================================
 def ai_score_components(a):
-    """Danelfin-stil multi-faktor scoring. Returnerar dict med delscore 0-10."""
     tech = 0
     tech += 3 if a["last"] > a["ema50"] else 0
     tech += 3 if a["last"] > a["ema200"] else 0
     tech += 2 if 45 <= a["rsi"] <= 75 else 0
     tech += 2 if a["ret_20"] > 0 else 0
     tech = min(10, tech)
-
     momentum = min(10, max(0, int(a["momentum"] / 3.5)))
     sentiment = min(10, max(1, int(a["rel_vol"] * 4)))
-
     timing = 8
-    if a["rel_vol"] < 1.2:   timing -= 3
-    if a["pct_from_high"] > -5: timing -= 2
-
+    if a["rel_vol"] < 1.2:        timing -= 3
+    if a["pct_from_high"] > -5:   timing -= 2
     risk = 8
     if a["atr_pct"] > 12: risk -= 3
     if a["rsi"] > 78:     risk -= 2
-
-    fund = 5
+    fund  = 5
     total = round((tech + momentum + sentiment + timing + risk + fund) / 6, 1)
-
-    return {
-        "ai_score":       total,
-        "technical":      tech,
-        "momentum_score": momentum,
-        "sentiment":      sentiment,
-        "fundamental":    fund,
-        "risk":           risk,
-        "timing":         max(1, timing),
-    }
+    return {"ai_score": total, "technical": tech, "momentum_score": momentum,
+            "sentiment": sentiment, "fundamental": fund, "risk": risk,
+            "timing": max(1, timing)}
 
 
-# =====================================================================
-#  TRADE MOTOR V2  (från moneygrab_pro_v4)
-# =====================================================================
 def trade_motor_v2(a):
-    """Entry/breakout/fakeout/exit quality med orsaker och risker."""
     entry_q = 10; breakout_q = 10; fakeout_r = 2; exit_r = 2
     reasons = []; risks = []
-
     if a.get("rel_vol", 0) < 1.2:
         entry_q -= 3; breakout_q -= 2; fakeout_r += 2
         risks.append("Låg relativ volym")
     if a.get("pct_from_high", -100) > -5:
-        entry_q -= 2
-        risks.append("Nära motstånd/topp")
+        entry_q -= 2; risks.append("Nära motstånd/topp")
     if a.get("rsi", 0) > 75:
-        entry_q -= 2; exit_r += 2
-        risks.append("Utsträckt RSI")
+        entry_q -= 2; exit_r += 2; risks.append("Utsträckt RSI")
     if a.get("ret_20", 0) > 30:
-        exit_r += 2
-        risks.append("Parabolisk rörelse")
+        exit_r += 2; risks.append("Parabolisk rörelse")
+    if a.get("last", 0) > a.get("ema50", 999999):  reasons.append("Över EMA50")
+    if a.get("last", 0) > a.get("ema200", 999999): reasons.append("Över EMA200")
+    if a.get("ret_5", 0) > 5:                      reasons.append("Stark 5d-fart")
+    if a.get("momentum", 0) > 20:                  reasons.append("Momentum starkt")
+    confidence = round((entry_q + breakout_q + (10 - fakeout_r) + (10 - exit_r)) / 4, 1)
+    return {"entry_quality": max(1, entry_q), "breakout_quality": max(1, breakout_q),
+            "fakeout_risk": min(10, fakeout_r), "exit_risk": min(10, exit_r),
+            "confidence": confidence, "reasons": reasons, "risks": risks}
 
-    if a.get("last", 0) > a.get("ema50", 999999):   reasons.append("Över EMA50")
-    if a.get("last", 0) > a.get("ema200", 999999):  reasons.append("Över EMA200")
-    if a.get("ret_5", 0) > 5:                       reasons.append("Stark 5d-fart")
-    if a.get("momentum", 0) > 20:                   reasons.append("Momentum starkt")
 
-    confidence = round(
-        (entry_q + breakout_q + (10 - fakeout_r) + (10 - exit_r)) / 4, 1)
+def render_ai_score_panel(a):
+    sc = ai_score_components(a)
+    tm = trade_motor_v2(a)
+    st.markdown("#### AI Score")
+    cells = "".join(
+        f"<div class='mcard'><div class='ml'>{l}</div>"
+        f"<div class='mv' style='color:{ACCENT}'>{v}/10</div></div>"
+        for l, v in [("AI Score", sc["ai_score"]), ("Technical", sc["technical"]),
+                     ("Momentum", sc["momentum_score"]), ("Sentiment", sc["sentiment"]),
+                     ("Risk", sc["risk"]), ("Timing", sc["timing"])])
+    st.markdown(f"<div class='mgrid'>{cells}</div>", unsafe_allow_html=True)
+    st.progress(min(sc["ai_score"] / 10, 1.0))
 
-    return {
-        "entry_quality":    max(1, entry_q),
-        "breakout_quality": max(1, breakout_q),
-        "fakeout_risk":     min(10, fakeout_r),
-        "exit_risk":        min(10, exit_r),
-        "confidence":       confidence,
-        "reasons":          reasons,
-        "risks":            risks,
-    }
-
+    st.markdown("#### Trade Motor")
+    cells2 = "".join(
+        f"<div class='mcard'><div class='ml'>{l}</div>"
+        f"<div class='mv' style='color:{c}'>{v}/10</div></div>"
+        for l, v, c in [
+            ("Entry",     tm["entry_quality"],    POS if tm["entry_quality"] >= 7 else ROCK_C),
+            ("Breakout",  tm["breakout_quality"], POS if tm["breakout_quality"] >= 7 else ROCK_C),
+            ("Fakeout",   tm["fakeout_risk"],     NEG if tm["fakeout_risk"] >= 6 else POS),
+            ("Exit-risk", tm["exit_risk"],        NEG if tm["exit_risk"] >= 6 else POS),
+            ("Confidence",tm["confidence"],       POS if tm["confidence"] >= 7 else ROCK_C),
+        ])
+    st.markdown(f"<div class='mgrid'>{cells2}</div>", unsafe_allow_html=True)
+    st.progress(min(tm["confidence"] / 10, 1.0))
+    c1, c2 = st.columns(2)
+    if tm["reasons"]:
+        c1.markdown("<div class='ml'>PLUS</div>" +
+                    "".join(f"<div style='font-size:.85rem;color:{POS}'>+ {r}</div>"
+                            for r in tm["reasons"]), unsafe_allow_html=True)
+    if tm["risks"]:
+        c2.markdown("<div class='ml'>RISKER</div>" +
+                    "".join(f"<div style='font-size:.85rem;color:{NEG}'>- {r}</div>"
+                            for r in tm["risks"]), unsafe_allow_html=True)
 
 # =====================================================================
-#  RENDER-HJÄLPARE FÖR DETALJVYN
+#  BREAKOUT ENGINE RENDER
 # =====================================================================
 def _escore_col(v, good_high=True):
     if good_high:
@@ -361,7 +419,6 @@ def _escore_col(v, good_high=True):
 
 
 def render_engine(e):
-    """Renderar breakout_engine-resultat (entry/exit/swing) i detaljvyn."""
     st.markdown("#### Trade-motor")
     ent, ex = e["entry"], e["exit"]
     bcol = _escore_col(e["breakout_score"])
@@ -378,8 +435,7 @@ def render_engine(e):
 
     st.markdown(
         f"<div style='display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin:6px 0 14px'>"
-        f"{_ring(e['breakout_score'], 'Breakout', bcol)}"
-        f"{_ring(e['confidence'], 'Confidence', ccol)}"
+        f"{_ring(e['breakout_score'], 'Breakout', bcol)}{_ring(e['confidence'], 'Confidence', ccol)}"
         f"<div style='flex:1;min-width:220px;display:grid;grid-template-columns:1fr 1fr;gap:10px'>"
         f"<div class='mcard'><div class='ml'>Exit-risk</div>"
         f"<div class='mv' style='color:{ecol}'>{ex['risk']}/100</div></div>"
@@ -401,13 +457,13 @@ def render_engine(e):
         f"Retest: <b>{ent['retest']}</b><br>Stop: <b style='color:{NEG}'>{ent['stop']}</b><br>"
         f"Mål 1: <b style='color:{POS}'>{ent['t1']}</b> · Mål 2: <b style='color:{POS}'>{ent['t2']}</b><br>"
         f"RR: <b style='color:{rr_col}'>{ent['rr']}</b></div></div>", unsafe_allow_html=True)
-    reasons = ", ".join(ex["reasons"]) if ex["reasons"] else "inga tydliga varningar"
+    reasons_txt = ", ".join(ex["reasons"]) if ex["reasons"] else "inga tydliga varningar"
     c2.markdown(
         f"<div class='mcard'><div class='ml'>EXIT-PLAN</div>"
         f"<div style='font-size:.9rem;line-height:1.8;margin-top:4px'>"
         f"Exit-risk: <b style='color:{_escore_col(ex['risk'], False)}'>{ex['risk']}/100</b><br>"
         f"Åtgärd: <b>{ex['action']}</b><br>Trailing stop: <b>{ex['trail']}</b><br>"
-        f"Tecken: {reasons}</div></div>", unsafe_allow_html=True)
+        f"Tecken: {reasons_txt}</div></div>", unsafe_allow_html=True)
 
     bars = "".join(
         f"<div style='margin:3px 0'><span style='display:inline-block;width:84px;color:{MUTED};"
@@ -428,82 +484,9 @@ def render_engine(e):
         st.markdown(lines, unsafe_allow_html=True)
 
 
-def render_ai_score_panel(a):
-    """Renderar Danelfin-stil AI Score + Trade Motor i detaljvyn."""
-    sc = ai_score_components(a)
-    tm = trade_motor_v2(a)
-
-    st.markdown("#### AI Score")
-    cells = "".join(
-        f"<div class='mcard'><div class='ml'>{l}</div>"
-        f"<div class='mv' style='color:{ACCENT}'>{v}/10</div></div>"
-        for l, v in [
-            ("AI Score",  sc["ai_score"]),
-            ("Technical", sc["technical"]),
-            ("Momentum",  sc["momentum_score"]),
-            ("Sentiment", sc["sentiment"]),
-            ("Risk",      sc["risk"]),
-            ("Timing",    sc["timing"]),
-        ])
-    st.markdown(f"<div class='mgrid'>{cells}</div>", unsafe_allow_html=True)
-    st.progress(min(sc["ai_score"] / 10, 1.0))
-
-    st.markdown("#### Trade Motor")
-    cells2 = "".join(
-        f"<div class='mcard'><div class='ml'>{l}</div>"
-        f"<div class='mv' style='color:{c}'>{v}/10</div></div>"
-        for l, v, c in [
-            ("Entry",    tm["entry_quality"],    POS if tm["entry_quality"] >= 7 else ROCK_C),
-            ("Breakout", tm["breakout_quality"], POS if tm["breakout_quality"] >= 7 else ROCK_C),
-            ("Fakeout",  tm["fakeout_risk"],     NEG if tm["fakeout_risk"] >= 6 else POS),
-            ("Exit-risk",tm["exit_risk"],        NEG if tm["exit_risk"] >= 6 else POS),
-            ("Confidence",tm["confidence"],      POS if tm["confidence"] >= 7 else ROCK_C),
-        ])
-    st.markdown(f"<div class='mgrid'>{cells2}</div>", unsafe_allow_html=True)
-    st.progress(min(tm["confidence"] / 10, 1.0))
-
-    c1, c2 = st.columns(2)
-    if tm["reasons"]:
-        c1.markdown("<div class='ml'>PLUS</div>" +
-                    "".join(f"<div style='font-size:.85rem;color:{POS}'>+ {r}</div>"
-                            for r in tm["reasons"]), unsafe_allow_html=True)
-    if tm["risks"]:
-        c2.markdown("<div class='ml'>RISKER</div>" +
-                    "".join(f"<div style='font-size:.85rem;color:{NEG}'>- {r}</div>"
-                            for r in tm["risks"]), unsafe_allow_html=True)
-
-
 # =====================================================================
-#  DETALJVY  (modal — öppnas via @st.dialog)
+#  DETALJVY  — company_info anropas FÖRE @st.dialog, skickas som arg
 # =====================================================================
-@st.cache_data(ttl=3600, show_spinner=False)
-def company_info(ticker):
-    if yf is None:
-        return {}
-    try:
-        info = yf.Ticker(ticker).info or {}
-        if not isinstance(info, dict):
-            return {}
-        return {
-            "name":    info.get("longName") or info.get("shortName") or "",
-            "sector":  info.get("sector") or info.get("industry") or "",
-            "mcap":    info.get("marketCap"),
-            "currency":info.get("currency") or "",
-            "summary": info.get("longBusinessSummary") or "",
-            "country": info.get("country") or "",
-        }
-    except Exception:
-        return {}
-
-
-def _fmt_mcap(v):
-    if not v:       return "—"
-    if v >= 1e12:   return f"{v/1e12:.1f}T"
-    if v >= 1e9:    return f"{v/1e9:.1f}B"
-    if v >= 1e6:    return f"{v/1e6:.0f}M"
-    return f"{v:,.0f}"
-
-
 def price_chart(df, color):
     try:
         closes = df["Close"].tail(90)
@@ -514,12 +497,12 @@ def price_chart(df, color):
 
 
 @st.dialog(" ", width="large")
-def show_detail(ticker):
+def show_detail(ticker: str, info: dict):
+    """Renderar detaljvyn. info skickas in färdighämtat — ingen cache inuti dialog."""
     a = scan(ticker)
     if not a:
         st.error(f"Hittade ingen data för {ticker}.")
         return
-    info = company_info(ticker) or {}
     try:
         df_full, _ = fetch(ticker)
     except Exception:
@@ -532,11 +515,16 @@ def show_detail(ticker):
         "strength": a["strength"], "momentum": a["momentum"], "setup": a["setup"],
     }
 
-    # ---- RUBRIK ----
+    # ---- RUBRIK med fullständigt bolagsnamn ----
+    name    = info.get("name", "")
+    sector  = info.get("sector", "—")
     top = st.columns([2, 1, 1])
-    top[0].markdown(f"## {ticker}")
-    if info.get("name") and info["name"] != ticker:
-        top[0].caption(f"{info['name']} · {info.get('sector','—')}")
+    if name and name.upper() != ticker.upper():
+        top[0].markdown(f"## {name}")
+        top[0].caption(f"{ticker} · {sector}")
+    else:
+        top[0].markdown(f"## {ticker}")
+        top[0].caption(sector)
     top[0].markdown(
         f"<span class='pill' style='background:{a['color']}22;color:{a['color']};"
         f"border:1px solid {a['color']}55'>{a['label']}</span>", unsafe_allow_html=True)
@@ -566,17 +554,17 @@ def show_detail(ticker):
 
     # ---- NYCKELTAL ----
     items = [
-        ("RSI",        f"{a['rsi']:.0f}",              TXT),
-        ("20d",        f"{a['ret_20']:+.1f}%",          POS if a["ret_20"] >= 0 else NEG),
-        ("5d",         f"{a['ret_5']:+.1f}%",           POS if a["ret_5"] >= 0 else NEG),
-        ("Mot topp",   f"{a['pct_from_high']:+.1f}%",   MUTED),
-        ("52v-range",  f"{a['rng_pos']:.0f}%",          TXT),
-        ("Rel.vol",    f"{a['rel_vol']:.2f}x",          TXT),
-        ("Volatilitet",f"{a['atr_pct']:.1f}%",          TXT),
-        ("EMA50",      "över"  if a["last"] > a["ema50"]  else "under",
-                       POS     if a["last"] > a["ema50"]  else NEG),
-        ("EMA200",     "över"  if a["last"] > a["ema200"] else "under",
-                       POS     if a["last"] > a["ema200"] else NEG),
+        ("RSI",        f"{a['rsi']:.0f}",             TXT),
+        ("20d",        f"{a['ret_20']:+.1f}%",         POS if a["ret_20"] >= 0 else NEG),
+        ("5d",         f"{a['ret_5']:+.1f}%",          POS if a["ret_5"] >= 0 else NEG),
+        ("Mot topp",   f"{a['pct_from_high']:+.1f}%",  MUTED),
+        ("52v-range",  f"{a['rng_pos']:.0f}%",         TXT),
+        ("Rel.vol",    f"{a['rel_vol']:.2f}x",         TXT),
+        ("Volatilitet",f"{a['atr_pct']:.1f}%",         TXT),
+        ("EMA50",  "över"  if a["last"] > a["ema50"]  else "under",
+                   POS     if a["last"] > a["ema50"]  else NEG),
+        ("EMA200", "över"  if a["last"] > a["ema200"] else "under",
+                   POS     if a["last"] > a["ema200"] else NEG),
     ]
     cells = "".join(f"<div class='mcard'><div class='ml'>{l}</div>"
                     f"<div class='mv' style='color:{c}'>{v}</div></div>" for l, v, c in items)
@@ -585,7 +573,7 @@ def show_detail(ticker):
                 text=f"Score {a['total']:.0f}/100 · Styrka {a['strength']:.0f}/40 · "
                      f"Momentum {a['momentum']:.0f}/35 · Setup {a['setup']:.0f}/25")
 
-    # ---- BREAKOUT ENGINE (om tillgänglig) ----
+    # ---- BREAKOUT ENGINE ----
     if df_full is not None and engine_evaluate is not None:
         try:
             _bench, _ = fetch("^GSPC")
@@ -598,14 +586,14 @@ def show_detail(ticker):
         if eng:
             render_engine(eng)
 
-    # ---- AI SCORE + TRADE MOTOR (alltid tillgänglig) ----
+    # ---- AI SCORE + TRADE MOTOR ----
     render_ai_score_panel(a)
 
     # ---- OM BOLAGET ----
     if info.get("summary"):
-        with st.expander(f"Om {info.get('name', ticker)}"):
+        with st.expander(f"Om {name or ticker}"):
             land = f" · {info['country']}" if info.get("country") else ""
-            st.caption(f"{info.get('sector','—')}{land}")
+            st.caption(f"{sector}{land}")
             st.write(info["summary"])
 
     tradingview_chart(guess_tv_symbol(ticker), height=360)
@@ -613,7 +601,7 @@ def show_detail(ticker):
 
 
 # =====================================================================
-#  MARKNADSLÄGE  (index-pills)
+#  MARKNADSLÄGE
 # =====================================================================
 @st.cache_data(ttl=1800, show_spinner=False)
 def regime_of(ticker):
@@ -624,7 +612,8 @@ def regime_of(ticker):
     if df is None or len(df) < 200:
         return "BLANDAD", 0.0
     c = df["Close"].dropna()
-    last = float(c.iloc[-1]); ma200 = float(c.rolling(200).mean().iloc[-1])
+    last  = float(c.iloc[-1])
+    ma200 = float(c.rolling(200).mean().iloc[-1])
     ma50  = float(c.rolling(50).mean().iloc[-1])
     pct   = (last / ma200 - 1) * 100
     if last > ma200 and ma50 > ma200: return "BULL", pct
@@ -652,7 +641,7 @@ tabs = st.tabs(["HETA NU", "VÄNDNINGAR", "VARNINGAR", "WATCHLIST",
 
 
 def collect(tickers, keep_labels=None, warn=False):
-    out = []
+    out  = []
     prog = st.progress(0.0)
     for i, t in enumerate(tickers):
         a = scan(t)
@@ -694,24 +683,35 @@ with tabs[2]:
             if a["ret_20"] > 35:           return "PARABOL"
             return "SVAG"
         r.sort(key=lambda x: x["rsi"], reverse=True)
-        df_w = pd.DataFrame([{
-            "Logo": logo_url(a["ticker"]), "Ticker": a["ticker"], "Flagga": warnflag(a),
-            "RSI": int(round(a["rsi"])), "20d": float(a["ret_20"]), "Pris": float(a["last"]),
-        } for a in r])
+        warn_data = []
+        for a in r:
+            short = get_short_name(a["ticker"])
+            display = f"{a['ticker']}  {short}" if short else a["ticker"]
+            warn_data.append({
+                "Logo":   logo_url(a["ticker"]),
+                "Bolag":  display,
+                "Flagga": warnflag(a),
+                "RSI":    int(round(a["rsi"])),
+                "20d":    float(a["ret_20"]),
+                "Pris":   float(a["last"]),
+                "_ticker": a["ticker"],
+            })
+        df_w = pd.DataFrame(warn_data)
         cfg_w = {
             "Logo":   st.column_config.ImageColumn("", width="small"),
-            "Ticker": st.column_config.TextColumn("Ticker", width="small"),
+            "Bolag":  st.column_config.TextColumn("Bolag"),
             "Flagga": st.column_config.TextColumn("Flagga"),
             "RSI":    st.column_config.NumberColumn("RSI", format="%d"),
             "20d":    st.column_config.NumberColumn("20d", format="%.1f%%"),
             "Pris":   st.column_config.NumberColumn("Pris", format="%.2f"),
         }
-        ev_w = st.dataframe(df_w, column_config=cfg_w, hide_index=True, use_container_width=True,
+        ev_w = st.dataframe(df_w.drop(columns=["_ticker"]), column_config=cfg_w,
+                            hide_index=True, use_container_width=True,
                             height=min(len(df_w) * 36 + 40, 560),
                             on_select="rerun", selection_mode="single-row", key="warn")
         sel_w = ev_w.selection.rows if (ev_w and ev_w.selection) else []
         if sel_w:
-            st.session_state["detail_req"] = df_w.iloc[sel_w[0]]["Ticker"]
+            st.session_state["detail_req"] = warn_data[sel_w[0]]["_ticker"]
 
 with tabs[3]:
     st.subheader("Watchlist — dina kärnnamn")
@@ -794,9 +794,10 @@ st.divider()
 st.caption("MoneyGrab · teknisk signalering på pris/volym, ingen finansiell rådgivning.")
 
 # =====================================================================
-#  DETALJVY — triggas en gång (undviker dubbel-dialog från flera grids)
+#  DETALJVY-TRIGGER — hämtar company_info UTANFÖR dialog, skickar in
 # =====================================================================
 _req = st.session_state.get("detail_req")
 if _req and _req != st.session_state.get("detail_shown"):
     st.session_state["detail_shown"] = _req
-    show_detail(_req)
+    _info = company_info(_req)          # cachat anrop utanför @st.dialog
+    show_detail(_req, _info)
