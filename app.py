@@ -24,6 +24,11 @@ try:
 except Exception:
     render_dagens_bull = None
 
+try:
+    from breakout_engine import evaluate as engine_evaluate
+except Exception:
+    engine_evaluate = None
+
 st.set_page_config(page_title="MoneyGrab", page_icon="📈",
                    layout="wide", initial_sidebar_state="expanded")
 
@@ -33,22 +38,30 @@ BULL_C, ROCK_C = "#16c784", "#f0a020"
 
 # tema-färg per ticker (för logo-ikonerna) -> ger variation som riktiga loggor
 THEME_COLOR = {
-    "AI-infra":"2b7fff","Photonics":"00c2c2","Quantum":"b06bff","Rare earth":"f5a623",
-    "Defense/Drone":"ff5468","Lidar/Phys.AI":"21c45d","Nuclear":"ffd23f","Space":"ff7ab8",
-    "Koppar":"d2691e","Silver/Guld":"9aa7b5","Sverige":"006aa7",
+    "AI-infra":"2b7fff","Halvledare":"4f8cff","Photonics":"00c2c2","Quantum":"b06bff",
+    "Rare earth":"f5a623","Defense/Drone":"ff5468","Lidar/Phys.AI":"21c45d",
+    "Nuclear/Energi":"ffd23f","Space":"ff7ab8","Mjukvara":"7c5cff","Fintech/Krypto":"f7931a",
+    "Bio":"2ecc71","Mega":"9aa7b5","Koppar":"d2691e","Silver/Guld":"c0c0c0",
+    "Sverige":"006aa7","Bevakning":"5a6678",
 }
 UNIVERSE = {
-    "AI-infra":     ["NVDA","NBIS","CRDO","ALAB","MRVL","AVGO","AMD","SMCI","VRT","DGXX"],
-    "Photonics":    ["SIVE.ST","POET","LWLG"],
-    "Quantum":      ["IONQ","QUBT","RGTI"],
-    "Rare earth":   ["USAR","MP"],
-    "Defense/Drone":["ONDS","KTOS","AVAV"],
-    "Lidar/Phys.AI":["OUST","LAZR"],
-    "Nuclear":      ["OKLO","NNE","SMR","UEC","UUUU"],
-    "Space":        ["RKLB","ASTS","RDW"],
-    "Koppar":       ["FCX","HBM"],
-    "Silver/Guld":  ["AG","PAAS","GAU"],
-    "Sverige":      ["SUBGEN.ST","SMOL.ST","SHT-B.ST","ACCON.ST","SIVE.ST","OBD.F"],
+    "AI-infra":      ["NVDA","NBIS","CRDO","ALAB","MRVL","AVGO","AMD","SMCI","VRT","DGXX","CRWV","IREN","PENG","AAOI"],
+    "Halvledare":    ["HIMX","SKYT","SNPS","NVTS","XFAB.PA"],
+    "Photonics":     ["SIVE.ST","POET","LWLG","VIAV","LPKFF","HLIT"],
+    "Quantum":       ["IONQ","QUBT","RGTI"],
+    "Rare earth":    ["USAR","MP"],
+    "Defense/Drone": ["ONDS","KTOS","AVAV"],
+    "Lidar/Phys.AI": ["OUST","LAZR","AEVA"],
+    "Nuclear/Energi":["OKLO","NNE","SMR","UEC","UUUU","VST","DNN","FLNC"],
+    "Space":         ["RKLB","ASTS","RDW"],
+    "Mjukvara":      ["NOW","PLTR","ZETA","TTWO","INFQ"],
+    "Fintech/Krypto":["HOOD","HIVE"],
+    "Bio":           ["RXRX","VIVO","HIMS"],
+    "Mega":          ["MSFT","IBM","TSLA"],
+    "Koppar":        ["FCX","HBM"],
+    "Silver/Guld":   ["AG","PAAS","GAU"],
+    "Sverige":       ["SUBGEN.ST","SMOL.ST","SHT-B.ST","ACCON.ST","SIVE.ST","OBDU-B.ST","XOM-B.ST","TERRNT-B.ST","VISC.ST"],
+    "Bevakning":     ["SUU","IMSR","AIRJ","ORBT","ENAFF","TRT","ABTC"],
 }
 TICKER_THEME = {t: k for k, v in UNIVERSE.items() for t in v}
 
@@ -186,30 +199,87 @@ def render_grid(rows, key):
         st.info("Inga namn matchar just nu.")
         return
     rows.sort(key=lambda x: x["score10"], reverse=True)
+    df = pd.DataFrame([{
+        "Logo": logo_url(a["ticker"]), "Ticker": a["ticker"], "Läge": a["label"],
+        "Poäng": int(a["score10"]), "Pris": float(a["last"]),
+        "5d": float(a.get("ret_5", 0)), "20d": float(a["ret_20"]),
+        "Vol": float(a["rel_vol"]),
+    } for a in rows])
+    h = min(len(df) * 35 + 38, 560)
+    ev = st.dataframe(
+        df, hide_index=True, use_container_width=True, height=h,
+        on_select="rerun", selection_mode="single-row", key=f"grid_{key}",
+        column_config={
+            "Logo": st.column_config.ImageColumn("", width="small"),
+            "Ticker": st.column_config.TextColumn("Ticker", width="small"),
+            "Läge": st.column_config.TextColumn("Läge"),
+            "Poäng": st.column_config.NumberColumn("Poäng", format="%d/10"),
+            "Pris": st.column_config.NumberColumn("Pris", format="%.2f"),
+            "5d": st.column_config.NumberColumn("5d", format="%+.1f%%"),
+            "20d": st.column_config.NumberColumn("20d", format="%+.1f%%"),
+            "Vol": st.column_config.NumberColumn("Vol", format="%.1fx"),
+        })
+    sel = ev.selection.rows if (ev and ev.selection) else []
+    if sel:
+        show_detail(df.iloc[sel[0]]["Ticker"])
 
-    # rubrikrad
-    head = st.columns([2.2, 2, 1, 1.2, 1])
-    for col, txt in zip(head, ["Ticker", "Läge", "Poäng", "5d", "Rel.vol"]):
-        col.markdown(f"<div style='font-size:11px;color:{MUTED};letter-spacing:1px;"
-                     f"text-transform:uppercase'>{txt}</div>", unsafe_allow_html=True)
+def _escore_col(v, good_high=True):
+    if good_high:
+        return POS if v >= 70 else (ACCENT if v >= 50 else (MUTED if v >= 30 else NEG))
+    return NEG if v >= 65 else (ROCK_C if v >= 40 else POS)
 
-    for a in rows:
-        c = st.columns([2.2, 2, 1, 1.2, 1])
-        # klickbar ticker-knapp (öppnar detaljvyn)
-        if c[0].button(a["ticker"], key=f"{key}_{a['ticker']}", use_container_width=True):
-            show_detail(a["ticker"])
-        # läge med färg
-        c[1].markdown(
-            f"<div style='padding-top:6px'><span class='pill' style='background:{a['color']}22;"
-            f"color:{a['color']};border:1px solid {a['color']}55'>{a['label']}</span></div>",
-            unsafe_allow_html=True)
-        c[2].markdown(f"<div style='padding-top:6px;font-weight:700'>{int(a['score10'])}/10</div>",
-                      unsafe_allow_html=True)
-        r5 = a.get("ret_5", 0)
-        c[3].markdown(f"<div style='padding-top:6px;font-weight:700;"
-                      f"color:{POS if r5>=0 else NEG}'>{r5:+.1f}%</div>", unsafe_allow_html=True)
-        c[4].markdown(f"<div style='padding-top:6px'>{a['rel_vol']:.2f}x</div>",
-                      unsafe_allow_html=True)
+
+def render_engine(e):
+    st.markdown("#### Trade-motor")
+    ent, ex = e["entry"], e["exit"]
+    cards = [("Breakout", f"{e['breakout_score']}", _escore_col(e['breakout_score'])),
+             ("Exit-risk", f"{ex['risk']}", _escore_col(ex['risk'], False)),
+             ("Swing", f"{e['swing_score']}", _escore_col(e['swing_score'])),
+             ("Confidence", f"{e['confidence']}%", _escore_col(e['confidence']))]
+    cells = "".join(f"<div class='mcard'><div class='ml'>{l}</div>"
+                    f"<div class='mv' style='color:{c}'>{v}</div></div>" for l, v, c in cards)
+    st.markdown(f"<div class='mgrid'>{cells}</div>", unsafe_allow_html=True)
+
+    fcol = {"HÖG": NEG, "MEDEL": ROCK_C, "LÅG": POS}[e["fake_risk"]]
+    st.markdown(f"<div style='margin:2px 0 10px'>Setup: <b>{e['setup']}</b> · "
+                f"Fake-breakout-risk: <span style='color:{fcol};font-weight:700'>{e['fake_risk']}</span>"
+                f"</div>", unsafe_allow_html=True)
+
+    c1, c2 = st.columns(2)
+    rr_col = POS if ent["rr"] >= 2 else (ROCK_C if ent["rr"] >= 1 else NEG)
+    c1.markdown(
+        f"<div class='mcard'><div class='ml'>ENTRY-PLAN</div>"
+        f"<div style='font-size:.9rem;line-height:1.8;margin-top:4px'>"
+        f"Aggressiv: <b>{ent['aggressive']}</b><br>Bekräftad: <b>{ent['confirmed']}</b><br>"
+        f"Retest: <b>{ent['retest']}</b><br>Stop: <b style='color:{NEG}'>{ent['stop']}</b><br>"
+        f"Mål 1: <b style='color:{POS}'>{ent['t1']}</b> · Mål 2: <b style='color:{POS}'>{ent['t2']}</b><br>"
+        f"RR: <b style='color:{rr_col}'>{ent['rr']}</b></div></div>", unsafe_allow_html=True)
+    reasons = ", ".join(ex["reasons"]) if ex["reasons"] else "inga tydliga varningar"
+    c2.markdown(
+        f"<div class='mcard'><div class='ml'>EXIT-PLAN</div>"
+        f"<div style='font-size:.9rem;line-height:1.8;margin-top:4px'>"
+        f"Exit-risk: <b style='color:{_escore_col(ex['risk'], False)}'>{ex['risk']}/100</b><br>"
+        f"Åtgärd: <b>{ex['action']}</b><br>Trailing stop: <b>{ex['trail']}</b><br>"
+        f"Tecken: {reasons}</div></div>", unsafe_allow_html=True)
+
+    bars = "".join(
+        f"<div style='margin:3px 0'><span style='display:inline-block;width:84px;color:{MUTED};"
+        f"font-size:.78rem'>{k}</span>"
+        f"<span style='display:inline-block;height:8px;width:{int(val*4)}px;max-width:160px;"
+        f"background:{ACCENT};border-radius:4px;vertical-align:middle'></span>"
+        f"<span style='font-size:.78rem;color:{TXT};margin-left:6px'>{val}</span></div>"
+        for k, val in e["components"].items())
+    st.markdown(f"<div style='margin:10px 0'><div class='ml'>POÄNG-FÖRDELNING</div>{bars}</div>",
+                unsafe_allow_html=True)
+
+    if e["explain"]:
+        st.markdown("<div class='ml' style='margin-top:6px'>VARFÖR</div>", unsafe_allow_html=True)
+        lines = "".join(
+            f"<div style='font-size:.85rem'><span style='color:{POS if p>0 else NEG};"
+            f"font-weight:700'>{'+' if p>0 else ''}{p}</span> {txt}</div>"
+            for txt, p in e["explain"][:8])
+        st.markdown(lines, unsafe_allow_html=True)
+
 
 # ---------------------------------------------------------------------
 #  DETALJVY  (modal)
@@ -321,6 +391,19 @@ def show_detail(ticker):
     st.progress(min(a["total"] / 100, 1.0),
                 text=f"Score {a['total']:.0f}/100 · Styrka {a['strength']:.0f}/40 · "
                      f"Momentum {a['momentum']:.0f}/35 · Setup {a['setup']:.0f}/25")
+    # ---- TRADE-MOTOR (breakout / entry / exit / swing) ----
+    if df_full is not None and engine_evaluate is not None:
+        try:
+            _bench, _ = fetch("^GSPC")
+        except Exception:
+            _bench = None
+        try:
+            eng = engine_evaluate(df_full, _bench["Close"] if _bench is not None else None)
+        except Exception:
+            eng = None
+        if eng:
+            render_engine(eng)
+
     # ---- OM BOLAGET (hopfällbart) ----
     if info.get("summary"):
         with st.expander(f"Om {info.get('name', ticker)}"):
