@@ -26,6 +26,12 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 
+try:
+    from levels_module import compute_levels, levels_score_bonus
+except Exception:
+    compute_levels = None
+    levels_score_bonus = None
+
 
 # ----------------------------------------------------------
 #  INDIKATORER
@@ -170,7 +176,24 @@ def analyze(df):
     if rolling_over: bonus -= 6
     if cooling: bonus -= 7          # MACD vänder + RSI ner = dra ner poängen
 
-    total = min(strength + momentum + setup + bonus, 100)   # 0–100
+    # ---------- LEVELS (RayAlgo-replika: BOS, OB, struktur, ATR-mål) ----------
+    if compute_levels is not None:
+        try:
+            lv = compute_levels(df)
+        except Exception:
+            lv = None
+    else:
+        lv = None
+
+    lv_bonus = 0
+    if lv and levels_score_bonus is not None:
+        try:
+            lv_bonus = levels_score_bonus(lv)
+        except Exception:
+            lv_bonus = 0
+
+    total = min(strength + momentum + setup + bonus + lv_bonus, 100)   # 0–100
+    total = max(0, total)
     score10 = max(1, min(10, round(total / 10)))
 
     # ---------- ETIKETT  (prioriterar entry-lägen) ----------
@@ -191,7 +214,7 @@ def analyze(df):
     else:
         label, emoji, color = "SVAG", "", "#ff9f43"
 
-    return {
+    result = {
         "last": last, "rsi": rsi, "atr_pct": atr_pct,
         "ema20": ema20, "ema50": ema50, "ema200": ema200,
         "pct_from_high": pct_from_high, "rng_pos": rng_pos,
@@ -202,6 +225,17 @@ def analyze(df):
         "rsi_falling": rsi_falling, "cooling": cooling,
         "label": label, "emoji": emoji, "color": color,
     }
+    # Levels (BOS/OB/struktur/ATR-mål/setup-grade). Defaultar tomt om modul saknas.
+    if lv:
+        result.update(lv)
+    else:
+        result.update({
+            "bos": "INGEN", "bos_level": None, "structure": "BLANDAD",
+            "ob_support": None, "ob_resist": None,
+            "atr_up_1": None, "atr_up_05": None, "atr_dn_05": None, "atr_dn_1": None,
+            "setup_grade": "C", "setup_score": 0, "levels_note": "",
+        })
+    return result
 
 
 # ----------------------------------------------------------
@@ -358,6 +392,38 @@ def render_sok_tab():
 
     st.caption("Detta är teknisk signalering, inte finansiell rådgivning. Rankingen väger styrka, "
                "momentum och setup — den säger inget om bolagets fundamenta eller nyhetsrisk.")
+
+    # ---- LEVELS (RayAlgo-stil) ----
+    if a.get("levels_note"):
+        st.markdown("##### Nivåer & struktur")
+        bos = a.get("bos", "INGEN")
+        bos_col = "#21c45d" if bos == "BULLISH" else "#ff4b4b" if bos == "BEARISH" else "#848e9c"
+        grade = a.get("setup_grade", "C")
+        grade_col = {"A": "#21c45d", "B": "#1199fa", "C": "#f5d142", "D": "#ff6b3d"}.get(grade, "#848e9c")
+        lc = st.columns(4)
+        lc[0].metric("BOS", bos)
+        lc[1].metric("Struktur", a.get("structure", "—"))
+        lc[2].metric("Setup-betyg", grade)
+        lc[3].metric("Setup-score", f"{a.get('setup_score', 0)}/100")
+        st.markdown(
+            f"<div style='margin:6px 0'>"
+            f"<span class='pill' style='background:{bos_col}22;color:{bos_col};"
+            f"border:1px solid {bos_col}55'>BOS {bos}</span> "
+            f"<span class='pill' style='background:{grade_col}22;color:{grade_col};"
+            f"border:1px solid {grade_col}55;margin-left:6px'>Betyg {grade}</span>"
+            f"</div>", unsafe_allow_html=True)
+        lv_tab = pd.DataFrame({
+            "Nivå": ["Stöd (OB)", "Motstånd (OB)", "Mål +0.5 ATR", "Mål +1.0 ATR",
+                     "Risk −0.5 ATR", "Risk −1.0 ATR"],
+            "Pris": [
+                a.get("ob_support") if a.get("ob_support") is not None else "—",
+                a.get("ob_resist") if a.get("ob_resist") is not None else "—",
+                a.get("atr_up_05", "—"), a.get("atr_up_1", "—"),
+                a.get("atr_dn_05", "—"), a.get("atr_dn_1", "—"),
+            ],
+        })
+        st.dataframe(lv_tab, hide_index=True, use_container_width=True)
+        st.caption(a["levels_note"])
 
     # ---- TRADINGVIEW-GRAF ----
     st.markdown("##### TradingView")

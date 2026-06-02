@@ -35,6 +35,11 @@ try:
 except Exception:
     engine_evaluate = None
 
+try:
+    from featured_picks import render_featured_picks
+except Exception:
+    render_featured_picks = None
+
 st.set_page_config(page_title="MoneyGrab", page_icon="📈",
                    layout="wide", initial_sidebar_state="expanded")
 
@@ -315,10 +320,14 @@ def render_grid(rows, key):
     for a in rows:
         short = get_short_name(a["ticker"])
         display = f"{a['ticker']}  {short}" if short else a["ticker"]
+        bos = a.get("bos", "INGEN")
+        bos_arrow = "↑" if bos == "BULLISH" else "↓" if bos == "BEARISH" else "–"
         grid_data.append({
             "Logo":   logo_url(a["ticker"]),
             "Bolag":  display,
             "Läge":   a["label"],
+            "Setup":  a.get("setup_grade", "C"),
+            "BOS":    bos_arrow,
             "Poäng":  int(a["score10"]),
             "Pris":   float(a["last"]),
             "5d":     float(a.get("ret_5", 0)),
@@ -338,6 +347,8 @@ def render_grid(rows, key):
             "Logo":  st.column_config.ImageColumn("", width="small"),
             "Bolag": st.column_config.TextColumn("Bolag"),
             "Läge":  st.column_config.TextColumn("Läge"),
+            "Setup": st.column_config.TextColumn("Setup", help="Setup-kvalitet A/B/C/D (BOS + OB + struktur)"),
+            "BOS":   st.column_config.TextColumn("BOS", help="Break of Structure: ↑ bullish, ↓ bearish, – ingen"),
             "Poäng": st.column_config.NumberColumn("Poäng", format="%d/10"),
             "Pris":  st.column_config.NumberColumn("Pris", format="%.2f"),
             "5d":    st.column_config.NumberColumn("5d", format="%+.1f%%"),
@@ -598,6 +609,27 @@ def show_detail(ticker: str, info: dict):
                 text=f"Score {a['total']:.0f}/100 · Styrka {a['strength']:.0f}/40 · "
                      f"Momentum {a['momentum']:.0f}/35 · Setup {a['setup']:.0f}/25")
 
+    # ---- NIVÅER & STRUKTUR (RayAlgo-stil) ----
+    if a.get("levels_note"):
+        bos = a.get("bos", "INGEN")
+        bos_col = POS if bos == "BULLISH" else NEG if bos == "BEARISH" else MUTED
+        grade = a.get("setup_grade", "C")
+        grade_col = {"A": POS, "B": ACCENT, "C": "#f5d142", "D": ROCK_C}.get(grade, MUTED)
+        lvitems = [
+            ("BOS", bos, bos_col),
+            ("Struktur", a.get("structure", "—"), TXT),
+            ("Setup", grade, grade_col),
+            ("Stöd OB", f"{a['ob_support']:.2f}" if a.get("ob_support") is not None else "—", POS),
+            ("Motstånd OB", f"{a['ob_resist']:.2f}" if a.get("ob_resist") is not None else "—", NEG),
+            ("Mål +1 ATR", f"{a['atr_up_1']:.2f}" if a.get("atr_up_1") is not None else "—", POS),
+            ("Risk −1 ATR", f"{a['atr_dn_1']:.2f}" if a.get("atr_dn_1") is not None else "—", NEG),
+        ]
+        lvcells = "".join(f"<div class='mcard'><div class='ml'>{l}</div>"
+                          f"<div class='mv' style='color:{c}'>{v}</div></div>" for l, v, c in lvitems)
+        st.markdown("#### Nivåer & struktur", unsafe_allow_html=True)
+        st.markdown(f"<div class='mgrid'>{lvcells}</div>", unsafe_allow_html=True)
+        st.caption(a["levels_note"])
+
     # ---- BREAKOUT ENGINE ----
     if df_full is not None and engine_evaluate is not None:
         try:
@@ -683,6 +715,13 @@ def collect(tickers, keep_labels=None, warn=False):
 
 
 with tabs[0]:
+    if render_featured_picks is not None:
+        try:
+            render_featured_picks(scan, selected, market_movers, company_info,
+                                  logo_url, THEME_COLOR, TICKER_THEME)
+        except Exception as _e:
+            st.caption(f"Veckans urval kunde inte laddas: {_e}")
+        st.divider()
     if render_dagens_bull is not None:
         render_dagens_bull()
         st.divider()
