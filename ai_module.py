@@ -161,3 +161,51 @@ def render_ai_tab():
 
     st.session_state["ai_messages"].append({"role": "assistant", "content": full})
     st.caption("AI-analys, inte finansiell rådgivning. Kontrollera alltid fakta själv.")
+
+
+# ============================================================
+#  GRABIT INLINE — liten frågeruta för detaljvyn
+# ============================================================
+def render_grabit_inline(ticker: str):
+    """Liten Grabit-ruta i detaljvyn. Frågar AI:n om just denna aktie.
+    (st.chat_input funkar ej i @st.dialog → knappar + textfält i stället.)"""
+    st.markdown(f"#### Fråga Grabit om {ticker}")
+    quick = ["Vad tror du om aktien?", "Förklara setupen", "Största risken just nu?"]
+    qcols = st.columns(len(quick))
+    pending = None
+    for i, q in enumerate(quick):
+        if qcols[i].button(q, key=f"gq_{ticker}_{i}", use_container_width=True):
+            pending = q
+
+    c_in, c_btn = st.columns([4, 1])
+    custom = c_in.text_input("Egen fråga", key=f"gq_txt_{ticker}",
+                             placeholder="…eller skriv en egen fråga",
+                             label_visibility="collapsed")
+    if c_btn.button("Fråga", key=f"gq_send_{ticker}", type="primary",
+                    use_container_width=True) and custom.strip():
+        pending = custom.strip()
+
+    ans_key = f"grabit_ans_{ticker}"
+    if pending:
+        client = _client()
+        if client is None:
+            return
+        msgs = [{"role": "user", "content": pending + _context_block()}]
+        ph, full = st.empty(), ""
+        try:
+            with client.messages.stream(model="claude-sonnet-4-6", max_tokens=900,
+                                        system=SYSTEM_PROMPT, messages=msgs) as stream:
+                for t in stream.text_stream:
+                    full += t
+                    ph.markdown(full + "▌")
+            ph.markdown(full)
+        except Exception as e:
+            st.error(f"Kunde inte nå AI:n: {e}")
+            return
+        st.session_state[ans_key] = {"q": pending, "a": full}
+        st.caption("AI-analys, inte finansiell rådgivning. Kontrollera fakta själv.")
+    elif st.session_state.get(ans_key):
+        prev = st.session_state[ans_key]
+        st.caption(f"Fråga: {prev['q']}")
+        st.markdown(prev["a"])
+        st.caption("AI-analys, inte finansiell rådgivning. Kontrollera fakta själv.")
