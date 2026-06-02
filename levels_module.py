@@ -103,10 +103,10 @@ def _bos(df, piv_hi, piv_lo, lookback=20):
     bos_level = None
     if last_swing_high is not None and last > last_swing_high:
         bos = "BULLISH"
-        bos_level = float(last_swing_high)
+        bos_level = round(float(last_swing_high), 2)
     elif last_swing_low is not None and last < last_swing_low:
         bos = "BEARISH"
-        bos_level = float(last_swing_low)
+        bos_level = round(float(last_swing_low), 2)
     return bos, bos_level
 
 

@@ -252,13 +252,17 @@ def tradingview_chart(tv_symbol, height=460):
           "autosize": true,
           "symbol": "{tv_symbol}",
           "interval": "D",
+          "range": "6M",
           "timezone": "Europe/Stockholm",
           "theme": "dark",
           "style": "1",
           "locale": "se",
-          "toolbar_bg": "#0e1117",
+          "toolbar_bg": "#0b0e16",
+          "backgroundColor": "#0b0e16",
+          "gridColor": "rgba(255,255,255,0.04)",
           "enable_publishing": false,
-          "hide_side_toolbar": false,
+          "hide_side_toolbar": true,
+          "hide_legend": false,
           "allow_symbol_change": true,
           "studies": ["STD;EMA","STD;RSI"],
           "container_id": "tv_chart"
@@ -308,6 +312,12 @@ def render_sok_tab():
         "last": a["last"], "rsi": a["rsi"], "pct_from_high": a["pct_from_high"],
         "ret_20": a["ret_20"], "rel_vol": a["rel_vol"],
         "strength": a["strength"], "momentum": a["momentum"], "setup": a["setup"],
+        "bos": a.get("bos"), "structure": a.get("structure"),
+        "setup_grade": a.get("setup_grade"), "setup_score": a.get("setup_score"),
+        "ob_support": a.get("ob_support"), "ob_resist": a.get("ob_resist"),
+        "atr_up_1": a.get("atr_up_1"), "atr_up_05": a.get("atr_up_05"),
+        "atr_dn_05": a.get("atr_dn_05"), "atr_dn_1": a.get("atr_dn_1"),
+        "levels_note": a.get("levels_note"),
     }
 
     # senaste pris från intraday om möjligt

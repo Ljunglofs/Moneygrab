@@ -23,7 +23,7 @@ except Exception:
     feedparser = None
 
 from sok_module import render_sok_tab, fetch, analyze, tradingview_chart, guess_tv_symbol
-from ai_module import render_ai_tab, render_grabit_inline
+from ai_module import render_ai_tab
 
 try:
     from dagens_bull import render_dagens_bull
@@ -39,6 +39,12 @@ try:
     from featured_picks import render_featured_picks
 except Exception:
     render_featured_picks = None
+
+try:
+    from compare_module import render_compare_tab, ranked_rows
+except Exception:
+    render_compare_tab = None
+    ranked_rows = None
 
 st.set_page_config(page_title="MoneyGrab", page_icon="📈",
                    layout="wide", initial_sidebar_state="expanded")
@@ -92,40 +98,92 @@ h1,h2,h3,h4 {{ font-family:'Space Grotesk','Inter',sans-serif; color:#fff; font-
 .stApp h2, .stApp h3 {{ font-size:1.35rem; }}
 .stApp {{
   background:
-    radial-gradient(900px 520px at 100% -5%, rgba(17,153,250,.10), transparent 55%),
-    radial-gradient(700px 420px at -5% 0%, rgba(88,213,224,.06), transparent 50%),
-    linear-gradient(180deg, #0b0f16 0%, #0c1018 100%);
+    radial-gradient(1100px 640px at 100% -8%, rgba(17,153,250,.16), transparent 58%),
+    radial-gradient(900px 560px at -8% 4%, rgba(88,213,224,.09), transparent 54%),
+    radial-gradient(700px 700px at 50% 120%, rgba(45,95,200,.10), transparent 60%),
+    linear-gradient(180deg, #070a11 0%, #0a0e16 45%, #080b12 100%);
   background-attachment: fixed;
 }}
-section[data-testid="stSidebar"] {{ background:rgba(8,11,17,.92); border-right:1px solid rgba(255,255,255,.05); }}
+section[data-testid="stSidebar"] {{ background:rgba(7,10,17,.94); border-right:1px solid rgba(255,255,255,.06); }}
 .stTabs [data-baseweb="tab-list"] {{ gap:6px; border-bottom:0; flex-wrap:wrap; }}
-.stTabs [data-baseweb="tab"] {{ background:rgba(19,25,34,.7); color:{MUTED}; border-radius:999px;
-    padding:7px 16px; font-weight:600; font-size:.82rem; border:1px solid rgba(255,255,255,.05); }}
+.stTabs [data-baseweb="tab"] {{ background:rgba(19,25,34,.6); color:{MUTED}; border-radius:999px;
+    padding:7px 16px; font-weight:600; font-size:.82rem; border:1px solid rgba(255,255,255,.06);
+    transition:all .18s ease; }}
+.stTabs [data-baseweb="tab"]:hover {{ border-color:rgba(17,153,250,.3); color:#cfe6ff; }}
 .stTabs [aria-selected="true"] {{ background:linear-gradient(135deg,{ACCENT},#58d5e0);
-    color:#04121f; border:1px solid transparent; }}
+    color:#04121f; border:1px solid transparent; box-shadow:0 4px 18px rgba(17,153,250,.3); }}
 .pill {{ display:inline-block; padding:4px 12px; border-radius:999px;
         font-size:.74rem; font-weight:700; letter-spacing:.4px; }}
 .sstrip {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:12px; margin:8px 0 16px; }}
-.scard {{ background:rgba(19,25,34,.92); border:1px solid rgba(255,255,255,.05); border-radius:20px;
-    padding:16px 18px; backdrop-filter:blur(16px);
-    box-shadow:0 8px 24px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.04);
+.scard {{ background:linear-gradient(160deg, rgba(22,28,40,.94), rgba(14,18,27,.94));
+    border:1px solid rgba(255,255,255,.06); border-radius:22px;
+    padding:16px 18px; backdrop-filter:blur(18px);
+    box-shadow:0 10px 30px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.05);
     transition:transform .2s ease, box-shadow .2s ease, border-color .2s ease; }}
-.scard:hover {{ transform:translateY(-2px); border-color:rgba(17,153,250,.25);
-    box-shadow:0 14px 38px rgba(0,0,0,.45), 0 0 22px rgba(17,153,250,.10); }}
+.scard:hover {{ transform:translateY(-2px); border-color:rgba(17,153,250,.28);
+    box-shadow:0 16px 44px rgba(0,0,0,.5), 0 0 26px rgba(17,153,250,.12); }}
 .sl {{ color:{MUTED}; font-size:.66rem; text-transform:uppercase; letter-spacing:.7px; }}
 .sv {{ font-size:1.5rem; font-weight:800; margin-top:3px; font-family:'Space Grotesk',sans-serif; }}
 .mgrid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(100px,1fr)); gap:10px; margin:14px 0; }}
-.mcard {{ background:rgba(13,17,24,.85); border:1px solid rgba(255,255,255,.05); border-radius:16px;
-    padding:11px 13px; box-shadow:inset 0 1px 0 rgba(255,255,255,.03); }}
+.mcard {{ background:rgba(13,17,24,.8); border:1px solid rgba(255,255,255,.05); border-radius:16px;
+    padding:11px 13px; box-shadow:inset 0 1px 0 rgba(255,255,255,.04); }}
 .ml {{ color:{MUTED}; font-size:.64rem; text-transform:uppercase; letter-spacing:.6px; }}
 .mv {{ font-size:1.1rem; font-weight:700; margin-top:3px; font-family:'Space Grotesk',sans-serif; }}
 .ring {{ width:94px; height:94px; border-radius:50%; display:flex; align-items:center;
         justify-content:center; flex:none; }}
 .ring-inner {{ width:76px; height:76px; border-radius:50%; background:#0c1018;
     display:flex; flex-direction:column; align-items:center; justify-content:center; }}
+
+/* ---- BAREBONE-STIL: hero, skill-kort, stylade knappar/input ---- */
+.hero-title {{ font-family:'Space Grotesk',sans-serif; font-size:2.4rem; font-weight:700;
+    line-height:1.05; letter-spacing:-1px; text-align:center; margin:8px 0 4px;
+    background:linear-gradient(120deg,#fff 30%,#9fd2ff 70%); -webkit-background-clip:text;
+    -webkit-text-fill-color:transparent; }}
+.hero-sub {{ text-align:center; color:{MUTED}; font-size:.95rem; margin-bottom:18px; }}
+.skill-card {{ background:linear-gradient(160deg, rgba(26,33,48,.9), rgba(15,20,30,.9));
+    border:1px solid rgba(255,255,255,.07); border-radius:22px; padding:18px 18px 16px;
+    height:100%; transition:all .2s ease; cursor:pointer;
+    box-shadow:0 8px 26px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.04); }}
+.skill-card:hover {{ transform:translateY(-3px); border-color:rgba(17,153,250,.4);
+    box-shadow:0 18px 48px rgba(0,0,0,.5), 0 0 30px rgba(17,153,250,.18); }}
+.skill-ico {{ width:42px; height:42px; border-radius:12px; display:flex; align-items:center;
+    justify-content:center; font-size:1.2rem; margin-bottom:12px;
+    background:rgba(17,153,250,.14); border:1px solid rgba(17,153,250,.25); }}
+.skill-title {{ font-family:'Space Grotesk',sans-serif; font-size:1.05rem; font-weight:700;
+    color:#fff; line-height:1.2; }}
+.skill-desc {{ color:{MUTED}; font-size:.82rem; margin-top:6px; line-height:1.4; }}
+
+/* rankade rad-kort (Trending-stil) */
+.rank-row {{ background:linear-gradient(160deg, rgba(20,26,38,.85), rgba(13,17,26,.85));
+    border:1px solid rgba(255,255,255,.06); border-radius:16px; padding:12px 14px;
+    transition:all .18s ease; box-shadow:0 4px 16px rgba(0,0,0,.28); }}
+.rank-row:hover {{ border-color:rgba(17,153,250,.3);
+    box-shadow:0 10px 30px rgba(0,0,0,.4), 0 0 20px rgba(17,153,250,.12); }}
+
+/* gör Streamlit-knappar i Grabit till glas-stil */
+div[data-testid="stButton"] > button {{
+    background:linear-gradient(160deg, rgba(26,33,48,.85), rgba(15,20,30,.85));
+    border:1px solid rgba(255,255,255,.08); border-radius:16px; color:#dce8f5;
+    font-weight:600; padding:12px 16px; transition:all .18s ease;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.04); }}
+div[data-testid="stButton"] > button:hover {{
+    border-color:rgba(17,153,250,.45); color:#fff; transform:translateY(-1px);
+    box-shadow:0 10px 26px rgba(0,0,0,.4), 0 0 22px rgba(17,153,250,.15); }}
+div[data-testid="stButton"] > button[kind="primary"] {{
+    background:linear-gradient(135deg,{ACCENT},#2d8fd6); border:1px solid transparent;
+    color:#fff; box-shadow:0 6px 22px rgba(17,153,250,.35); }}
+
+/* stylat textfält + chat-input med accent-glow */
+div[data-testid="stTextInput"] input, div[data-testid="stChatInput"] textarea,
+.stChatInput textarea {{
+    background:rgba(13,18,28,.9) !important; border:1px solid rgba(17,153,250,.25) !important;
+    border-radius:16px !important; color:#eaf2ff !important; }}
+div[data-testid="stTextInput"] input:focus {{
+    border-color:rgba(17,153,250,.6) !important; box-shadow:0 0 0 3px rgba(17,153,250,.12) !important; }}
+
+[data-testid="stDataFrame"] {{ border-radius:16px; overflow:hidden; border:1px solid rgba(255,255,255,.06); }}
 .ring-num {{ font-family:'Space Grotesk',sans-serif; font-size:1.5rem; font-weight:700; line-height:1; }}
 .ring-lab {{ font-size:.56rem; color:{MUTED}; text-transform:uppercase; letter-spacing:.5px; margin-top:2px; }}
-[data-testid="stDataFrame"] {{ border-radius:16px; overflow:hidden; border:1px solid rgba(255,255,255,.05); }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -206,7 +264,6 @@ def company_info(ticker: str) -> dict:
             "currency": info.get("currency") or "",
             "summary":  info.get("longBusinessSummary") or "",
             "country":  info.get("country") or "",
-            "website":  info.get("website") or "",
         }
     except Exception:
         return {}
@@ -246,39 +303,26 @@ def scan(ticker: str):
 
 @st.cache_data(ttl=900, show_spinner=False)
 def market_movers(source_key):
-    """Tar EN källa (str, bakåtkompatibelt) eller FLERA (tuple/list).
-    Slår ihop och deduplicerar. Cap 35/källa, 200 totalt."""
     if yf is None:
         return []
-    keys = [source_key] if isinstance(source_key, str) else list(source_key)
-    seen, out = set(), []
-    for key in keys:
-        res = None
+    res = None
+    try:
+        res = yf.screen(source_key)
+    except Exception:
         try:
-            res = yf.screen(key)
+            from yfinance import Screener
+            s = Screener()
+            s.set_predefined_body(source_key)
+            res = s.response
         except Exception:
-            try:
-                from yfinance import Screener
-                s = Screener()
-                s.set_predefined_body(key)
-                res = s.response
-            except Exception:
-                res = None
-        quotes = res.get("quotes", []) if isinstance(res, dict) else []
-        n_key = 0
-        for q in quotes:
-            sym = q.get("symbol", "") if isinstance(q, dict) else ""
-            if not sym or any(ch in sym for ch in (".", "-", "=", "^")):
-                continue
-            sym = sym.upper()
-            if sym in seen:
-                continue
-            seen.add(sym)
-            out.append(sym)
-            n_key += 1
-            if n_key >= 35:
-                break
-    return out[:200]
+            return []
+    quotes = res.get("quotes", []) if isinstance(res, dict) else []
+    syms = []
+    for q in quotes:
+        sym = q.get("symbol", "") if isinstance(q, dict) else ""
+        if sym and all(ch not in sym for ch in (".", "-", "=", "^")):
+            syms.append(sym.upper())
+    return syms[:35]
 
 
 def logo_url(ticker: str):
@@ -299,57 +343,6 @@ def get_short_name(ticker: str) -> str:
     if len(name) > 22:
         name = name[:20].rstrip() + "…"
     return name
-
-
-COUNTRY_ISO = {
-    "United States":"us","Sweden":"se","Canada":"ca","United Kingdom":"gb",
-    "Germany":"de","France":"fr","Netherlands":"nl","Switzerland":"ch",
-    "China":"cn","Taiwan":"tw","Japan":"jp","South Korea":"kr","Israel":"il",
-    "Ireland":"ie","Norway":"no","Finland":"fi","Denmark":"dk","Australia":"au",
-    "India":"in","Singapore":"sg","Hong Kong":"hk","Brazil":"br","Mexico":"mx",
-    "Italy":"it","Spain":"es","Bermuda":"bm","Cayman Islands":"ky","Luxembourg":"lu",
-}
-
-def flag_html(country: str, h: int = 14) -> str:
-    code = COUNTRY_ISO.get((country or "").strip())
-    if not code:
-        return ""
-    return (f"<img src='https://flagcdn.com/h20/{code}.png' "
-            f"style='height:{h}px;border-radius:2px;vertical-align:-2px;margin-left:7px' "
-            f"alt='{country}'/>")
-
-
-def company_logo_html(ticker: str, info: dict, size: int = 46) -> str:
-    """Riktig logotyp via Clearbit (bolagets domän). Faller tillbaka på monogram."""
-    color = THEME_COLOR.get(TICKER_THEME.get(ticker, ""), "1c2330")
-    mono  = ("".join(ch for ch in ticker if ch.isalpha())[:2] or ticker[:2]).upper()
-    web   = info.get("website", "") or ""
-    domain = ""
-    if web:
-        domain = (web.replace("https://", "").replace("http://", "")
-                     .replace("www.", "").strip("/").split("/")[0])
-    img = ""
-    if domain:
-        img = (f"<img src='https://logo.clearbit.com/{domain}' "
-               f"onerror=\"this.remove()\" "
-               f"style='position:absolute;inset:0;width:100%;height:100%;object-fit:contain;"
-               f"background:#0c1018;border-radius:13px'/>")
-    return (f"<div style='position:relative;width:{size}px;height:{size}px;border-radius:13px;"
-            f"background:#{color}22;border:1px solid #{color}55;display:flex;align-items:center;"
-            f"justify-content:center;overflow:hidden;flex:none;"
-            f"font-family:\"Space Grotesk\",sans-serif;font-weight:700;font-size:15px;"
-            f"color:#{color}'>{mono}{img}</div>")
-
-
-def short_blurb(text: str, max_len: int = 280) -> str:
-    if not text:
-        return ""
-    s = " ".join(text.split())
-    if len(s) <= max_len:
-        return s
-    cut = s[:max_len]
-    dot = cut.rfind(". ")
-    return cut[:dot + 1] if dot > 90 else cut.rstrip() + "…"
 
 
 def _fmt_mcap(v):
@@ -380,7 +373,17 @@ def render_grid(rows, key):
         return
     rows.sort(key=lambda x: x["score10"], reverse=True)
 
-    # Hämta bolagsnamn för alla rader (cachat — snabbt för redan kända)
+    # Vy-toggle: snygga rad-kort (default) eller tät tabell
+    view = st.radio("Vy", ["Kort", "Tabell"], horizontal=True, key=f"view_{key}",
+                    label_visibility="collapsed")
+
+    if view == "Kort" and ranked_rows is not None:
+        chosen = ranked_rows(rows, logo_url, company_info, key=f"rr_{key}")
+        if chosen:
+            st.session_state["detail_req"] = chosen
+        return
+
+    # ---- TABELL-VY (fallback / tät översikt) ----
     grid_data = []
     for a in rows:
         short = get_short_name(a["ticker"])
@@ -398,7 +401,7 @@ def render_grid(rows, key):
             "5d":     float(a.get("ret_5", 0)),
             "1mån":   float(a["ret_20"]),
             "Vol":    float(a["rel_vol"]),
-            "_ticker": a["ticker"],   # intern nyckel för detaljvy
+            "_ticker": a["ticker"],
         })
 
     df = pd.DataFrame(grid_data)
@@ -427,73 +430,6 @@ def render_grid(rows, key):
 # =====================================================================
 #  AI SCORE + TRADE MOTOR
 # =====================================================================
-@st.cache_data(ttl=900, show_spinner=False)
-def top_week_data(tickers):
-    """Topp 5 på 5-dagarsavkastning. Cachas 15 min, delar fetch-cache med HETA NU."""
-    rows = []
-    for t in tickers:
-        a = scan(t)
-        if not a:
-            continue
-        r5 = a.get("ret_5")
-        if r5 is None:
-            continue
-        rows.append({
-            "ticker": t, "ret_5": float(r5), "ret_20": float(a.get("ret_20", 0)),
-            "label": a["label"], "color": a["color"], "score10": a["score10"],
-            "rel_vol": float(a.get("rel_vol", 1)),
-        })
-    rows.sort(key=lambda x: x["ret_5"], reverse=True)
-    return rows[:5]
-
-
-def render_top_week(tickers):
-    data = top_week_data(tuple(sorted(tickers)))
-    if not data:
-        return
-    st.markdown(
-        "<div style='display:flex;align-items:baseline;gap:12px;margin:.1rem 0 .7rem'>"
-        "<div style='font-family:\"Space Grotesk\",sans-serif;font-weight:700;font-size:1.18rem;"
-        "color:#fff;letter-spacing:-.3px'>Veckans raketer</div>"
-        f"<div style='font-size:.78rem;color:{MUTED}'>Starkast senaste 5 dagarna · ditt universum</div>"
-        "</div>", unsafe_allow_html=True)
-    cols = st.columns(len(data))
-    for i, (col, d) in enumerate(zip(cols, data)):
-        tk    = d["ticker"]
-        info  = company_info(tk)
-        name  = get_short_name(tk) or ""
-        c     = d["color"]
-        r5    = d["ret_5"]
-        rcol  = POS if r5 >= 0 else NEG
-        arrow = "▲" if r5 >= 0 else "▼"
-        logo  = company_logo_html(tk, info, size=34)
-        col.markdown(
-            f"<div style='background:#131922;border:1px solid rgba(255,255,255,.06);"
-            f"border-top:2px solid {rcol};border-radius:15px;padding:13px 13px 12px;"
-            f"position:relative;min-height:152px'>"
-            f"<div style='position:absolute;top:11px;right:13px;font-family:\"Space Grotesk\",sans-serif;"
-            f"font-weight:700;font-size:.7rem;color:{c}'>{d['score10']}/10</div>"
-            f"<div style='font-family:\"Space Grotesk\",sans-serif;font-weight:700;font-size:.72rem;"
-            f"color:{MUTED};margin-bottom:8px'>#{i+1}</div>"
-            f"<div style='display:flex;align-items:center;gap:9px;margin-bottom:10px'>{logo}"
-            f"<div style='min-width:0'><div style='font-family:\"Space Grotesk\",sans-serif;font-weight:700;"
-            f"font-size:1rem;color:#fff;line-height:1'>{tk}</div>"
-            f"<div style='font-size:.64rem;color:{MUTED};white-space:nowrap;overflow:hidden;"
-            f"text-overflow:ellipsis;max-width:92px;margin-top:2px'>{name}</div></div></div>"
-            f"<div style='font-family:\"Space Grotesk\",sans-serif;font-weight:800;font-size:1.5rem;"
-            f"color:{rcol};line-height:1'>{arrow} {r5:+.1f}%</div>"
-            f"<div style='font-size:.58rem;color:{MUTED};margin-top:3px;letter-spacing:.6px'>5 DAGAR · "
-            f"{d['rel_vol']:.1f}x VOL</div>"
-            f"<span class='pill' style='background:{c}22;color:{c};border:1px solid {c}55;"
-            f"margin-top:9px;display:inline-block;font-size:.6rem'>{d['label']}</span>"
-            f"</div>", unsafe_allow_html=True)
-        if col.button("Detaljer", key=f"tw_{tk}", use_container_width=True):
-            st.session_state["detail_req"] = tk
-            st.session_state.pop("detail_shown", None)
-            st.rerun()
-    st.divider()
-
-
 def ai_score_components(a):
     tech = 0
     tech += 3 if a["last"] > a["ema50"] else 0
@@ -678,62 +614,60 @@ def show_detail(ticker: str, info: dict):
         "last": a["last"], "rsi": a["rsi"], "pct_from_high": a["pct_from_high"],
         "ret_20": a["ret_20"], "rel_vol": a["rel_vol"],
         "strength": a["strength"], "momentum": a["momentum"], "setup": a["setup"],
+        "bos": a.get("bos"), "structure": a.get("structure"),
+        "setup_grade": a.get("setup_grade"), "setup_score": a.get("setup_score"),
+        "ob_support": a.get("ob_support"), "ob_resist": a.get("ob_resist"),
+        "atr_up_1": a.get("atr_up_1"), "atr_up_05": a.get("atr_up_05"),
+        "atr_dn_05": a.get("atr_dn_05"), "atr_dn_1": a.get("atr_dn_1"),
+        "levels_note": a.get("levels_note"),
     }
 
-    # ---- RUBRIK: logga + namn + flagga + live-kurs + dagens % ----
+    # ---- RUBRIK: featured-kort-stil (matchar Veckans urval) ----
     name   = info.get("name", "")
     sector = info.get("sector", "") or ""
-    flag   = flag_html(info.get("country", ""))
     _live = live_price(ticker)
     price_display = _live if _live else a["last"]
     price_label   = "Live" if _live else "Stängning"
-
-    day_chg = None
-    if df_full is not None:
-        cc = df_full["Close"].dropna()
-        if len(cc) >= 2 and cc.iloc[-2]:
-            day_chg = (float(cc.iloc[-1]) / float(cc.iloc[-2]) - 1) * 100
-
-    top = st.columns([2, 1, 1])
-    title = name if (name and name.upper() != ticker.upper()) else ticker
-    sub   = f"{ticker} · {sector}" if sector else ticker
-    top[0].markdown(
-        f"<div style='display:flex;align-items:center;gap:13px'>{company_logo_html(ticker, info)}"
-        f"<div><div style='font-family:\"Space Grotesk\",sans-serif;font-weight:700;font-size:1.5rem;"
-        f"line-height:1.1;color:#fff'>{title}</div>"
-        f"<div style='font-size:.8rem;color:{MUTED};margin-top:2px'>{sub}{flag}</div></div></div>",
-        unsafe_allow_html=True)
-    top[0].markdown(
-        f"<span class='pill' style='background:{a['color']}22;color:{a['color']};"
-        f"border:1px solid {a['color']}55;margin-top:8px;display:inline-block'>{a['label']}</span>",
-        unsafe_allow_html=True)
-    top[1].metric(price_label, f"{price_display:.2f}",
-                  f"{day_chg:+.2f}% idag" if day_chg is not None else None)
-    top[2].metric("Lyftchans", f"{a['score10']}/10")
-
-    # ---- KORT OM BOLAGET ----
-    blurb = short_blurb(info.get("summary", ""))
-    if blurb:
-        st.markdown(
-            f"<div style='font-size:.86rem;color:#b6c0cc;line-height:1.5;margin:10px 0 2px;"
-            f"padding:11px 14px;background:rgba(19,25,34,.55);border:1px solid rgba(255,255,255,.05);"
-            f"border-radius:12px'>{blurb}</div>", unsafe_allow_html=True)
-
-    # ---- STOR 5D-RÖRELSE ----
+    acc = a["color"]
     r5 = a["ret_5"]
     r5_color = POS if r5 >= 0 else NEG
     arrow = "▲" if r5 >= 0 else "▼"
+    bos = a.get("bos", "INGEN")
+    bos_txt = "BOS↑" if bos == "BULLISH" else "BOS↓" if bos == "BEARISH" else "BOS –"
+    grade = a.get("setup_grade", "C")
+    disp_name = name if (name and name.upper() != ticker.upper()) else ""
+    sub = f"{sector}" if sector else ""
+
     st.markdown(
-        f"<div style='display:flex;gap:24px;align-items:baseline;margin:8px 0 4px;flex-wrap:wrap'>"
-        f"<div><div style='font-size:12px;color:{MUTED};letter-spacing:1px'>SENASTE 5 DAGARNA</div>"
-        f"<div style='font-size:40px;font-weight:800;line-height:1;color:{r5_color}'>"
-        f"{arrow} {r5:+.1f}%</div></div>"
-        f"<div style='align-self:flex-end'><span style='font-size:13px;color:{MUTED}'>20 dagar: </span>"
-        f"<span style='font-size:18px;font-weight:700;color:{POS if a['ret_20']>=0 else NEG}'>"
-        f"{a['ret_20']:+.1f}%</span></div>"
-        f"<div style='align-self:flex-end'><span style='font-size:13px;color:{MUTED}'>Börsvärde: </span>"
-        f"<span style='font-size:18px;font-weight:700;color:{TXT}'>"
-        f"{_fmt_mcap(info.get('mcap'))} {info.get('currency','')}</span></div>"
+        f"<div class='scard' style='border-color:{acc}55;box-shadow:0 0 26px {acc}22;padding:20px'>"
+        # rad 1: logo + ticker/namn + score
+        f"<div style='display:flex;align-items:center;gap:14px'>"
+        f"<img src='{logo_url(ticker)}' style='width:46px;height:46px;border-radius:12px'/>"
+        f"<div style='flex:1'>"
+        f"<div style='font-size:1.7rem;font-weight:800;color:{TXT};line-height:1'>{ticker}</div>"
+        f"<div style='font-size:.8rem;color:{MUTED};margin-top:2px'>{disp_name}{(' · ' if disp_name and sub else '')}{sub}</div>"
+        f"</div>"
+        f"<div style='text-align:right'>"
+        f"<div style='font-size:1.9rem;font-weight:800;color:{acc};line-height:1'>{a['score10']}/10</div>"
+        f"<div style='font-size:.66rem;color:{MUTED};text-transform:uppercase;letter-spacing:.6px'>lyftchans</div>"
+        f"</div></div>"
+        # rad 2: pillrar
+        f"<div style='margin-top:12px;display:flex;gap:6px;flex-wrap:wrap'>"
+        f"<span class='pill' style='background:{acc}22;color:{acc}'>{a['label']}</span>"
+        f"<span class='pill' style='background:rgba(255,255,255,.06);color:{TXT}'>{bos_txt}</span>"
+        f"<span class='pill' style='background:rgba(255,255,255,.06);color:{TXT}'>setup {grade}</span>"
+        f"</div>"
+        # rad 3: stor 5d-rörelse + nyckeltal
+        f"<div style='display:flex;gap:28px;align-items:baseline;margin-top:16px;flex-wrap:wrap'>"
+        f"<div><div style='font-size:11px;color:{MUTED};letter-spacing:1px'>SENASTE 5 DAGARNA</div>"
+        f"<div style='font-size:38px;font-weight:800;line-height:1;color:{r5_color}'>{arrow} {r5:+.1f}%</div></div>"
+        f"<div style='align-self:flex-end'><span style='font-size:12px;color:{MUTED}'>{price_label}: </span>"
+        f"<span style='font-size:18px;font-weight:700;color:{TXT}'>{price_display:.2f}</span></div>"
+        f"<div style='align-self:flex-end'><span style='font-size:12px;color:{MUTED}'>20d: </span>"
+        f"<span style='font-size:18px;font-weight:700;color:{POS if a['ret_20']>=0 else NEG}'>{a['ret_20']:+.1f}%</span></div>"
+        f"<div style='align-self:flex-end'><span style='font-size:12px;color:{MUTED}'>Börsvärde: </span>"
+        f"<span style='font-size:18px;font-weight:700;color:{TXT}'>{_fmt_mcap(info.get('mcap'))} {info.get('currency','')}</span></div>"
+        f"</div>"
         f"</div>", unsafe_allow_html=True)
 
     # ---- KURSGRAF ----
@@ -805,9 +739,15 @@ def show_detail(ticker: str, info: dict):
             st.caption(f"{sector}{land}")
             st.write(info["summary"])
 
-    tradingview_chart(guess_tv_symbol(ticker), height=360)
+    tradingview_chart(guess_tv_symbol(ticker), height=420)
+
+    # ---- GRABIT INLINE (skill-kort-stil) ----
     st.divider()
-    render_grabit_inline(ticker)
+    try:
+        from ai_module import render_grabit_inline
+        render_grabit_inline(ticker)
+    except Exception:
+        st.caption(f"Öppna **Ask Grabit**-fliken för att fråga AI:n om {ticker}.")
 
 
 # =====================================================================
@@ -846,10 +786,8 @@ st.markdown("<div style='margin:.3rem 0 1.1rem;display:flex;flex-wrap:wrap;"
 # =====================================================================
 #  FLIKAR
 # =====================================================================
-render_top_week(selected)
-
 tabs = st.tabs(["HETA NU", "VÄNDNINGAR", "VARNINGAR", "WATCHLIST",
-                "MARKNAD", "SÖK", "ASK GRABIT", "MACRO", "RÅVAROR"])
+                "MARKNAD", "JÄMFÖR", "SÖK", "ASK GRABIT", "MACRO", "RÅVAROR"])
 
 
 def collect(tickers, keep_labels=None, warn=False):
@@ -938,41 +876,23 @@ with tabs[3]:
     render_stats(r); render_grid(r, "wl")
 
 with tabs[4]:
-    st.subheader("Marknad — bredda universum")
+    st.subheader("Marknad — det som rör sig idag")
     SOURCES = {
-        "Dagens vinnare":          "day_gainers",
-        "Mest omsatta":            "most_actives",
-        "Small-cap raketer":       "small_cap_gainers",
-        "Aggressiva small-caps":   "aggressive_small_caps",
-        "Tillväxt-tech":           "growth_technology_stocks",
-        "Undervärderad tillväxt":  "undervalued_growth_stocks",
-        "Mest blankade":           "most_shorted_stocks",
-        "Dagens förlorare":        "day_losers",
+        "Dagens vinnare":   "day_gainers",
+        "Mest omsatta":     "most_actives",
+        "Small-cap raketer":"small_cap_gainers",
+        "Tillväxt-tech":    "growth_technology_stocks",
+        "Dagens förlorare": "day_losers",
     }
-    c1, c2 = st.columns([3, 2])
-    src_sel = c1.multiselect(
-        "Källor", list(SOURCES.keys()),
-        default=["Dagens vinnare", "Mest omsatta", "Small-cap raketer", "Tillväxt-tech"],
-        key="mkt_src")
-    only_new = c2.checkbox("Bara nya namn (ej i mitt universum)", value=True, key="mkt_new")
-
-    f1, f2, f3 = st.columns(3)
-    min_score  = f1.slider("Min poäng", 0, 10, 6, key="mkt_minscore")
-    min_rvol   = f2.slider("Min RVOL", 0.0, 3.0, 1.2, 0.1, key="mkt_rvol")
-    only_entry = f3.checkbox("Bara entry-lägen", value=True, key="mkt_entry")
-
+    csrc, cflt = st.columns([3, 2])
+    src_name   = csrc.radio("Källa", list(SOURCES.keys()), horizontal=True, key="mkt_src")
+    only_entry = cflt.checkbox("Visa bara entry-lägen", value=True, key="mkt_entry")
     if yf is None:
         st.error("yfinance saknas — kan inte scanna marknaden.")
-    elif not src_sel:
-        st.info("Välj minst en källa ovan.")
     else:
-        keys = tuple(SOURCES[s] for s in src_sel)
-        syms = market_movers(keys)
-        if only_new:
-            known = set(TICKER_THEME.keys())
-            syms = [s for s in syms if s not in known]
+        syms = market_movers(SOURCES[src_name])
         if not syms:
-            st.warning("Inga symboler från valda källor just nu. Prova fler källor eller tryck refresh.")
+            st.warning("Kunde inte hämta marknadsdata just nu. Prova en annan källa eller tryck refresh.")
         else:
             r = []
             prog = st.progress(0.0)
@@ -982,22 +902,25 @@ with tabs[4]:
                 if a:
                     r.append(a)
             prog.empty()
-            r = [a for a in r
-                 if a["score10"] >= min_score and a.get("rel_vol", 0) >= min_rvol]
             if only_entry:
                 r = [a for a in r if a["label"] in {"MOMENTUM", "BULL", "Rocketcase", "VÄNDNING"}]
-            st.caption(f"{len(syms)} skannade · {len(r)} träffar efter filter. Klicka en rad för detaljer.")
+            st.caption(f"{src_name} · {len(r)} träffar. Klicka en rad för detaljer.")
             render_stats(r)
             render_grid(r, "market")
 
-
 with tabs[5]:
-    render_sok_tab()
+    if render_compare_tab is not None:
+        render_compare_tab(scan, company_info, logo_url)
+    else:
+        st.info("Jämför-modulen kunde inte laddas.")
 
 with tabs[6]:
-    render_ai_tab()
+    render_sok_tab()
 
 with tabs[7]:
+    render_ai_tab()
+
+with tabs[8]:
     st.subheader("Macro")
     macro = {"S&P 500":"^GSPC","Nasdaq 100":"^NDX","VIX":"^VIX",
              "US 10y":"^TNX","Dollar (DXY)":"DX-Y.NYB"}
@@ -1014,7 +937,7 @@ with tabs[7]:
         else:
             col.metric(name, "—")
 
-with tabs[8]:
+with tabs[9]:
     st.subheader("Råvaror")
     comm = {"Guld":"GC=F","Silver":"SI=F","Koppar":"HG=F","Olja (WTI)":"CL=F","Uran (URA)":"URA"}
     cols = st.columns(len(comm))
