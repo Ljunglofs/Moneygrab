@@ -22,6 +22,17 @@ TXT    = "#eaecef"
 ROCK_C = "#f0a020"
 
 
+def _md(html):
+    """Renderar rå HTML säkert. Tar bort indrag/blankrader och kör st.html()
+    som kringgår markdown-parsern helt (Streamlit >= 1.33). Faller tillbaka
+    på st.markdown för äldre versioner."""
+    clean = "\n".join(line.strip() for line in html.splitlines() if line.strip())
+    try:
+        st.html(clean)
+    except AttributeError:
+        st.markdown(clean, unsafe_allow_html=True)
+
+
 def _get_universe():
     return st.session_state.get("_mg_universe", {})
 
@@ -121,7 +132,7 @@ def _hero_card(winner, period):
         if name else ""
     )
 
-    st.markdown(f"""
+    _md(f"""
     <div style="
         background:linear-gradient(160deg,{color}10 0%,rgba(11,14,22,.97) 55%);
         border:1px solid {color}55;
@@ -188,7 +199,7 @@ def _hero_card(winner, period):
                 {rsi:.0f}</div>
         </div>
     </div>
-    """, unsafe_allow_html=True)
+    """)
 
     if st.button("Öppna detaljer", key=f"bull_{period}_{winner['ticker']}",
                  use_container_width=True):
@@ -202,10 +213,9 @@ def _ranking_table(rows, period):
     ret_key = "day_ret" if period == "day" else "week_ret"
     title   = "Hetast just nu" if period == "day" else "Starkast denna vecka"
 
-    st.markdown(
+    _md(
         f"<div style='font-size:1rem;font-weight:700;color:#fff;"
-        f"margin:14px 0 6px'>{title}</div>",
-        unsafe_allow_html=True)
+        f"margin:14px 0 6px'>{title}</div>")
 
     rows_html = ""
     for r in rows:
@@ -228,7 +238,7 @@ def _ranking_table(rows, period):
         for h in ["Ticker", "Läge", "Hetta", "Rel.vol", "5d %", "Rank"]
     )
 
-    st.markdown(f"""
+    _md(f"""
     <div style="border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,.06)">
         <table style="width:100%;border-collapse:collapse;font-size:.84rem">
             <thead>
@@ -237,7 +247,7 @@ def _ranking_table(rows, period):
             <tbody style="background:rgba(13,17,24,.85)">{rows_html}</tbody>
         </table>
     </div>
-    """, unsafe_allow_html=True)
+    """)
 
 
 def render_dagens_bull():
@@ -267,9 +277,7 @@ def render_dagens_bull():
     else:
         st.info("Ingen dagsvinnare matchade filtret just nu.")
 
-    st.markdown(
-        "<hr style='border:none;border-top:1px solid rgba(255,255,255,.06);margin:28px 0'>",
-        unsafe_allow_html=True)
+    _md("<hr style='border:none;border-top:1px solid rgba(255,255,255,.06);margin:28px 0'>")
 
     # ---- VECKANS BULL ----
     if week_top:
