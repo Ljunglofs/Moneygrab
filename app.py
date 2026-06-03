@@ -555,6 +555,8 @@ def trade_motor_v2(a):
 
 
 def render_ai_score_panel(a):
+    """AI Score-grid + Trade-motor-stats. Trade-motor-rubriken ägs av detta block;
+    render_engine ritar ringarna direkt under utan egen rubrik."""
     sc = ai_score_components(a)
     tm = trade_motor_v2(a)
     st.markdown("#### AI Score")
@@ -565,9 +567,8 @@ def render_ai_score_panel(a):
                      ("Momentum", sc["momentum_score"]), ("Sentiment", sc["sentiment"]),
                      ("Risk", sc["risk"]), ("Timing", sc["timing"])])
     st.markdown(f"<div class='mgrid'>{cells}</div>", unsafe_allow_html=True)
-    st.progress(min(sc["ai_score"] / 10, 1.0))
 
-    st.markdown("#### Trade Motor")
+    st.markdown("#### Trade-motor")
     cells2 = "".join(
         f"<div class='mcard'><div class='ml'>{l}</div>"
         f"<div class='mv' style='color:{c}'>{v}/10</div></div>"
@@ -579,16 +580,8 @@ def render_ai_score_panel(a):
             ("Confidence",tm["confidence"],       POS if tm["confidence"] >= 7 else ROCK_C),
         ])
     st.markdown(f"<div class='mgrid'>{cells2}</div>", unsafe_allow_html=True)
-    st.progress(min(tm["confidence"] / 10, 1.0))
-    c1, c2 = st.columns(2)
-    if tm["reasons"]:
-        c1.markdown("<div class='ml'>PLUS</div>" +
-                    "".join(f"<div style='font-size:.85rem;color:{POS}'>+ {r}</div>"
-                            for r in tm["reasons"]), unsafe_allow_html=True)
-    if tm["risks"]:
-        c2.markdown("<div class='ml'>RISKER</div>" +
-                    "".join(f"<div style='font-size:.85rem;color:{NEG}'>- {r}</div>"
-                            for r in tm["risks"]), unsafe_allow_html=True)
+
+
 
 # =====================================================================
 #  BREAKOUT ENGINE RENDER
@@ -600,7 +593,6 @@ def _escore_col(v, good_high=True):
 
 
 def render_engine(e):
-    st.markdown("#### Trade-motor")
     ent, ex = e["entry"], e["exit"]
     bcol = _escore_col(e["breakout_score"])
     ccol = _escore_col(e["confidence"])
@@ -645,16 +637,6 @@ def render_engine(e):
         f"Exit-risk: <b style='color:{_escore_col(ex['risk'], False)}'>{ex['risk']}/100</b><br>"
         f"Åtgärd: <b>{ex['action']}</b><br>Trailing stop: <b>{ex['trail']}</b><br>"
         f"Tecken: {reasons_txt}</div></div>", unsafe_allow_html=True)
-
-    bars = "".join(
-        f"<div style='margin:3px 0'><span style='display:inline-block;width:84px;color:{MUTED};"
-        f"font-size:.78rem'>{k}</span>"
-        f"<span style='display:inline-block;height:8px;width:{int(val*4)}px;max-width:160px;"
-        f"background:{ACCENT};border-radius:4px;vertical-align:middle'></span>"
-        f"<span style='font-size:.78rem;color:{TXT};margin-left:6px'>{val}</span></div>"
-        for k, val in e["components"].items())
-    st.markdown(f"<div style='margin:10px 0'><div class='ml'>POÄNG-FÖRDELNING</div>{bars}</div>",
-                unsafe_allow_html=True)
 
     if e["explain"]:
         st.markdown("<div class='ml' style='margin-top:6px'>VARFÖR</div>", unsafe_allow_html=True)
@@ -822,7 +804,10 @@ def show_detail(ticker: str, info: dict):
         st.markdown(f"<div class='mgrid'>{lvcells}</div>", unsafe_allow_html=True)
         st.caption(a["levels_note"])
 
-    # ---- BREAKOUT ENGINE ----
+    # ---- AI SCORE + TRADE-MOTOR STATS (ovanför ringarna) ----
+    render_ai_score_panel(a)
+
+    # ---- TRADE-MOTOR RINGAR + ENTRY/EXIT (breakout engine) ----
     if df_full is not None and engine_evaluate is not None:
         try:
             _bench, _ = fetch("^GSPC")
@@ -834,9 +819,6 @@ def show_detail(ticker: str, info: dict):
             eng = None
         if eng:
             render_engine(eng)
-
-    # ---- AI SCORE + TRADE MOTOR ----
-    render_ai_score_panel(a)
 
     tradingview_chart(guess_tv_symbol(ticker), height=420)
 
