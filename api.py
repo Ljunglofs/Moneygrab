@@ -1,6 +1,6 @@
 """
 =====================================================================
- MoneyGrab API  ·  api.py
+ GRABIT API  ·  api.py
  Exponerar din riktiga screening-logik som JSON så frontend:en kan
  hämta ekta data. Återanvänder fetch/analyze från sok_module och
  evaluate från breakout_engine — INGEN kopia av analysen.
@@ -238,7 +238,7 @@ def scan_universe(theme_key: Optional[str] = None) -> list:
 # =====================================================================
 #  FASTAPI
 # =====================================================================
-app = FastAPI(title="MoneyGrab API", version="0.1")
+app = FastAPI(title="GRABIT API", version="0.1")
 
 app.add_middleware(
     CORSMiddleware,

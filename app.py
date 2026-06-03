@@ -46,7 +46,7 @@ except Exception:
     render_compare_tab = None
     ranked_rows = None
 
-st.set_page_config(page_title="MoneyGrab", page_icon="📈",
+st.set_page_config(page_title="GRABIT", page_icon="📈",
                    layout="wide", initial_sidebar_state="expanded")
 
 BG, PANEL, LINE = "#0b0e16", "#161a23", "#252b38"
@@ -216,13 +216,13 @@ def render_news_ticker():
 #  LOGGA
 # =====================================================================
 LOGO_PATH = "logo.png"
-lc1, lc2 = st.columns([1, 3])
-with lc1:
-    if os.path.exists(LOGO_PATH):
-        st.image(LOGO_PATH, use_container_width=True)
-    else:
-        st.markdown(f"<h1 style='margin:0'>MONEY<span style='color:{ACCENT}'>GRAB</span></h1>",
-                    unsafe_allow_html=True)
+if os.path.exists(LOGO_PATH):
+    # Brett ordmärke (GRABIT) — visas vänsterställt i fast bredd så det inte blir
+    # jättestort över hela sidan men ändå skarpt. width i px funkar bäst för 3:1-logga.
+    st.image(LOGO_PATH, width=340)
+else:
+    st.markdown(f"<h1 style='margin:0'>GRA<span style='color:{ACCENT}'>BIT</span></h1>",
+                unsafe_allow_html=True)
 
 render_news_ticker()
 
@@ -1035,7 +1035,7 @@ with tabs[9]:
             col.metric(name, "—")
 
 st.divider()
-st.caption("MoneyGrab · teknisk signalering på pris/volym, ingen finansiell rådgivning.")
+st.caption("GRABIT · teknisk signalering på pris/volym, ingen finansiell rådgivning.")
 
 # =====================================================================
 #  DETALJVY-TRIGGER — hämtar company_info UTANFÖR dialog, skickar in
