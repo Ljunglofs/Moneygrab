@@ -264,6 +264,7 @@ def company_info(ticker: str) -> dict:
             "currency": info.get("currency") or "",
             "summary":  info.get("longBusinessSummary") or "",
             "country":  info.get("country") or "",
+            "website":  info.get("website") or "",
         }
     except Exception:
         return {}
@@ -343,6 +344,85 @@ def get_short_name(ticker: str) -> str:
     if len(name) > 22:
         name = name[:20].rstrip() + "…"
     return name
+
+
+# =====================================================================
+#  LOGGA (riktig) + FLAGGA + BESKRIVNING
+#  Clearbit-logo-API:t stängdes 2025-12-08. Använder logo.dev om en
+#  nyckel finns i secrets, annars Googles favicon (ingen inloggning).
+#  Monogram som sista fallback via onerror.
+# =====================================================================
+COUNTRY_ISO = {
+    "United States": "us", "Sweden": "se", "Canada": "ca", "United Kingdom": "gb",
+    "Germany": "de", "France": "fr", "Netherlands": "nl", "Switzerland": "ch",
+    "China": "cn", "Taiwan": "tw", "Japan": "jp", "South Korea": "kr", "Israel": "il",
+    "Ireland": "ie", "Norway": "no", "Finland": "fi", "Denmark": "dk", "Australia": "au",
+    "India": "in", "Singapore": "sg", "Hong Kong": "hk", "Brazil": "br", "Mexico": "mx",
+    "Italy": "it", "Spain": "es", "Bermuda": "bm", "Cayman Islands": "ky", "Luxembourg": "lu",
+}
+
+
+def flag_html(country: str, h: int = 15) -> str:
+    code = COUNTRY_ISO.get((country or "").strip())
+    if not code:
+        return ""
+    return (f"<img src='https://flagcdn.com/h40/{code}.png' "
+            f"style='height:{h}px;border-radius:2px;vertical-align:-2px;margin-left:8px' "
+            f"alt='{country}'/>")
+
+
+def _logodev_token() -> str:
+    """Hämtar logo.dev-nyckel från Streamlit-secrets om den finns. Annars tomt."""
+    try:
+        return st.secrets.get("LOGODEV_TOKEN", "") or ""
+    except Exception:
+        return ""
+
+
+def _domain_from(info: dict) -> str:
+    web = (info or {}).get("website", "") or ""
+    if not web:
+        return ""
+    return (web.replace("https://", "").replace("http://", "")
+               .replace("www.", "").strip("/").split("/")[0])
+
+
+def _logo_src(domain: str) -> str:
+    if not domain:
+        return ""
+    tok = _logodev_token()
+    if tok:
+        return f"https://img.logo.dev/{domain}?token={tok}&size=128&format=png"
+    return f"https://www.google.com/s2/favicons?domain={domain}&sz=128"
+
+
+def company_logo_html(ticker: str, info: dict, size: int = 46) -> str:
+    """Riktig logga via logo.dev/favicon. Monogram-bakgrund som fallback."""
+    color = THEME_COLOR.get(TICKER_THEME.get(ticker, ""), "1c2330")
+    mono  = ("".join(ch for ch in ticker if ch.isalpha())[:2] or ticker[:2]).upper()
+    src   = _logo_src(_domain_from(info))
+    img = ""
+    if src:
+        img = (f"<img src='{src}' onerror=\"this.remove()\" "
+               f"style='position:absolute;inset:0;width:100%;height:100%;object-fit:contain;"
+               f"padding:6px;background:#0c1018;border-radius:12px'/>")
+    return (f"<div style='position:relative;width:{size}px;height:{size}px;border-radius:12px;"
+            f"background:#{color}22;border:1px solid #{color}55;display:flex;align-items:center;"
+            f"justify-content:center;overflow:hidden;flex:none;"
+            f"font-family:\"Space Grotesk\",sans-serif;font-weight:800;font-size:15px;"
+            f"color:#{color}'>{mono}{img}</div>")
+
+
+def short_blurb(text: str, max_len: int = 320) -> str:
+    """Kortar bolagsbeskrivning till ~3–4 rader, bryter helst vid meningsslut."""
+    if not text:
+        return ""
+    s = " ".join(text.split())
+    if len(s) <= max_len:
+        return s
+    cut = s[:max_len]
+    dot = cut.rfind(". ")
+    return cut[:dot + 1] if dot > 120 else cut.rstrip() + "…"
 
 
 def _fmt_mcap(v):
@@ -628,6 +708,14 @@ def show_detail(ticker: str, info: dict):
     _live = live_price(ticker)
     price_display = _live if _live else a["last"]
     price_label   = "Live" if _live else "Stängning"
+    # dagens förändring (senaste stapeln mot föregående stängning)
+    day_chg = None
+    if df_full is not None:
+        _c = df_full["Close"].dropna()
+        if len(_c) >= 2 and float(_c.iloc[-2]):
+            day_chg = (float(price_display) / float(_c.iloc[-2]) - 1) * 100
+    day_col = POS if (day_chg is not None and day_chg >= 0) else NEG
+    cur = info.get("currency", "") or ""
     acc = a["color"]
     r5 = a["ret_5"]
     r5_color = POS if r5 >= 0 else NEG
@@ -636,20 +724,25 @@ def show_detail(ticker: str, info: dict):
     bos_txt = "BOS↑" if bos == "BULLISH" else "BOS↓" if bos == "BEARISH" else "BOS –"
     grade = a.get("setup_grade", "C")
     disp_name = name if (name and name.upper() != ticker.upper()) else ""
-    sub = f"{sector}" if sector else ""
+    flag = flag_html(info.get("country", ""))
+    sub_name = f"{disp_name}{flag}" if disp_name else (flag or "")
 
     st.markdown(
         f"<div class='scard' style='border-color:{acc}55;box-shadow:0 0 26px {acc}22;padding:20px'>"
         # rad 1: logo + ticker/namn + score
         f"<div style='display:flex;align-items:center;gap:14px'>"
-        f"<img src='{logo_url(ticker)}' style='width:46px;height:46px;border-radius:12px'/>"
-        f"<div style='flex:1'>"
+        f"{company_logo_html(ticker, info, 46)}"
+        f"<div style='flex:1;min-width:0'>"
         f"<div style='font-size:1.7rem;font-weight:800;color:{TXT};line-height:1'>{ticker}</div>"
-        f"<div style='font-size:.8rem;color:{MUTED};margin-top:2px'>{disp_name}{(' · ' if disp_name and sub else '')}{sub}</div>"
+        f"<div style='font-size:.84rem;color:{MUTED};margin-top:3px'>{sub_name}</div>"
         f"</div>"
-        f"<div style='text-align:right'>"
-        f"<div style='font-size:1.9rem;font-weight:800;color:{acc};line-height:1'>{a['score10']}/10</div>"
-        f"<div style='font-size:.66rem;color:{MUTED};text-transform:uppercase;letter-spacing:.6px'>lyftchans</div>"
+        f"<div style='text-align:right;flex:none'>"
+        f"<div style='font-size:.95rem;font-weight:800;color:{acc};line-height:1'>{a['score10']}/10</div>"
+        f"<div style='font-size:.58rem;color:{MUTED};text-transform:uppercase;letter-spacing:.6px;margin-bottom:9px'>lyftchans</div>"
+        f"<div style='font-size:2.8rem;font-weight:800;color:{TXT};line-height:.95;font-family:\"Space Grotesk\",sans-serif'>"
+        f"{price_display:.2f}<span style='font-size:.85rem;font-weight:600;color:{MUTED};margin-left:4px'>{cur}</span></div>"
+        f"<div style='font-size:.82rem;font-weight:700;color:{day_col};margin-top:3px'>"
+        f"{(f'{day_chg:+.2f}% · ' if day_chg is not None else '')}{price_label}</div>"
         f"</div></div>"
         # rad 2: pillrar
         f"<div style='margin-top:12px;display:flex;gap:6px;flex-wrap:wrap'>"
@@ -657,18 +750,31 @@ def show_detail(ticker: str, info: dict):
         f"<span class='pill' style='background:rgba(255,255,255,.06);color:{TXT}'>{bos_txt}</span>"
         f"<span class='pill' style='background:rgba(255,255,255,.06);color:{TXT}'>setup {grade}</span>"
         f"</div>"
-        # rad 3: stor 5d-rörelse + nyckeltal
+        # rad 3: 5d-rörelse (mindre än priset) + nyckeltal
         f"<div style='display:flex;gap:28px;align-items:baseline;margin-top:16px;flex-wrap:wrap'>"
         f"<div><div style='font-size:11px;color:{MUTED};letter-spacing:1px'>SENASTE 5 DAGARNA</div>"
-        f"<div style='font-size:38px;font-weight:800;line-height:1;color:{r5_color}'>{arrow} {r5:+.1f}%</div></div>"
-        f"<div style='align-self:flex-end'><span style='font-size:12px;color:{MUTED}'>{price_label}: </span>"
-        f"<span style='font-size:18px;font-weight:700;color:{TXT}'>{price_display:.2f}</span></div>"
+        f"<div style='font-size:30px;font-weight:800;line-height:1;color:{r5_color}'>{arrow} {r5:+.1f}%</div></div>"
         f"<div style='align-self:flex-end'><span style='font-size:12px;color:{MUTED}'>20d: </span>"
         f"<span style='font-size:18px;font-weight:700;color:{POS if a['ret_20']>=0 else NEG}'>{a['ret_20']:+.1f}%</span></div>"
         f"<div style='align-self:flex-end'><span style='font-size:12px;color:{MUTED}'>Börsvärde: </span>"
-        f"<span style='font-size:18px;font-weight:700;color:{TXT}'>{_fmt_mcap(info.get('mcap'))} {info.get('currency','')}</span></div>"
+        f"<span style='font-size:18px;font-weight:700;color:{TXT}'>{_fmt_mcap(info.get('mcap'))} {cur}</span></div>"
         f"</div>"
         f"</div>", unsafe_allow_html=True)
+
+    # ---- OM BOLAGET (synlig beskrivning + sektor + land) ----
+    _blurb = short_blurb(info.get("summary", ""))
+    if _blurb or sector or info.get("country"):
+        _meta_bits = [b for b in [sector, info.get("country", "")] if b]
+        _meta = " · ".join(_meta_bits)
+        _meta_line = (f"<div style='font-size:.66rem;color:{MUTED};text-transform:uppercase;"
+                      f"letter-spacing:.7px;font-weight:600;margin-bottom:6px'>{_meta}{flag}</div>"
+                      if _meta else "")
+        _body = (f"<div style='font-size:.86rem;color:#b6c0cc;line-height:1.55'>{_blurb}</div>"
+                 if _blurb else "")
+        st.markdown(
+            f"<div style='margin:12px 0 4px;padding:13px 16px;background:rgba(19,25,34,.55);"
+            f"border:1px solid rgba(255,255,255,.05);border-radius:14px'>{_meta_line}{_body}</div>",
+            unsafe_allow_html=True)
 
     # ---- KURSGRAF ----
     if df_full is not None:
@@ -731,13 +837,6 @@ def show_detail(ticker: str, info: dict):
 
     # ---- AI SCORE + TRADE MOTOR ----
     render_ai_score_panel(a)
-
-    # ---- OM BOLAGET ----
-    if info.get("summary"):
-        with st.expander(f"Om {name or ticker}"):
-            land = f" · {info['country']}" if info.get("country") else ""
-            st.caption(f"{sector}{land}")
-            st.write(info["summary"])
 
     tradingview_chart(guess_tv_symbol(ticker), height=420)
 
