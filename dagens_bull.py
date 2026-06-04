@@ -22,17 +22,6 @@ TXT    = "#eaecef"
 ROCK_C = "#f0a020"
 
 
-def _md(html):
-    """Renderar rå HTML säkert. Tar bort indrag/blankrader och kör st.html()
-    som kringgår markdown-parsern helt (Streamlit >= 1.33). Faller tillbaka
-    på st.markdown för äldre versioner."""
-    clean = "\n".join(line.strip() for line in html.splitlines() if line.strip())
-    try:
-        st.html(clean)
-    except AttributeError:
-        st.markdown(clean, unsafe_allow_html=True)
-
-
 def _get_universe():
     return st.session_state.get("_mg_universe", {})
 
@@ -111,8 +100,14 @@ def _top_day(results, n=10):
 
 
 def _top_week(results, n=10):
-    # Sorterar på week_ret (= ret_5), inget hårt filter
-    f = [r for r in results if r["week_ret"] > 0]
+    # Sållar bort tunna paraboliska pumpar (ENAFF-typ: extremt RSI + stor
+    # kortsiktig spik + ingen volym bakom) och avsvalnande namn.
+    def _pump(r):
+        return r["rsi"] >= 80 and r["rel_vol"] < 1.0 and r["week_ret"] > 40
+    f = [r for r in results
+         if r["week_ret"] > 0
+         and r["label"] != "AVSVALNING"
+         and not _pump(r)]
     return sorted(f, key=lambda x: x["week_ret"], reverse=True)[:n]
 
 
@@ -132,7 +127,7 @@ def _hero_card(winner, period):
         if name else ""
     )
 
-    _md(f"""
+    st.markdown(f"""
     <div style="
         background:linear-gradient(160deg,{color}10 0%,rgba(11,14,22,.97) 55%);
         border:1px solid {color}55;
@@ -199,7 +194,7 @@ def _hero_card(winner, period):
                 {rsi:.0f}</div>
         </div>
     </div>
-    """)
+    """, unsafe_allow_html=True)
 
     if st.button("Öppna detaljer", key=f"bull_{period}_{winner['ticker']}",
                  use_container_width=True):
@@ -213,9 +208,10 @@ def _ranking_table(rows, period):
     ret_key = "day_ret" if period == "day" else "week_ret"
     title   = "Hetast just nu" if period == "day" else "Starkast denna vecka"
 
-    _md(
+    st.markdown(
         f"<div style='font-size:1rem;font-weight:700;color:#fff;"
-        f"margin:14px 0 6px'>{title}</div>")
+        f"margin:14px 0 6px'>{title}</div>",
+        unsafe_allow_html=True)
 
     rows_html = ""
     for r in rows:
@@ -238,7 +234,7 @@ def _ranking_table(rows, period):
         for h in ["Ticker", "Läge", "Hetta", "Rel.vol", "5d %", "Rank"]
     )
 
-    _md(f"""
+    st.markdown(f"""
     <div style="border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,.06)">
         <table style="width:100%;border-collapse:collapse;font-size:.84rem">
             <thead>
@@ -247,7 +243,7 @@ def _ranking_table(rows, period):
             <tbody style="background:rgba(13,17,24,.85)">{rows_html}</tbody>
         </table>
     </div>
-    """)
+    """, unsafe_allow_html=True)
 
 
 def render_dagens_bull():
@@ -270,21 +266,21 @@ def render_dagens_bull():
     day_top  = _top_day(all_data)
     week_top = _top_week(all_data)
 
-    # ---- DAGENS BULL ----
+    # ---- HETAST JUST NU (ren ranking — Dagens Bull bor i Veckans urval, ej dubblerad här) ----
     if day_top:
-        _hero_card(day_top[0], "day")
         _ranking_table(day_top, "day")
     else:
-        st.info("Ingen dagsvinnare matchade filtret just nu.")
+        st.info("Inga dagsvinnare matchade filtret just nu.")
 
-    _md("<hr style='border:none;border-top:1px solid rgba(255,255,255,.06);margin:28px 0'>")
+    st.markdown(
+        "<hr style='border:none;border-top:1px solid rgba(255,255,255,.06);margin:28px 0'>",
+        unsafe_allow_html=True)
 
-    # ---- VECKANS BULL ----
+    # ---- STARKAST DENNA VECKA (ren ranking — Veckans Bull bor i Veckans urval) ----
     if week_top:
-        _hero_card(week_top[0], "week")
         _ranking_table(week_top, "week")
     else:
-        st.info("Ingen veckavinnare matchade filtret just nu.")
+        st.info("Inga veckavinnare matchade filtret just nu.")
 
     st.caption(
         f"Skannade {len(all_data)} aktier · uppdateras var 10:e minut · "
