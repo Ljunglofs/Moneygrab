@@ -42,6 +42,7 @@ except Exception:
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 
 # =====================================================================
 #  ENKEL TTL-CACHE  (ersätter st.cache_data på servern)
@@ -246,6 +247,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/", response_class=HTMLResponse)
+def index():
+    import os
+    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "index.html")
+    if os.path.exists(p):
+        with open(p, encoding="utf-8") as fh:
+            return fh.read()
+    return "<h1>GRABIT API</h1><p>index.html saknas i repot.</p>"
 
 
 @app.get("/api/health")
