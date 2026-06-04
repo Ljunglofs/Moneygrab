@@ -100,10 +100,15 @@ def _top_day(results, n=10):
 
 
 def _top_week(results, n=10):
-    # Sållar bort tunna paraboliska pumpar (ENAFF-typ: extremt RSI + stor
-    # kortsiktig spik + ingen volym bakom) och avsvalnande namn.
+    # Sållar bort paraboliska pumpar (ENAFF-typ) och avsvalnande namn.
     def _pump(r):
-        return r["rsi"] >= 80 and r["rel_vol"] < 1.0 and r["week_ret"] > 40
+        # Extrem spik = nästan alltid blow-off, oavsett volym
+        if r["week_ret"] > 80:
+            return True
+        # Stor spik + extremt RSI utan tydlig volymbekräftelse
+        if r["week_ret"] > 40 and r["rsi"] >= 80 and r["rel_vol"] < 1.5:
+            return True
+        return False
     f = [r for r in results
          if r["week_ret"] > 0
          and r["label"] != "AVSVALNING"
