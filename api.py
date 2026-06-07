@@ -358,3 +358,171 @@ def overview():
     }
     return {"indices": idx, "picks": picks, "hetast": hetast,
             "dagens_bull": dagens_bull, "factors": factors}
+
+
+# =====================================================================
+#  AI  ·  POST /api/ai   ("Fråga Grabit")
+#  Portar systemprompt + Anthropic-logik från ai_module.py till API:t.
+#  Skillnad mot Streamlit-versionen:
+#    - nyckel läses från MILJÖVARIABEL (Render → Environment), ej st.secrets
+#    - kontext byggs LIVE från scannern (scan/scan_universe/indices) i stället
+#      för st.session_state, så Grabit kan svara på "Varför rör sig MRVL?",
+#      jämföra aktier och ranka dagens lägen — utan att hitta på siffror.
+#  Frontend-kontrakt (grabit_index.html → aiSend):
+#    POST {question: str, history: [{r:"u"|"a", t:str}]}  ->  {answer: str}
+# =====================================================================
+import os
+import re as _re
+
+from pydantic import BaseModel
+
+# Återanvänd EXAKT samma systemprompt som Streamlit-appen.
+try:
+    from ai_module import SYSTEM_PROMPT
+except Exception:
+    SYSTEM_PROMPT = (
+        "Du är Grabit, AI-analytiker i appen GRABIT för teknisk aktieanalys. "
+        "Svara på svenska, koncist och pedagogiskt. Du ger ALDRIG köp- eller "
+        "säljråd, påminner om att detta inte är finansiell rådgivning, och "
+        "varnar tydligt för risk (överköpt, parabol, tunn likviditet, utspädning). "
+        "Du hittar inte på siffror — vet du inte, säger du det."
+    )
+
+AI_MODEL = os.environ.get("GRABIT_AI_MODEL", "claude-sonnet-4-6")
+
+
+def _anthropic_client():
+    """Anthropic-klient från ANTHROPIC_API_KEY. None om nyckel/paket saknas."""
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        return None
+    try:
+        import anthropic
+    except Exception:
+        return None
+    return anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+
+
+def _num(v, dec=2, suf="", sign=False):
+    """Säker sifferformat — returnerar '—' för None/NaN."""
+    if isinstance(v, (int, float)) and not (v != v):  # not NaN
+        return (f"{v:+.{dec}f}{suf}" if sign else f"{v:.{dec}f}{suf}")
+    return "—"
+
+
+def _fmt_stock_ctx(a: dict) -> str:
+    """En kompakt kontextrad per aktie ur analyze()-datan."""
+    name = company_info(a.get("ticker", "")).get("name") or a.get("ticker", "")
+    last = a.get("last", 0) or 0
+    ema50 = "över" if last > (a.get("ema50") or 9e9) else "under"
+    ema200 = "över" if last > (a.get("ema200") or 9e9) else "under"
+    return (
+        f"- {a.get('ticker')} ({name}) · tema {a.get('theme', '—')}\n"
+        f"  GRABIT-score {a.get('score10', '?')}/10 · bedömning {a.get('label', '?')}\n"
+        f"  pris {_num(last)} · RSI {_num(a.get('rsi'), 0)} · "
+        f"från 52v-topp {_num(a.get('pct_from_high'), 1, '%', sign=True)} · "
+        f"5d {_num(a.get('ret_5'), 1, '%', sign=True)} · "
+        f"20d {_num(a.get('ret_20'), 1, '%', sign=True)} · "
+        f"rel.volym {_num(a.get('rel_vol'))}x\n"
+        f"  EMA50 {ema50} · EMA200 {ema200} · "
+        f"BOS {a.get('bos', '—')} · struktur {a.get('structure', '—')}"
+    )
+
+
+def _ai_context(question: str) -> str:
+    """Bygg live-kontext från scannern utifrån frågans innehåll."""
+    qU = question.upper()
+    tokens = set(_re.split(r"[^A-Z0-9.]+", qU))
+    hits = [t for t in ALL_TICKERS if t in tokens]
+
+    blocks = []
+    for t in hits[:3]:                       # nämnda aktier (cachas 5 min via fetch)
+        a = scan(t)
+        if a:
+            blocks.append(_fmt_stock_ctx(a))
+
+    wide = (not hits) or _re.search(
+        r"MARKNAD|IDAG|RÖR SIG|HETAST|BÄST|TOPP|VÄNDNING|R/R|RISK|SETUP", qU)
+    if wide:
+        try:
+            idx = indices()["indices"]
+            idx_line = " · ".join(
+                f"{i['name']} {i['label']} ({_num(i['pct'], 1, '%', sign=True)})" for i in idx)
+            hot = sorted(scan_universe(None), key=lambda x: x.get("hetta", 0),
+                         reverse=True)[:5]
+            hot_line = ", ".join(
+                f"{r['ticker']} {r.get('score10', '?')}/10 ({r.get('label', '')})" for r in hot)
+            blocks.append(f"MARKNADSLÄGE: {idx_line}\nHETAST NU: {hot_line}")
+        except Exception:
+            pass
+
+    if not blocks:
+        return ""
+    return ("\n\n[LIVE-DATA FRÅN GRABIT-SCANNERN — använd bara om frågan rör det, "
+            "och hitta inte på siffror utöver dessa:]\n"
+            + "\n".join(blocks)
+            + "\n[Slut på live-data.]")
+
+
+def _ai_fallback(question: str, ctx: str) -> str:
+    msg = ("Grabit AI är inte aktiverad på servern ännu — sätt miljövariabeln "
+           "ANTHROPIC_API_KEY på backenden (Render → Environment) så svarar jag "
+           "med riktig analys i stället för det här.")
+    if ctx:
+        msg += "\n\nMen jag har live-data för din fråga:" + ctx
+    return msg
+
+
+class AiPayload(BaseModel):
+    question: str
+    history: list = []
+
+
+@app.post("/api/ai")
+def ai(payload: AiPayload):
+    q = (payload.question or "").strip()
+    if not q:
+        raise HTTPException(400, "Tom fråga")
+
+    ctx = _ai_context(q)
+
+    # Mappa frontend-historiken (r:"u"/"a") -> Anthropic (user/assistant).
+    msgs = []
+    for m in (payload.history or []):
+        if not isinstance(m, dict):
+            continue
+        text = (m.get("t") or "").strip()
+        if not text or text == "…":
+            continue
+        msgs.append({"role": "user" if m.get("r") == "u" else "assistant",
+                     "content": text})
+
+    # Säkerställ att sista turn är just den här frågan.
+    if not msgs or msgs[-1]["role"] != "user" or msgs[-1]["content"] != q:
+        msgs.append({"role": "user", "content": q})
+    # Anthropic kräver att konversationen börjar med 'user'.
+    while msgs and msgs[0]["role"] != "user":
+        msgs.pop(0)
+    # Injicera live-kontexten i sista användarmeddelandet.
+    if ctx:
+        msgs[-1]["content"] += ctx
+
+    client = _anthropic_client()
+    if client is None:
+        return {"answer": _ai_fallback(q, ctx), "demo": True}
+
+    try:
+        resp = client.messages.create(
+            model=AI_MODEL,
+            max_tokens=1024,
+            system=SYSTEM_PROMPT,
+            messages=msgs,
+        )
+        text = "".join(getattr(b, "text", "") for b in resp.content
+                       if getattr(b, "type", "") == "text").strip()
+        if not text:
+            text = "Jag fick inget svar just nu — försök igen om en stund."
+        return {"answer": text}
+    except Exception as e:
+        # Mjukt fel: frontenden visar svaret i chatten i stället för en krasch.
+        return {"answer": f"Kunde inte nå Grabit AI just nu ({type(e).__name__}). "
+                          f"Försök igen om en stund.", "error": True}
