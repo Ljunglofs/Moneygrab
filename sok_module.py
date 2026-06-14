@@ -77,6 +77,41 @@ def fetch(ticker):
 
 
 # ----------------------------------------------------------
+#  BATCH-HÄMTNING  →  ett anrop för många tickers
+#  Gör hundratals aktier möjligt utan att spamma Yahoo en-och-en.
+#  Returnerar {ticker: df}  (bara de som har giltig data).
+# ----------------------------------------------------------
+def fetch_many(tickers, period="1y", interval="1d", chunk=60):
+    out = {}
+    if yf is None or not tickers:
+        return out
+    tickers = list(dict.fromkeys(tickers))          # unika, behåll ordning
+    for i in range(0, len(tickers), chunk):
+        part = tickers[i:i + chunk]
+        try:
+            data = yf.download(part, period=period, interval=interval,
+                               auto_adjust=False, group_by="ticker",
+                               threads=True, progress=False)
+        except Exception:
+            continue
+        if data is None or len(data) == 0:
+            continue
+        if len(part) == 1:                          # platt frame (ej grupperad)
+            df = data.dropna(how="all")
+            if df is not None and not df.empty and len(df) >= 60:
+                out[part[0]] = df
+            continue
+        for t in part:
+            try:
+                df = data[t].dropna(how="all")
+            except Exception:
+                df = None
+            if df is not None and not df.empty and len(df) >= 60:
+                out[t] = df
+    return out
+
+
+# ----------------------------------------------------------
 #  SCORING-MOTOR  →  0–100, sen 1–10 + etikett
 #  Kombo: STYRKA (40) + MOMENTUM (35) + SETUP (25)
 # ----------------------------------------------------------

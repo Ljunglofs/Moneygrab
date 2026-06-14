@@ -34,7 +34,7 @@ except Exception:
     yf = None
 
 # Din riktiga logik
-from sok_module import fetch as _fetch_raw, analyze            # noqa
+from sok_module import fetch as _fetch_raw, analyze, fetch_many   # noqa
 try:
     from breakout_engine import evaluate as engine_evaluate
 except Exception:
@@ -66,6 +66,20 @@ def cached(ttl: int):
 
 fetch = cached(300)(_fetch_raw)   # 5 min, som i appen
 
+# ----- BATCH-PREFETCH (för stora universum) --------------------------
+_PREFETCH: dict = {}              # ticker -> df (dagsdata), fylls inför en scan
+
+@cached(600)
+def _batch(tickers_tuple):
+    return fetch_many(list(tickers_tuple))
+
+def prefetch(tickers):
+    """Hämtar dagsdata för många tickers i få anrop och cachar i _PREFETCH."""
+    try:
+        _PREFETCH.update(_batch(tuple(tickers)))
+    except Exception:
+        pass
+
 # =====================================================================
 #  UNIVERSE  (måste matcha app.py)
 # =====================================================================
@@ -87,6 +101,15 @@ UNIVERSE = {
     "Silver/Guld":   ["AG","PAAS","GAU"],
     "Sverige":       ["SUBGEN.ST","SMOL.ST","SHT-B.ST","ACCON.ST","SIVE.ST","OBDU-B.ST","XOM-B.ST","TERRNT-B.ST","VISC.ST"],
     "Bevakning":     ["SUU","IMSR","AIRJ","ORBT","ENAFF","TRT","ABTC"],
+    "Big Tech":      ["AAPL","GOOGL","AMZN","META","NFLX","ADBE","CRM","ORCL","CSCO","QCOM","TXN","INTC","INTU","AMAT","MU","LRCX","KLAC","ADI","PANW","CDNS","ARM","DELL","HPQ"],
+    "SaaS/Moln":     ["UBER","ABNB","SHOP","CRWD","DDOG","SNOW","NET","MDB","ZS","TEAM","PYPL","SQ","ABNB"],
+    "Finans":        ["JPM","BAC","WFC","GS","MS","C","V","MA","AXP","BLK","SCHW","SPGI","CB","PGR","COF"],
+    "Hälsa":         ["UNH","JNJ","LLY","PFE","MRK","ABBV","TMO","ABT","AMGN","GILD","MRNA","ISRG","VRTX","BMY","DHR","CVS"],
+    "Konsument":     ["WMT","COST","HD","NKE","MCD","SBUX","KO","PEP","PG","DIS","LOW","TGT","CMG","BKNG","MDLZ"],
+    "Industri/Energi":["XOM","CVX","COP","BA","CAT","GE","HON","LMT","RTX","DE","UPS","UNP","SLB","OXY","NEE"],
+    "EV/Clean":      ["RIVN","LCID","PLUG","ENPH","FSLR","RUN","CHPT"],
+    "Auto/Telekom":  ["F","GM","T","VZ","TMUS"],
+    "Krypto-proxy":  ["COIN","MSTR","MARA","RIOT","CLSK"],
 }
 TICKER_THEME = {t: k for k, v in UNIVERSE.items() for t in v}
 ALL_TICKERS = sorted({t for v in UNIVERSE.values() for t in v})
@@ -115,7 +138,9 @@ def _jsonable(obj):
 
 def scan(ticker: str):
     try:
-        df, _ = fetch(ticker)
+        df = _PREFETCH.get(ticker)
+        if df is None:
+            df, _ = fetch(ticker)
     except Exception:
         return None
     if df is None:
@@ -228,6 +253,7 @@ def regime_of(ticker):
 def scan_universe(theme_key: Optional[str] = None) -> list:
     """Scannar hela universumet (eller ett tema). Cachas 10 min."""
     tickers = UNIVERSE.get(theme_key, []) if theme_key else ALL_TICKERS
+    prefetch(tickers)                 # batch-hämta allt i få Yahoo-anrop
     out = []
     for t in tickers:
         a = scan(t)
