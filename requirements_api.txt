@@ -5,3 +5,5 @@ pandas
 numpy
 streamlit
 anthropic
+
+feedparser

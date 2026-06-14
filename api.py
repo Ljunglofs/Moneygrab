@@ -295,6 +295,73 @@ def universe():
     return {"themes": UNIVERSE, "ticker_theme": TICKER_THEME}
 
 
+# ----- NYHETER (riktig RSS via feedparser) ---------------------------
+@cached(600)
+def _news_list():
+    try:
+        import feedparser
+    except Exception:
+        return []
+    feeds = [
+        "https://www.financialjuice.com/feed.ashx?xy=rss",
+        "https://feeds.marketwatch.com/marketwatch/topstories/",
+    ]
+    out = []
+    for url in feeds:
+        try:
+            f = feedparser.parse(url)
+            for e in f.entries[:10]:
+                t = (e.get("title") or "").strip()
+                if t and t not in out:
+                    out.append(t)
+        except Exception:
+            continue
+    return out[:18]
+
+
+@app.get("/api/news")
+def news():
+    return {"news": _news_list()}
+
+
+# ----- KOMMANDE RAPPORTER (riktiga earnings-datum via yfinance) ------
+@cached(6 * 3600)
+def _events_list():
+    if yf is None:
+        return []
+    import datetime as _dt
+    today = _dt.date.today()
+    base = list(dict.fromkeys(UNIVERSE.get("Bevakning", []) + ALL_TICKERS))[:30]
+    out = []
+    for t in base:
+        dt = None
+        try:
+            cal = yf.Ticker(t).calendar
+            if isinstance(cal, dict):
+                ed = cal.get("Earnings Date")
+                dt = ed[0] if isinstance(ed, (list, tuple)) and ed else ed
+            elif cal is not None and hasattr(cal, "loc"):
+                dt = cal.loc["Earnings Date"][0]
+        except Exception:
+            dt = None
+        if dt is None:
+            continue
+        try:
+            d = dt.date() if hasattr(dt, "date") else dt
+            days = (d - today).days
+        except Exception:
+            continue
+        if 0 <= days <= 45:
+            out.append({"tkr": t, "date": str(d), "days": days})
+    out.sort(key=lambda x: x["days"])
+    return out[:8]
+
+
+@app.get("/api/events")
+def events():
+    return {"events": _events_list()}
+
+
 @app.get("/api/indices")
 def indices():
     out = []
