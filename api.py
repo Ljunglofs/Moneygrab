@@ -176,6 +176,14 @@ def company_info(ticker: str) -> dict:
             "country": info.get("country") or "",
             "website": web,
             "domain": domain,
+            "pe": info.get("trailingPE"),
+            "fwd_pe": info.get("forwardPE"),
+            "beta": info.get("beta"),
+            "div_yield": info.get("dividendYield"),
+            "wk_high": info.get("fiftyTwoWeekHigh"),
+            "wk_low": info.get("fiftyTwoWeekLow"),
+            "avg_vol": info.get("averageVolume"),
+            "prev_close": info.get("regularMarketPreviousClose") or info.get("previousClose"),
         }
     except Exception:
         return {}
@@ -360,6 +368,98 @@ def _events_list():
 @app.get("/api/events")
 def events():
     return {"events": _events_list()}
+
+
+# ----- GRAF: pris + volym över olika tidsramar -----------------------
+_RANGE = {
+    "1d":  ("1d",  "5m"),
+    "5d":  ("5d",  "30m"),
+    "1mo": ("1mo", "1d"),
+    "3mo": ("3mo", "1d"),
+    "6mo": ("6mo", "1d"),
+    "1y":  ("1y",  "1d"),
+}
+
+@cached(300)
+def _chart(ticker, rng):
+    if yf is None:
+        return []
+    period, interval = _RANGE.get(rng, ("1mo", "1d"))
+    try:
+        df = yf.Ticker(ticker).history(period=period, interval=interval, auto_adjust=False)
+    except Exception:
+        return []
+    if df is None or df.empty:
+        return []
+    out = []
+    for ts, row in df.iterrows():
+        try:
+            c = float(row["Close"])
+            if c != c:
+                continue
+            v = float(row.get("Volume", 0) or 0)
+            out.append({"t": int(ts.timestamp()), "c": round(c, 4), "v": v})
+        except Exception:
+            continue
+    return out
+
+
+@app.get("/api/chart/{ticker}")
+def chart(ticker: str, range: str = "1mo"):
+    return {"ticker": ticker.upper(), "range": range, "points": _chart(ticker.upper(), range)}
+
+
+# ----- ÄGANDE: institutionellt + insider + största ägare -------------
+@cached(6 * 3600)
+def _ownership(ticker):
+    out = {"inst_pct": None, "insider_pct": None, "holders": []}
+    if yf is None:
+        return out
+    tk = yf.Ticker(ticker)
+    try:
+        mh = tk.major_holders
+        if mh is not None and hasattr(mh, "to_dict"):
+            d = mh.to_dict()
+            col = list(d.keys())[0]
+            for k, v in d[col].items():
+                kk = str(k).lower()
+                try:
+                    fv = float(v)
+                except Exception:
+                    continue
+                pct = round(fv * 100, 2) if fv <= 1 else round(fv, 2)
+                if "insider" in kk and out["insider_pct"] is None:
+                    out["insider_pct"] = pct
+                elif "institution" in kk and "float" not in kk and "count" not in kk and out["inst_pct"] is None:
+                    out["inst_pct"] = pct
+    except Exception:
+        pass
+    try:
+        ih = tk.institutional_holders
+        if ih is not None and hasattr(ih, "iterrows"):
+            for _, row in ih.head(6).iterrows():
+                try:
+                    name = str(row.get("Holder") or row.get("holder") or "").strip()
+                    if not name:
+                        continue
+                    raw = row.get("% Out")
+                    if raw is None:
+                        raw = row.get("pctHeld")
+                    pct = None
+                    if raw is not None:
+                        fr = float(raw)
+                        pct = round(fr * 100, 2) if fr <= 1 else round(fr, 2)
+                    out["holders"].append({"name": name, "pct": pct})
+                except Exception:
+                    continue
+    except Exception:
+        pass
+    return out
+
+
+@app.get("/api/ownership/{ticker}")
+def ownership(ticker: str):
+    return {"ticker": ticker.upper(), **_ownership(ticker.upper())}
 
 
 @app.get("/api/indices")
