@@ -42,7 +42,7 @@ except Exception:
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
 
 # =====================================================================
 #  ENKEL TTL-CACHE  (ersätter st.cache_data på servern)
@@ -291,6 +291,24 @@ def index():
         with open(p, encoding="utf-8") as fh:
             return fh.read()
     return "<h1>GRABIT API</h1><p>index.html saknas i repot.</p>"
+
+
+# ---- Statiska assets (hero-video + poster) -------------------------
+_STATIC_FILES = {
+    "bg_1280-1.mp4": "video/mp4",
+    "bg_poster.jpg": "image/jpeg",
+}
+
+@app.get("/{fname}")
+def static_asset(fname: str):
+    media = _STATIC_FILES.get(fname)
+    if not media:
+        raise HTTPException(404, "Not found")
+    import os
+    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), fname)
+    if not os.path.exists(p):
+        raise HTTPException(404, "File missing")
+    return FileResponse(p, media_type=media)
 
 
 @app.get("/api/health")
@@ -719,3 +737,128 @@ def ai(payload: AiPayload):
         # Mjukt fel: frontenden visar svaret i chatten i stället för en krasch.
         return {"answer": f"Kunde inte nå Grabit AI just nu ({type(e).__name__}). "
                           f"Försök igen om en stund.", "error": True}
+
+
+# =====================================================================
+#  DAYTRADE  ·  /api/daytrade
+#  Regelbaserade intraday-setups från live-data. Inga magiska siffror:
+#  Entry/SL/TP/RR/confidence härleds ur VWAP, RSI, ATR och EMA-trend.
+# =====================================================================
+_DT_WATCH = [
+    ("GC=F", "XAUUSD", "Guld (futures)",       True),
+    ("NQ=F", "US100",  "Nasdaq 100 (futures)", True),
+    ("ES=F", "US500",  "S&P 500 (futures)",    False),
+    ("AAPL", "AAPL",   "Apple Inc.",           False),
+    ("NVDA", "NVDA",   "NVIDIA Corp.",         False),
+    ("TSLA", "TSLA",   "Tesla Inc.",           False),
+]
+_DT_INTERVAL = "15m"
+_DT_ATR_K = 0.6
+
+
+def _dt_rsi(close, n=14):
+    d = close.diff()
+    up = d.clip(lower=0).rolling(n).mean()
+    dn = (-d.clip(upper=0)).rolling(n).mean()
+    rs = up / dn.replace(0, np.nan)
+    return float((100 - 100 / (1 + rs)).iloc[-1])
+
+
+def _dt_atr(df, n=14):
+    h, l, c = df["High"], df["Low"], df["Close"]
+    tr = pd.concat([h - l, (h - c.shift()).abs(), (l - c.shift()).abs()], axis=1).max(axis=1)
+    return float(tr.rolling(n).mean().iloc[-1])
+
+
+def _dt_vwap(df):
+    day = df[df.index.date == df.index[-1].date()]
+    if day.empty:
+        day = df.tail(26)
+    tp = (day["High"] + day["Low"] + day["Close"]) / 3
+    return float((tp * day["Volume"]).cumsum().iloc[-1] / day["Volume"].cumsum().iloc[-1])
+
+
+def _dt_build(sym, ticker, name, pinned):
+    if yf is None:
+        return None
+    df = yf.download(sym, period="5d", interval=_DT_INTERVAL, progress=False, auto_adjust=False)
+    if df is None or len(df) < 30:
+        return None
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = df.columns.get_level_values(0)
+
+    import math
+    price = float(df["Close"].iloc[-1])
+    vwap = _dt_vwap(df)
+    rsi = _dt_rsi(df["Close"])
+    atr = _dt_atr(df)
+    ema20 = float(df["Close"].ewm(span=20).mean().iloc[-1])
+    ema50 = float(df["Close"].ewm(span=50).mean().iloc[-1])
+    vol = float(df["Volume"].iloc[-1])
+    vol_avg = float(df["Volume"].tail(20).mean())
+    if any(v is None or (isinstance(v, float) and math.isnan(v)) for v in [price, vwap, rsi, atr, ema20]):
+        return None
+
+    up_trend = ema20 >= ema50 and price >= vwap
+    dn_trend = ema20 < ema50 and price < vwap
+    if up_trend and rsi < 68:
+        bias = "long"
+    elif dn_trend and rsi > 32:
+        bias = "short"
+    else:
+        bias = "wait"
+
+    risk = max(_DT_ATR_K * atr, price * 0.0008)
+    if bias == "long":
+        entry = vwap if abs(price - vwap) < risk else price
+        sl, tp1, tp2 = entry - risk, entry + 2 * risk, entry + 3 * risk
+    elif bias == "short":
+        entry = vwap if abs(price - vwap) < risk else price
+        sl, tp1, tp2 = entry + risk, entry - 2 * risk, entry - 3 * risk
+    else:
+        entry, sl, tp1, tp2 = price, price - risk, price + 2 * risk, price + 3 * risk
+
+    rr = abs(tp1 - entry) / abs(entry - sl) if entry != sl else 0
+
+    score = 50
+    if (bias == "long" and up_trend) or (bias == "short" and dn_trend): score += 15
+    if bias == "long" and 40 <= rsi <= 58: score += 10
+    if bias == "short" and 42 <= rsi <= 60: score += 10
+    if vol > vol_avg: score += 10
+    if 0.0005 * price < atr < 0.02 * price: score += 8
+    if abs(price - vwap) < 0.5 * risk: score += 7
+    score = max(50, min(90, score)) if bias != "wait" else max(50, min(64, score))
+
+    rdec = 4 if price < 10 else (2 if price < 1000 else 1)
+    f = lambda v: round(v, rdec)
+    ctx = (f"{'Över' if price >= vwap else 'Under'} VWAP"
+           f'<span class="sep">·</span>RSI {rsi:.0f}'
+           f'<span class="sep">·</span>{"hög" if vol > vol_avg else "normal"} volym'
+           f'<span class="sep">·</span>ATR {f(atr)}')
+
+    return {
+        "ticker": ticker, "name": name, "bias": bias, "pinned": pinned,
+        "price": f(price), "entry": f(entry),
+        "entryLabel": f"{f(entry - 0.3 * risk)}–{f(entry + 0.3 * risk)}" if bias != "wait" else "—",
+        "sl": f(sl), "tp1": f(tp1), "tp2": f(tp2),
+        "rr": f"{rr:.1f}", "confidence": int(round(score)), "context": ctx,
+    }
+
+
+@cached(180)
+def _dt_all():
+    out = []
+    for sym, ticker, name, pinned in _DT_WATCH:
+        try:
+            s = _dt_build(sym, ticker, name, pinned)
+            if s:
+                out.append(s)
+        except Exception:
+            continue
+    out.sort(key=lambda s: (not s["pinned"], -s["confidence"]))
+    return out
+
+
+@app.get("/api/daytrade")
+def daytrade():
+    return {"setups": _dt_all(), "interval": _DT_INTERVAL, "ts": int(time.time())}
