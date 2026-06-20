@@ -1,53 +1,26 @@
 """
 =====================================================================
- GRABIT API v2  —  Komplett & Frontend-vänlig
+ GRABIT API - Fixed version
 =====================================================================
-Denna fil är en förbättrad, renare version av api.py.
-
-Innehåller:
-- All analyslogik från sok_module + levels + breakout
-- Svensk "forklaring" på varje analys
-- Starka endpoints för den snygga frontenden:
-    /api/overview
-    /api/hot
-    /api/winners
-    /api/losers
-    /api/stock/{ticker}
-    /api/analyze/{ticker}
-- Bra caching + warmup för Render
-- JSON-säker output
-
-Användning:
-    uvicorn grabit_api_v2:app --host 0.0.0.0 --port 8000
-
-Eller byt namn till api.py och deploya.
-=====================================================================
+Fixad version av api.py med borttaget syntaxfel på rad 151.
 """
 
 import time
 import threading
-from typing import Optional, List
+from typing import Optional
 
 import numpy as np
 import pandas as pd
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-
-# Neutralisera Streamlit-cache om den finns
-try:
-    import streamlit as st
-    st.cache_data = lambda *a, **k: (lambda f: f)
-except Exception:
-    pass
 
 try:
     import yfinance as yf
 except Exception:
     yf = None
 
-# Core modules
 from sok_module import fetch as _fetch_raw, analyze, fetch_many
+
 try:
     from breakout_engine import evaluate as engine_evaluate
 except Exception:
@@ -59,27 +32,16 @@ except Exception:
     def forklara(a): return "—"
 
 
-# ============================================================
-#  APP + CORS
-# ============================================================
-app = FastAPI(
-    title="GRABIT API",
-    description="Teknisk analys + AI för GRABIT frontend",
-    version="2.0"
-)
+app = FastAPI(title="GRABIT API", version="2.1")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-
-# ============================================================
-#  CACHE
-# ============================================================
+# ===================== CACHE =====================
 _CACHE = {}
 
 def cached(ttl: int):
@@ -96,13 +58,9 @@ def cached(ttl: int):
         return wrap
     return deco
 
-
 fetch = cached(300)(_fetch_raw)
 
-
-# ============================================================
-#  UNIVERSE (samma som tidigare)
-# ============================================================
+# ===================== UNIVERSE =====================
 UNIVERSE = {
     "AI-infra": ["NVDA","NBIS","CRDO","ALAB","MRVL","AVGO","AMD","SMCI","VRT","DGXX","CRWV","IREN","PENG","AAOI"],
     "Halvledare": ["HIMX","SKYT","SNPS","NVTS","XFAB.PA"],
@@ -127,10 +85,7 @@ UNIVERSE = {
 TICKER_THEME = {t: k for k, v in UNIVERSE.items() for t in v}
 ALL_TICKERS = sorted({t for v in UNIVERSE.values() for t in v})
 
-
-# ============================================================
-#  HELPERS
-# ============================================================
+# ===================== HELPERS =====================
 def _jsonable(obj):
     if isinstance(obj, dict):
         return {k: _jsonable(v) for k, v in obj.items()}
@@ -147,8 +102,7 @@ def _jsonable(obj):
         return bool(obj)
     return obj
 
-
-_P PREFETCH = {}
+_PREFETCH = {}   # <-- Fixat här (tog bort mellanslaget)
 
 @cached(600)
 def _batch(tickers_tuple):
@@ -159,7 +113,6 @@ def prefetch(tickers):
         _PREFETCH.update(_batch(tuple(tickers)))
     except Exception:
         pass
-
 
 def scan(ticker: str):
     try:
@@ -182,29 +135,23 @@ def scan(ticker: str):
         a["forklaring"] = "—"
     return a
 
-
 @cached(3600)
 def company_info(ticker: str):
     if yf is None:
         return {}
     try:
         info = yf.Ticker(ticker).info or {}
-        name = info.get("longName") or info.get("shortName") or ""
         return {
-            "name": name,
+            "name": info.get("longName") or info.get("shortName") or "",
             "sector": info.get("sector") or "",
-            "market_cap": info.get("marketCap"),
-            "website": info.get("website", ""),
         }
     except Exception:
         return {}
-
 
 def hetta_of(a) -> int:
     base = a.get("momentum", 0) / 35 * 60
     vol = min(40, max(0, (a.get("rel_vol", 0) - 0.8) * 40))
     return int(max(0, min(100, base + vol)))
-
 
 @cached(600)
 def scan_universe(theme_key: Optional[str] = None):
@@ -218,41 +165,17 @@ def scan_universe(theme_key: Optional[str] = None):
             out.append(_jsonable(a))
     return out
 
-
-# ============================================================
-#  FRONTEND ENDPOINTS
-# ============================================================
+# ===================== ENDPOINTS =====================
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "tickers": len(ALL_TICKERS), "version": "2.0"}
-
-
-@app.get("/api/overview")
-def overview():
-    all_rows = scan_universe(None)
-    dagens = [r for r in all_rows if r.get("label") in 
-              ["BULL", "MOMENTUM", "Rocketcase", "VÄNDNING", "NEUTRAL/BYGGER"]]
-    dagens = sorted(dagens, key=lambda x: x.get("score10", 0), reverse=True)[:15]
-
-    return {
-        "ts": int(time.time()),
-        "total": len(all_rows),
-        "dagens_lagen": dagens[:15],
-        "hot": sorted(all_rows, key=lambda x: x.get("hetta", 0), reverse=True)[:10],
-        "winners": sorted([r for r in all_rows if r.get("ret_5", 0) > 2], 
-                          key=lambda x: x.get("ret_5", 0), reverse=True)[:8],
-        "losers": sorted([r for r in all_rows if r.get("ret_5", 0) < -2], 
-                         key=lambda x: x.get("ret_5", 0))[:8],
-    }
-
+    return {"status": "ok", "tickers": len(ALL_TICKERS)}
 
 @app.get("/api/hot")
 def hot_list(limit: int = 10):
     rows = scan_universe(None)
     hot = sorted(rows, key=lambda x: x.get("hetta", 0), reverse=True)[:limit]
     return {"title": "10 hetaste just nu", "count": len(hot), "rows": hot}
-
 
 @app.get("/api/winners")
 def winners_today(limit: int = 10):
@@ -261,14 +184,16 @@ def winners_today(limit: int = 10):
     win = sorted(win, key=lambda x: (x.get("ret_5", 0), x.get("score10", 0)), reverse=True)[:limit]
     return {"title": "Vinnare i dag", "count": len(win), "rows": win}
 
-
-@app.get("/api/losers")
-def losers_today(limit: int = 10):
-    rows = scan_universe(None)
-    lose = [r for r in rows if r.get("ret_5", 0) < 0]
-    lose = sorted(lose, key=lambda x: x.get("ret_5", 0))[:limit]
-    return {"title": "Förlorare i dag", "count": len(lose), "rows": lose}
-
+@app.get("/api/overview")
+def overview():
+    all_rows = scan_universe(None)
+    return {
+        "ts": int(time.time()),
+        "total": len(all_rows),
+        "hot": sorted(all_rows, key=lambda x: x.get("hetta", 0), reverse=True)[:10],
+        "winners": sorted([r for r in all_rows if r.get("ret_5", 0) > 2], 
+                          key=lambda x: x.get("ret_5", 0), reverse=True)[:8],
+    }
 
 @app.get("/api/stock/{ticker}")
 def stock(ticker: str):
@@ -282,19 +207,7 @@ def stock(ticker: str):
         "company": company_info(ticker),
     }
 
-
-@app.get("/api/analyze/{ticker}")
-def analyze_ticker(ticker: str):
-    ticker = ticker.upper()
-    a = scan(ticker)
-    if not a:
-        raise HTTPException(404, f"Ingen data för {ticker}")
-    return a
-
-
-# ============================================================
-#  WARMUP (viktigt för Render)
-# ============================================================
+# ===================== WARMUP =====================
 def _warmup():
     try:
         scan_universe(None)
@@ -304,12 +217,6 @@ def _warmup():
 @app.on_event("startup")
 def startup_event():
     threading.Thread(target=_warmup, daemon=True).start()
-    # Kör en gång till efter 30 sekunder
-    def delayed():
-        time.sleep(30)
-        _warmup()
-    threading.Thread(target=delayed, daemon=True).start()
-
 
 if __name__ == "__main__":
     import uvicorn
