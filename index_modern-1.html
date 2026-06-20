@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GRABIT • Modern</title>
+  
+  <!-- Future Tech Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --font-main: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+      --bg: #0b0e16;
+      --panel: #161a23;
+      --accent: #1199fa;
+      --text: #eaecef;
+      --muted: #848e9c;
+      --pos: #16c784;
+      --neg: #f6465d;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: var(--font-main);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 16px;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .logo {
+      font-size: 1.8rem;
+      font-weight: 800;
+      letter-spacing: -1.5px;
+    }
+
+    .section-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin: 24px 0 12px;
+      color: #fff;
+    }
+
+    /* === MODERNA AKTIEKORT === */
+    .stock-card {
+      background: var(--panel);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 18px;
+      padding: 16px;
+      margin-bottom: 12px;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      cursor: pointer;
+    }
+
+    .stock-card:active {
+      transform: scale(0.985);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    }
+
+    .stock-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .logo-wrapper {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      background: #0f1219;
+      overflow: hidden;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .stock-logo {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      padding: 6px;
+    }
+
+    .monogram {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 17px;
+      font-weight: 800;
+      color: white;
+      letter-spacing: -0.8px;
+    }
+
+    .ticker {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .company-name {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 140px;
+    }
+
+    .price-section {
+      text-align: right;
+      margin-left: auto;
+    }
+
+    .price {
+      font-size: 1.3rem;
+      font-weight: 800;
+      color: #fff;
+      line-height: 1;
+    }
+
+    .change {
+      font-size: 0.9rem;
+      font-weight: 700;
+      margin-top: 2px;
+    }
+
+    .change.positive { color: var(--pos); }
+    .change.negative { color: var(--neg); }
+
+    .stock-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .score-badge {
+      background: #1199fa22;
+      color: #1199fa;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+
+    .meta {
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    .pill {
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-weight: 600;
+    }
+
+    .pill.bull { background: #16c78422; color: #16c784; }
+    .pill.bear { background: #f6465d22; color: #f6465d; }
+    .pill.rocket { background: #f0a02022; color: #f0a020; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">GRABIT</div>
+    <div style="color: #1199fa; font-weight: 600;">PRO</div>
+  </div>
+
+  <h2 class="section-title">10 hetaste just nu</h2>
+
+  <!-- Exempel på modernt aktiekort -->
+  <div class="stock-card" onclick="openDetail('NVDA')">
+    <div class="stock-header">
+      <!-- Logo + Monogram fallback -->
+      <div class="logo-wrapper">
+        <img src="https://logo.clearbit.com/nvidia.com" class="stock-logo"
+             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+        <div class="monogram" style="display:none; background:#1199fa">
+          <span>NVDA</span>
+        </div>
+      </div>
+
+      <div style="flex:1; min-width:0">
+        <div style="display:flex; align-items:center; gap:8px">
+          <span class="ticker">NVDA</span>
+          <span class="pill bull">BULL</span>
+        </div>
+        <div class="company-name">NVIDIA Corporation</div>
+      </div>
+
+      <div class="price-section">
+        <div class="price">$142.8</div>
+        <div class="change positive">+4.2%</div>
+      </div>
+    </div>
+
+    <div class="stock-footer">
+      <div>
+        <span class="score-badge">9.1 / 10</span>
+      </div>
+      <div class="meta">
+        Vol 2.1× • RSI 71
+      </div>
+    </div>
+  </div>
+
+  <!-- Fler exempelkort -->
+  <div class="stock-card" onclick="openDetail('RKLB')">
+    <div class="stock-header">
+      <div class="logo-wrapper">
+        <img src="https://logo.clearbit.com/rocketlabusa.com" class="stock-logo"
+             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+        <div class="monogram" style="display:none; background:#f0a020">
+          <span>RKLB</span>
+        </div>
+      </div>
+
+      <div style="flex:1; min-width:0">
+        <div style="display:flex; align-items:center; gap:8px">
+          <span class="ticker">RKLB</span>
+          <span class="pill rocket">ROCKET</span>
+        </div>
+        <div class="company-name">Rocket Lab</div>
+      </div>
+
+      <div class="price-section">
+        <div class="price">$28.4</div>
+        <div class="change positive">+12.8%</div>
+      </div>
+    </div>
+
+    <div class="stock-footer">
+      <div>
+        <span class="score-badge">8.4 / 10</span>
+      </div>
+      <div class="meta">
+        Vol 3.4× • RSI 78
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function openDetail(ticker) {
+      alert("Öppnar detaljvy för " + ticker + " (demo)");
+      // Här kan du senare koppla till din detalj-modal eller navigation
+    }
+
+    // Exempel: Hur du kan använda monogram dynamiskt
+    console.log('%c[GRABIT] Modern font + nya kort aktiverade', 'color:#1199fa');
+  </script>
+
+</body>
+</html>
