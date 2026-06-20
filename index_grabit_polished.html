@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GRABIT</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --font-main: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+      --bg: #0b0e16;
+      --panel: #161a23;
+      --accent: #1199fa;
+      --text: #eaecef;
+      --muted: #848e9c;
+      --pos: #16c784;
+      --neg: #f6465d;
+      --gold: #f0a020;
+    }
+
+    * { margin:0; padding:0; box-sizing:border-box; }
+    
+    body {
+      font-family: var(--font-main);
+      background: var(--bg);
+      color: var(--text);
+      padding: 16px;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .logo {
+      font-size: 1.85rem;
+      font-weight: 800;
+      letter-spacing: -1.5px;
+    }
+
+    .section {
+      margin-bottom: 26px;
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .section-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+    }
+
+    /* === IMPROVED CARDS === */
+    .stock-card {
+      background: var(--panel);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 16px;
+      padding: 15px 16px;
+      margin-bottom: 10px;
+      cursor: pointer;
+    }
+
+    .stock-header {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+    }
+
+    .logo-wrapper {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      background: #0f1219;
+      overflow: hidden;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .stock-logo { width: 100%; height: 100%; object-fit: contain; padding: 5px; }
+    
+    .monogram {
+      width: 100%; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; font-weight: 800; color: white;
+    }
+
+    .ticker { font-size: 1.08rem; font-weight: 800; }
+    .company-name { font-size: 0.76rem; color: var(--muted); margin-top: 1px; }
+
+    .price { font-size: 1.2rem; font-weight: 800; }
+    .change { font-size: 0.85rem; font-weight: 700; margin-top: 1px; }
+    .change.positive { color: var(--pos); }
+    .change.negative { color: var(--neg); }
+
+    .stock-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .score { font-weight: 700; color: #1199fa; }
+    .meta { font-size: 0.73rem; color: var(--muted); }
+
+    .pill {
+      font-size: 0.65rem;
+      padding: 1px 6px;
+      border-radius: 999px;
+      font-weight: 600;
+    }
+    .pill.bull { background: #16c78422; color: #16c784; }
+    .pill.bear { background: #f6465d22; color: #f6465d; }
+    .pill.rocket { background: #f0a02022; color: #f0a020; }
+    .pill.avvakta { background: #f0a02022; color: #f0a020; }
+
+    .signal-card {
+      background: var(--panel);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">GRABIT</div>
+    <div style="color:#1199fa; font-weight:700; font-size:0.95rem;">PRO</div>
+  </div>
+
+  <!-- 10 HETASTE -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-title">10 hetaste just nu</div>
+      <div style="color:#1199fa; font-size:0.85rem;">Visa alla</div>
+    </div>
+    <div id="hot-list"></div>
+  </div>
+
+  <!-- TIDIGA SIGNALER -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-title">Tidiga signaler</div>
+      <div style="color:#1199fa; font-size:0.85rem;">5</div>
+    </div>
+    
+    <div class="signal-card">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div style="background:#222; width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:0.8rem;">BK</div>
+        <div>
+          <div style="font-weight:700;">BKNG</div>
+          <div style="font-size:0.75rem; color:#848e9c;">Konsument</div>
+        </div>
+      </div>
+      <div style="font-weight:700; color:#1199fa; font-size:1.1rem;">7.0</div>
+    </div>
+
+    <div class="signal-card">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div style="background:#222; width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center;">
+          <img src="https://logo.clearbit.com/nnasafe.com" style="width:26px; height:26px; border-radius:6px;" onerror="this.style.display='none'">
+        </div>
+        <div>
+          <div style="font-weight:700;">NNE</div>
+          <div style="font-size:0.75rem; color:#848e9c;">Nano Nuclear</div>
+        </div>
+      </div>
+      <div style="font-weight:700; color:#1199fa; font-size:1.1rem;">7.0</div>
+    </div>
+
+    <div class="signal-card">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div style="background:#222; width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center;">
+          <img src="https://logo.clearbit.com/nuscalepower.com" style="width:26px; height:26px; border-radius:6px;" onerror="this.style.display='none'">
+        </div>
+        <div>
+          <div style="font-weight:700;">SMR</div>
+          <div style="font-size:0.75rem; color:#848e9c;">NuScale Power</div>
+        </div>
+      </div>
+      <div style="font-weight:700; color:#1199fa; font-size:1.1rem;">7.0</div>
+    </div>
+  </div>
+
+  <script>
+    // Exempeldata (kan senare kopplas till API)
+    const hotData = [
+      { ticker: "NVDA", label: "BULL", last: 142.8, ret_5: 4.2, score10: 9.1, rel_vol: 2.1, rsi: 71, theme: "AI-infra" },
+      { ticker: "RKLB", label: "ROCKET", last: 28.4, ret_5: 12.8, score10: 8.4, rel_vol: 3.4, rsi: 78, theme: "Space" },
+      { ticker: "OKLO", label: "BULL", last: 18.9, ret_5: 6.5, score10: 7.8, rel_vol: 1.8, rsi: 65, theme: "Nuclear" },
+    ];
+
+    function createCard(data) {
+      const chgClass = data.ret_5 >= 0 ? 'positive' : 'negative';
+      const chgSign = data.ret_5 >= 0 ? '+' : '';
+      const labelClass = data.label === 'BULL' ? 'bull' : data.label === 'BEAR' ? 'bear' : 'rocket';
+
+      return `
+        <div class="stock-card" onclick="openDetail('${data.ticker}')">
+          <div class="stock-header">
+            <div class="logo-wrapper">
+              <img src="https://logo.clearbit.com/${data.ticker.toLowerCase()}.com" class="stock-logo"
+                   onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+              <div class="monogram" style="display:none; background:#1199fa"><span>${data.ticker}</span></div>
+            </div>
+            <div style="flex:1; min-width:0">
+              <div style="display:flex; align-items:center; gap:7px">
+                <span class="ticker">${data.ticker}</span>
+                <span class="pill ${labelClass}">${data.label}</span>
+              </div>
+              <div class="company-name">${data.theme}</div>
+            </div>
+            <div style="text-align:right">
+              <div class="price">${data.last.toFixed(2)}</div>
+              <div class="change ${chgClass}">${chgSign}${data.ret_5.toFixed(1)}%</div>
+            </div>
+          </div>
+          <div class="stock-footer">
+            <span class="score">${data.score10}/10</span>
+            <span class="meta">Vol ${data.rel_vol.toFixed(1)}× • RSI ${data.rsi}</span>
+          </div>
+        </div>`;
+    }
+
+    function renderHotList() {
+      const container = document.getElementById('hot-list');
+      container.innerHTML = hotData.map(createCard).join('');
+    }
+
+    function openDetail(ticker) {
+      alert("Öppnar detaljvy för " + ticker + " (demo)");
+      // Här kan du senare koppla till riktig detalj-modal
+    }
+
+    // Start
+    window.onload = function() {
+      renderHotList();
+    }
+  </script>
+</body>
+</html>
