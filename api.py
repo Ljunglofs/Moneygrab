@@ -862,3 +862,26 @@ def _dt_all():
 @app.get("/api/daytrade")
 def daytrade():
     return {"setups": _dt_all(), "interval": _DT_INTERVAL, "ts": int(time.time())}
+
+
+# =====================================================================
+#  BAKGRUNDS-WARMUP
+#  Värmer den tunga 193-ticker-skanningen (overview + screen) UTANFÖR
+#  request-vägen, så Render-kallstart inte timeout:ar frontenden.
+# =====================================================================
+import threading as _threading
+
+def _warmup_once():
+    try:
+        scan_universe(None)          # värmer /api/overview och /api/screen
+    except Exception:
+        pass
+
+def _warmup_loop():
+    while True:
+        _warmup_once()
+        time.sleep(480)              # uppdatera var 8:e min (cache-TTL = 10 min)
+
+@app.on_event("startup")
+def _start_warmup():
+    _threading.Thread(target=_warmup_loop, daemon=True).start()

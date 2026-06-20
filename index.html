@@ -543,6 +543,63 @@ body:has(#s-hem.on) .bgvid{display:block}
 @media (prefers-reduced-motion:reduce){.bgvid video{display:none}}
 header.hdr{z-index:30}
 main{position:relative;z-index:1}
+
+/* ---- POLISH: platta ut lågupplösta base64-bilder -> rena T1-ytor ---- */
+.pulsimg{display:none!important}
+.pkbg{display:none!important}
+.secgfx,.secchart{background-image:none!important;opacity:0!important}
+.st-hero{background-image:none!important;background:radial-gradient(120% 130% at 50% 0%,#1a2533,#0B0F14 70%)!important;border-bottom:1px solid rgba(255,255,255,.06)}
+.verdict .secgfx,.about .secgfx{display:none!important}
+
+/* ---- NY MARKNADSLÄGE-MÄTARE (ren båge istället för eldig bild) ---- */
+.tempg{justify-content:flex-start;padding:14px 12px 12px}
+.tg-gauge{position:relative;display:grid;place-items:center;margin:8px 0 2px}
+.tg-gauge svg{display:block}
+.tg-num{position:absolute;bottom:0;font-family:var(--disp);font-weight:900;font-size:38px;line-height:1;letter-spacing:-.02em}
+.tempg .tg-l{margin-bottom:2px}
+.tempg .tg-s{font-size:15px;letter-spacing:.05em;margin-top:8px}
+
+/* ---- DAYTRADE ---- */
+#s-daytrade{padding-top:2px}
+.dtw{padding:2px 0 10px}
+.dt-head2{display:flex;align-items:baseline;justify-content:space-between;margin:6px 2px 3px}
+.dt-head2 h2{font-family:var(--disp);font-weight:700;font-size:23px}
+.dt-live2{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--mut)}
+.dt-live2 i{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--pos);margin-right:5px;vertical-align:middle}
+.dt-disc2{font-size:10.5px;color:var(--mut);margin:0 2px 13px;line-height:1.5}
+.dt-c{display:flex;gap:12px;background:linear-gradient(180deg,#12191F,#0B0F14);border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:14px 14px 13px;margin-bottom:11px}
+.dt-c.pin{border-color:rgba(245,197,66,.24)}
+.dt-cl{flex:1;min-width:0}
+.dt-cid{display:flex;align-items:center;gap:9px}
+.dt-ctk{font-family:var(--disp);font-weight:900;font-size:18px;letter-spacing:.01em}
+.dt-bi{font-family:var(--disp);font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:7px}
+.dt-bi.long{color:var(--pos);background:rgba(34,197,94,.13)}
+.dt-bi.short{color:var(--neg);background:rgba(239,68,68,.13)}
+.dt-bi.wait{color:var(--gold2);background:rgba(245,197,66,.13)}
+.dt-cn{font-size:11.5px;color:var(--mut);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dt-lv2{margin-top:12px;display:grid;grid-template-columns:auto 1fr;row-gap:7px;column-gap:14px;align-items:baseline}
+.dt-lk2{font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em}
+.dt-vv{font-family:var(--disp);font-weight:800;font-size:15px;text-align:right;font-variant-numeric:tabular-nums}
+.dt-vv.sl{color:var(--neg)}.dt-vv.tp{color:var(--pos)}
+.dt-cx{margin-top:11px;font-size:10.5px;color:var(--mut);line-height:1.55}
+.dt-cx .sep{margin:0 5px;opacity:.45}
+.dt-ft{margin-top:12px;display:flex;align-items:center;gap:13px}
+.dt-rr2{font-size:11px;color:var(--mut);white-space:nowrap}
+.dt-rr2 b{font-family:var(--disp);color:var(--txt);font-size:14px}
+.dt-cf{flex:1}
+.dt-cf .t{display:flex;justify-content:space-between;font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px}
+.dt-cf .t b{color:var(--txt);font-family:var(--disp)}
+.dt-bar{height:5px;border-radius:3px;background:#1b232c;overflow:hidden}
+.dt-bar i{display:block;height:100%;border-radius:3px}
+.dt-ld{width:54px;flex-shrink:0;position:relative}
+.dt-ld .tr{position:absolute;left:12px;top:6px;bottom:6px;width:2px;background:#1b232c;border-radius:2px}
+.dt-rg{position:absolute;left:0;right:0;display:flex;align-items:center;gap:6px;transform:translateY(-50%)}
+.dt-rg .tk{width:22px;height:2px;border-radius:2px;background:var(--mut);flex:none}
+.dt-rg .rl{font-family:var(--disp);font-size:9px;color:var(--mut)}
+.dt-rg.tp .tk{background:var(--pos)}.dt-rg.tp .rl{color:var(--pos)}
+.dt-rg.sl .tk{background:var(--neg)}.dt-rg.sl .rl{color:var(--neg)}
+.dt-rg.e .tk{width:28px;height:2px;background:var(--gold2)}.dt-rg.e .rl{color:var(--gold2);font-weight:800}
+.dt-dot2{position:absolute;left:13px;width:9px;height:9px;border-radius:50%;background:#fff;border:2px solid var(--bg);transform:translate(-50%,-50%);box-shadow:0 0 0 2px rgba(255,255,255,.12)}
 </style>
 </head>
 <body>
@@ -596,12 +653,14 @@ main{position:relative;z-index:1}
   <section class="screen" id="s-signal"><div class="card feed" id="feed2" style="margin-top:8px"></div></section>
   <section class="screen" id="s-portfolj"><div id="pf"></div></section>
   <section class="screen" id="s-mer"><div class="placeholder"><span class="gi">&#9881;</span><h3>Mer</h3><p>Watchlist, nyheter, inställningar.</p></div></section>
+  <section class="screen" id="s-daytrade"><div id="dt-wrap"></div></section>
 </main>
 
 <nav class="nav">
   <button class="on" data-s="hem"><span class="gi">${I.home}</span>Översikt</button>
   <button data-s="signal"><span class="gi">${I.signal}</span><span style="position:relative">Signal Feed<span class="badge">5</span></span></button>
   <button data-s="marknad"><span class="gi">${I.compass}</span>Upptäck</button>
+  <button data-s="daytrade"><span class="gi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><polyline points="3 17 9 11 13 15 21 7"></polyline><polyline points="15 7 21 7 21 13"></polyline></svg></span>Daytrade</button>
   <button data-s="portfolj"><span class="gi">${I.folio}</span>Portfölj</button>
   <button data-s="mer"><span class="gi">${I.more}</span>Mer</button>
 </nav>
@@ -1141,8 +1200,13 @@ function render(d){
   // AI-sammanfattning
   if($("#aibrief"))$("#aibrief").innerHTML=`<div class="aichip-bg" style="background-image:url('${IMGS.aichip}')"></div><div class="ai-h"><span class="dot2"></span>AI · Marknadsläge</div><p>${d.aiSummary}</p>`;
   // tempmätare
-  if($("#tempg")){const PULSE={BEARISH:"pulse_bear",BULLISH:"pulse_bull",NEUTRAL:"pulse_neutral","SUPER BULLISH":"pulse_super"};const pim=IMGS[PULSE[d.gauge.state]||"pulse_bear"];
-    $("#tempg").innerHTML=`<div class="tg-l">Marknadsläge</div><img class="pulsimg" src="${pim}" alt="Marknadspuls ${d.gauge.score}"><div class="tg-s" style="color:${d.gauge.color}">${d.gauge.state}</div>`;}
+  if($("#tempg")){const g=d.gauge, sc=Math.max(0,Math.min(100,g.score||0)), C=Math.PI*56, off=C*(1-sc/100);
+    $("#tempg").innerHTML=`<div class="tg-l">Marknadsläge</div>`+
+      `<div class="tg-gauge"><svg viewBox="0 0 130 80" width="138" height="84" aria-hidden="true">`+
+      `<path d="M9 72 A56 56 0 0 1 121 72" fill="none" stroke="#1b232c" stroke-width="9" stroke-linecap="round"/>`+
+      `<path d="M9 72 A56 56 0 0 1 121 72" fill="none" stroke="${g.color}" stroke-width="9" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${off}"/>`+
+      `</svg><div class="tg-num" style="color:${g.color}">${g.score}</div></div>`+
+      `<div class="tg-s" style="color:${g.color}">${g.state}</div>`;}
   // picks + fråga grabit
   if($("#picks"))$("#picks").innerHTML=d.picks.map(pickCard).join("")+askCard(d.picks[0].tkr);
   // events (bildkort med riktiga foton ur mockupen)
@@ -1304,6 +1368,47 @@ const manifest={name:"GRABIT",short_name:"GRABIT",display:"standalone",backgroun
 const ml=document.createElement("link");ml.rel="manifest";ml.href=URL.createObjectURL(new Blob([JSON.stringify(manifest)],{type:"application/json"}));document.head.appendChild(ml);
 
 load();
+/* Render-kallstart: försök växla demo->live var 10:e sek i en minut tills servern vaknat */
+let _grabitTries=0;
+const _grabitUp=setInterval(()=>{ _grabitTries++; load(); if(_grabitTries>=6) clearInterval(_grabitUp); }, 10000);
+/* håll datan färsk medan appen är öppen */
+setInterval(()=>{ if(document.visibilityState==='visible') load(); }, 90000);
+
+/* ---- DAYTRADE SETUPS ---- */
+function dtFmt(n){n=Number(n);if(isNaN(n))return "—";return n.toLocaleString('sv-SE',{maximumFractionDigits:n<10?4:(n<1000?2:1)});}
+function dtLadder(s){const lo=-1.35,hi=3.35,sp=hi-lo,Y=r=>Math.max(3,Math.min(97,(1-((r-lo)/sp))*100));
+  const R=Math.abs(s.entry-s.sl)||1,sg=s.bias==='short'?-1:1,pr=(s.price-s.entry)/R*sg;
+  return '<div class="dt-ld"><div class="tr"></div>'+
+    '<div class="dt-rg tp" style="top:'+Y(3)+'%"><span class="tk"></span><span class="rl">+3R</span></div>'+
+    '<div class="dt-rg tp" style="top:'+Y(2)+'%"><span class="tk"></span><span class="rl">+2R</span></div>'+
+    '<div class="dt-rg e" style="top:'+Y(0)+'%"><span class="tk"></span><span class="rl">E</span></div>'+
+    '<div class="dt-rg sl" style="top:'+Y(-1)+'%"><span class="tk"></span><span class="rl">\u22121R</span></div>'+
+    '<div class="dt-dot2" style="top:'+Y(pr)+'%"></div></div>';}
+function dtCard(s){const cf=Math.round(s.confidence||0),cc=cf>=78?'var(--pos)':cf>=68?'var(--gold2)':'var(--neg)';
+  const bt=s.bias==='long'?'Long':s.bias==='short'?'Short':'Avvakta';
+  return '<div class="dt-c '+(s.pinned?'pin':'')+'"><div class="dt-cl">'+
+    '<div class="dt-cid"><span class="dt-ctk">'+s.ticker+'</span><span class="dt-bi '+s.bias+'">'+bt+'</span></div>'+
+    '<div class="dt-cn">'+(s.name||'')+'</div>'+
+    '<div class="dt-lv2"><span class="dt-lk2">Entry</span><span class="dt-vv">'+(s.entryLabel||dtFmt(s.entry))+'</span>'+
+      '<span class="dt-lk2">Stop</span><span class="dt-vv sl">'+dtFmt(s.sl)+'</span>'+
+      '<span class="dt-lk2">TP1</span><span class="dt-vv tp">'+dtFmt(s.tp1)+'</span>'+
+      '<span class="dt-lk2">TP2</span><span class="dt-vv tp">'+dtFmt(s.tp2)+'</span></div>'+
+    '<div class="dt-cx">'+(s.context||'')+'</div>'+
+    '<div class="dt-ft"><span class="dt-rr2">RR <b>1:'+s.rr+'</b></span>'+
+      '<div class="dt-cf"><div class="t"><span>Score</span><b>'+cf+'%</b></div>'+
+      '<div class="dt-bar"><i style="width:'+cf+'%;background:'+cc+'"></i></div></div></div>'+
+    '</div>'+dtLadder(s)+'</div>';}
+async function loadDaytrade(){const w=document.getElementById('dt-wrap');if(!w)return;
+  if(!w.dataset.done)w.innerHTML='<div class="dtw"><div class="dt-disc2">H\u00e4mtar live-niv\u00e5er\u2026</div></div>';
+  let d;try{const r=await fetch(CONFIG.API_BASE.replace(/\/$/,'')+'/api/daytrade',{cache:'no-store'});d=await r.json();}
+  catch(e){if(!w.dataset.done)w.innerHTML='<div class="dtw"><div class="dt-disc2">Kunde inte n\u00e5 /api/daytrade just nu \u2014 f\u00f6rs\u00f6ker igen.</div></div>';return;}
+  const s=(d&&d.setups)||[];w.dataset.done='1';
+  let h='<div class="dtw"><div class="dt-head2"><h2>Daytrade Setups</h2><span class="dt-live2"><i></i>Live \u00b7 '+((d&&d.interval)||'15m')+'</span></div>'+
+    '<div class="dt-disc2">Regelbaserade niv\u00e5er fr\u00e5n live intraday-data (VWAP, RSI, ATR, EMA) \u2014 ej finansiell r\u00e5dgivning.</div>';
+  h+= s.length ? s.map(dtCard).join('') : '<div class="dt-disc2">Inga setups matchar just nu.</div>';
+  w.innerHTML=h+'</div>';}
+document.querySelector('[data-s="daytrade"]')?.addEventListener('click',loadDaytrade);
+loadDaytrade();
 </script>
 </body>
 </html>
