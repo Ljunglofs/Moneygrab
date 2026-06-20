@@ -34,6 +34,14 @@ except Exception:
 
 app = FastAPI(title="GRABIT API", version="2.1")
 
+@app.get("/")
+def root():
+    return {
+        "message": "GRABIT API is running",
+        "version": "2.1",
+        "endpoints": ["/api/health", "/api/hot", "/api/winners", "/api/stock/{ticker}"]
+    }
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
