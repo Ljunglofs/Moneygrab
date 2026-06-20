@@ -31,7 +31,6 @@
       padding: 16px;
       max-width: 480px;
       margin: 0 auto;
-      line-height: 1.5;
     }
 
     .header {
@@ -42,58 +41,53 @@
     }
 
     .logo {
-      font-size: 1.9rem;
+      font-size: 1.85rem;
       font-weight: 800;
       letter-spacing: -1.5px;
     }
 
     .section {
-      margin-bottom: 28px;
+      margin-bottom: 26px;
     }
 
     .section-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
     }
 
     .section-title {
-      font-size: 1.1rem;
+      font-size: 1.05rem;
       font-weight: 700;
     }
 
+    /* === IMPROVED CARDS === */
     .stock-card {
       background: var(--panel);
       border: 1px solid rgba(255,255,255,0.06);
-      border-radius: 18px;
-      padding: 16px;
-      margin-bottom: 12px;
+      border-radius: 16px;
+      padding: 15px 16px;
+      margin-bottom: 10px;
       cursor: pointer;
-      transition: transform 0.2s ease;
-    }
-
-    .stock-card:active {
-      transform: scale(0.985);
     }
 
     .stock-header {
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 13px;
     }
 
     .logo-wrapper {
-      width: 46px;
-      height: 46px;
-      border-radius: 11px;
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
       background: #0f1219;
       overflow: hidden;
       flex-shrink: 0;
       display: flex;
       align-items: center;
       justify-content: center;
-      border: 1px solid rgba(255,255,255,0.08);
     }
 
     .stock-logo { width: 100%; height: 100%; object-fit: contain; padding: 5px; }
@@ -101,37 +95,50 @@
     .monogram {
       width: 100%; height: 100%;
       display: flex; align-items: center; justify-content: center;
-      font-size: 16px; font-weight: 800; color: white;
+      font-size: 15px; font-weight: 800; color: white;
     }
 
-    .ticker { font-size: 1.1rem; font-weight: 800; }
-    .company-name { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+    .ticker { font-size: 1.08rem; font-weight: 800; }
+    .company-name { font-size: 0.76rem; color: var(--muted); margin-top: 1px; }
 
-    .price { font-size: 1.25rem; font-weight: 800; }
-    .change { font-size: 0.88rem; font-weight: 700; margin-top: 2px; }
+    .price { font-size: 1.2rem; font-weight: 800; }
+    .change { font-size: 0.85rem; font-weight: 700; margin-top: 1px; }
     .change.positive { color: var(--pos); }
     .change.negative { color: var(--neg); }
 
     .stock-footer {
-      display: flex; justify-content: space-between; align-items: center;
-      margin-top: 14px; padding-top: 11px; border-top: 1px solid rgba(255,255,255,0.06);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255,255,255,0.05);
     }
 
-    .score-badge {
-      background: #1199fa22; color: #1199fa;
-      padding: 3px 9px; border-radius: 999px; font-size: 0.82rem; font-weight: 700;
-    }
-
-    .meta { font-size: 0.74rem; color: var(--muted); }
+    .score { font-weight: 700; color: #1199fa; }
+    .meta { font-size: 0.73rem; color: var(--muted); }
 
     .pill {
-      font-size: 0.68rem; padding: 2px 7px; border-radius: 999px; font-weight: 600;
+      font-size: 0.65rem;
+      padding: 1px 6px;
+      border-radius: 999px;
+      font-weight: 600;
     }
     .pill.bull { background: #16c78422; color: #16c784; }
     .pill.bear { background: #f6465d22; color: #f6465d; }
     .pill.rocket { background: #f0a02022; color: #f0a020; }
+    .pill.avvakta { background: #f0a02022; color: #f0a020; }
 
-    .loading { text-align: center; color: var(--muted); padding: 30px 0; }
+    .signal-card {
+      background: var(--panel);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
   </style>
 </head>
 <body>
@@ -139,43 +146,74 @@
   <!-- Header -->
   <div class="header">
     <div class="logo">GRABIT</div>
-    <div style="color:#1199fa; font-weight:700;">PRO</div>
+    <div style="color:#1199fa; font-weight:700; font-size:0.95rem;">PRO</div>
   </div>
 
   <!-- 10 HETASTE -->
   <div class="section">
     <div class="section-header">
       <div class="section-title">10 hetaste just nu</div>
+      <div style="color:#1199fa; font-size:0.85rem;">Visa alla</div>
     </div>
-    <div id="hot-list"><div class="loading">Laddar...</div></div>
+    <div id="hot-list"></div>
   </div>
 
-  <!-- DAGENS BULL + VECKANS SETUP -->
+  <!-- TIDIGA SIGNALER -->
   <div class="section">
     <div class="section-header">
-      <div class="section-title">Dagens & Veckans</div>
+      <div class="section-title">Tidiga signaler</div>
+      <div style="color:#1199fa; font-size:0.85rem;">5</div>
     </div>
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-      <div>
-        <div style="font-size:0.85rem; color:#f0a020; margin-bottom:6px; font-weight:600;">DAGENS BULL</div>
-        <div id="dagens-bull"><div class="loading">Laddar...</div></div>
+    
+    <div class="signal-card">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div style="background:#222; width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:0.8rem;">BK</div>
+        <div>
+          <div style="font-weight:700;">BKNG</div>
+          <div style="font-size:0.75rem; color:#848e9c;">Konsument</div>
+        </div>
       </div>
-      <div>
-        <div style="font-size:0.85rem; color:#16c784; margin-bottom:6px; font-weight:600;">VECKANS SETUP</div>
-        <div id="veckans-setup"><div class="loading">Laddar...</div></div>
+      <div style="font-weight:700; color:#1199fa; font-size:1.1rem;">7.0</div>
+    </div>
+
+    <div class="signal-card">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div style="background:#222; width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center;">
+          <img src="https://logo.clearbit.com/nnasafe.com" style="width:26px; height:26px; border-radius:6px;" onerror="this.style.display='none'">
+        </div>
+        <div>
+          <div style="font-weight:700;">NNE</div>
+          <div style="font-size:0.75rem; color:#848e9c;">Nano Nuclear</div>
+        </div>
       </div>
+      <div style="font-weight:700; color:#1199fa; font-size:1.1rem;">7.0</div>
+    </div>
+
+    <div class="signal-card">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div style="background:#222; width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center;">
+          <img src="https://logo.clearbit.com/nuscalepower.com" style="width:26px; height:26px; border-radius:6px;" onerror="this.style.display='none'">
+        </div>
+        <div>
+          <div style="font-weight:700;">SMR</div>
+          <div style="font-size:0.75rem; color:#848e9c;">NuScale Power</div>
+        </div>
+      </div>
+      <div style="font-weight:700; color:#1199fa; font-size:1.1rem;">7.0</div>
     </div>
   </div>
 
   <script>
-    const CONFIG = {
-      API_BASE: "https://grabit-api-80dh.onrender.com"
-    };
+    // Exempeldata (kan senare kopplas till API)
+    const hotData = [
+      { ticker: "NVDA", label: "BULL", last: 142.8, ret_5: 4.2, score10: 9.1, rel_vol: 2.1, rsi: 71, theme: "AI-infra" },
+      { ticker: "RKLB", label: "ROCKET", last: 28.4, ret_5: 12.8, score10: 8.4, rel_vol: 3.4, rsi: 78, theme: "Space" },
+      { ticker: "OKLO", label: "BULL", last: 18.9, ret_5: 6.5, score10: 7.8, rel_vol: 1.8, rsi: 65, theme: "Nuclear" },
+    ];
 
     function createCard(data) {
-      const chg = data.ret_5 || 0;
-      const chgClass = chg >= 0 ? 'positive' : 'negative';
-      const chgSign = chg >= 0 ? '+' : '';
+      const chgClass = data.ret_5 >= 0 ? 'positive' : 'negative';
+      const chgSign = data.ret_5 >= 0 ? '+' : '';
       const labelClass = data.label === 'BULL' ? 'bull' : data.label === 'BEAR' ? 'bear' : 'rocket';
 
       return `
@@ -191,95 +229,34 @@
                 <span class="ticker">${data.ticker}</span>
                 <span class="pill ${labelClass}">${data.label}</span>
               </div>
-              <div class="company-name">${data.theme || ''}</div>
+              <div class="company-name">${data.theme}</div>
             </div>
             <div style="text-align:right">
-              <div class="price">${data.last ? data.last.toFixed(2) : '-'}</div>
-              <div class="change ${chgClass}">${chgSign}${chg.toFixed(1)}%</div>
+              <div class="price">${data.last.toFixed(2)}</div>
+              <div class="change ${chgClass}">${chgSign}${data.ret_5.toFixed(1)}%</div>
             </div>
           </div>
           <div class="stock-footer">
-            <span class="score-badge">${data.score10 || 0}/10</span>
-            <span class="meta">Vol ${data.rel_vol ? data.rel_vol.toFixed(1) : 1}×</span>
+            <span class="score">${data.score10}/10</span>
+            <span class="meta">Vol ${data.rel_vol.toFixed(1)}× • RSI ${data.rsi}</span>
           </div>
         </div>`;
     }
 
-    async function loadSection(endpoint, containerId) {
-      const el = document.getElementById(containerId);
-      el.innerHTML = '<div class="loading">Laddar...</div>';
-
-      try {
-        const res = await fetch(`${CONFIG.API_BASE}${endpoint}`);
-        const data = await res.json();
-        const rows = data.rows || data.hot || data.dagens_lagen || [];
-
-        if (rows.length > 0) {
-          el.innerHTML = rows.slice(0, 3).map(createCard).join('');
-        } else {
-          el.innerHTML = '<div class="loading">Ingen data</div>';
-        }
-      } catch (e) {
-        el.innerHTML = '<div class="loading">Fel vid laddning</div>';
-      }
+    function renderHotList() {
+      const container = document.getElementById('hot-list');
+      container.innerHTML = hotData.map(createCard).join('');
     }
 
-    async function loadHot() {
-      await loadSection('/api/hot?limit=8', 'hot-list');
+    function openDetail(ticker) {
+      alert("Öppnar detaljvy för " + ticker + " (demo)");
+      // Här kan du senare koppla till riktig detalj-modal
     }
 
-    async function loadDagensBull() {
-      await loadSection('/api/winners?limit=3', 'dagens-bull');
+    // Start
+    window.onload = function() {
+      renderHotList();
     }
-
-    async function loadVeckansSetup() {
-      await loadSection('/api/overview', 'veckans-setup');
-    }
-
-    async function openDetail(ticker) {
-      const main = document.body;
-      main.innerHTML = `<div style="padding:40px 20px; text-align:center;">Laddar ${ticker}...</div>`;
-
-      try {
-        const res = await fetch(`${CONFIG.API_BASE}/api/stock/${ticker}`);
-        const data = await res.json();
-        const a = data.analysis || data;
-
-        main.innerHTML = `
-          <div style="padding:20px">
-            <button onclick="location.reload()" style="margin-bottom:20px; background:#222; color:#fff; border:none; padding:8px 14px; border-radius:8px;">← Tillbaka</button>
-            
-            <h2 style="font-size:1.6rem; margin-bottom:8px;">${ticker}</h2>
-            <div style="font-size:1.1rem; color:#1199fa; margin-bottom:20px;">${a.label} • ${a.score10}/10</div>
-
-            <div style="background:#161a23; padding:18px; border-radius:16px; margin-bottom:16px;">
-              <div><strong>Pris:</strong> ${a.last ? a.last.toFixed(2) : '-'}</div>
-              <div><strong>5d:</strong> ${a.ret_5 ? a.ret_5.toFixed(1) : 0}%</div>
-              <div><strong>RSI:</strong> ${a.rsi ? Math.round(a.rsi) : '-'}</div>
-              <div style="margin-top:12px; color:#aaa; font-size:0.9rem;">${a.forklaring || ''}</div>
-            </div>
-
-            <button onclick="location.reload()" 
-                    style="width:100%; padding:14px; background:#1199fa; color:white; border:none; border-radius:12px; font-weight:700;">
-              Stäng
-            </button>
-          </div>
-        `;
-      } catch (e) {
-        main.innerHTML = `<div style="padding:40px 20px; text-align:center;">Kunde inte ladda ${ticker}.</div>`;
-        setTimeout(() => location.reload(), 1800);
-      }
-    }
-
-    // Start everything
-    function init() {
-      loadHot();
-      loadDagensBull();
-      loadVeckansSetup();
-      console.log('%c[GRABIT] Full connected version loaded', 'color:#1199fa');
-    }
-
-    window.onload = init;
   </script>
 </body>
 </html>
