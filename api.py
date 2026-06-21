@@ -315,6 +315,146 @@ def static_asset(fname: str):
     return FileResponse(p, media_type=media)
 
 
+# ---- Research / screener (skanner + Alpaca-nyheter + Finnhub) -------
+def _alpaca_news_counts(symbols):
+    """Antal farska nyheter per symbol via Alpaca (om APCA-nycklar finns). Tyst fallback {}."""
+    import os
+    key = os.getenv("APCA_API_KEY_ID", ""); sec = os.getenv("APCA_API_SECRET_KEY", "")
+    if not (key and sec) or not symbols:
+        return {}
+    try:
+        import requests
+        r = requests.get(
+            "https://data.alpaca.markets/v1beta1/news",
+            headers={"APCA-API-KEY-ID": key, "APCA-API-SECRET-KEY": sec},
+            params={"symbols": ",".join([x for x in symbols[:40] if x]), "limit": 50, "sort": "desc"},
+            timeout=8,
+        )
+        cnt = {}
+        for n in (r.json().get("news") or []):
+            for sym in n.get("symbols", []):
+                cnt[sym] = cnt.get(sym, 0) + 1
+        return cnt
+    except Exception:
+        return {}
+
+
+# Finnhub: market cap + insiderkop (gratis-nivan). Nyckel = env FINNHUB_API_KEY.
+_FH_CACHE = {}
+
+def _finnhub(path, params):
+    import os, requests
+    key = os.getenv("FINNHUB_API_KEY", "")
+    if not key:
+        return None
+    try:
+        p = dict(params); p["token"] = key
+        r = requests.get("https://finnhub.io/api/v1" + path, params=p, timeout=8)
+        if r.status_code == 200:
+            return r.json()
+    except Exception:
+        pass
+    return None
+
+def _fh_market_cap(ticker):
+    """Market cap i miljoner USD (eller None)."""
+    k = ("mcap", ticker)
+    if k in _FH_CACHE:
+        return _FH_CACHE[k]
+    j = _finnhub("/stock/profile2", {"symbol": ticker})
+    mc = (j or {}).get("marketCapitalization")
+    _FH_CACHE[k] = mc
+    return mc
+
+def _fh_insider_buys(ticker):
+    """Antal insider-KOP (transactionCode P, positiv forandring)."""
+    k = ("ins", ticker)
+    if k in _FH_CACHE:
+        return _FH_CACHE[k]
+    j = _finnhub("/stock/insider-transactions", {"symbol": ticker})
+    buys = 0
+    for t in (j or {}).get("data", []):
+        code = (t.get("transactionCode") or "").upper()
+        if code == "P" and (t.get("change") or 0) > 0:
+            buys += 1
+    _FH_CACHE[k] = buys
+    return buys
+
+
+@app.get("/api/research")
+def research(max_price: float = 15.0, min_relvol: float = 1.3,
+             min_momentum: float = 0.0, themes: str = "",
+             needs_news: bool = False, max_mcap: float = 0.0,
+             insider_buys: bool = False, limit: int = 40):
+    """Filtrerar hela universumet. Tekniskt (kurs/relvol/momentum/tema) gar direkt;
+       nyheter via Alpaca; market cap + insiderkop via Finnhub (om nyckel finns)."""
+    import os
+    has_fh = bool(os.getenv("FINNHUB_API_KEY", ""))
+    rows = scan_universe(None) or []
+    want = set(t.strip().lower() for t in themes.split(",") if t.strip())
+    hits = []
+    for r in rows:
+        last = r.get("last") or 0
+        if max_price and last and last > max_price:              # Kurs under $X
+            continue
+        if min_relvol and (r.get("rel_vol") or 0) < min_relvol:  # Hog relativ volym
+            continue
+        if min_momentum and (r.get("momentum") or 0) < min_momentum:  # Kraftigt momentum
+            continue
+        if want:                                                 # Tema-exponering
+            th = (r.get("theme") or "").lower()
+            if not any(w in th for w in want):
+                continue
+        hits.append(r)
+
+    # Rank tekniskt forst -> Finnhub/Alpaca bara pa toppkandidaterna (snallt mot rate-limit)
+    def _rs0(r):
+        return (r.get("rel_vol", 0) * 2.0) + (r.get("momentum", 0) * 0.1) + (r.get("score10", 0) * 1.0)
+    hits.sort(key=_rs0, reverse=True)
+    top = hits[:max(limit, 30)]
+
+    # Nyheter (Alpaca)
+    news = _alpaca_news_counts([r.get("ticker") for r in top])
+    for r in top:
+        r["news_count"] = news.get(r.get("ticker"), 0)
+
+    # Finnhub-berikning (kapat till 25 for att halla oss under gratis-rate-limit)
+    use_fh = has_fh and ((max_mcap and max_mcap > 0) or insider_buys)
+    if use_fh:
+        for r in top[:25]:
+            tk = r.get("ticker")
+            if max_mcap and max_mcap > 0:
+                r["market_cap"] = _fh_market_cap(tk)
+            if insider_buys:
+                r["insider_buys"] = _fh_insider_buys(tk)
+
+    # Filter som kraver berikning (hoppas tyst over om data saknas)
+    out = []
+    for r in top:
+        if needs_news and r.get("news_count", 0) <= 0:
+            continue
+        if has_fh and max_mcap and max_mcap > 0:
+            mc = r.get("market_cap")
+            if mc is None or mc > max_mcap:                      # market cap i miljoner USD
+                continue
+        if has_fh and insider_buys and r.get("insider_buys", 0) <= 0:
+            continue
+        out.append(r)
+
+    def _rs(r):
+        return _rs0(r) + (r.get("news_count", 0) * 0.8) + (r.get("insider_buys", 0) * 0.6)
+    out.sort(key=_rs, reverse=True)
+    return {
+        "count": len(out),
+        "finnhub": has_fh,
+        "filters": {"max_price": max_price, "min_relvol": min_relvol,
+                    "min_momentum": min_momentum, "themes": sorted(want),
+                    "needs_news": needs_news, "max_mcap": max_mcap,
+                    "insider_buys": insider_buys},
+        "rows": out[:limit],
+    }
+
+
 @app.get("/api/health")
 def health():
     return {"status": "ok", "tickers": len(ALL_TICKERS), "yfinance": yf is not None}
