@@ -920,7 +920,7 @@ function stockData(tkr,live){live=live||{};const r=_rng(_seed(tkr));
   const bullPool=[["Stark trend & momentum",25],["N\u00e4ra 52v-topp",9],["Stigande bottnar",6],["RSI accelererar",5],["Sl\u00e5r index tydligt",5],["Veckotrend bullish",4],["Positiv ROC",3]];
   const riskPool=[["Utbrott utan volym",-25],["H\u00f6g fake-breakout-risk",-12],["\u00d6verk\u00f6pt RSI",-8],["Svag relativ volym",-6],["Mots\u00e5nd n\u00e4ra",-5]];
   const bull=bullPool.slice(0,score>=7?6:4),risks=riskPool.slice(0,score>=7?2:4);
-  const desc=DESC[base]||((SECT[tkr]?SECT[tkr]+"-bolag noterat i "+land+". ":"Bolag noterat i "+land+". ")+"Ingår i GRABIT-universumet inom temat "+(SECT[tkr]||"tematisk tillväxt")+". "+(score>=7?"Visar just nu stark teknisk profil med stigande relativ styrka och bekräftad trend.":"Bygger upp en setup – trend och volym är ännu inte fullt bekräftade, så avvakta läget."));
+  const desc=live.desc||DESC[base]||((SECT[tkr]?SECT[tkr]+"-bolag noterat i "+land+". ":"Bolag noterat i "+land+". ")+"Ingår i GRABIT-universumet inom temat "+(SECT[tkr]||"tematisk tillväxt")+". "+(score>=7?"Visar just nu stark teknisk profil med stigande relativ styrka och bekräftad trend.":"Bygger upp en setup – trend och volym är ännu inte fullt bekräftade, så avvakta läget."));
   const mcap=fmtCap(price*(50e6+r()*3.2e9));
   const verdict=score>=7.5?"KÖP":score>=6?"AVVAKTA":"UNDVIK";
   const vcolor=score>=7.5?"#22C55E":score>=6?"#F5C542":"#FF3B30";
@@ -928,7 +928,7 @@ function stockData(tkr,live){live=live||{};const r=_rng(_seed(tkr));
   const catPool=[["Kvartalsrapport","28 maj"],["Analytikeruppgradering","denna vecka"],["Sektorn i medvind","pågår"],["Institutionellt inflöde","senaste 10 d"],["Breakout-nivå nära","nu"],["Insynsköp registrerat","nyligen"]];
   const ci=Math.floor(r()*3),catalysts=catPool.slice(ci,ci+3);
   const instOwn=Math.round(28+r()*55),insiderOwn=+(r()*9).toFixed(1),shortInt=+(2+r()*16).toFixed(1);
-  return {tkr,name:live.name||NAMES[tkr]||tkr,land,bors,flag,cur,sector:SECT[tkr]||"\u2014",dom:DOMAINS[tkr]||"",
+  return {tkr,name:live.name||NAMES[tkr]||tkr,land,bors,flag,cur,sector:live.sector||SECT[tkr]||"\u2014",dom:DOMAINS[tkr]||"",
     price,day,score,mom,sent,tech,tag,rsi,relvol,vol,d20,d5,fromHi,ema50,ema200,
     bos,struktur,trendstyrka,setupG,atr,breakout:Math.min(99,breakout),confidence:Math.min(99,confidence),exitrisk:Math.max(4,Math.min(99,exitrisk)),
     bias,conv,riskp,fakeb,bull,risks,desc,mcap,verdict,vcolor,entryLo,entryHi,hitrate,catalysts,instOwn,insiderOwn,shortInt,
@@ -1046,6 +1046,7 @@ function openStock(tkr){_curStock=tkr;const d=stockData(tkr,_liveStock[tkr]);
   document.getElementById("stock").classList.add("on");
   document.getElementById("stock").scrollTop=0;
   if(CONFIG.API_BASE&&_liveStock[tkr]===undefined)fetchLiveStock(tkr);
+  if(CONFIG.API_BASE&&_liveCo[tkr]===undefined)fetchCompany(tkr);
 }
 // Hämtar riktig analys för en aktie och lägger den över demo-basen.
 // Backend: GET /api/stock/{ticker} -> { analysis:{last,score10,rsi,ret_5,ret_20,rel_vol,pct_from_high}, company:{name,sector}, ... }
@@ -1064,9 +1065,24 @@ async function fetchLiveStock(tkr){
     if((p=n(a.rel_vol))!=null)ov.relvol=p;
     if((p=n(a.pct_from_high))!=null)ov.fromHi=p;
     if(typeof co.name==="string"&&co.name)ov.name=co.name;
+    _liveStock[tkr]=Object.assign(_liveStock[tkr]||{},ov);
+    if(_curStock===tkr)openStock(tkr);
+  }catch(e){_liveStock[tkr]=_liveStock[tkr]||{};/* behåll demo-data tyst */}
+}
+let _liveCo={};
+async function fetchCompany(tkr){
+  if(_liveCo[tkr]!==undefined)return; _liveCo[tkr]={};
+  if(!CONFIG.API_BASE)return;
+  try{
+    const r=await fetch(CONFIG.API_BASE.replace(/\/$/,"")+"/api/company/"+encodeURIComponent(tkr),{cache:"no-store"});
+    if(!r.ok)throw 0; const j=await r.json();
+    const ov=_liveStock[tkr]||{};
+    if(j.sector)ov.sector=j.sector;
+    if(j.summary)ov.desc=j.summary;
+    if(j.name&&!ov.name)ov.name=j.name;
     _liveStock[tkr]=ov;
     if(_curStock===tkr)openStock(tkr);
-  }catch(e){_liveStock[tkr]={};/* behåll demo-data tyst */}
+  }catch(e){}
 }
 function tfSwitch(btn,tkr,i){btn.parentNode.querySelectorAll("button").forEach(b=>b.classList.remove("on"));btn.classList.add("on");
   const d=stockData(tkr);$("#st-area").innerHTML=areaChart(tkr+"_"+i,d.day,d.day>=0?"#22c55e":"#FF3B30");}

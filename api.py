@@ -772,6 +772,61 @@ def ai(payload: AiPayload):
                           f"Försök igen om en stund.", "error": True}
 
 
+# ----------------------------------------------------------
+#  BOLAGSPROFIL  (svensk sektor + beskrivning)
+#  yfinance .info funkar lokalt men blockas på Render -> AI-fallback.
+#  Cachas per ticker, anropas BARA från detaljvyn (ej i skannern).
+# ----------------------------------------------------------
+_company_blurb_cache: dict = {}
+
+
+def _ai_company(tk: str, name: str) -> dict:
+    client = _anthropic_client()
+    if client is None:
+        return {"sector": "", "summary": ""}
+    try:
+        import json as _j
+        who = tk + (f' ("{name}")' if name and name != tk else "")
+        prompt = (
+            f"Aktien med tickern {who}. Svara ENBART med giltig JSON (inga kodblock), på svenska:\n"
+            '{"sector": "<sektor på ett ord, t.ex. Teknik, Energi, Finans, Konsument, '
+            'Hälsa, Industri, Råvaror, Fastighet, Kommunikation>", '
+            '"summary": "<2 korta meningar om vad bolaget gör och varför det är intressant, på svenska>"}\n'
+            "Känner du inte till bolaget – sätt båda fälten till tom sträng."
+        )
+        resp = client.messages.create(
+            model=AI_MODEL, max_tokens=400,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        text = "".join(getattr(b, "text", "") for b in resp.content
+                       if getattr(b, "type", "") == "text").strip()
+        text = text.replace("```json", "").replace("```", "").strip()
+        data = _j.loads(text)
+        return {"sector": str(data.get("sector", "") or "").strip(),
+                "summary": str(data.get("summary", "") or "").strip()}
+    except Exception:
+        return {"sector": "", "summary": ""}
+
+
+@app.get("/api/company/{ticker}")
+def company_blurb(ticker: str):
+    tk = ticker.upper().strip()
+    if tk in _company_blurb_cache:
+        return _company_blurb_cache[tk]
+    base = company_info(tk)
+    name = base.get("name") or tk
+    sector = base.get("sector") or ""
+    summary = base.get("summary") or ""
+    if not sector or not summary:          # tomt (t.ex. Render) -> AI-fallback
+        ai = _ai_company(tk, name)
+        sector = sector or ai.get("sector", "")
+        summary = summary or ai.get("summary", "")
+    out = {"ticker": tk, "name": name, "sector": sector, "summary": summary}
+    if sector or summary:                  # cacha bara lyckade svar
+        _company_blurb_cache[tk] = out
+    return out
+
+
 # =====================================================================
 #  DAYTRADE  ·  /api/daytrade
 #  Regelbaserade intraday-setups från live-data. Inga magiska siffror:
