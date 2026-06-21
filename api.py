@@ -974,6 +974,107 @@ def company_blurb(ticker: str):
 
 
 # =====================================================================
+#  AI-TEXTER  ·  cachade Claude-anrop (setup, dagsläge, nyheter)
+#  Återanvänder _anthropic_client() + AI_MODEL. Allt cachas så samma
+#  fråga aldrig kostar mer än en gång i en varm process.
+# =====================================================================
+_AI_TEXT_CACHE: dict = {}
+
+
+def _ai_text(cache_key: str, system: str, user: str, max_tokens: int = 220) -> str:
+    """Generisk cachad Claude-text. Tom sträng om nyckel saknas/fel."""
+    if cache_key in _AI_TEXT_CACHE:
+        return _AI_TEXT_CACHE[cache_key]
+    client = _anthropic_client()
+    if client is None:
+        return ""
+    try:
+        kw = {"model": AI_MODEL, "max_tokens": max_tokens,
+              "messages": [{"role": "user", "content": user}]}
+        if system:
+            kw["system"] = system
+        resp = client.messages.create(**kw)
+        text = "".join(getattr(b, "text", "") for b in resp.content
+                       if getattr(b, "type", "") == "text").strip()
+        if text:
+            _AI_TEXT_CACHE[cache_key] = text
+        return text
+    except Exception:
+        return ""
+
+
+@app.get("/api/ai_setup/{ticker}")
+def ai_setup(ticker: str):
+    """En till två meningar på svenska som förklarar bolagets tekniska setup."""
+    tk = ticker.upper().strip()
+    a = scan(tk)
+    if not a:
+        return {"ticker": tk, "text": ""}
+    sysp = ("Du är Grabit, teknisk aktieanalytiker. Förklara setupen på svenska i EN "
+            "till TVÅ korta meningar — vardagligt och konkret utifrån siffrorna. Nämn "
+            "det viktigaste (trend, brott, volym, momentum) och en risk om den finns "
+            "(överköpt, parabol, tunn likviditet). Inga köp/säljråd. Hitta inte på siffror.")
+    txt = _ai_text("setup:%s:%s:%s" % (tk, a.get("score10"), a.get("last")),
+                   sysp, "Förklara setupen:\n" + _fmt_stock_ctx(a), 170)
+    return {"ticker": tk, "text": txt}
+
+
+@app.get("/api/ai_daily")
+def ai_daily():
+    """Kort 'Dagens läge'-text för Översikt, byggd på index + hetast."""
+    import datetime as _dt
+    key = "daily:" + _dt.datetime.utcnow().strftime("%Y%m%d%H")  # ny var timme
+    try:
+        idx = indices()["indices"]
+        idx_line = " · ".join("%s %s (%s)" % (i.get("name"), i.get("label", ""),
+                              _num(i.get("pct"), 1, "%", sign=True)) for i in idx)
+    except Exception:
+        idx_line = ""
+    try:
+        hot = sorted(scan_universe(None), key=lambda x: x.get("hetta", 0), reverse=True)[:6]
+        hot_line = ", ".join("%s %s/10" % (r["ticker"], r.get("score10", "?")) for r in hot)
+    except Exception:
+        hot_line = ""
+    sysp = ("Du är Grabit. Skriv en kort svensk marknadssammanfattning på 2-3 meningar "
+            "('Dagens läge') utifrån index och de hetaste aktierna. Sakligt, ingen "
+            "rådgivning, hitta inte på siffror utöver de givna.")
+    txt = _ai_text(key, sysp, "INDEX: %s\nHETAST: %s\nSkriv 'Dagens läge'." % (idx_line, hot_line), 240)
+    return {"text": txt, "indices": idx_line, "hot": hot_line}
+
+
+@app.get("/api/ai_news/{ticker}")
+def ai_news(ticker: str):
+    """Svensk sammanfattning + stämpel av bolagets nyheter (kräver Alpaca-nycklar)."""
+    tk = ticker.upper().strip()
+    heads = []
+    try:
+        import os as _os
+        import requests
+        k = _os.getenv("APCA_API_KEY_ID", ""); s = _os.getenv("APCA_API_SECRET_KEY", "")
+        if k and s:
+            r = requests.get("https://data.alpaca.markets/v1beta1/news",
+                             headers={"APCA-API-KEY-ID": k, "APCA-API-SECRET-KEY": s},
+                             params={"symbols": tk, "limit": 6, "sort": "desc"}, timeout=8)
+            for n in (r.json().get("news") or []):
+                h = (n.get("headline") or "").strip()
+                if h:
+                    heads.append(h)
+    except Exception:
+        pass
+    if not heads:
+        return {"ticker": tk, "text": "", "sentiment": "", "headlines": []}
+    sysp = ("Du är Grabit. Sammanfatta nyhetsläget för aktien på svenska i 1-2 meningar: "
+            "vad hände och varför det kan röra kursen. Avsluta med EN rad exakt: "
+            "'Stämpel: Positivt' eller 'Stämpel: Negativt' eller 'Stämpel: Neutralt'. "
+            "Tolka bara rubrikerna, hitta inte på.")
+    txt = _ai_text("news:%s:%x" % (tk, hash(tuple(heads[:6])) & 0xffffff),
+                   sysp, "Aktie %s. Rubriker:\n- %s" % (tk, "\n- ".join(heads[:6])), 240)
+    low = txt.lower()
+    senti = "pos" if "positivt" in low else "neg" if "negativt" in low else "neu" if "neutralt" in low else ""
+    return {"ticker": tk, "text": txt, "sentiment": senti, "headlines": heads[:6]}
+
+
+# =====================================================================
 #  DAYTRADE  ·  /api/daytrade
 #  Regelbaserade intraday-setups från live-data. Inga magiska siffror:
 #  Entry/SL/TP/RR/confidence härleds ur VWAP, RSI, ATR och EMA-trend.
