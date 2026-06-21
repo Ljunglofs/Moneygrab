@@ -5,6 +5,7 @@
 Fixad version av api.py med borttaget syntaxfel på rad 151.
 """
 
+import os
 import time
 import threading
 from typing import Optional
@@ -13,6 +14,7 @@ import numpy as np
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
 
 try:
     import yfinance as yf
@@ -34,13 +36,42 @@ except Exception:
 
 app = FastAPI(title="GRABIT API", version="2.1")
 
-@app.get("/")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+INDEX_FILE = os.path.join(BASE_DIR, "index.html")
+
+API_INFO = {
+    "message": "GRABIT API is running",
+    "version": "2.1",
+    "endpoints": ["/api/health", "/api/hot", "/api/winners", "/api/stock/{ticker}"],
+}
+
+@app.get("/", include_in_schema=False)
 def root():
-    return {
-        "message": "GRABIT API is running",
-        "version": "2.1",
-        "endpoints": ["/api/health", "/api/hot", "/api/winners", "/api/stock/{ticker}"]
-    }
+    # Servera GRABIT-appen (index.html) om den finns – annars API-info som fallback.
+    if os.path.exists(INDEX_FILE):
+        return FileResponse(INDEX_FILE, media_type="text/html")
+    return JSONResponse(API_INFO)
+
+@app.get("/api", include_in_schema=False)
+def api_info():
+    return JSONResponse(API_INFO)
+
+# --- Statiska filer som frontend refererar (samma origin) ---
+_STATIC = {
+    "bg_1280-1.mp4": "video/mp4",
+    "bg_poster.jpg": "image/jpeg",
+    "logo.png": "image/png",
+    "monthly_case.json": "application/json",
+}
+
+@app.get("/{fname}", include_in_schema=False)
+def static_file(fname: str):
+    media = _STATIC.get(fname)
+    if media:
+        p = os.path.join(BASE_DIR, fname)
+        if os.path.exists(p):
+            return FileResponse(p, media_type=media)
+    raise HTTPException(404, "not found")
 
 app.add_middleware(
     CORSMiddleware,
