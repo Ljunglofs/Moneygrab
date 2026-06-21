@@ -4,7 +4,7 @@ services:
     env: python
     region: frankfurt
     plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn api:app --host 0.0.0.0 --port $PORT
+    buildCommand: pip install -r requirements_api.txt
+    startCommand: uvicorn api_v3:app --host 0.0.0.0 --port $PORT
     autoDeploy: true
     healthCheckPath: /api/health
