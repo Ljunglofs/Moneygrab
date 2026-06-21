@@ -782,76 +782,22 @@ const THEMES = [
 ];
 
 const DEMO = {
-  hero_n:4, edge:{v:9.3,t:"Mycket hög"}, minis:{hi:9.2,hi_t:"HBM",strong:4,early:7},
-  setups:[
-    {tkr:"HBM",score:9.2,tag:"Mycket hög",c:"#F5C542",trend:[3,4,3,5,6,5,7,8,9]},
-    {tkr:"MRVL",score:8.9,tag:"Hög",c:"#22c55e",trend:[4,4,5,5,6,7,7,8,9]},
-    {tkr:"RXRX",score:8.7,tag:"Hög",c:"#22c55e",trend:[5,4,4,5,6,6,7,8,9]},
-    {tkr:"NVTS",score:7.9,tag:"Positiv",c:"#FFB000",trend:[3,4,4,3,5,5,6,7,8]}
-  ],
-  gauge:{score:34,state:"BEARISH",color:"#FF3B30"},
-  holding:[{tkr:"RDW",chg:2.1},{tkr:"USAR",chg:1.4},{tkr:"HBM",chg:0.8},{tkr:"OKLO",chg:0.3},{tkr:"MP",chg:0.1}],
-  weak:[{tkr:"SIVE",chg:-6.2,tag:"BOS↓"},{tkr:"QUBT",chg:-4.1,tag:"BLANKNING"},{tkr:"LAZR",chg:-3.5,tag:"BOS↓"},{tkr:"AEVA",chg:-2.8,tag:"SVAGHET"}],
-  idx:[{k:"Nasdaq",v:"-1.62%",neg:true},{k:"S&P 500",v:"-0.94%",neg:true},{k:"VIX",v:"22.4",neutral:true},{k:"Bitcoin",v:"-3.81%",neg:true},{k:"Brent",v:"+2.10%"}],
-  events:[
-    {i:"rocket",img:"rocket",t:"SpaceX IPO",d:"Torsdag 22 maj",bdg:"HÖG PÅVERKAN",bc:"#FF7A45",note:"Hög marknadspåverkan"},
-    {ic:"&#127919;",img:"chip",t:"NVIDIA Q1 Earnings",d:"Onsdag 28 maj",bdg:"VOLATILITET",bc:"#A98BFF",note:"Volatilitet väntas",dom:"nvidia.com",tkr:"NVDA"},
-    {i:"bank",img:"fed",t:"Fed Interest Rate Decision",d:"Onsdag 11 juni",bdg:"MAKRO",bc:"#4FB0FF",note:"Risk-on / Risk-off"},
-    {i:"calendar",img:"apple",t:"Apple WWDC 2025",d:"Måndag 9 juni",bdg:"KATALYSATOR",bc:"#F5C542",note:"AI-fokus förväntas",dom:"apple.com",tkr:"AAPL"}
-  ],
-  feed:[
-    {time:"10:21",c:"#F5C542",i:"flame",h:"Ny extrem möjlighet",tkr:"HBM",score:9.2,detalj:"Bröt motstånd vid $26.94 på dubbel volym. RSI accelererar och trenden bekräftad (HH/HL) — setup-score höjd till 9.2.",kurs:"$27.41",chg:1.46},
-    {time:"09:47",c:"#22C55E",i:"trend",h:"Setup bekräftad",tkr:"RXRX",score:8.7,detalj:"Momentum ökar tredje dagen i rad. Stigande bottnar och positivt nyhetsflöde bekräftar setupen.",kurs:"$11.24",chg:4.18},
-    {time:"09:14",c:"#F5C542",i:"pulse",h:"Momentum ökar",tkr:"MRVL",score:8.9,detalj:"Volym 142% över snittet. Slår sektorn tydligt och bröt 50-dagars glidande medel.",kurs:"$125.38",chg:2.31},
-    {time:"08:56",c:"#22D3EE",i:"dot",h:"Ny tidig signal",tkr:"NVTS",score:7.9,detalj:"Tidigt utbrottsmönster bildas. Relativ styrka vänder upp — bevaka för bekräftelse.",kurs:"$6.72",chg:3.21}
-  ],
-  news:["Tech-sektorn pressas – halvledare säljs av brett","Kärnkraft håller emot på USA-börsen","VIX upp mot 22 på ökad oro","Fed-besked nästa vecka i fokus","Guld stiger när risken vägs av"],
-  market:[
-    {k:"S&P 500",v:"5 278",chg:-0.94},{k:"Nasdaq",v:"16 735",chg:-1.62},{k:"OMX30",v:"2 612",chg:-0.41},
-    {k:"Bitcoin",v:"64 580",chg:-3.81},{k:"Guld",v:"2 358",chg:0.31},{k:"Silver",v:"29.80",chg:-0.60},
-    {k:"Koppar",v:"4.55",chg:0.90},{k:"Olja",v:"77.85",chg:-0.45}
-  ],
-  aiSummary:"Tech pressas i dag – Nasdaq ned 1,6% när halvledare säljs av brett. Kärnkraft och försvar håller emot bäst, medan VIX kring 22 visar ökad oro. Risk-off-läge: fokus på relativ styrka och kommande Fed-besked.",
-  picks:[
-    {kicker:"DAGENS BULL",tkr:"HBM",score:9.2,tag:"Mycket stark",c:"#F5C542",trend:[3,4,3,5,6,5,7,8,9]},
-    {kicker:"VECKANS SETUP",tkr:"MRVL",score:8.9,tag:"Stark setup",c:"#22c55e",trend:[4,4,5,5,6,7,7,8,9]},
-    {kicker:"WILDCARD",tkr:"ONDS",score:7.1,tag:"Microcap < $5",c:"#a78bfa",trend:[2,3,3,4,3,5,6,7,8]}
-  ],
-  hetaste:[
-    {tkr:"HBM",score:9.2,tag:"Mkt stark"},{tkr:"MRVL",score:8.9,tag:"Stark"},{tkr:"RXRX",score:8.7,tag:"Stark"},
-    {tkr:"NVTS",score:7.9,tag:"Stark"},{tkr:"OKLO",score:7.4,tag:"Bra"},{tkr:"BLND",score:7.2,tag:"Neutral"},
-    {tkr:"IONQ",score:6.9,tag:"Neutral"},{tkr:"OUST",score:6.4,tag:"Bevaka"},{tkr:"PLTR",score:6.1,tag:"Bevaka"},
-    {tkr:"AUR",score:5.6,tag:"Svag"}
-  ],
-  winners:[{tkr:"RDW",chg:7.4},{tkr:"USAR",chg:6.1},{tkr:"IONQ",chg:5.3},{tkr:"OUST",chg:4.8},{tkr:"OKLO",chg:3.9}],
-  losers:[{tkr:"SIVE",chg:-6.2},{tkr:"QUBT",chg:-4.1},{tkr:"LAZR",chg:-3.5},{tkr:"AEVA",chg:-2.8},{tkr:"ASTS",chg:-2.1}],
-  portfolio:{
-    total:184250, ccy:"kr", dayChg:1.8, totChg:23.4,
-    holdings:[
-      {tkr:"HBM",qty:120,avg:21.40,last:27.41,ccy:"$"},
-      {tkr:"MRVL",qty:30,avg:98.20,last:125.38,ccy:"$"},
-      {tkr:"OKLO",qty:200,avg:9.80,last:12.15,ccy:"$"},
-      {tkr:"RXRX",qty:340,avg:8.10,last:11.24,ccy:"$"},
-      {tkr:"USAR",qty:150,avg:14.60,last:13.90,ccy:"$"}
-    ],
-    exposure:[
-      {name:"Rare earth",pct:31,c:"#F5C542"},
-      {name:"AI-infra",pct:24,c:"#22d3ee"},
-      {name:"Nuclear/Energi",pct:19,c:"#facc15"},
-      {name:"Bio/Hälsa",pct:14,c:"#2dd4bf"},
-      {name:"Övrigt",pct:12,c:"#5b677d"}
-    ]
-  },
+  hero_n:0, edge:{v:0,t:""}, minis:{hi:0,hi_t:"",strong:0,early:0},
+  setups:[],
+  gauge:{score:50,state:"NEUTRAL",color:"#F5C542"},
+  holding:[], weak:[], idx:[], events:[], feed:[],
+  news:["Laddar nyheter…"],
+  market:[],
+  aiSummary:"Laddar dagens läge…",
+  picks:[], hetaste:[], winners:[], losers:[],
+  portfolio:{total:0, ccy:"kr", dayChg:0, totChg:0, holdings:[], exposure:[]},
   scanner:{
-    gainers:[{tkr:"RDW",chg:7.4},{tkr:"USAR",chg:6.1},{tkr:"IONQ",chg:5.3},{tkr:"OUST",chg:4.8},{tkr:"RKLB",chg:4.2}],
-    volume:[{tkr:"HBM",x:3.1},{tkr:"MRVL",x:2.4},{tkr:"NVTS",x:2.0},{tkr:"RXRX",x:1.8},{tkr:"LAZR",x:1.6}],
-    setup:[{tkr:"HBM",score:9.2},{tkr:"MRVL",score:8.9},{tkr:"RXRX",score:8.7},{tkr:"NVTS",score:7.9}],
-    riskoff:[{tkr:"SIVE",chg:-6.2},{tkr:"QUBT",chg:-4.1},{tkr:"LAZR",chg:-3.5}],
+    gainers:[], volume:[], setup:[], riskoff:[],
     screeners:[
-      {n:"Bekräftade utbrott",d:"Score ≥ 8 · volym över snitt",c:"#22c55e",ic:"trend",pill:"12 SETUPS",filt:"bull"},
-      {n:"Tidiga signaler",d:"Rel. styrka vänder upp",c:"#22d3ee",ic:"pulse",pill:"7 SIGNALER",filt:"early"},
-      {n:"Microcaps < $5",d:"Hög risk · hög potential",c:"#a78bfa",ic:"flame",pill:"23 BOLAG",filt:"micro"},
-      {n:"Risk Off",d:"BOS↓ · blankningstryck",c:"#FF3B30",ic:"shield",pill:"4 VARNINGSFLAGGOR",filt:"risk"}
+      {n:"Bekräftade utbrott",d:"Score ≥ 8 · volym över snitt",c:"#22c55e",ic:"trend",pill:"—",filt:"bull"},
+      {n:"Tidiga signaler",d:"Rel. styrka vänder upp",c:"#22d3ee",ic:"pulse",pill:"—",filt:"early"},
+      {n:"Microcaps < $5",d:"Hög risk · hög potential",c:"#a78bfa",ic:"flame",pill:"—",filt:"micro"},
+      {n:"Risk Off",d:"BOS↓ · blankningstryck",c:"#FF3B30",ic:"shield",pill:"—",filt:"risk"}
     ]
   }
 };
@@ -1316,7 +1262,7 @@ function render(d){
   if($("#tempg")){const PULSE={BEARISH:"pulse_bear",BULLISH:"pulse_bull",NEUTRAL:"pulse_neutral","SUPER BULLISH":"pulse_super"};const pim=IMGS[PULSE[d.gauge.state]||"pulse_bear"];
     $("#tempg").innerHTML=`<div class="tg-l">Marknadsläge</div>${gaugeOrb(d.gauge.color,d.gauge.score)}<div class="tg-s" style="color:${d.gauge.color}">${d.gauge.state}</div>`;}
   // picks + fråga grabit
-  if($("#picks"))$("#picks").innerHTML=d.picks.map(pickCard).join("")+askCard(d.picks[0].tkr);
+  if($("#picks"))$("#picks").innerHTML=d.picks.map(pickCard).join("")+(d.picks[0]?askCard(d.picks[0].tkr):"");
   // events (bildkort med riktiga foton ur mockupen)
   if($("#events"))$("#events").innerHTML=d.events.map(e=>`<div class="evcard" ${e.tkr?`onclick="openStock('${e.tkr}')"`:""}>
     <div class="ehead" style="background-image:url('${IMGS[e.img]||""}');background-size:cover;background-position:center">
@@ -1432,7 +1378,7 @@ function mapOverview(o,d){
   }
   if(Array.isArray(o.indices)){
     d.idx=o.indices.map(i=>({k:i.name,v:(i.pct>=0?"+":"")+(i.pct?.toFixed?.(2)??i.pct)+"%",neg:i.pct<0}));
-    o.indices.forEach(i=>{const m=d.market.find(x=>x.k.toLowerCase()===String(i.name).toLowerCase());if(m&&typeof i.pct==="number")m.chg=i.pct;});
+    d.market=o.indices.map(i=>({k:i.name,v:i.label||"",chg:typeof i.pct==="number"?i.pct:0}));
   }
 }
 function mapScreen(rows,d){
@@ -1452,6 +1398,30 @@ function mapScreen(rows,d){
   if(S&&S[2])S[2].pill=cMicro+" BOLAG";
   if(S&&S[3])S[3].pill=cRisk+" VARNINGSFLAGGOR";
   d.scanner.confirmed=cBull; d.scanner.early=cEarly; d.scanner.riskCount=cRisk;
+  // Vinnare/förlorare ur skannern (5-dagars rörelse)
+  const byRet=[...rows].sort((a,b)=>(+b.ret_5||0)-(+a.ret_5||0));
+  d.winners=byRet.slice(0,6).map(r=>({tkr:r.ticker,chg:+(+r.ret_5||0).toFixed(1)}));
+  d.losers=byRet.slice(-6).reverse().map(r=>({tkr:r.ticker,chg:+(+r.ret_5||0).toFixed(1)}));
+  // Sentiment-mätare ur marknadsbredd (andel bull av bull+bear)
+  const isBull=r=>r.label==="BULL"||r.label==="MOMENTUM"||r.label==="Rocketcase";
+  const isBear=r=>r.label==="BEAR"||r.label==="AVSVALNING";
+  const nb=rows.filter(isBull).length, ne=rows.filter(isBear).length, tt=nb+ne;
+  const gs=tt?Math.round(nb/tt*100):50;
+  let gst,gc;
+  if(gs>=75){gst="SUPER BULLISH";gc="#22c55e";}
+  else if(gs>=55){gst="BULLISH";gc="#22c55e";}
+  else if(gs>=40){gst="NEUTRAL";gc="#F5C542";}
+  else{gst="BEARISH";gc="#FF3B30";}
+  d.gauge={score:gs,state:gst,color:gc};
+}
+const _SVm=["jan","feb","mar","apr","maj","jun","jul","aug","sep","okt","nov","dec"];
+function mapEvents(arr){
+  return arr.map(e=>{
+    const dt=new Date((e.date||"")+"T00:00:00");
+    const ds=isNaN(dt.getTime())?(e.date||""):(dt.getDate()+" "+_SVm[dt.getMonth()]);
+    const note=e.days===0?"Idag":e.days===1?"Imorgon":("Om "+e.days+" dgr");
+    return {tkr:e.tkr,t:(NAMES[e.tkr]||e.tkr)+" – rapport",d:ds,bdg:"Rapport",i:"calendar",bc:"#F5C542",note,img:""};
+  });
 }
 async function load(){
   if(!CONFIG.API_BASE){render(DEMO);return;}
@@ -1459,6 +1429,8 @@ async function load(){
   try{const r=await fetch(B+"/api/overview",{cache:"no-store"}); if(r.ok){mapOverview(await r.json(),d); live=true;}}catch(e){}
   try{const r=await fetch(B+"/api/screen",{cache:"no-store"}); if(r.ok){const s=await r.json(); mapScreen(s.rows||[],d); live=true;}}catch(e){}
   try{const r=await fetch(B+"/api/signals",{cache:"no-store"}); if(r.ok){const s=await r.json(); if(Array.isArray(s.feed)&&s.feed.length){d.feed=s.feed;live=true;}}}catch(e){}
+  try{const r=await fetch(B+"/api/news",{cache:"no-store"}); if(r.ok){const j=await r.json(); if(Array.isArray(j.news)&&j.news.length){d.news=j.news;live=true;}}}catch(e){}
+  try{const r=await fetch(B+"/api/events",{cache:"no-store"}); if(r.ok){const j=await r.json(); if(Array.isArray(j.events)&&j.events.length){d.events=mapEvents(j.events);live=true;}}}catch(e){}
   $("#demo-flag").textContent = live ? ("Live · "+B.replace(/^https?:\/\//,"")) : "API svarar inte \u2014 visar demo-data";
   render(d);
 }
