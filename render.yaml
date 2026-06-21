@@ -1,20 +1,10 @@
-# GRABIT API – Render Blueprint
-# Lägg denna fil i roten av repot (Moneygrab-main) och pusha till GitHub.
-# I Render: New + → Blueprint → välj repot. Render läser den här filen,
-# skapar web service:n åt dig och frågar efter ANTHROPIC_API_KEY.
 services:
   - type: web
     name: grabit-api
-    runtime: python
-    plan: free                       # byt till "starter" om du vill slippa att den somnar
-    buildCommand: pip install -r requirements_api.txt
+    env: python
+    region: frankfurt
+    plan: free
+    buildCommand: pip install -r requirements.txt
     startCommand: uvicorn api:app --host 0.0.0.0 --port $PORT
+    autoDeploy: true
     healthCheckPath: /api/health
-    autoDeploy: true                 # ny deploy varje gång du pushar till GitHub
-    envVars:
-      - key: ANTHROPIC_API_KEY       # sync:false => Render frågar dig (hemlig, sparas ej i filen)
-        sync: false
-      - key: GRABIT_AI_MODEL
-        value: claude-sonnet-4-6
-      - key: PYTHON_VERSION
-        value: "3.12.7"
