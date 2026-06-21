@@ -297,6 +297,7 @@ def index():
 _STATIC_FILES = {
     "bg_1280-1.mp4": "video/mp4",
     "bg_poster.jpg": "image/jpeg",
+    "monthly_case.json": "application/json",
 }
 
 @app.get("/{fname}")

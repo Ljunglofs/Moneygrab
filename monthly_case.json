@@ -1,0 +1,20 @@
+{
+  "manad": "Juni 2026",
+  "ticker": "ASTS",
+  "name": "AST SpaceMobile",
+  "tagline": "Satelliter direkt till vanliga mobiler",
+  "score": 8.4,
+  "verdict": "KÖP",
+  "summary": "Bygger ett rymdbaserat mobilnät som kopplar vanliga smartphones direkt till satellit \u2013 utan specialhårdvara. Partneravtal med stora teleoperatörer ger en tydlig intäktsväg när konstellationen skalas upp.",
+  "sektioner": [
+    { "h": "Vad de gör", "t": "Driver BlueBird-satelliter som fungerar som basstationer i omloppsbana, så att täckning når dit marknätet inte räcker." },
+    { "h": "Kunder", "t": "Avtal och avsiktsförklaringar med ledande operatörer i USA, Europa och Japan \u2013 sammanlagt hundratals miljoner abonnenter i räckhåll." },
+    { "h": "Varför det spelar roll", "t": "Direct-to-cell är en helt ny kategori. Lyckas utrullningen blir bolaget en infrastrukturspelare snarare än en nischaktör." },
+    { "h": "Tesen", "t": "Hög risk, hög potential. Kursen drivs av uppskjutningar och avtal snarare än vinst \u2013 en case för den som tål svängningar och tror på exekveringen." }
+  ],
+  "nyckeltal": [
+    { "k": "Sektor", "v": "Space" },
+    { "k": "Risk", "v": "Hög" },
+    { "k": "Horisont", "v": "12\u201336 mån" }
+  ]
+}
