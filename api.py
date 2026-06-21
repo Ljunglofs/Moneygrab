@@ -529,32 +529,29 @@ def news():
 # ----- KOMMANDE RAPPORTER (riktiga earnings-datum via yfinance) ------
 @cached(6 * 3600)
 def _events_list():
-    if yf is None:
-        return []
+    """Kommande rapportdatum via Finnhub (funkar på Render, kräver FINNHUB_API_KEY)."""
     import datetime as _dt
     today = _dt.date.today()
+    horizon = today + _dt.timedelta(days=45)
     base = list(dict.fromkeys(UNIVERSE.get("Bevakning", []) + ALL_TICKERS))[:30]
     out = []
     for t in base:
-        dt = None
-        try:
-            cal = yf.Ticker(t).calendar
-            if isinstance(cal, dict):
-                ed = cal.get("Earnings Date")
-                dt = ed[0] if isinstance(ed, (list, tuple)) and ed else ed
-            elif cal is not None and hasattr(cal, "loc"):
-                dt = cal.loc["Earnings Date"][0]
-        except Exception:
-            dt = None
-        if dt is None:
+        j = _finnhub("/calendar/earnings",
+                     {"symbol": t, "from": str(today), "to": str(horizon)})
+        if not j:
             continue
-        try:
-            d = dt.date() if hasattr(dt, "date") else dt
-            days = (d - today).days
-        except Exception:
-            continue
-        if 0 <= days <= 45:
-            out.append({"tkr": t, "date": str(d), "days": days})
+        for e in (j.get("earningsCalendar") or []):
+            ds = (e.get("date") or "")[:10]
+            if not ds:
+                continue
+            try:
+                d = _dt.date.fromisoformat(ds)
+                days = (d - today).days
+            except Exception:
+                continue
+            if 0 <= days <= 45:
+                out.append({"tkr": t, "date": str(d), "days": days})
+                break
     out.sort(key=lambda x: x["days"])
     return out[:8]
 
@@ -1072,6 +1069,80 @@ def ai_news(ticker: str):
     low = txt.lower()
     senti = "pos" if "positivt" in low else "neg" if "negativt" in low else "neu" if "neutralt" in low else ""
     return {"ticker": tk, "text": txt, "sentiment": senti, "headlines": heads[:6]}
+
+
+_SV_MONTHS = ["januari", "februari", "mars", "april", "maj", "juni", "juli",
+              "augusti", "september", "oktober", "november", "december"]
+
+
+@app.get("/api/ai_monthly")
+def ai_monthly(ticker: str = ""):
+    """Auto-skrivet 'Månadens case'. Väljer starkaste bolaget om ingen ticker anges."""
+    import datetime as _dt
+    import json as _j
+    import re as _re3
+    tk = (ticker or "").upper().strip()
+    if not tk:
+        try:
+            hot = sorted(scan_universe(None),
+                         key=lambda x: (x.get("score10", 0), x.get("hetta", 0)), reverse=True)
+            tk = hot[0]["ticker"] if hot else ""
+        except Exception:
+            tk = ""
+    if not tk:
+        return {}
+    a = scan(tk) or {}
+    now = _dt.datetime.utcnow()
+    manad = _SV_MONTHS[now.month - 1].capitalize() + " " + str(now.year)
+    name = ""
+    try:
+        ci = company_info(tk)
+        name = (ci.get("name") if isinstance(ci, dict) else "") or ""
+    except Exception:
+        pass
+    if not name:
+        name = _ai_company(tk).get("name") or tk
+    score = a.get("score10")
+    nyckeltal = []
+    if a.get("last") is not None:
+        nyckeltal.append({"k": "Pris", "v": "$" + _num(a.get("last"))})
+    if score is not None:
+        nyckeltal.append({"k": "GRABIT-score", "v": "%s/10" % score})
+    if a.get("rsi") is not None:
+        nyckeltal.append({"k": "RSI", "v": _num(a.get("rsi"), 0)})
+    if a.get("rel_vol") is not None:
+        nyckeltal.append({"k": "Rel.volym", "v": _num(a.get("rel_vol")) + "x"})
+    if a.get("pct_from_high") is not None:
+        nyckeltal.append({"k": "Från 52v-topp", "v": _num(a.get("pct_from_high"), 1, "%", sign=True)})
+
+    sysp = ("Du är Grabit, aktieanalytiker. Skriv 'Månadens case' på svenska. Svara ENBART "
+            "med giltig JSON (inga kodblock):\n"
+            '{"tagline":"<slogan, max 8 ord>","verdict":"<ett ord: Stark/Lovande/Spekulativ>",'
+            '"summary":"<2-3 meningar: vad bolaget gör och varför det är manadens case>",'
+            '"sektioner":[{"h":"Varför nu","t":"<2-3 meningar>"},'
+            '{"h":"Setupen","t":"<2-3 meningar utifrån tekniken>"},'
+            '{"h":"Risker","t":"<2-3 meningar>"}]}\n'
+            "Sakligt, ingen köp/säljrådgivning, hitta inte på siffror utöver de givna.")
+    user = "Bolag: %s (%s)\nManad: %s\n%s" % (tk, name, manad, _fmt_stock_ctx(a))
+    raw = _ai_text("monthly:%s:%s" % (tk, now.strftime("%Y%m")), sysp, user, 900)
+    tagline = summary = verdict = ""
+    sektioner = []
+    if raw:
+        try:
+            mt = _re3.search(r"\{.*\}", raw, _re3.S)
+            data = _j.loads(mt.group(0) if mt else raw)
+            tagline = str(data.get("tagline", "") or "").strip()
+            summary = str(data.get("summary", "") or "").strip()
+            verdict = str(data.get("verdict", "") or "").strip()
+            for s in (data.get("sektioner") or []):
+                if isinstance(s, dict):
+                    sektioner.append({"h": str(s.get("h", "")).strip(),
+                                      "t": str(s.get("t", "")).strip()})
+        except Exception:
+            pass
+    return {"ticker": tk, "name": name, "manad": manad, "score": score,
+            "verdict": verdict, "tagline": tagline, "summary": summary,
+            "sektioner": sektioner, "nyckeltal": nyckeltal, "ai": bool(summary)}
 
 
 # =====================================================================
