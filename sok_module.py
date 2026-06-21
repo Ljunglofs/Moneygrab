@@ -60,17 +60,64 @@ def _atr(df, period=14):
 
 
 # ----------------------------------------------------------
+#  RESERVKÄLLA: STOOQ  (fungerar från moln-IP där Yahoo blockar)
+#  Returnerar OHLCV-DataFrame i samma format som yfinance.
+# ----------------------------------------------------------
+import io as _io
+from urllib.request import Request as _Req, urlopen as _urlopen
+
+
+def _stooq_symbol(ticker):
+    t = (ticker or "").strip()
+    if not t or any(c in t for c in ("=", "^")):
+        return None            # futures/index – Stooq har andra symboler
+    if "." in t:
+        return None            # icke-US/särskilda – hoppa
+    return t.lower() + ".us"
+
+
+def _stooq_df(ticker):
+    sym = _stooq_symbol(ticker)
+    if not sym:
+        return None
+    url = "https://stooq.com/q/d/l/?s=" + sym + "&i=d"
+    try:
+        req = _Req(url, headers={"User-Agent": "Mozilla/5.0"})
+        raw = _urlopen(req, timeout=10).read().decode("utf-8", "replace")
+    except Exception:
+        return None
+    if not raw or "Date,Open" not in raw or "No data" in raw:
+        return None
+    try:
+        df = pd.read_csv(_io.StringIO(raw))
+        df["Date"] = pd.to_datetime(df["Date"])
+        df = df.set_index("Date").sort_index()
+    except Exception:
+        return None
+    keep = [c for c in ("Open", "High", "Low", "Close", "Volume") if c in df.columns]
+    if "Close" not in keep:
+        return None
+    df = df[keep].dropna(how="all")
+    return df if len(df) >= 60 else None
+
+
+# ----------------------------------------------------------
 #  HÄMTA DATA  (cache 5 min så vi inte spammar Yahoo)
 # ----------------------------------------------------------
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch(ticker):
-    t = yf.Ticker(ticker)
-    df = t.history(period="1y", interval="1d", auto_adjust=False)
-    if df is None or df.empty or len(df) < 60:
-        return None, None
-    # intraday för en färskare "senaste"-känsla
+    df = None
     try:
-        intr = t.history(period="1d", interval="5m", auto_adjust=False)
+        t = yf.Ticker(ticker)
+        df = t.history(period="1y", interval="1d", auto_adjust=False)
+    except Exception:
+        df = None
+    if df is None or getattr(df, "empty", True) or len(df) < 60:
+        # Yahoo gav inget (vanligt från moln-IP) -> reservkälla Stooq
+        sdf = _stooq_df(ticker)
+        return (sdf, None) if sdf is not None else (None, None)
+    try:
+        intr = yf.Ticker(ticker).history(period="1d", interval="5m", auto_adjust=False)
     except Exception:
         intr = None
     return df, intr
@@ -108,6 +155,20 @@ def fetch_many(tickers, period="1y", interval="1d", chunk=60):
                 df = None
             if df is not None and not df.empty and len(df) >= 60:
                 out[t] = df
+    # Reservkälla Stooq för tickers Yahoo inte gav (parallellt)
+    missing = [t for t in tickers if t not in out]
+    if missing:
+        try:
+            from concurrent.futures import ThreadPoolExecutor
+            with ThreadPoolExecutor(max_workers=8) as ex:
+                for t, sdf in ex.map(lambda x: (x, _stooq_df(x)), missing):
+                    if sdf is not None:
+                        out[t] = sdf
+        except Exception:
+            for t in missing:
+                sdf = _stooq_df(t)
+                if sdf is not None:
+                    out[t] = sdf
     return out
 
 
