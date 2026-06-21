@@ -41,7 +41,7 @@
     }
 
     .logo {
-      font-size: 1.85rem;
+      font-size: 1.9rem;
       font-weight: 800;
       letter-spacing: -1.5px;
     }
@@ -58,11 +58,10 @@
     }
 
     .section-title {
-      font-size: 1.05rem;
+      font-size: 1.08rem;
       font-weight: 700;
     }
 
-    /* === IMPROVED CARDS === */
     .stock-card {
       background: var(--panel);
       border: 1px solid rgba(255,255,255,0.06);
@@ -98,11 +97,11 @@
       font-size: 15px; font-weight: 800; color: white;
     }
 
-    .ticker { font-size: 1.08rem; font-weight: 800; }
+    .ticker { font-size: 1.1rem; font-weight: 800; }
     .company-name { font-size: 0.76rem; color: var(--muted); margin-top: 1px; }
 
-    .price { font-size: 1.2rem; font-weight: 800; }
-    .change { font-size: 0.85rem; font-weight: 700; margin-top: 1px; }
+    .price { font-size: 1.22rem; font-weight: 800; }
+    .change { font-size: 0.86rem; font-weight: 700; margin-top: 1px; }
     .change.positive { color: var(--pos); }
     .change.negative { color: var(--neg); }
 
@@ -127,33 +126,19 @@
     .pill.bull { background: #16c78422; color: #16c784; }
     .pill.bear { background: #f6465d22; color: #f6465d; }
     .pill.rocket { background: #f0a02022; color: #f0a020; }
-    .pill.avvakta { background: #f0a02022; color: #f0a020; }
-
-    .signal-card {
-      background: var(--panel);
-      border: 1px solid rgba(255,255,255,0.06);
-      border-radius: 14px;
-      padding: 14px 16px;
-      margin-bottom: 8px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
   </style>
 </head>
 <body>
 
-  <!-- Header -->
   <div class="header">
     <div class="logo">GRABIT</div>
-    <div style="color:#1199fa; font-weight:700; font-size:0.95rem;">PRO</div>
+    <div style="color:#1199fa; font-weight:700;">PRO</div>
   </div>
 
   <!-- 10 HETASTE -->
   <div class="section">
     <div class="section-header">
       <div class="section-title">10 hetaste just nu</div>
-      <div style="color:#1199fa; font-size:0.85rem;">Visa alla</div>
     </div>
     <div id="hot-list"></div>
   </div>
@@ -162,53 +147,52 @@
   <div class="section">
     <div class="section-header">
       <div class="section-title">Tidiga signaler</div>
-      <div style="color:#1199fa; font-size:0.85rem;">5</div>
     </div>
     
-    <div class="signal-card">
-      <div style="display:flex; align-items:center; gap:12px;">
-        <div style="background:#222; width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:0.8rem;">BK</div>
-        <div>
-          <div style="font-weight:700;">BKNG</div>
-          <div style="font-size:0.75rem; color:#848e9c;">Konsument</div>
+    <div class="stock-card">
+      <div class="stock-header">
+        <div class="logo-wrapper">
+          <img src="https://logo.clearbit.com/booking.com" class="stock-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+          <div class="monogram" style="display:none; background:#f0a020"><span>BK</span></div>
+        </div>
+        <div style="flex:1">
+          <div style="display:flex; align-items:center; gap:7px">
+            <span class="ticker">BKNG</span>
+            <span class="pill bull">BULL</span>
+          </div>
+          <div class="company-name">Booking Holdings</div>
+        </div>
+        <div style="text-align:right">
+          <div class="price">7.0</div>
         </div>
       </div>
-      <div style="font-weight:700; color:#1199fa; font-size:1.1rem;">7.0</div>
     </div>
 
-    <div class="signal-card">
-      <div style="display:flex; align-items:center; gap:12px;">
-        <div style="background:#222; width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center;">
-          <img src="https://logo.clearbit.com/nnasafe.com" style="width:26px; height:26px; border-radius:6px;" onerror="this.style.display='none'">
+    <div class="stock-card">
+      <div class="stock-header">
+        <div class="logo-wrapper">
+          <img src="https://logo.clearbit.com/nnasafe.com" class="stock-logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+          <div class="monogram" style="display:none; background:#16c784"><span>NN</span></div>
         </div>
-        <div>
-          <div style="font-weight:700;">NNE</div>
-          <div style="font-size:0.75rem; color:#848e9c;">Nano Nuclear</div>
+        <div style="flex:1">
+          <div style="display:flex; align-items:center; gap:7px">
+            <span class="ticker">NNE</span>
+            <span class="pill rocket">ROCKET</span>
+          </div>
+          <div class="company-name">Nano Nuclear</div>
         </div>
-      </div>
-      <div style="font-weight:700; color:#1199fa; font-size:1.1rem;">7.0</div>
-    </div>
-
-    <div class="signal-card">
-      <div style="display:flex; align-items:center; gap:12px;">
-        <div style="background:#222; width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center;">
-          <img src="https://logo.clearbit.com/nuscalepower.com" style="width:26px; height:26px; border-radius:6px;" onerror="this.style.display='none'">
-        </div>
-        <div>
-          <div style="font-weight:700;">SMR</div>
-          <div style="font-size:0.75rem; color:#848e9c;">NuScale Power</div>
+        <div style="text-align:right">
+          <div class="price">7.0</div>
         </div>
       </div>
-      <div style="font-weight:700; color:#1199fa; font-size:1.1rem;">7.0</div>
     </div>
   </div>
 
   <script>
-    // Exempeldata (kan senare kopplas till API)
     const hotData = [
-      { ticker: "NVDA", label: "BULL", last: 142.8, ret_5: 4.2, score10: 9.1, rel_vol: 2.1, rsi: 71, theme: "AI-infra" },
-      { ticker: "RKLB", label: "ROCKET", last: 28.4, ret_5: 12.8, score10: 8.4, rel_vol: 3.4, rsi: 78, theme: "Space" },
-      { ticker: "OKLO", label: "BULL", last: 18.9, ret_5: 6.5, score10: 7.8, rel_vol: 1.8, rsi: 65, theme: "Nuclear" },
+      { ticker: "NVDA", label: "BULL", last: 142.8, ret_5: 4.2, score10: 9.1, rel_vol: 2.1, rsi: 71 },
+      { ticker: "RKLB", label: "ROCKET", last: 28.4, ret_5: 12.8, score10: 8.4, rel_vol: 3.4, rsi: 78 },
+      { ticker: "OKLO", label: "BULL", last: 18.9, ret_5: 6.5, score10: 7.8, rel_vol: 1.8, rsi: 65 },
     ];
 
     function createCard(data) {
@@ -229,7 +213,7 @@
                 <span class="ticker">${data.ticker}</span>
                 <span class="pill ${labelClass}">${data.label}</span>
               </div>
-              <div class="company-name">${data.theme}</div>
+              <div class="company-name">Tech</div>
             </div>
             <div style="text-align:right">
               <div class="price">${data.last.toFixed(2)}</div>
@@ -243,19 +227,16 @@
         </div>`;
     }
 
-    function renderHotList() {
-      const container = document.getElementById('hot-list');
-      container.innerHTML = hotData.map(createCard).join('');
+    function renderHot() {
+      document.getElementById('hot-list').innerHTML = hotData.map(createCard).join('');
     }
 
     function openDetail(ticker) {
-      alert("Öppnar detaljvy för " + ticker + " (demo)");
-      // Här kan du senare koppla till riktig detalj-modal
+      alert("Öppnar detaljvy för " + ticker);
     }
 
-    // Start
     window.onload = function() {
-      renderHotList();
+      renderHot();
     }
   </script>
 </body>
