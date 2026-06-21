@@ -317,6 +317,38 @@ def health():
     return {"status": "ok", "tickers": len(ALL_TICKERS), "yfinance": yf is not None}
 
 
+@app.get("/api/debug", include_in_schema=False)
+def debug():
+    """Diagnos: visar exakt vad yfinance ger på Render (enskild + bulk + scan)."""
+    import traceback
+    out = {}
+    try:
+        import yfinance as _yf
+        out["yfinance_version"] = getattr(_yf, "__version__", "?")
+    except Exception as e:
+        out["yfinance_version"] = f"import-fail: {e}"
+    try:
+        df, _intr = _fetch_raw("AAPL")
+        out["single_AAPL"] = {
+            "rows": 0 if df is None else int(len(df)),
+            "last": None if (df is None or len(df) == 0) else round(float(df["Close"].iloc[-1]), 2),
+        }
+    except Exception:
+        out["single_AAPL"] = {"error": traceback.format_exc().strip().splitlines()[-1]}
+    try:
+        m = fetch_many(["AAPL", "MSFT", "NVDA"]) or {}
+        out["bulk"] = {t: (0 if v is None else int(len(v))) for t, v in m.items()}
+    except Exception:
+        out["bulk"] = {"error": traceback.format_exc().strip().splitlines()[-1]}
+    try:
+        rows = scan_universe(None)
+        out["scan_rows"] = len(rows)
+        out["scan_sample"] = (rows[0] if rows else None)
+    except Exception:
+        out["scan_rows"] = {"error": traceback.format_exc().strip().splitlines()[-1]}
+    return out
+
+
 @app.get("/api/universe")
 def universe():
     return {"themes": UNIVERSE, "ticker_theme": TICKER_THEME}
