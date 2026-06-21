@@ -780,19 +780,21 @@ def ai(payload: AiPayload):
 _company_blurb_cache: dict = {}
 
 
-def _ai_company(tk: str, name: str) -> dict:
+def _ai_company(tk: str, name: str = "") -> dict:
     client = _anthropic_client()
     if client is None:
-        return {"sector": "", "summary": ""}
+        return {"name": "", "sector": "", "summary": ""}
     try:
         import json as _j
+        import re as _re2
         who = tk + (f' ("{name}")' if name and name != tk else "")
         prompt = (
             f"Aktien med tickern {who}. Svara ENBART med giltig JSON (inga kodblock), på svenska:\n"
-            '{"sector": "<sektor på ett ord, t.ex. Teknik, Energi, Finans, Konsument, '
+            '{"name": "<bolagets fullständiga namn>", '
+            '"sector": "<sektor på ett ord, t.ex. Teknik, Energi, Finans, Konsument, '
             'Hälsa, Industri, Råvaror, Fastighet, Kommunikation>", '
             '"summary": "<2 korta meningar om vad bolaget gör och varför det är intressant, på svenska>"}\n'
-            "Känner du inte till bolaget – sätt båda fälten till tom sträng."
+            "Känner du inte till tickern – sätt alla fält till tom sträng."
         )
         resp = client.messages.create(
             model=AI_MODEL, max_tokens=400,
@@ -800,12 +802,15 @@ def _ai_company(tk: str, name: str) -> dict:
         )
         text = "".join(getattr(b, "text", "") for b in resp.content
                        if getattr(b, "type", "") == "text").strip()
-        text = text.replace("```json", "").replace("```", "").strip()
+        m = _re2.search(r"\{.*\}", text, _re2.S)   # robust JSON-extraktion
+        if m:
+            text = m.group(0)
         data = _j.loads(text)
-        return {"sector": str(data.get("sector", "") or "").strip(),
+        return {"name": str(data.get("name", "") or "").strip(),
+                "sector": str(data.get("sector", "") or "").strip(),
                 "summary": str(data.get("summary", "") or "").strip()}
     except Exception:
-        return {"sector": "", "summary": ""}
+        return {"name": "", "sector": "", "summary": ""}
 
 
 @app.get("/api/company/{ticker}")
@@ -813,16 +818,14 @@ def company_blurb(ticker: str):
     tk = ticker.upper().strip()
     if tk in _company_blurb_cache:
         return _company_blurb_cache[tk]
-    base = company_info(tk)
-    name = base.get("name") or tk
-    sector = base.get("sector") or ""
-    summary = base.get("summary") or ""
-    if not sector or not summary:          # tomt (t.ex. Render) -> AI-fallback
-        ai = _ai_company(tk, name)
-        sector = sector or ai.get("sector", "")
-        summary = summary or ai.get("summary", "")
+    # AI direkt — Claude vet bolagen, funkar på Render, ger svenska.
+    # (Hoppar yfinance.info som HÄNGER på Render där Yahoo blockar.)
+    ai = _ai_company(tk)
+    name = ai.get("name") or tk
+    sector = ai.get("sector") or ""
+    summary = ai.get("summary") or ""
     out = {"ticker": tk, "name": name, "sector": sector, "summary": summary}
-    if sector or summary:                  # cacha bara lyckade svar
+    if sector or summary:
         _company_blurb_cache[tk] = out
     return out
 
