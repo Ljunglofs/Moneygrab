@@ -283,14 +283,17 @@ app.add_middleware(
 )
 
 
+# Tvinga webbläsaren att ALLTID hämta färsk index.html (aldrig cacha gammal version)
+_NOCACHE = {"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0", "Pragma": "no-cache", "Expires": "0"}
+
 @app.get("/", response_class=HTMLResponse)
 def index():
     import os
     p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "index.html")
     if os.path.exists(p):
         with open(p, encoding="utf-8") as fh:
-            return fh.read()
-    return "<h1>GRABIT API</h1><p>index.html saknas i repot.</p>"
+            return HTMLResponse(fh.read(), headers=_NOCACHE)
+    return HTMLResponse("<h1>GRABIT API</h1><p>index.html saknas i repot.</p>", headers=_NOCACHE)
 
 
 # ---- Statiska assets (hero-video + poster) -------------------------
