@@ -1145,6 +1145,102 @@ def ai_monthly(ticker: str = ""):
             "sektioner": sektioner, "nyckeltal": nyckeltal, "ai": bool(summary)}
 
 
+def _alpaca_news_latest(symbols):
+    """Senaste rubrik per symbol via Alpaca. {} om nycklar saknas."""
+    import os as _os
+    key = _os.getenv("APCA_API_KEY_ID", ""); sec = _os.getenv("APCA_API_SECRET_KEY", "")
+    if not (key and sec) or not symbols:
+        return {}
+    try:
+        import requests
+        r = requests.get("https://data.alpaca.markets/v1beta1/news",
+                         headers={"APCA-API-KEY-ID": key, "APCA-API-SECRET-KEY": sec},
+                         params={"symbols": ",".join([x for x in symbols[:20] if x]),
+                                 "limit": 50, "sort": "desc"}, timeout=8)
+        out = {}
+        for n in (r.json().get("news") or []):
+            h = (n.get("headline") or "").strip()
+            for sym in n.get("symbols", []):
+                if h and sym not in out:
+                    out[sym] = h
+        return out
+    except Exception:
+        return {}
+
+
+@app.get("/api/signals")
+def signals():
+    """Live signal-feed: setups (skanner) + insiderköp (Finnhub) + nyheter (Alpaca)."""
+    import os as _os
+    rows = scan_universe(None) or []
+    if not rows:
+        return {"feed": []}
+    GOLD, GREEN, CYAN = "#F5C542", "#22c55e", "#22d3ee"
+    by = sorted(rows, key=lambda x: (x.get("score10", 0), x.get("hetta", 0)), reverse=True)
+    feed = []
+
+    def _pp(v, dec=1):
+        try:
+            return "%+.*f" % (dec, float(v))
+        except Exception:
+            return "0.0"
+
+    # --- Setup-signaler (skanner) ---
+    for a in by[:12]:
+        tk = a.get("ticker")
+        sc = a.get("score10") or 0
+        relv = a.get("rel_vol") or 0
+        struct = a.get("structure") or ""
+        bos = a.get("bos") or ""
+        ret5 = a.get("ret_5") or 0
+        theme = a.get("theme") or "Signal"
+        if sc >= 9:
+            h, ic, c = "Ny extrem möjlighet", "flame", GOLD
+            det = "Score %s/10 · rel.volym %.1fx. %s." % (sc, relv, struct or "stark struktur")
+        elif "ekräft" in str(bos) or "ekräft" in str(struct):
+            h, ic, c = "Setup bekräftad", "trend", GREEN
+            det = "%s. Rel.volym %.1fx, 5d %s%%." % (bos or "Trend bekräftad", relv, _pp(ret5))
+        elif relv >= 1.6:
+            h, ic, c = "Momentum ökar", "pulse", GOLD
+            det = "Rel.volym %.1fx snittet. %s, 5d %s%%." % (relv, struct or "stigande", _pp(ret5))
+        else:
+            h, ic, c = "Ny tidig signal", "dot", CYAN
+            det = "Tidigt mönster bildas. %s, score %s/10." % (struct or "relativ styrka", sc)
+        feed.append({"tkr": tk, "i": ic, "c": c, "time": theme, "h": h, "detalj": det,
+                     "score": sc, "kurs": "$" + _num(a.get("last")),
+                     "chg": round(float(ret5 or 0), 1)})
+
+    by_tk = {a.get("ticker"): a for a in by}
+    tops = [a.get("ticker") for a in by[:12]]
+
+    # --- Insiderköp (Finnhub) ---
+    if _os.getenv("FINNHUB_API_KEY"):
+        for tk in tops[:8]:
+            try:
+                n = _fh_insider_buys(tk)
+            except Exception:
+                n = 0
+            if n and n > 0:
+                a = by_tk.get(tk, {})
+                feed.append({"tkr": tk, "i": "bank", "c": GREEN, "time": "Insider",
+                             "h": "Insiderköp", "detalj": "%s insiderköp registrerade nyligen." % n,
+                             "score": a.get("score10") or 0, "kurs": "$" + _num(a.get("last")),
+                             "chg": round(float(a.get("ret_5") or 0), 1)})
+
+    # --- Nyheter (Alpaca) ---
+    if _os.getenv("APCA_API_KEY_ID") and _os.getenv("APCA_API_SECRET_KEY"):
+        heads = _alpaca_news_latest(tops)
+        for tk in tops:
+            if tk in heads:
+                a = by_tk.get(tk, {})
+                feed.append({"tkr": tk, "i": "bell", "c": CYAN, "time": "Nyhet",
+                             "h": "Ny nyhet", "detalj": heads[tk][:140],
+                             "score": a.get("score10") or 0, "kurs": "$" + _num(a.get("last")),
+                             "chg": round(float(a.get("ret_5") or 0), 1)})
+
+    return {"feed": feed[:16]}
+
+
 # =====================================================================
 #  DAYTRADE  ·  /api/daytrade
 #  Regelbaserade intraday-setups från live-data. Inga magiska siffror:
