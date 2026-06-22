@@ -693,16 +693,17 @@ body{background:
   <section class="screen on" id="s-hem">
     <div class="vhero"><video autoplay muted loop playsinline poster="bg_poster.jpg"><source src="bg_1280-1.mp4" type="video/mp4"></video></div>
     <div class="newsbar" id="newsbar"></div>
-    <div class="mcase" id="mcase" style="display:none" onclick="openMonthly()"></div>
-    <div class="rscard" id="rscard" onclick="openResearch()"><div class="rsc-l"><span class="rsc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="16.2" y1="16.2" x2="21" y2="21"/></svg></span><span class="rsc-tx"><b>RESEARCH</b><i>Filtrera bolag — kurs, volym, tema, nyheter, insiders</i></span></div><span class="rsc-go">&#8594;</span></div>
     <div class="mkt-scroll" id="mkt-scroll"></div>
     <div class="airow">
       <div class="card aibrief" id="aibrief"></div>
       <div class="card tempg" id="tempg"></div>
     </div>
+    <div class="card gauge-card fgcard" id="feargreed"></div>
     <div class="aiask" id="aiask" onclick="openAI()"><div class="aiask-l"><span class="aiask-ic gico">${I.grabit}</span><span class="aiask-tx"><b>Fråga Grabit AI</b><i>Din analytiker — setups, jämförelser, R/R, marknadsläge</i></span></div><span class="aiask-go">&#8594;</span></div>
+    <div class="mcase" id="mcase" style="display:none" onclick="openMonthly()"></div>
     <div class="sect"><h2>Dagens lägen</h2><a onclick="go('marknad')">Visa alla</a></div>
     <div class="picks" id="picks"></div>
+    <div class="rscard" id="rscard" onclick="openResearch()"><div class="rsc-l"><span class="rsc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="16.2" y1="16.2" x2="21" y2="21"/></svg></span><span class="rsc-tx"><b>RESEARCH</b><i>Filtrera bolag — kurs, volym, tema, nyheter, insiders</i></span></div><span class="rsc-go">&#8594;</span></div>
     <div class="sect"><h2>Kommande event</h2><a>Kalender</a></div>
     <div class="evrow" id="events"></div>
     <div class="sect"><h2>10 hetaste just nu</h2><a onclick="go('marknad')">Mer</a></div>
@@ -728,7 +729,7 @@ body{background:
     </div>
   </section>
 
-  <section class="screen" id="s-signal"><div class="card feed" id="feed2" style="margin-top:8px"></div></section>
+  <section class="screen" id="s-signal"><div class="sigfilter" id="sigfilter"><button class="sigchip on" data-k="allt" onclick="setSig('allt')">Allt</button><button class="sigchip" data-k="setup" onclick="setSig('setup')">Setups</button><button class="sigchip" data-k="insider" onclick="setSig('insider')">Insiders</button><button class="sigchip" data-k="nyhet" onclick="setSig('nyhet')">Nyheter</button></div><div class="card feed" id="feed2" style="margin-top:8px"></div></section>
   <section class="screen" id="s-daytrade"><div class="dt-head" id="dt-head"></div><div class="dt-list" id="dtlist"></div></section>
   <section class="screen" id="s-portfolj"><div id="pf"></div></section>
   <section class="screen" id="s-mer"><div class="placeholder"><span class="gi">&#9881;</span><h3>Mer</h3><p>Watchlist, nyheter, inställningar.</p></div></section>
@@ -1272,6 +1273,7 @@ function render(d){
   // tempmätare
   if($("#tempg")){const PULSE={BEARISH:"pulse_bear",BULLISH:"pulse_bull",NEUTRAL:"pulse_neutral","SUPER BULLISH":"pulse_super"};const pim=IMGS[PULSE[d.gauge.state]||"pulse_bear"];
     $("#tempg").innerHTML=`<div class="tg-l">Marknadsläge</div><div class="globewrap"><img class="globeimg" src="${pim}" alt=""><span class="globescore" style="color:${d.gauge.color}">${d.gauge.score}</span></div><div class="tg-s" style="color:${d.gauge.color}">${d.gauge.state}</div>`;}
+  if($("#feargreed")){const fg=fgInfo(d.gauge.score);$("#feargreed").innerHTML=`<div class="sc2-top"><span class="sc2-title">Fear &amp; Greed-index</span><span class="sc2-live"><i></i>Live</span></div><div class="fg-gauge">${gaugeSVG(d.gauge.score,fg.col)}</div><div class="fg-state2" style="color:${fg.col}">${fg.label}</div><div class="fg-scale"><span>Rädsla</span><span class="fg-num" style="color:${fg.col}">${d.gauge.score}<small>/100</small></span><span>Girighet</span></div>`;}
   // picks + fråga grabit
   if($("#picks"))$("#picks").innerHTML=d.picks.map(pickCard).join("")+(d.picks[0]?askCard(d.picks[0].tkr):"");
   // events (bildkort med riktiga foton ur mockupen)
@@ -1289,6 +1291,7 @@ function render(d){
   const _BG={flame:bgSpark,trend:bgRadar,pulse:bgCandles,dot:bgDots};
   const feedHTML=d.feed.map(f=>`<div class="sig" style="border-color:${f.c}55" onclick="openStock('${f.tkr}')"><div class="sig-bg">${(_BG[f.i]||bgDots)(f.c)}</div><div class="sig-c"><div class="sig-time">${f.time} · ${NAMES[f.tkr]||f.tkr}</div><div class="sig-h" style="color:${f.c}"><span class="fic">${I[f.i]||I.dot}</span>${f.h}</div><div class="sig-sub">${f.detalj}</div><div class="sig-meta"><span class="sig-pill" style="background:${f.c}26;color:${f.c}">${f.score.toFixed(1)} · ${f.tkr}</span><span class="sig-kurs">${f.kurs} <b style="color:${f.chg>=0?'var(--pos)':'var(--neg)'}">${f.chg>=0?'+':''}${f.chg}%</b></span></div></div></div>`).join("");
   if($("#feed2"))$("#feed2").innerHTML=feedHTML;
+  window.__SIG={feed:(d.feed||[]),news:(d.news||[]),allHTML:feedHTML};if(window.applySigFilter)applySigFilter();
   // UPPTÄCK
   if($("#catgrid"))$("#catgrid").innerHTML=THEMES.map((t,i)=>`<div class="cat" style="background-image:linear-gradient(to top,rgba(8,13,16,.97) 6%,rgba(8,13,16,.5) 42%,rgba(8,13,16,.12)),url('${THEME_IMG[t.key]||""}')" onclick="openCat(${i})"><div class="ci" style="color:${t.c}">${ICONS[t.key]||t.ic}</div><div class="cbottom"><div class="cn">${t.key}</div><div class="cc">${t.n} bolag</div><div class="cstatus" style="color:${t.c}">${THEME_STATUS[t.key]||""}</div></div></div>`).join("");
   if($("#winners"))$("#winners").innerHTML=qlist(d.winners);
@@ -1305,16 +1308,27 @@ function wlist(arr){return arr.map(x=>`<div class="qrow" onclick="openStock('${x
   <div class="wtag" style="color:#FF3B30">${x.tag||"BOS&#8595;"}</div></div></div>`).join("");}
 
 function radarSVG(){
-  const blips=[[60,52,'#22c55e'],[92,70,'#22c55e'],[120,46,'#22d3ee'],[78,104,'#22d3ee'],[140,92,'#FF3B30']];
-  const dots=blips.map((p,i)=>`<circle cx="${p[0]}" cy="${p[1]}" r="3.4" fill="${p[2]}"><animate attributeName="opacity" values="0.35;1;0.35" dur="${2+i*0.35}s" repeatCount="indefinite"/></circle>`).join("");
-  return `<svg class="radar" viewBox="0 0 180 180" width="148" height="148">
-    <defs><radialGradient id="rg" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="rgba(245,197,66,.16)"/><stop offset="100%" stop-color="rgba(245,197,66,0)"/></radialGradient>
-    <linearGradient id="sweep" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="rgba(245,197,66,0)"/><stop offset="100%" stop-color="rgba(245,197,66,.45)"/></linearGradient></defs>
-    <circle cx="90" cy="90" r="80" fill="url(#rg)"/>
-    ${[80,58,36].map(r=>`<circle cx="90" cy="90" r="${r}" fill="none" stroke="rgba(245,197,66,.18)"/>`).join("")}
-    <line x1="10" y1="90" x2="170" y2="90" stroke="rgba(245,197,66,.12)"/><line x1="90" y1="10" x2="90" y2="170" stroke="rgba(245,197,66,.12)"/>
-    <g transform="translate(90 90)"><path d="M0 0 L0 -80 A80 80 0 0 1 56 -56 Z" fill="url(#sweep)"><animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="4s" repeatCount="indefinite"/></path></g>
-    ${dots}<circle cx="90" cy="90" r="2.6" fill="var(--gold)"/></svg>`;
+  const blips=[[72,64,'#22c55e'],[150,86,'#3b82f6'],[128,150,'#22c55e'],[84,162,'#22c55e'],[150,128,'#FF3B30']];
+  const dots=blips.map((p,i)=>`<circle cx="${p[0]}" cy="${p[1]}" r="4" fill="${p[2]}" style="filter:drop-shadow(0 0 5px ${p[2]})"><animate attributeName="opacity" values="0.4;1;0.4" dur="${2+i*0.4}s" repeatCount="indefinite"/></circle>`).join("");
+  let ticks="";
+  for(let a=0;a<360;a+=6){const rad=a*Math.PI/180,r1=93,r2=(a%30===0?83:89),x1=100+r1*Math.cos(rad),y1=100+r1*Math.sin(rad),x2=100+r2*Math.cos(rad),y2=100+r2*Math.sin(rad);ticks+=`<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="rgba(90,160,215,.45)" stroke-width="1"/>`;}
+  return `<svg class="radar" viewBox="0 0 200 200" width="100%" style="max-width:240px">
+    <defs>
+      <radialGradient id="rgbg" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="rgba(20,44,64,.92)"/><stop offset="72%" stop-color="rgba(10,24,36,.96)"/><stop offset="100%" stop-color="rgba(8,16,24,1)"/></radialGradient>
+      <linearGradient id="sweepg" x1="0" y1="0" x2="1" y2="-1"><stop offset="0%" stop-color="rgba(34,211,238,0)"/><stop offset="100%" stop-color="rgba(34,211,238,.5)"/></linearGradient>
+    </defs>
+    <circle cx="100" cy="100" r="91" fill="url(#rgbg)" stroke="rgba(34,211,238,.45)" stroke-width="1.5"/>
+    ${ticks}
+    ${[90,68,46,24].map(r=>`<circle cx="100" cy="100" r="${r}" fill="none" stroke="rgba(70,145,205,.26)" stroke-width="1"/>`).join("")}
+    <line x1="9" y1="100" x2="191" y2="100" stroke="rgba(70,145,205,.26)" stroke-width="1"/>
+    <line x1="100" y1="9" x2="100" y2="191" stroke="rgba(70,145,205,.26)" stroke-width="1"/>
+    <g transform="translate(100 100)"><g>
+      <path d="M0 0 L0 -91 A91 91 0 0 1 64 -64 Z" fill="url(#sweepg)"/>
+      <line x1="0" y1="0" x2="0" y2="-91" stroke="rgba(34,211,238,.95)" stroke-width="2" style="filter:drop-shadow(0 0 4px #22d3ee)"/>
+      <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="4.5s" repeatCount="indefinite"/>
+    </g></g>
+    ${dots}
+    <circle cx="100" cy="100" r="4.6" fill="#22d3ee" style="filter:drop-shadow(0 0 7px #22d3ee)"/></svg>`;
 }
 function renderScanner(s){
   const spark=(tkr,col,up)=>{const W=80,H=28,d=_series(tkr,18,up?1:-1),a=areaPath(d,W,H);
@@ -1328,8 +1342,7 @@ function renderScanner(s){
   const hero=`<div class="theme-hero" onclick="go('marknad')" style="background-image:linear-gradient(100deg,#0A0E12 34%,rgba(10,14,18,.55) 58%,rgba(10,14,18,.1) 100%),url('${IMGS.rocket}')"><div class="th-k">HETASTA TEMAN JUST NU</div><div class="th-h">Space &amp; Defense</div><div class="th-s">Stark momentum · Flera breakout-setups</div><div class="th-pill">3 TOPPSETUPS</div></div>`;
   return `<div class="sect"><h2>Populära screeners</h2></div>
     <div class="scr-grid">${scr}</div>
-    <div class="sect"><h2>Sektorscanner</h2><a class="live">● Live</a></div>
-    <div class="card radar-card">${radarSVG()}<div class="radar-meta"><div class="rm-row"><span>Bekräftade setups</span><b style="color:var(--pos)">${s.confirmed??12}</b></div><div class="rm-row"><span>Tidiga signaler</span><b style="color:var(--cyan)">${s.early??7}</b></div><div class="rm-row"><span>Risk Off</span><b style="color:var(--neg)">${s.riskCount??4}</b></div></div></div>
+    <div class="card scanner2"><div class="sc2-top"><span class="sc2-title">SEKTORSCANNER</span><span class="sc2-live"><i></i>Live</span></div><div class="sc2-body"><div class="sc2-radar">${radarSVG()}</div><div class="sc2-rows"><div class="sc2-row"><span class="sc2-ic" style="--c:#22c55e"><svg viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="1.9"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.4" fill="#22c55e" stroke="none"/><line x1="12" y1="2.5" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="21.5"/><line x1="2.5" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="21.5" y2="12"/></svg></span><span class="sc2-lbl">Bekräftade setups</span><b class="sc2-num" style="color:#22c55e">${s.confirmed??"–"}</b></div><div class="sc2-row"><span class="sc2-ic" style="--c:#22d3ee"><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-6 4 12 2-6h6"/></svg></span><span class="sc2-lbl">Tidiga signaler</span><b class="sc2-num" style="color:#22d3ee">${s.early??"–"}</b></div><div class="sc2-row"><span class="sc2-ic" style="--c:#FF3B30"><svg viewBox="0 0 24 24" fill="none" stroke="#FF3B30" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/><line x1="12" y1="8" x2="12" y2="12.5"/><circle cx="12" cy="16" r="0.7" fill="#FF3B30" stroke="none"/></svg></span><span class="sc2-lbl">Risk off</span><b class="sc2-num" style="color:#FF3B30">${s.riskCount??"–"}</b></div></div></div></div>
     <div class="scan-grid">${mini('Top Gainers','var(--pos)',g)}${mini('Högsta volym','var(--gold2)',v)}</div>
     ${hero}`;
 }
@@ -1624,6 +1637,81 @@ if(typeof openStock==="function"){
   window.openStock=function(tkr){_origOpenStock(tkr);try{loadStockAI(tkr);}catch(e){}};
 }
 load();loadMonthly();loadDaily();
+function fgInfo(s){s=+s||0;
+  if(s>=75)return{label:"Extrem girighet",col:"#22c55e"};
+  if(s>=55)return{label:"Girighet",col:"#22c55e"};
+  if(s>=45)return{label:"Neutral",col:"#F5C542"};
+  if(s>=25)return{label:"Rädsla",col:"#FF9F0A"};
+  return{label:"Extrem rädsla",col:"#FF3B30"};}
+var SIGFILTER="allt";
+function setSig(k){SIGFILTER=k;
+  var cs=document.querySelectorAll("#sigfilter .sigchip");
+  for(var i=0;i<cs.length;i++)cs[i].classList.toggle("on",cs[i].getAttribute("data-k")===k);
+  applySigFilter();}
+function _sigCard(f){var nm=(typeof NAMES!=="undefined"&&NAMES[f.tkr])||f.tkr;
+  var ic=(typeof I!=="undefined"&&(I[f.i]||I.dot))||"";
+  return `<div class="sig sigf" style="border-color:${f.c}55" onclick="openStock('${f.tkr}')"><div class="sig-c"><div class="sig-time">${f.time} · ${nm}</div><div class="sig-h" style="color:${f.c}"><span class="fic">${ic}</span>${f.h}</div><div class="sig-sub">${f.detalj||""}</div></div></div>`;}
+function _newsCard(t){return `<div class="sig sigf newsf" style="border-color:#22d3ee55"><div class="sig-c"><div class="sig-time">Marknadsnyhet</div><div class="sig-sub" style="color:#dfe7ee;font-weight:600">${t}</div></div></div>`;}
+function applySigFilter(){var box=document.getElementById("feed2");if(!box)return;
+  var S=window.__SIG||{feed:[],news:[],allHTML:""};
+  var feed=S.feed||[],news=S.news||[];
+  var SET={flame:1,trend:1,pulse:1,dot:1};var html="";
+  if(SIGFILTER==="allt"){html=S.allHTML||feed.map(_sigCard).join("");}
+  else if(SIGFILTER==="setup"){html=feed.filter(function(f){return SET[f.i];}).map(_sigCard).join("");}
+  else if(SIGFILTER==="insider"){html=feed.filter(function(f){return f.time==="Insider"||f.i==="bank";}).map(_sigCard).join("");}
+  else if(SIGFILTER==="nyhet"){
+    var tn=feed.filter(function(f){return f.time==="Nyhet"||f.i==="bell";}).map(_sigCard).join("");
+    var mn=(news||[]).filter(function(t){return t&&t!=="Laddar nyheter…";}).map(_newsCard).join("");
+    html=tn+mn;}
+  if(!html)html=`<div class="sig-empty">Inga signaler i den här kategorin just nu.</div>`;
+  box.innerHTML=html;}
 </script>
+<style>
+/* === Signaler-filter + Fear&Greed (append, vinner via källordning) === */
+.sigfilter{display:flex;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:2px 0 2px!important;margin:6px 0 2px!important;scrollbar-width:none}
+.sigfilter::-webkit-scrollbar{display:none}
+.sigchip{flex:none!important;padding:8px 15px!important;border-radius:999px!important;border:1px solid rgba(255,255,255,.10)!important;background:#0E141A!important;color:var(--mut,#8b97a3)!important;font-weight:700!important;font-size:12.5px!important;letter-spacing:.02em!important;cursor:pointer!important;white-space:nowrap!important;transition:none!important}
+.sigchip.on{color:#0b0f13!important;background:#F5C542!important;border-color:#F5C542!important}
+.sig.sigf{background:#0E141A!important;border:1px solid rgba(255,255,255,.08);border-left-width:2px!important;border-radius:14px!important;padding:13px 15px!important;margin:0 0 10px!important;box-shadow:none!important;cursor:pointer}
+.sig.sigf .sig-time{font-size:10.5px!important;letter-spacing:.08em!important;text-transform:uppercase!important;color:var(--mut,#8b97a3)!important;font-weight:800!important}
+.sig.sigf .sig-h{display:flex;align-items:center;gap:7px;font-weight:800!important;font-size:14.5px!important;margin:3px 0 2px!important}
+.sig.sigf .sig-h .fic{width:15px;height:15px;display:inline-flex}
+.sig.sigf .sig-h .fic svg{width:15px;height:15px}
+.sig.sigf .sig-sub{font-size:12.5px!important;line-height:1.45!important;color:#aeb8c2!important}
+.sig.sigf.newsf .sig-sub{font-size:13px!important;color:#dfe7ee!important}
+.sig-empty{padding:26px 14px!important;text-align:center!important;color:var(--mut,#8b97a3)!important;font-size:13px!important;border:1px dashed rgba(255,255,255,.10)!important;border-radius:14px!important}
+.fgcard{background:#0E141A!important;border:1px solid rgba(255,255,255,.08)!important;border-radius:18px!important;padding:16px 16px 14px!important;margin:4px 0 0!important;box-shadow:none!important}
+.fgcard .fg-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.fgcard .fg-lbl{font-weight:800!important;font-size:11px!important;letter-spacing:.1em!important;text-transform:uppercase!important;color:var(--mut,#8b97a3)!important}
+.fgcard .fg-state{font-weight:900!important;font-size:15px!important;letter-spacing:.01em!important}
+.fgcard .fg-gauge{display:flex;justify-content:center;margin:2px 0 0}
+.fgcard .fg-scale{display:flex;align-items:center;justify-content:space-between;margin-top:-6px;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mut,#8b97a3)}
+.fgcard .fg-num{font-size:22px!important;font-weight:900!important;letter-spacing:-.02em!important;font-feature-settings:"tnum"}
+.fgcard .fg-num small{font-size:11px;font-weight:700;color:var(--mut,#8b97a3)}
+</style>
+<style>
+/* === Sektorscanner + Fear&Greed (mockup-stil, append) === */
+.scanner2,.fgcard{position:relative!important;background:linear-gradient(180deg,#0d1620,#0a121a)!important;border:1px solid rgba(34,211,238,.16)!important;border-radius:20px!important;padding:16px 18px!important;margin:4px 0 12px!important;box-shadow:none!important;overflow:hidden}
+.sc2-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px}
+.sc2-title{font-weight:900!important;font-size:15px!important;letter-spacing:.13em!important;text-transform:uppercase!important;color:#eaf2f8!important;position:relative;padding-bottom:8px}
+.sc2-title::after{content:"";position:absolute;left:0;bottom:0;width:34px;height:3px;border-radius:2px;background:#22d3ee}
+.sc2-live{display:inline-flex;align-items:center;gap:6px;font-weight:800!important;font-size:13px!important;color:#22c55e!important}
+.sc2-live i{width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 7px #22c55e;animation:sc2pulse 1.8s ease-in-out infinite}
+@keyframes sc2pulse{0%,100%{opacity:1}50%{opacity:.45}}
+.sc2-body{display:flex;align-items:center;gap:14px;margin-top:6px}
+.sc2-radar{flex:none;width:43%;max-width:240px;display:flex;justify-content:center;align-items:center}
+.sc2-rows{flex:1;min-width:0;display:flex;flex-direction:column}
+.sc2-row{display:flex;align-items:center;gap:11px;padding:12px 0}
+.sc2-row+.sc2-row{border-top:1px solid rgba(255,255,255,.07)}
+.sc2-ic{flex:none;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.05);background:color-mix(in srgb,var(--c) 14%,transparent);border:1px solid rgba(255,255,255,.12);border-color:color-mix(in srgb,var(--c) 38%,transparent)}
+.sc2-ic svg{width:19px;height:19px}
+.sc2-lbl{flex:1;min-width:0;font-weight:800!important;font-size:13px!important;letter-spacing:.05em!important;text-transform:uppercase!important;color:#c4ced8!important;line-height:1.25}
+.sc2-num{flex:none;font-weight:900!important;font-size:29px!important;letter-spacing:-.02em!important;font-feature-settings:"tnum";line-height:1}
+.fgcard .fg-gauge{display:flex;justify-content:center;margin:6px 0 0}
+.fgcard .fg-state2{text-align:center;font-weight:900!important;font-size:17px!important;letter-spacing:.01em;margin-top:-2px}
+.fgcard .fg-scale{display:flex;align-items:center;justify-content:space-between;margin-top:6px;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mut,#8b97a3)}
+.fgcard .fg-num{font-size:22px!important;font-weight:900!important;letter-spacing:-.02em!important;font-feature-settings:"tnum"}
+.fgcard .fg-num small{font-size:11px;font-weight:700;color:var(--mut,#8b97a3)}
+</style>
 </body>
 </html>
