@@ -33,8 +33,8 @@ class Config:
     MTF_LOOKBACK_DAYS = 12
 
     # --- Alpaca data ---
-    ALPACA_KEY      = os.environ.get("ALPACA_KEY", "")
-    ALPACA_SECRET   = os.environ.get("ALPACA_SECRET", "")
+    ALPACA_KEY      = os.environ.get("APCA_API_KEY_ID", "")
+    ALPACA_SECRET   = os.environ.get("APCA_API_SECRET_KEY", "")
     ALPACA_FEED     = "iex"       # gratis. "sip" om du har Algo Trader Plus.
     ALPACA_DATA_URL = "https://data.alpaca.markets/v2/stocks"
 
