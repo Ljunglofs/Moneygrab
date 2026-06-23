@@ -5,5 +5,6 @@ pandas
 numpy
 streamlit
 anthropic
-
 feedparser
+ta
+requests
