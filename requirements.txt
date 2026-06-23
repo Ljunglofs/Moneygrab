@@ -1,9 +1,10 @@
-streamlit>=1.45.0
-yfinance>=1.4.1
-pandas>=2.2.0
-numpy>=1.26.0
-anthropic>=0.50.0
-feedparser>=6.0.11
-requests>=2.31.0
-
-# force full rebuild 0820
+fastapi
+uvicorn[standard]
+yfinance
+pandas
+numpy
+streamlit
+anthropic
+feedparser
+ta
+requests
