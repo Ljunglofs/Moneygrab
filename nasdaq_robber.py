@@ -35,8 +35,11 @@ class Config:
     # --- Alpaca data ---
     ALPACA_KEY      = os.environ.get("APCA_API_KEY_ID", "")
     ALPACA_SECRET   = os.environ.get("APCA_API_SECRET_KEY", "")
-    ALPACA_FEED     = "iex"       # gratis. "sip" om du har Algo Trader Plus.
     ALPACA_DATA_URL = "https://data.alpaca.markets/v2/stocks"
+    # Feed väljs automatiskt efter klockslag (se current_feed):
+    #   overnight-sessionen -> OVERNIGHT_FEED, annars DAY_FEED.
+    DAY_FEED        = "iex"        # gratis dagtid/pre-market/ordinarie
+    OVERNIGHT_FEED  = "overnight"  # gratis Basic; "boats" om Algo Trader Plus
 
     # --- Confluence thresholds ---
     MIN_SCORE      = 5            # av 7 möjliga poäng för en giltig setup
@@ -51,9 +54,10 @@ class Config:
     ACCOUNT_SIZE   = 100_000      # SEK, för positionsstorleksförslag
     RISK_PCT       = 0.01         # 1% risk per trade
 
-    # --- Session (UTC). US cash 13:30–20:00 UTC. Skippa öppningsminuterna. ---
-    SESSION_START_UTC = (13, 45)
-    SESSION_END_UTC   = (19, 45)
+    # --- Session (svensk tid, DST-säkert via zoneinfo) ---
+    LOCAL_TZ          = "Europe/Stockholm"
+    SESSION_START     = (6, 0)            # 06:00 svensk tid
+    SESSION_END       = (22, 0)           # 22:00 svensk tid
     TRADE_DAYS        = {0, 1, 2, 3, 4}   # mån–fre
 
     # --- Loop ---
@@ -68,14 +72,29 @@ class Config:
 # ==================================================================
 # DATA LAYER  — Alpaca (IEX free feed)
 # ==================================================================
+def current_feed() -> str:
+    """
+    Väljer Alpaca-feed efter aktuell New York-tid (DST-säkert).
+    Overnight-sessionen är 20:00–04:00 ET -> OVERNIGHT_FEED.
+    Övrig tid (pre-market/ordinarie/after-hours) -> DAY_FEED.
+    """
+    from zoneinfo import ZoneInfo
+    et = datetime.now(ZoneInfo("America/New_York"))
+    h = et.hour
+    if h >= 20 or h < 4:
+        return Config.OVERNIGHT_FEED
+    return Config.DAY_FEED
+
+
 def fetch_ohlcv(ticker: str, timeframe: str, lookback_days: int) -> pd.DataFrame:
     """
     Hämtar OHLCV-barer från Alpaca. Returnerar DataFrame med
     Open/High/Low/Close/Volume och tz-aware index (UTC).
-    Hanterar paginering. IEX-feeden ger realtid men endast IEX-volym.
+    Hanterar paginering. Feed väljs automatiskt (dag vs overnight).
     """
     import requests
 
+    feed = current_feed()
     headers = {
         "APCA-API-KEY-ID": Config.ALPACA_KEY,
         "APCA-API-SECRET-KEY": Config.ALPACA_SECRET,
@@ -86,7 +105,7 @@ def fetch_ohlcv(ticker: str, timeframe: str, lookback_days: int) -> pd.DataFrame
         "timeframe": timeframe,
         "start": start,
         "limit": 10000,
-        "feed": Config.ALPACA_FEED,
+        "feed": feed,
         "adjustment": "raw",
         "sort": "asc",
     }
@@ -296,14 +315,15 @@ def is_fresh(sig, state):
 # SESSION
 # ==================================================================
 def in_session(now=None):
-    now = now or datetime.now(timezone.utc)
-    if now.weekday() not in Config.TRADE_DAYS:
+    from zoneinfo import ZoneInfo
+    local = now or datetime.now(ZoneInfo(Config.LOCAL_TZ))
+    if local.weekday() not in Config.TRADE_DAYS:
         return False
-    start = now.replace(hour=Config.SESSION_START_UTC[0],
-                        minute=Config.SESSION_START_UTC[1], second=0, microsecond=0)
-    end = now.replace(hour=Config.SESSION_END_UTC[0],
-                      minute=Config.SESSION_END_UTC[1], second=0, microsecond=0)
-    return start <= now <= end
+    start = local.replace(hour=Config.SESSION_START[0],
+                          minute=Config.SESSION_START[1], second=0, microsecond=0)
+    end = local.replace(hour=Config.SESSION_END[0],
+                        minute=Config.SESSION_END[1], second=0, microsecond=0)
+    return start <= local <= end
 
 
 def seconds_to_next_bar():
@@ -319,6 +339,7 @@ def seconds_to_next_bar():
 def scan_once():
     state = load_state()
     fired = 0
+    print(f"[scan] feed={current_feed()}")
     for ticker in Config.TICKERS:
         try:
             htf = fetch_ohlcv(ticker, Config.HTF_TIMEFRAME, Config.HTF_LOOKBACK_DAYS)
@@ -358,7 +379,7 @@ def run_loop():
     print("=== NASDAQ ROBBER startad ===")
     if not Config.ALPACA_KEY or not Config.ALPACA_SECRET:
         print("VARNING: ALPACA_KEY/ALPACA_SECRET saknas i miljön.")
-    print(f"Tickers: {Config.TICKERS}  |  {Config.MTF_TIMEFRAME} setup / {Config.HTF_TIMEFRAME} bias  |  feed={Config.ALPACA_FEED}")
+    print(f"Tickers: {Config.TICKERS}  |  {Config.MTF_TIMEFRAME} setup / {Config.HTF_TIMEFRAME} bias  |  feed={current_feed()} (auto)")
     while True:
         try:
             if in_session():
