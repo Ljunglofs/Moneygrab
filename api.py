@@ -1247,12 +1247,9 @@ def signals():
 #  Entry/SL/TP/RR/confidence härleds ur VWAP, RSI, ATR och EMA-trend.
 # =====================================================================
 _DT_WATCH = [
-    ("GC=F", "XAUUSD", "Guld (futures)",       True),
-    ("NQ=F", "US100",  "Nasdaq 100 (futures)", True),
-    ("ES=F", "US500",  "S&P 500 (futures)",    False),
-    ("AAPL", "AAPL",   "Apple Inc.",           False),
-    ("NVDA", "NVDA",   "NVIDIA Corp.",         False),
-    ("TSLA", "TSLA",   "Tesla Inc.",           False),
+    ("NQ=F",    "US100",  "Nasdaq 100 (futures)", True),
+    ("GC=F",    "XAUUSD", "Guld (futures)",       True),
+    ("BTC-USD", "BTCUSD", "Bitcoin",              True),
 ]
 _DT_INTERVAL = "15m"
 _DT_ATR_K = 0.6
@@ -1303,9 +1300,17 @@ def _dt_build(sym, ticker, name, pinned):
 
     up_trend = ema20 >= ema50 and price >= vwap
     dn_trend = ema20 < ema50 and price < vwap
-    if up_trend and rsi < 68:
+    # VWAP är primär intradag-referens; EMA/RSI/momentum bekräftar riktningen.
+    lean = 0
+    lean += 3 if price >= vwap else -3
+    lean += 1 if ema20 >= ema50 else -1
+    lean += 1 if price >= ema20 else -1
+    lean += 1 if rsi >= 50 else -1
+    if rsi >= 74: lean -= 2      # överköpt – dämpa long
+    if rsi <= 26: lean += 2      # översålt – dämpa short
+    if lean >= 1:
         bias = "long"
-    elif dn_trend and rsi > 32:
+    elif lean <= -1:
         bias = "short"
     else:
         bias = "wait"
