@@ -24,7 +24,8 @@ from ta.volatility import AverageTrueRange
 # ==================================================================
 class Config:
     # --- Universe ---
-    TICKERS = ["QQQ", "GLD"]      # QQQ = Nasdaq 100, GLD = guld. (Bitcoin kräver Alpacas krypto-endpoint – separat.)
+    TICKERS = ["NQ=F", "GC=F", "BTC-USD"]   # US100 (Nasdaq futures), Guld futures, Bitcoin – via yfinance (dygnet-runt-data)
+    NAMES   = {"NQ=F": "US100", "GC=F": "Guld", "BTC-USD": "Bitcoin"}
 
     # --- Timeframes (Alpaca-format) ---
     HTF_TIMEFRAME     = "1Hour"   # high-timeframe bias
@@ -88,49 +89,33 @@ def current_feed() -> str:
 
 def fetch_ohlcv(ticker: str, timeframe: str, lookback_days: int) -> pd.DataFrame:
     """
-    Hämtar OHLCV-barer från Alpaca. Returnerar DataFrame med
-    Open/High/Low/Close/Volume och tz-aware index (UTC).
-    Hanterar paginering. Feed väljs automatiskt (dag vs overnight).
+    Hamtar OHLCV-barer via yfinance. Futures (NQ=F, GC=F) handlas nastan
+    dygnet runt -> data finns aven fore USA-oppning. timeframe i Alpaca-format
+    mappas till yfinance-intervall. Returnerar tz-aware DataFrame.
     """
-    import requests
+    import yfinance as yf
+    iv_map = {"1Hour": "1h", "60Min": "1h", "30Min": "30m",
+              "15Min": "15m", "5Min": "5m", "1Min": "1m"}
+    interval = iv_map.get(timeframe, "15m")
+    period = f"{max(1, int(lookback_days))}d"
+    try:
+        df = yf.download(ticker, period=period, interval=interval,
+                         progress=False, auto_adjust=False, threads=False)
+    except Exception as e:
+        raise RuntimeError(f"yfinance fel ({ticker} {interval}): {e}")
 
-    feed = current_feed()
-    headers = {
-        "APCA-API-KEY-ID": Config.ALPACA_KEY,
-        "APCA-API-SECRET-KEY": Config.ALPACA_SECRET,
-    }
-    start = (datetime.now(timezone.utc) - timedelta(days=lookback_days)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    url = f"{Config.ALPACA_DATA_URL}/{ticker}/bars"
-    params = {
-        "timeframe": timeframe,
-        "start": start,
-        "limit": 10000,
-        "feed": feed,
-        "adjustment": "raw",
-        "sort": "asc",
-    }
-
-    rows, token = [], None
-    while True:
-        if token:
-            params["page_token"] = token
-        resp = requests.get(url, headers=headers, params=params, timeout=15)
-        if resp.status_code != 200:
-            raise RuntimeError(f"Alpaca {resp.status_code}: {resp.text[:200]}")
-        data = resp.json()
-        rows.extend(data.get("bars") or [])
-        token = data.get("next_page_token")
-        if not token:
-            break
-
-    if not rows:
+    if df is None or df.empty:
         return pd.DataFrame(columns=["Open", "High", "Low", "Close", "Volume"])
-
-    df = pd.DataFrame(rows)
-    df["t"] = pd.to_datetime(df["t"], utc=True)
-    df = df.set_index("t").rename(columns={
-        "o": "Open", "h": "High", "l": "Low", "c": "Close", "v": "Volume"
-    })[["Open", "High", "Low", "Close", "Volume"]]
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = df.columns.get_level_values(0)
+    df.columns = [str(c).title() for c in df.columns]
+    want = ["Open", "High", "Low", "Close", "Volume"]
+    keep = [c for c in want if c in df.columns]
+    if len(keep) < 5:
+        return pd.DataFrame(columns=want)
+    df = df[keep].dropna()
+    if getattr(df.index, "tz", None) is None:
+        df.index = df.index.tz_localize("UTC")
     return df
 
 
@@ -285,17 +270,18 @@ def send_telegram(text):
 
 
 def format_alert(sig):
-    emoji = "🔥" if sig["side"] == "LONG" else "🩸"
-    tlines = "\n".join(f"  T{i+1} ({r}R): ${t}"
+    side_txt = "KÖP" if sig["side"] == "LONG" else "SÄLJ"
+    emoji = "\U0001F7E2" if sig["side"] == "LONG" else "\U0001F534"
+    name = Config.NAMES.get(sig["ticker"], sig["ticker"])
+    tlines = "\n".join(f"  T{i+1} ({r}R): {t}"
                        for i, (t, r) in enumerate(zip(sig["targets"], Config.TARGETS_R)))
-    reasons = "\n".join(f"  ✓ {r}" for r in sig["reasons"])
+    reasons = "\n".join(f"  \u2713 {r}" for r in sig["reasons"])
     return (
-        f"{emoji} <b>{sig['side']} {sig['ticker']}</b>  "
+        f"{emoji} <b>{side_txt} {name}</b> ({sig['ticker']})  "
         f"[{sig['score']}/{sig['max_score']}]\n"
-        f"Pris: <b>${sig['price']}</b>   ATR: ${sig['atr']}\n"
-        f"Stop: ${sig['stop']}   (risk ${sig['risk_per_share']}/aktie)\n"
+        f"Pris: <b>{sig['price']}</b>   ATR: {sig['atr']}\n"
+        f"Stop: {sig['stop']}   (risk {sig['risk_per_share']}/enhet)\n"
         f"{tlines}\n"
-        f"Förslag storlek: {sig['shares']} st (1% av {Config.ACCOUNT_SIZE:,})\n"
         f"HTF-bias: {sig['bias']}\n"
         f"<i>Confluence:</i>\n{reasons}"
     )
@@ -355,8 +341,8 @@ def scan_once():
     from zoneinfo import ZoneInfo
     state = load_state()
     fired = 0
-    feed = current_feed()
-    print(f"[scan] feed={feed}")
+    feed = "yfinance"
+    print(f"[scan] kalla={feed}")
     STATUS["last_feed"] = feed
     results = {}
     for ticker in Config.TICKERS:
@@ -407,12 +393,13 @@ def run_loop():
     print("=== NASDAQ ROBBER startad ===")
     if not Config.ALPACA_KEY or not Config.ALPACA_SECRET:
         print("VARNING: ALPACA_KEY/ALPACA_SECRET saknas i miljön.")
-    print(f"Tickers: {Config.TICKERS}  |  {Config.MTF_TIMEFRAME} setup / {Config.HTF_TIMEFRAME} bias  |  feed={current_feed()} (auto)")
+    print(f"Tickers: {Config.TICKERS}  |  {Config.MTF_TIMEFRAME} setup / {Config.HTF_TIMEFRAME} bias  |  data=yfinance (futures)")
+    names = ", ".join(Config.NAMES.get(t, t) for t in Config.TICKERS)
     ok = send_telegram(
         "\u2705 <b>NASDAQ ROBBER startad</b>\n"
-        f"Bevakar: {', '.join(Config.TICKERS)} \u00b7 setup {Config.MTF_TIMEFRAME} / bias {Config.HTF_TIMEFRAME}\n"
-        f"Session 06:00\u201322:00 (m\u00e5n\u2013fre) \u00b7 larm vid \u2265{Config.MIN_SCORE}/7 confluence\n"
-        f"Feed: {current_feed()}"
+        f"Bevakar: {names}\n"
+        f"Setup {Config.MTF_TIMEFRAME} / bias {Config.HTF_TIMEFRAME} \u00b7 larm vid \u2265{Config.MIN_SCORE}/7\n"
+        "Data: yfinance (futures, dygnet runt) \u00b7 session 06:00\u201322:00 m\u00e5n\u2013fre"
     )
     print(f"Startup-ping till Telegram: {'OK' if ok else 'MISSLYCKADES (kolla TOKEN/CHAT_ID)'}")
     from zoneinfo import ZoneInfo
@@ -435,16 +422,18 @@ def run_loop():
 
 def start_in_background():
     """
-    Startar roboten i en daemon-tråd. Anropas från en värd-app (t.ex. grabit).
-    Kraschar tråden påverkas inte värd-appen. Startar inte utan Alpaca-keys.
+    Startar roboten i en daemon-tråd. Datakälla är yfinance — inga API-nycklar
+    krävs. Kraschar tråden påverkas inte värd-appen.
     """
     import threading
-    if not (Config.ALPACA_KEY and Config.ALPACA_SECRET):
-        print("Robber: hoppar över start — ALPACA_KEY/SECRET saknas.")
+    try:
+        import yfinance  # noqa: F401
+    except Exception as e:
+        print(f"Robber: yfinance saknas, startar inte: {e}")
         return None
     t = threading.Thread(target=run_loop, daemon=True, name="nasdaq-robber")
     t.start()
-    print("Robber: bakgrundstråd startad.")
+    print("Robber: bakgrundstråd startad (yfinance-data).")
     return t
 
 
