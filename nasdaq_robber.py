@@ -345,22 +345,34 @@ def seconds_to_next_bar():
 # ==================================================================
 # EN SKANNING
 # ==================================================================
+STATUS = {
+    "started": None, "last_scan": None, "last_feed": None,
+    "in_session": None, "fired_total": 0, "fired_last": 0, "tickers": {},
+}
+
+
 def scan_once():
+    from zoneinfo import ZoneInfo
     state = load_state()
     fired = 0
-    print(f"[scan] feed={current_feed()}")
+    feed = current_feed()
+    print(f"[scan] feed={feed}")
+    STATUS["last_feed"] = feed
+    results = {}
     for ticker in Config.TICKERS:
         try:
             htf = fetch_ohlcv(ticker, Config.HTF_TIMEFRAME, Config.HTF_LOOKBACK_DAYS)
             mtf = fetch_ohlcv(ticker, Config.MTF_TIMEFRAME, Config.MTF_LOOKBACK_DAYS)
             if len(htf) < 200 or len(mtf) < 50:
-                print(f"{ticker}: för lite data"); continue
+                results[ticker] = f"för lite data (htf={len(htf)}, mtf={len(mtf)})"
+                print(f"{ticker}: {results[ticker]}"); continue
 
             # färsk bar?
             last = mtf.index[-1]
             age = (pd.Timestamp.now(tz=last.tz) - last).total_seconds() / 60
             if age > Config.BAR_MINUTES * 3:
-                print(f"{ticker}: stale ({age:.0f} min) – stängt?"); continue
+                results[ticker] = f"stale ({age:.0f} min) – marknad stängd?"
+                print(f"{ticker}: {results[ticker]}"); continue
 
             mtf = add_indicators(mtf)
             bias = htf_bias(htf)
@@ -372,12 +384,19 @@ def scan_once():
                 send_telegram(msg)
                 state[f"{sig['ticker']}:{sig['side']}"] = sig["bar_time"]
                 fired += 1
+                results[ticker] = f"LARM {sig['side']} {sig['score']}/7"
             else:
                 why = "ingen setup" if not sig else "redan larmat denna bar"
-                print(f"{ticker}: {why} (bias {bias})")
+                results[ticker] = f"{why} (bias {bias})"
+                print(f"{ticker}: {results[ticker]}")
         except Exception as e:
+            results[ticker] = f"fel: {e}"
             print(f"{ticker} fel: {e}")
     save_state(state)
+    STATUS["last_scan"] = datetime.now(ZoneInfo(Config.LOCAL_TZ)).isoformat(timespec="seconds")
+    STATUS["fired_last"] = fired
+    STATUS["fired_total"] += fired
+    STATUS["tickers"] = results
     return fired
 
 
@@ -396,9 +415,13 @@ def run_loop():
         f"Feed: {current_feed()}"
     )
     print(f"Startup-ping till Telegram: {'OK' if ok else 'MISSLYCKADES (kolla TOKEN/CHAT_ID)'}")
+    from zoneinfo import ZoneInfo
+    STATUS["started"] = datetime.now(ZoneInfo(Config.LOCAL_TZ)).isoformat(timespec="seconds")
     while True:
         try:
-            if in_session():
+            sess = in_session()
+            STATUS["in_session"] = sess
+            if sess:
                 scan_once()
             else:
                 print("Utanför session — vilar.")

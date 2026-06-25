@@ -494,6 +494,31 @@ def robber_test():
         return {"sent": False, "error": str(e), "config": cfg}
 
 
+@app.get("/api/robber/status")
+def robber_status():
+    """Visar om skannings-traden lever och vad senaste skanningen gav.
+    thread_alive=false betyder att roboten ALDRIG startade (fel startkommando
+    eller saknade Alpaca-nycklar) — aven om /api/robber/test fungerar."""
+    import threading
+    alive = any(t.name == "nasdaq-robber" and t.is_alive() for t in threading.enumerate())
+    out = {"thread_alive": alive}
+    try:
+        import nasdaq_robber as R
+        out["status"] = R.STATUS
+        out["config"] = {
+            "telegram": bool(R.Config.TELEGRAM_TOKEN and R.Config.CHAT_ID),
+            "alpaca_keys": bool(R.Config.ALPACA_KEY and R.Config.ALPACA_SECRET),
+            "tickers": R.Config.TICKERS,
+            "min_score": R.Config.MIN_SCORE,
+        }
+        if not alive:
+            out["hint"] = ("Traden lever inte. Kontrollera att Render Start Command ar "
+                           "'uvicorn grabit_entry:app ...' OCH att APCA_API_KEY_ID/APCA_API_SECRET_KEY finns.")
+    except Exception as e:
+        out["error"] = str(e)
+    return out
+
+
 @app.get("/api/debug", include_in_schema=False)
 def debug():
     """Diagnos: visar exakt vad yfinance ger på Render (enskild + bulk + scan)."""
