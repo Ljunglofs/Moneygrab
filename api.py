@@ -460,6 +460,40 @@ def health():
     return {"status": "ok", "tickers": len(ALL_TICKERS), "yfinance": yf is not None}
 
 
+@app.get("/api/robber/test")
+def robber_test():
+    """Tvingar fram ett Telegram-testmeddelande. Oppna i webblasaren for att
+    verifiera hela kedjan (token + chat_id). Visar config-status i svaret."""
+    try:
+        from nasdaq_robber import send_telegram, format_alert, Config
+    except Exception as e:
+        return {"sent": False, "error": "kunde inte importera nasdaq_robber: " + str(e)}
+
+    cfg = {
+        "telegram_token": bool(Config.TELEGRAM_TOKEN),
+        "chat_id": bool(Config.CHAT_ID),
+        "alpaca_keys": bool(Config.ALPACA_KEY and Config.ALPACA_SECRET),
+        "tickers": Config.TICKERS,
+        "min_score": Config.MIN_SCORE,
+    }
+    if not cfg["telegram_token"] or not cfg["chat_id"]:
+        return {"sent": False, "reason": "TELEGRAM_TOKEN och/eller CHAT_ID saknas i Render-miljon", "config": cfg}
+
+    sample = {
+        "ticker": "QQQ", "side": "LONG", "score": 6, "max_score": 7,
+        "price": 512.34, "atr": 1.85, "stop": 509.10, "risk_per_share": 3.24,
+        "targets": [517.20, 520.44, 525.30], "shares": 30, "bias": "LONG",
+        "reasons": ["HTF-bias LONG", "Pris > EMA20 > EMA50", "RSI momentum (58)"],
+        "bar_time": "test",
+    }
+    try:
+        msg = "\U0001F9EA <b>TESTSIGNAL</b> (manuell) \u2014 ser du detta funkar hela Telegram-kedjan.\n\n" + format_alert(sample)
+        ok = send_telegram(msg)
+        return {"sent": bool(ok), "config": cfg}
+    except Exception as e:
+        return {"sent": False, "error": str(e), "config": cfg}
+
+
 @app.get("/api/debug", include_in_schema=False)
 def debug():
     """Diagnos: visar exakt vad yfinance ger på Render (enskild + bulk + scan)."""
@@ -1247,9 +1281,12 @@ def signals():
 #  Entry/SL/TP/RR/confidence härleds ur VWAP, RSI, ATR och EMA-trend.
 # =====================================================================
 _DT_WATCH = [
-    ("NQ=F",    "US100",  "Nasdaq 100 (futures)", True),
-    ("GC=F",    "XAUUSD", "Guld (futures)",       True),
-    ("BTC-USD", "BTCUSD", "Bitcoin",              True),
+    ("GC=F", "XAUUSD", "Guld (futures)",       True),
+    ("NQ=F", "US100",  "Nasdaq 100 (futures)", True),
+    ("ES=F", "US500",  "S&P 500 (futures)",    False),
+    ("AAPL", "AAPL",   "Apple Inc.",           False),
+    ("NVDA", "NVDA",   "NVIDIA Corp.",         False),
+    ("TSLA", "TSLA",   "Tesla Inc.",           False),
 ]
 _DT_INTERVAL = "15m"
 _DT_ATR_K = 0.6
@@ -1300,17 +1337,9 @@ def _dt_build(sym, ticker, name, pinned):
 
     up_trend = ema20 >= ema50 and price >= vwap
     dn_trend = ema20 < ema50 and price < vwap
-    # VWAP är primär intradag-referens; EMA/RSI/momentum bekräftar riktningen.
-    lean = 0
-    lean += 3 if price >= vwap else -3
-    lean += 1 if ema20 >= ema50 else -1
-    lean += 1 if price >= ema20 else -1
-    lean += 1 if rsi >= 50 else -1
-    if rsi >= 74: lean -= 2      # överköpt – dämpa long
-    if rsi <= 26: lean += 2      # översålt – dämpa short
-    if lean >= 1:
+    if up_trend and rsi < 68:
         bias = "long"
-    elif lean <= -1:
+    elif dn_trend and rsi > 32:
         bias = "short"
     else:
         bias = "wait"

@@ -24,7 +24,7 @@ from ta.volatility import AverageTrueRange
 # ==================================================================
 class Config:
     # --- Universe ---
-    TICKERS = ["QQQ"]              # lägg till fler: ["QQQ", "NVDA", "TSLA", ...]
+    TICKERS = ["QQQ", "GLD"]      # QQQ = Nasdaq 100, GLD = guld. (Bitcoin kräver Alpacas krypto-endpoint – separat.)
 
     # --- Timeframes (Alpaca-format) ---
     HTF_TIMEFRAME     = "1Hour"   # high-timeframe bias
@@ -42,7 +42,7 @@ class Config:
     OVERNIGHT_FEED  = "overnight"  # gratis Basic; "boats" om Algo Trader Plus
 
     # --- Confluence thresholds ---
-    MIN_SCORE      = 5            # av 7 möjliga poäng för en giltig setup
+    MIN_SCORE      = int(os.environ.get("ROBBER_MIN_SCORE", "5"))  # av 7; sänk t.ex. till 4 via env för fler larm
     RSI_LONG_LOW, RSI_LONG_HIGH   = 50, 70
     RSI_SHORT_LOW, RSI_SHORT_HIGH = 30, 50
     MIN_REL_VOLUME = 1.2          # volym mot 20-snitt
@@ -264,15 +264,24 @@ def build_signal(ticker, df, bias):
 # LARM / STATE
 # ==================================================================
 def send_telegram(text):
-    if not Config.TELEGRAM_TOKEN:
-        print("[ingen telegram-token]\n" + text); return
+    if not Config.TELEGRAM_TOKEN or not Config.CHAT_ID:
+        miss = []
+        if not Config.TELEGRAM_TOKEN: miss.append("TELEGRAM_TOKEN")
+        if not Config.CHAT_ID: miss.append("CHAT_ID")
+        print(f"[telegram ej konfigurerad – saknar {', '.join(miss)} i miljön]\n" + text)
+        return False
     import requests
     url = f"https://api.telegram.org/bot{Config.TELEGRAM_TOKEN}/sendMessage"
     try:
-        requests.post(url, json={"chat_id": Config.CHAT_ID, "text": text,
-                                 "parse_mode": "HTML"}, timeout=10)
+        r = requests.post(url, json={"chat_id": Config.CHAT_ID, "text": text,
+                                     "parse_mode": "HTML"}, timeout=10)
+        if r.status_code != 200:
+            print(f"Telegram-API {r.status_code}: {r.text[:200]}")
+            return False
+        return True
     except Exception as e:
         print("Telegram-fel:", e)
+        return False
 
 
 def format_alert(sig):
@@ -380,6 +389,13 @@ def run_loop():
     if not Config.ALPACA_KEY or not Config.ALPACA_SECRET:
         print("VARNING: ALPACA_KEY/ALPACA_SECRET saknas i miljön.")
     print(f"Tickers: {Config.TICKERS}  |  {Config.MTF_TIMEFRAME} setup / {Config.HTF_TIMEFRAME} bias  |  feed={current_feed()} (auto)")
+    ok = send_telegram(
+        "\u2705 <b>NASDAQ ROBBER startad</b>\n"
+        f"Bevakar: {', '.join(Config.TICKERS)} \u00b7 setup {Config.MTF_TIMEFRAME} / bias {Config.HTF_TIMEFRAME}\n"
+        f"Session 06:00\u201322:00 (m\u00e5n\u2013fre) \u00b7 larm vid \u2265{Config.MIN_SCORE}/7 confluence\n"
+        f"Feed: {current_feed()}"
+    )
+    print(f"Startup-ping till Telegram: {'OK' if ok else 'MISSLYCKADES (kolla TOKEN/CHAT_ID)'}")
     while True:
         try:
             if in_session():
@@ -411,7 +427,17 @@ def start_in_background():
 
 if __name__ == "__main__":
     import sys
-    if "--once" in sys.argv:
+    if "--test" in sys.argv:
+        sample = {
+            "ticker": "QQQ", "side": "LONG", "score": 6, "max_score": 7,
+            "price": 512.34, "atr": 1.85, "stop": 509.10, "risk_per_share": 3.24,
+            "targets": [517.20, 520.44, 525.30], "shares": 30, "bias": "LONG",
+            "reasons": ["HTF-bias LONG", "Pris > EMA20 > EMA50", "RSI momentum (58)"],
+            "bar_time": "test",
+        }
+        ok = send_telegram("\U0001F9EA <b>TESTSIGNAL</b> (manuell)\n\n" + format_alert(sample))
+        print("Testsignal skickad:", ok)
+    elif "--once" in sys.argv:
         scan_once()
     else:
         run_loop()
