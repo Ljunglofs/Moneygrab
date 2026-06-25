@@ -24,3 +24,48 @@ try:
 except Exception as e:
     # Roboten får ALDRIG hindra grabit från att starta.
     print(f"Robber kunde inte starta (grabit kör vidare): {e}")
+
+# 3) TESTENDPOINT — avfyra ett skarpt formaterat (men fejkat) Telegram-larm
+#    på begäran. Ligger på tvåsegments-väg så api.py:s catch-all /{fname}
+#    inte slukar den. Öppna i mobilen:
+#        https://grabit-api-80dh.onrender.com/robber/testsignal
+@app.get("/robber/testsignal")
+def _robber_testsignal():
+    from datetime import datetime, timezone
+    import math
+    try:
+        from nasdaq_robber import send_telegram, format_alert, Config
+    except Exception as e:
+        return {"ok": False, "error": f"kan inte importera roboten: {e}"}
+
+    price, atr, risk = 581.20, 1.85, 2.40
+    stop    = round(price - risk, 2)
+    targets = [round(price + risk * r, 2) for r in Config.TARGETS_R]
+    shares  = math.floor((Config.ACCOUNT_SIZE * Config.RISK_PCT) / risk)
+
+    sig = {
+        "side": "LONG", "ticker": "QQQ",
+        "score": 6, "max_score": 7,
+        "price": price, "atr": atr, "stop": stop,
+        "risk_per_share": round(risk, 2),
+        "targets": targets, "shares": shares,
+        "bias": "BULL · 1H EMA50 > EMA200",
+        "reasons": [
+            "15m stänger över EMA50",
+            "MACD vänder upp ur svalka",
+            "RSI > 50 och stigande",
+            "Pris reagerar på bull Order Block",
+            "Bryter senaste 15m-swinghög",
+            "HTF-bias bekräftar long",
+        ],
+        "bar_time": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    }
+
+    msg = ("🧪 <b>TESTSIGNAL</b> — ej skarp, bara ett rörtest.\n"
+           "Så här ser ett riktigt larm ut:\n\n" + format_alert(sig))
+    try:
+        send_telegram(msg)
+    except Exception as e:
+        return {"ok": False, "error": f"telegram-fel: {e}"}
+    return {"ok": True, "sent": True,
+            "note": "Kolla Telegram — testlarmet ska ha kommit."}
