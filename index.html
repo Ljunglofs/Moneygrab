@@ -1470,7 +1470,7 @@ function go(s){
   window.scrollTo({top:0,behavior:"instant"});}
 I.grabit='<img class="gimg" src="'+IMGS.grabit+'" alt="">';
 document.querySelector(".nav").innerHTML=document.querySelector(".nav").innerHTML.replace(/\$\{I\.(\w+)\}/g,(m,k)=>I[k]||"");
-document.getElementById("fab").innerHTML=document.getElementById("fab").innerHTML.replace(/\$\{I\.(\w+)\}/g,(m,k)=>I[k]||"");
+var _fb=document.getElementById("fab");if(_fb)_fb.innerHTML=_fb.innerHTML.replace(/\$\{I\.(\w+)\}/g,(m,k)=>I[k]||"");
 (function(){var a=document.getElementById("aiask");if(a)a.innerHTML=a.innerHTML.replace(/\$\{I\.(\w+)\}/g,(m,k)=>I[k]||"");})();
 document.querySelector(".ai-hd .ai-title").innerHTML=document.querySelector(".ai-hd .ai-title").innerHTML.replace(/\$\{I\.(\w+)\}/g,(m,k)=>I[k]||"");
 document.querySelector(".ai-in .send").innerHTML=I.send;
@@ -1524,7 +1524,7 @@ function openMonthly(){const m=_MCASE; if(!m)return;
 function closeMonthly(){document.getElementById("mcdetail").classList.remove("on");}
 
 // ---- Daytrade ----
-let _dtLoaded=false;
+var _dtLoaded=false;
 async function loadDaytrade(force){
   if(_dtLoaded&&!force)return; _dtLoaded=true;
   const wrap=document.getElementById("dtlist"); const head=document.getElementById("dt-head");
