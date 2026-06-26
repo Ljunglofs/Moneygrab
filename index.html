@@ -716,6 +716,10 @@ body{background:
     <div id="search-res"></div>
     <div id="discover">
       <div id="scanner"></div>
+      <div class="sect"><h2>Polymarket</h2><a onclick="loadPoly(true)">Uppdatera</a></div>
+      <div id="poly-markets" class="poly-wrap"></div>
+      <div class="sect"><h2>Stora trades · smart money</h2><a onclick="loadPolyInsiders(true)">Uppdatera</a></div>
+      <div id="poly-insiders" class="poly-wrap"></div>
       <div class="sect"><h2>Kategorier</h2></div>
       <div class="catgrid" id="catgrid"></div>
       <div class="sect" id="cat-list-sect" style="display:none"><h2 id="cat-list-title">Tema</h2><a onclick="clearCat()">Rensa</a></div>
@@ -1466,6 +1470,7 @@ function go(s){
   document.querySelectorAll(".screen").forEach(x=>x.classList.remove("on"));
   document.getElementById("s-"+s)?.classList.add("on");
   if(s==="watch")renderWatch();
+  if(s==="marknad"){loadPoly();loadPolyInsiders();}
   document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("on",b.dataset.s===s));
   window.scrollTo({top:0,behavior:"instant"});}
 I.grabit='<img class="gimg" src="'+IMGS.grabit+'" alt="">';
@@ -1682,6 +1687,46 @@ function renderWatch(){var box=document.getElementById("watchlist");if(!box)retu
   if(!a.length){box.innerHTML='<div class="scl-empty">Inga bevakade bolag än. Öppna en aktie och tryck på stjärnan \u2606 för att lägga till.</div>';return;}
   box.innerHTML='<div class="card feed" style="margin-top:8px">'+a.map(function(t){var nm=(typeof NAMES!=="undefined"&&NAMES[t])||t;
     return '<div class="sig sigf wlrow" style="border-color:#F5C54255" onclick="openStock(\''+t+'\')"><div class="sig-c"><div class="sig-time">Bevakad</div><div class="sig-h" style="color:#F5C542">'+t+'</div><div class="sig-sub">'+nm+'</div></div><button class="wl-x" onclick="event.stopPropagation();watchToggle(\''+t+'\')">&#10005;</button></div>';}).join("")+'</div>';}
+function polyEsc(x){return String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+function polyUsd(n){n=+n||0;if(n>=1e6)return "$"+(n/1e6).toFixed(1)+"M";if(n>=1e3)return "$"+(n/1e3).toFixed(0)+"k";return "$"+Math.round(n);}
+async function loadPoly(force){
+  var box=document.getElementById("poly-markets");if(!box)return;
+  if(!CONFIG.API_BASE){box.innerHTML='<div class="scl-empty">Koppla API:t för Polymarket-data.</div>';return;}
+  if(!force&&box.getAttribute("data-loaded"))return;
+  box.setAttribute("data-loaded","1");
+  if(!box.innerHTML)box.innerHTML='<div class="scl-empty">Laddar marknader…</div>';
+  try{
+    var r=await fetch(CONFIG.API_BASE+"/api/polymarket?limit=16",{cache:"no-store"});
+    var d=await r.json();var ms=(d&&d.markets)||[];
+    if(!ms.length){box.innerHTML='<div class="scl-empty">Inga marknader just nu.</div>';return;}
+    box.innerHTML=ms.map(function(m){
+      var yes=(m.yesPct!=null)?m.yesPct:null;
+      var bar=(yes!=null)?'<div class="poly-bar"><span style="width:'+yes+'%"></span></div>':'';
+      var odds=(yes!=null)?'<span class="poly-yes">'+yes+'% JA</span>':'';
+      var slug=polyEsc(m.slug||m.eventSlug||"");
+      return '<div class="poly-card" onclick="window.open(\'https://polymarket.com/event/'+slug+'\',\'_blank\')"><div class="poly-q">'+polyEsc(m.question)+'</div>'+bar+'<div class="poly-meta">'+odds+'<span>'+polyUsd(m.volume24h||m.volume)+' vol</span></div></div>';
+    }).join("");
+  }catch(e){box.innerHTML='<div class="scl-empty">Kunde inte ladda Polymarket.</div>';}
+}
+async function loadPolyInsiders(force){
+  var box=document.getElementById("poly-insiders");if(!box)return;
+  if(!CONFIG.API_BASE){box.innerHTML='<div class="scl-empty">Koppla API:t.</div>';return;}
+  if(!force&&box.getAttribute("data-loaded"))return;
+  box.setAttribute("data-loaded","1");
+  if(!box.innerHTML)box.innerHTML='<div class="scl-empty">Laddar trades…</div>';
+  try{
+    var r=await fetch(CONFIG.API_BASE+"/api/polymarket/insiders?min_usd=5000&limit=25",{cache:"no-store"});
+    var d=await r.json();var ts=(d&&d.trades)||[];
+    if(!ts.length){box.innerHTML='<div class="scl-empty">Inga stora trades just nu.</div>';return;}
+    box.innerHTML=ts.map(function(t){
+      var buy=String(t.side||"").toUpperCase()!=="SELL";
+      var col=buy?"#22c55e":"#FF3B30";
+      var who=t.trader||(t.wallet?(t.wallet.slice(0,6)+"…"+t.wallet.slice(-4)):"okänd");
+      var sideTxt=(t.side||(buy?"BUY":"SELL"))+(t.outcome?(" "+t.outcome):"");
+      return '<div class="poly-trade" style="border-left-color:'+col+'"><div class="poly-trade-top"><b style="color:'+col+'">'+polyUsd(t.usd)+'</b><span class="poly-side">'+polyEsc(sideTxt)+'</span></div><div class="poly-q">'+polyEsc(t.question)+'</div><div class="poly-meta"><span>'+polyEsc(who)+'</span></div></div>';
+    }).join("");
+  }catch(e){box.innerHTML='<div class="scl-empty">Kunde inte ladda trades.</div>';}
+}
 </script>
 <style>
 /* === Signaler-filter + Fear&Greed (append, vinner via källordning) === */
@@ -1749,6 +1794,21 @@ main,.screen{padding-bottom:170px!important}
 .wl-x{flex:none;width:34px;height:34px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:var(--mut,#8b97a3);font-size:13px;align-self:center;margin-left:8px}
 .wlrow{display:flex;align-items:center;justify-content:space-between}
 .st-hd #st-star{color:#F5C542}
+</style>
+<style>
+/* === Polymarket (append) === */
+.poly-wrap{display:flex;flex-direction:column;gap:9px;margin:2px 0 6px}
+.poly-card{background:#0E141A!important;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:13px 14px;cursor:pointer}
+.poly-card .poly-q,.poly-trade .poly-q{font-weight:700;font-size:13.5px;color:#dfe7ee;line-height:1.35;margin-bottom:8px}
+.poly-bar{height:7px;border-radius:5px;background:rgba(255,59,48,.28);overflow:hidden;margin:6px 0 8px}
+.poly-bar span{display:block;height:100%;background:#22c55e;border-radius:5px}
+.poly-meta{display:flex;align-items:center;justify-content:space-between;font-size:11.5px;font-weight:800;letter-spacing:.03em;color:var(--mut,#8b97a3)}
+.poly-yes{color:#22c55e!important}
+.poly-trade{background:#0E141A!important;border:1px solid rgba(255,255,255,.08);border-left:3px solid #22c55e;border-radius:12px;padding:11px 13px}
+.poly-trade-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:5px}
+.poly-trade-top b{font-size:18px;font-weight:900;letter-spacing:-.02em;font-feature-settings:"tnum"}
+.poly-side{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--mut,#8b97a3)}
+.poly-trade .poly-q{margin-bottom:4px;font-size:13px}
 </style>
 </body>
 </html>

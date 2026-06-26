@@ -389,6 +389,63 @@ def scan_once():
 # ==================================================================
 # LOOP — exakt på bar-stängning
 # ==================================================================
+POLY_MIN_USD = float(os.environ.get("POLY_MIN_USD", "20000"))
+_POLY_SEEN = set()
+_POLY_PRIMED = False
+
+
+def poly_scan():
+    """Pollar Polymarkets Data API efter stora taker-trades och larmar pa nya.
+    Forsta korningen 'primar' bara (seedar seen-set) sa du inte far 30 larm direkt."""
+    global _POLY_PRIMED
+    import requests
+    try:
+        r = requests.get(
+            "https://data-api.polymarket.com/trades",
+            params={"takerOnly": "true", "filterType": "CASH",
+                    "filterAmount": POLY_MIN_USD, "limit": 30},
+            headers={"User-Agent": "grabit/1.0"}, timeout=12,
+        )
+        r.raise_for_status()
+        rows = r.json() or []
+    except Exception as e:
+        print("poly_scan fel:", e)
+        return 0
+
+    fired = 0
+    for t in rows:
+        tx = t.get("transactionHash") or (str(t.get("proxyWallet")) + str(t.get("timestamp")))
+        if tx in _POLY_SEEN:
+            continue
+        _POLY_SEEN.add(tx)
+        if not _POLY_PRIMED:
+            continue  # seeda bara forsta varvet, larma inte
+        try:
+            size = float(t.get("size") or 0)
+            price = float(t.get("price") or 0)
+            usd = size * price
+        except Exception:
+            continue
+        if usd < POLY_MIN_USD:
+            continue
+        side = t.get("side") or "BUY"
+        who = t.get("name") or t.get("pseudonym") or (str(t.get("proxyWallet") or "")[:8])
+        msg = ("\U0001F40B <b>Polymarket \u2013 stor trade</b>\n"
+               f"{side} {t.get('outcome','')} \u00b7 ${usd:,.0f}\n"
+               f"{t.get('title','')}\n"
+               f"Trader: {who}")
+        if send_telegram(msg):
+            fired += 1
+
+    _POLY_PRIMED = True
+    if len(_POLY_SEEN) > 4000:
+        _POLY_SEEN.clear()
+        _POLY_PRIMED = False  # re-seeda utan att spamma
+    STATUS["poly_fired_total"] = STATUS.get("poly_fired_total", 0) + fired
+    STATUS["poly_last"] = len(rows)
+    return fired
+
+
 def run_loop():
     print("=== NASDAQ ROBBER startad ===")
     if not Config.ALPACA_KEY or not Config.ALPACA_SECRET:
@@ -399,7 +456,8 @@ def run_loop():
         "\u2705 <b>NASDAQ ROBBER startad</b>\n"
         f"Bevakar: {names}\n"
         f"Setup {Config.MTF_TIMEFRAME} / bias {Config.HTF_TIMEFRAME} \u00b7 larm vid \u2265{Config.MIN_SCORE}/7\n"
-        "Data: yfinance (futures, dygnet runt) \u00b7 session 06:00\u201322:00 m\u00e5n\u2013fre"
+        "Data: yfinance (futures, dygnet runt) \u00b7 session 06:00\u201322:00 m\u00e5n\u2013fre\n"
+        f"+ Polymarket-monitor: larm vid trades \u2265 ${int(POLY_MIN_USD):,}"
     )
     print(f"Startup-ping till Telegram: {'OK' if ok else 'MISSLYCKADES (kolla TOKEN/CHAT_ID)'}")
     from zoneinfo import ZoneInfo
@@ -412,6 +470,7 @@ def run_loop():
                 scan_once()
             else:
                 print("Utanför session — vilar.")
+            poly_scan()  # Polymarket 24/7, oberoende av aktie-session
         except Exception as e:
             # En miss i en cykel får ALDRIG döda tråden / värd-appen.
             print(f"Robber loop-fel (hoppar över cykel): {e}")
