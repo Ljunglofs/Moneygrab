@@ -366,6 +366,9 @@ def scan_once():
 
             if sig and is_fresh(sig, state):
                 msg = format_alert(sig)
+                ctx = poly_context(sig["ticker"])
+                if ctx:
+                    msg = msg + "\n\n" + ctx
                 print(msg, "\n")
                 send_telegram(msg)
                 state[f"{sig['ticker']}:{sig['side']}"] = sig["bar_time"]
@@ -462,6 +465,87 @@ def poly_scan():
     STATUS["poly_fired_total"] = STATUS.get("poly_fired_total", 0) + fired
     STATUS["poly_last"] = len(rows)
     return fired
+
+
+_POLY_INSTR = {
+    "NQ=F": ["nasdaq", "s&p", "sp 500", "stock market", "dow", "equit"],
+    "GC=F": ["gold", "xau"],
+    "BTC-USD": ["bitcoin", "btc", "microstrategy"],
+}
+_GAMMA_CACHE = {"t": 0.0, "rows": []}
+
+
+def _gamma_markets():
+    """Cachead lista over aktiva Polymarket-marknader (5 min)."""
+    import time, requests
+    now = time.time()
+    if _GAMMA_CACHE["rows"] and now - _GAMMA_CACHE["t"] < 300:
+        return _GAMMA_CACHE["rows"]
+    try:
+        r = requests.get(
+            "https://gamma-api.polymarket.com/markets",
+            params={"closed": "false", "active": "true",
+                    "order": "volume24hr", "ascending": "false", "limit": 120},
+            headers={"User-Agent": "grabit/1.0"}, timeout=10,
+        )
+        r.raise_for_status()
+        rows = r.json() or []
+    except Exception as e:
+        print("gamma fel:", e)
+        return _GAMMA_CACHE["rows"]
+    _GAMMA_CACHE["t"] = now
+    _GAMMA_CACHE["rows"] = rows
+    return rows
+
+
+def poly_context(ticker):
+    """Polymarkets crowd-odds for instrumentets tema -> confluence i signalen.
+    Returnerar en kort textblock med de mest relevanta marknaderna + 24h-riktning."""
+    import json as _json
+    kws = _POLY_INSTR.get(ticker)
+    if not kws:
+        return ""
+    hits = []
+    for m in _gamma_markets():
+        q = m.get("question") or ""
+        ql = q.lower()
+        if not any(k in ql for k in kws):
+            continue
+        prices = m.get("outcomePrices")
+        if isinstance(prices, str):
+            try:
+                prices = _json.loads(prices or "[]")
+            except Exception:
+                prices = []
+        if not prices:
+            continue
+        try:
+            yes = float(prices[0])
+        except Exception:
+            continue
+        chg = m.get("oneDayPriceChange")
+        try:
+            chg = float(chg) if chg is not None else None
+        except Exception:
+            chg = None
+        hits.append((q, yes, chg))
+        if len(hits) >= 3:
+            break
+    if not hits:
+        return ""
+    lines = ["\U0001F4CA <b>Polymarket-l\u00e4ge</b>"]
+    for q, yes, chg in hits:
+        if chg is None:
+            arrow = ""
+        elif chg > 0.005:
+            arrow = " \u2191"
+        elif chg < -0.005:
+            arrow = " \u2193"
+        else:
+            arrow = " \u2192"
+        short = q if len(q) <= 58 else q[:57] + "\u2026"
+        lines.append(f"\u2022 {short}: {round(yes * 100)}%{arrow}")
+    return "\n".join(lines)
 
 
 def run_loop():
