@@ -522,19 +522,23 @@ def robber_status():
 _PM_CACHE = {"t": 0.0, "data": None}
 
 @app.get("/api/polymarket")
-def polymarket(limit: int = 24):
+def polymarket(limit: int = 24, show_all: bool = False):
     """Trendande Polymarket-marknader via publika Gamma API (ingen auth).
-    Returnerar fraga, ja/nej-odds (= sannolikhet), volym och likviditet."""
+    Filtrerar till aktier/index/ravaror/crypto (sport & politik bort) om inte show_all=true."""
     import time, json as _json, requests
+    try:
+        from nasdaq_robber import poly_relevant as _rel
+    except Exception:
+        _rel = lambda x: True
     now = time.time()
-    if _PM_CACHE["data"] is not None and now - _PM_CACHE["t"] < 60:
+    if (not show_all) and _PM_CACHE["data"] is not None and now - _PM_CACHE["t"] < 60:
         return {"markets": _PM_CACHE["data"], "cached": True}
     lim = max(1, min(int(limit), 50))
     try:
         r = requests.get(
             "https://gamma-api.polymarket.com/markets",
             params={"closed": "false", "active": "true",
-                    "order": "volume24hr", "ascending": "false", "limit": lim},
+                    "order": "volume24hr", "ascending": "false", "limit": 200},
             headers={"User-Agent": "grabit/1.0"},
             timeout=12,
         )
@@ -546,6 +550,9 @@ def polymarket(limit: int = 24):
     out = []
     for m in (raw or []):
         try:
+            q = m.get("question") or m.get("title") or ""
+            if (not show_all) and not _rel(q):
+                continue
             prices = m.get("outcomePrices")
             if isinstance(prices, str):
                 prices = _json.loads(prices or "[]")
@@ -558,7 +565,7 @@ def polymarket(limit: int = 24):
             else:
                 no = None
             out.append({
-                "question": m.get("question") or m.get("title") or "",
+                "question": q,
                 "slug": m.get("slug"),
                 "outcomes": outcomes,
                 "yes": yes,
@@ -571,11 +578,18 @@ def polymarket(limit: int = 24):
                 "category": m.get("category"),
                 "icon": m.get("icon") or m.get("image"),
             })
+            if len(out) >= lim:
+                break
         except Exception:
             continue
-    _PM_CACHE["t"] = now
-    _PM_CACHE["data"] = out
+    if not show_all:
+        _PM_CACHE["t"] = now
+        _PM_CACHE["data"] = out
     return {"markets": out, "cached": False}
+
+
+
+
 
 
 @app.get("/api/polymarket/insiders")
@@ -1459,12 +1473,8 @@ def signals():
 #  Entry/SL/TP/RR/confidence härleds ur VWAP, RSI, ATR och EMA-trend.
 # =====================================================================
 _DT_WATCH = [
-    ("GC=F", "XAUUSD", "Guld (futures)",       True),
-    ("NQ=F", "US100",  "Nasdaq 100 (futures)", True),
-    ("ES=F", "US500",  "S&P 500 (futures)",    False),
-    ("AAPL", "AAPL",   "Apple Inc.",           False),
-    ("NVDA", "NVDA",   "NVIDIA Corp.",         False),
-    ("TSLA", "TSLA",   "Tesla Inc.",           False),
+    ("^NDX", "US100", "Nasdaq 100 (cash)", True),
+    ("GC=F", "XAU",   "Guld",              True),
 ]
 _DT_INTERVAL = "15m"
 _DT_ATR_K = 0.6

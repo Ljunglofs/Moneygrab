@@ -395,21 +395,48 @@ def scan_once():
 POLY_MIN_USD = float(os.environ.get("POLY_MIN_USD", "20000"))
 # Ämnesfilter: bara marknader vars fraga matchar dina teman larmar (sport/politik filtreras bort).
 # Justerbart via env POLY_KEYWORDS (kommaseparerat).
+import re as _re
+
 POLY_KEYWORDS = [k.strip().lower() for k in os.environ.get(
     "POLY_KEYWORDS",
-    "nasdaq,s&p,sp 500,s&p500,dow,russell,stock,stocks,equit,nvidia,tesla,apple,microsoft,"
-    "fed,fomc,powell,interest rate,rate cut,rate hike,cpi,inflation,recession,gdp,unemployment,jobs report,"
-    "bitcoin,btc,ethereum,crypto,solana,coinbase,microstrategy,"
+    "nasdaq,ndx,s&p,s&p 500,sp 500,dow jones,russell,stock,stocks,equity,equities,"
+    "nvidia,tesla,apple,microsoft,"
+    "fed,federal reserve,fomc,powell,interest rate,rate cut,rate hike,cpi,inflation,recession,gdp,unemployment,jobs report,"
+    "bitcoin,btc,ethereum,ether,crypto,solana,coinbase,microstrategy,"
     "gold,xau,silver,oil,crude,wti,brent"
 ).split(",") if k.strip()]
 _POLY_SEEN = set()
 _POLY_PRIMED = False
 
 
+def _kw_match(text, kws):
+    """Ordgräns-matchning sa korta ord (dow, btc, oil) inte trillar in i
+    andra ord (down, btca, spoil)."""
+    t = (text or "").lower()
+    for k in kws:
+        if _re.search(r"\b" + _re.escape(k) + r"\b", t):
+            return True
+    return False
+
+
+# Blocklista: sport/politik/nojen filtreras bort aven om ett nyckelord rakar matcha
+# (t.ex. "gold medal", "Senegal vs Iraq", "Will France win on ...").
+POLY_BLOCK = [
+    " vs.", " vs ", " v ", "medal", "olympic", "world cup", "champions league",
+    "premier league", "la liga", "serie a", "bundesliga", "super bowl", "playoff",
+    "grand prix", "formula 1", " nba ", " nfl ", " ufc ", "boxing", "cricket",
+    "election", "president", "senate", "governor", "prime minister", "parliament",
+    "referendum", "mayor", "win on ", "to win the", "tournament", "championship",
+    "grammy", "oscar", "box office", "rotten tomatoes", "time person",
+]
+
+
 def poly_relevant(title):
-    """True om marknadsfragan ror dina teman (aktier/index/makro/krypto/ravaror)."""
+    """True bara for aktier/index/ravaror/crypto. Sport & politik blockas forst."""
     t = (title or "").lower()
-    return any(k in t for k in POLY_KEYWORDS)
+    if any(b in t for b in POLY_BLOCK):
+        return False
+    return _kw_match(title, POLY_KEYWORDS)
 
 
 def poly_scan():
@@ -468,7 +495,7 @@ def poly_scan():
 
 
 _POLY_INSTR = {
-    "NQ=F": ["nasdaq", "s&p", "sp 500", "stock market", "dow", "equit"],
+    "NQ=F": ["nasdaq", "ndx", "s&p", "s&p 500", "stock market", "dow jones"],
     "GC=F": ["gold", "xau"],
     "BTC-USD": ["bitcoin", "btc", "microstrategy"],
 }
@@ -509,7 +536,9 @@ def poly_context(ticker):
     for m in _gamma_markets():
         q = m.get("question") or ""
         ql = q.lower()
-        if not any(k in ql for k in kws):
+        if any(b in ql for b in POLY_BLOCK):
+            continue
+        if not _kw_match(q, kws):
             continue
         prices = m.get("outcomePrices")
         if isinstance(prices, str):
