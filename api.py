@@ -519,6 +519,112 @@ def robber_status():
     return out
 
 
+_PM_CACHE = {"t": 0.0, "data": None}
+
+@app.get("/api/polymarket")
+def polymarket(limit: int = 24):
+    """Trendande Polymarket-marknader via publika Gamma API (ingen auth).
+    Returnerar fraga, ja/nej-odds (= sannolikhet), volym och likviditet."""
+    import time, json as _json, requests
+    now = time.time()
+    if _PM_CACHE["data"] is not None and now - _PM_CACHE["t"] < 60:
+        return {"markets": _PM_CACHE["data"], "cached": True}
+    lim = max(1, min(int(limit), 50))
+    try:
+        r = requests.get(
+            "https://gamma-api.polymarket.com/markets",
+            params={"closed": "false", "active": "true",
+                    "order": "volume24hr", "ascending": "false", "limit": lim},
+            headers={"User-Agent": "grabit/1.0"},
+            timeout=12,
+        )
+        r.raise_for_status()
+        raw = r.json()
+    except Exception as e:
+        return {"markets": [], "error": str(e)}
+
+    out = []
+    for m in (raw or []):
+        try:
+            prices = m.get("outcomePrices")
+            if isinstance(prices, str):
+                prices = _json.loads(prices or "[]")
+            outcomes = m.get("outcomes")
+            if isinstance(outcomes, str):
+                outcomes = _json.loads(outcomes or "[]")
+            yes = float(prices[0]) if prices else None
+            if yes is not None:
+                no = float(prices[1]) if len(prices) > 1 else round(1.0 - yes, 4)
+            else:
+                no = None
+            out.append({
+                "question": m.get("question") or m.get("title") or "",
+                "slug": m.get("slug"),
+                "outcomes": outcomes,
+                "yes": yes,
+                "no": no,
+                "yesPct": round(yes * 100) if yes is not None else None,
+                "volume": float(m.get("volumeNum") or m.get("volume") or 0),
+                "volume24h": float(m.get("volume24hr") or m.get("volume24hrClob") or 0),
+                "liquidity": float(m.get("liquidityNum") or m.get("liquidity") or 0),
+                "endDate": m.get("endDate"),
+                "category": m.get("category"),
+                "icon": m.get("icon") or m.get("image"),
+            })
+        except Exception:
+            continue
+    _PM_CACHE["t"] = now
+    _PM_CACHE["data"] = out
+    return {"markets": out, "cached": False}
+
+
+@app.get("/api/polymarket/insiders")
+def polymarket_insiders(min_usd: float = 5000, limit: int = 40):
+    """Slimmad insider/smart-money-detektor: hamtar stora taker-trades fran
+    Polymarkets publika Data API och flaggar ovanligt stora positioner.
+    Detta ar 'unusual sizing'-lagret. Fresh-wallet/pre-resolution kan laggas till sen."""
+    import requests
+    lim = max(1, min(int(limit), 100))
+    try:
+        r = requests.get(
+            "https://data-api.polymarket.com/trades",
+            params={"takerOnly": "true", "filterType": "CASH",
+                    "filterAmount": float(min_usd), "limit": lim},
+            headers={"User-Agent": "grabit/1.0"},
+            timeout=12,
+        )
+        r.raise_for_status()
+        raw = r.json()
+    except Exception as e:
+        return {"trades": [], "error": str(e)}
+
+    out = []
+    for t in (raw or []):
+        try:
+            size = float(t.get("size") or 0)
+            price = float(t.get("price") or 0)
+            usd = size * price
+            out.append({
+                "wallet": t.get("proxyWallet"),
+                "trader": t.get("name") or t.get("pseudonym") or "",
+                "side": t.get("side") or "",
+                "outcome": t.get("outcome"),
+                "usd": round(usd),
+                "size": round(size),
+                "price": round(price, 4),
+                "question": t.get("title") or "",
+                "slug": t.get("slug"),
+                "eventSlug": t.get("eventSlug"),
+                "icon": t.get("icon"),
+                "ts": t.get("timestamp"),
+                "tx": t.get("transactionHash"),
+            })
+        except Exception:
+            continue
+    out.sort(key=lambda x: x["usd"], reverse=True)
+    return {"trades": out, "min_usd": min_usd, "count": len(out)}
+
+
 @app.get("/api/debug", include_in_schema=False)
 def debug():
     """Diagnos: visar exakt vad yfinance ger på Render (enskild + bulk + scan)."""
