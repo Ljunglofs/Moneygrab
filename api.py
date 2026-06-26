@@ -625,6 +625,47 @@ def polymarket_insiders(min_usd: float = 5000, limit: int = 40):
     return {"trades": out, "min_usd": min_usd, "count": len(out)}
 
 
+@app.get("/api/polymarket/test-alert")
+def polymarket_test_alert(min_usd: float = 1000):
+    """Tvingar fram ett Polymarket-Telegram-larm pa den storsta aktuella traden.
+    Verifierar hela kedjan: Polymarket Data API -> format -> Telegram."""
+    import requests
+    try:
+        from nasdaq_robber import send_telegram, Config
+    except Exception as e:
+        return {"sent": False, "error": "import nasdaq_robber: " + str(e)}
+    if not (Config.TELEGRAM_TOKEN and Config.CHAT_ID):
+        return {"sent": False, "reason": "TELEGRAM_TOKEN/CHAT_ID saknas i miljon"}
+    try:
+        r = requests.get(
+            "https://data-api.polymarket.com/trades",
+            params={"takerOnly": "true", "filterType": "CASH",
+                    "filterAmount": float(min_usd), "limit": 20},
+            headers={"User-Agent": "grabit/1.0"}, timeout=12,
+        )
+        r.raise_for_status()
+        rows = r.json() or []
+    except Exception as e:
+        return {"sent": False, "error": str(e)}
+    if not rows:
+        return {"sent": False, "reason": f"inga trades over ${min_usd:.0f} just nu"}
+
+    def _usd(t):
+        try:
+            return float(t.get("size") or 0) * float(t.get("price") or 0)
+        except Exception:
+            return 0.0
+    t = max(rows, key=_usd)
+    usd = _usd(t)
+    who = t.get("name") or t.get("pseudonym") or (str(t.get("proxyWallet") or "")[:8])
+    msg = ("\U0001F9EA <b>TEST \u2013 Polymarket stor trade</b>\n"
+           f"{t.get('side','BUY')} {t.get('outcome','')} \u00b7 ${usd:,.0f}\n"
+           f"{t.get('title','')}\n"
+           f"Trader: {who}")
+    ok = send_telegram(msg)
+    return {"sent": bool(ok), "usd": round(usd), "question": t.get("title")}
+
+
 @app.get("/api/debug", include_in_schema=False)
 def debug():
     """Diagnos: visar exakt vad yfinance ger på Render (enskild + bulk + scan)."""
