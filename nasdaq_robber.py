@@ -390,20 +390,35 @@ def scan_once():
 # LOOP — exakt på bar-stängning
 # ==================================================================
 POLY_MIN_USD = float(os.environ.get("POLY_MIN_USD", "20000"))
+# Ämnesfilter: bara marknader vars fraga matchar dina teman larmar (sport/politik filtreras bort).
+# Justerbart via env POLY_KEYWORDS (kommaseparerat).
+POLY_KEYWORDS = [k.strip().lower() for k in os.environ.get(
+    "POLY_KEYWORDS",
+    "nasdaq,s&p,sp 500,s&p500,dow,russell,stock,stocks,equit,nvidia,tesla,apple,microsoft,"
+    "fed,fomc,powell,interest rate,rate cut,rate hike,cpi,inflation,recession,gdp,unemployment,jobs report,"
+    "bitcoin,btc,ethereum,crypto,solana,coinbase,microstrategy,"
+    "gold,xau,silver,oil,crude,wti,brent"
+).split(",") if k.strip()]
 _POLY_SEEN = set()
 _POLY_PRIMED = False
 
 
+def poly_relevant(title):
+    """True om marknadsfragan ror dina teman (aktier/index/makro/krypto/ravaror)."""
+    t = (title or "").lower()
+    return any(k in t for k in POLY_KEYWORDS)
+
+
 def poly_scan():
-    """Pollar Polymarkets Data API efter stora taker-trades och larmar pa nya.
-    Forsta korningen 'primar' bara (seedar seen-set) sa du inte far 30 larm direkt."""
+    """Pollar Polymarkets Data API efter stora taker-trades och larmar pa nya
+    SOM matchar dina teman (POLY_KEYWORDS). Forsta korningen primar bara seen-set."""
     global _POLY_PRIMED
     import requests
     try:
         r = requests.get(
             "https://data-api.polymarket.com/trades",
             params={"takerOnly": "true", "filterType": "CASH",
-                    "filterAmount": POLY_MIN_USD, "limit": 30},
+                    "filterAmount": POLY_MIN_USD, "limit": 40},
             headers={"User-Agent": "grabit/1.0"}, timeout=12,
         )
         r.raise_for_status()
@@ -420,6 +435,9 @@ def poly_scan():
         _POLY_SEEN.add(tx)
         if not _POLY_PRIMED:
             continue  # seeda bara forsta varvet, larma inte
+        title = t.get("title") or ""
+        if not poly_relevant(title):
+            continue  # fel amne (sport/politik osv) -> hoppa
         try:
             size = float(t.get("size") or 0)
             price = float(t.get("price") or 0)
@@ -432,7 +450,7 @@ def poly_scan():
         who = t.get("name") or t.get("pseudonym") or (str(t.get("proxyWallet") or "")[:8])
         msg = ("\U0001F40B <b>Polymarket \u2013 stor trade</b>\n"
                f"{side} {t.get('outcome','')} \u00b7 ${usd:,.0f}\n"
-               f"{t.get('title','')}\n"
+               f"{title}\n"
                f"Trader: {who}")
         if send_telegram(msg):
             fired += 1

@@ -579,11 +579,14 @@ def polymarket(limit: int = 24):
 
 
 @app.get("/api/polymarket/insiders")
-def polymarket_insiders(min_usd: float = 5000, limit: int = 40):
-    """Slimmad insider/smart-money-detektor: hamtar stora taker-trades fran
-    Polymarkets publika Data API och flaggar ovanligt stora positioner.
-    Detta ar 'unusual sizing'-lagret. Fresh-wallet/pre-resolution kan laggas till sen."""
+def polymarket_insiders(min_usd: float = 5000, limit: int = 40, show_all: bool = False):
+    """Slimmad insider/smart-money-detektor: stora taker-trades fran Polymarkets Data API.
+    Filtrerar till dina teman (aktier/index/makro/krypto/ravaror) om inte show_all=true."""
     import requests
+    try:
+        from nasdaq_robber import poly_relevant as _rel
+    except Exception:
+        _rel = lambda x: True
     lim = max(1, min(int(limit), 100))
     try:
         r = requests.get(
@@ -601,6 +604,9 @@ def polymarket_insiders(min_usd: float = 5000, limit: int = 40):
     out = []
     for t in (raw or []):
         try:
+            title = t.get("title") or ""
+            if not show_all and not _rel(title):
+                continue
             size = float(t.get("size") or 0)
             price = float(t.get("price") or 0)
             usd = size * price
@@ -612,7 +618,7 @@ def polymarket_insiders(min_usd: float = 5000, limit: int = 40):
                 "usd": round(usd),
                 "size": round(size),
                 "price": round(price, 4),
-                "question": t.get("title") or "",
+                "question": title,
                 "slug": t.get("slug"),
                 "eventSlug": t.get("eventSlug"),
                 "icon": t.get("icon"),
