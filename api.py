@@ -1157,13 +1157,31 @@ def ai(payload: AiPayload):
     if client is None:
         return {"answer": _ai_fallback(q, ctx), "demo": True}
 
+    import datetime as _dt
+    _today = _dt.date.today().isoformat()
+    sys_live = (SYSTEM_PROMPT +
+                f"\n\nDagens datum är {_today}. Du har tillgång till webbsökning. "
+                "Använd den för aktuella fakta (kurser, IPO:er, bolagsnyheter, vem som äger vad) "
+                "istället för att svara från minnet, eftersom din träningsdata kan vara inaktuell. "
+                "Svara alltid på svenska.")
+
     try:
-        resp = client.messages.create(
-            model=AI_MODEL,
-            max_tokens=1024,
-            system=SYSTEM_PROMPT,
-            messages=msgs,
-        )
+        try:
+            resp = client.messages.create(
+                model=AI_MODEL,
+                max_tokens=1500,
+                system=sys_live,
+                messages=msgs,
+                tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 4}],
+            )
+        except Exception:
+            # SDK/modell stödjer kanske inte web_search -> kör utan, så AI:n aldrig dör
+            resp = client.messages.create(
+                model=AI_MODEL,
+                max_tokens=1024,
+                system=sys_live,
+                messages=msgs,
+            )
         text = "".join(getattr(b, "text", "") for b in resp.content
                        if getattr(b, "type", "") == "text").strip()
         if not text:
