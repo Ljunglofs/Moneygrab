@@ -40,9 +40,10 @@ try:
 except Exception:
     engine_evaluate = None
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import HTMLResponse, FileResponse, Response
 
 # =====================================================================
 #  ENKEL TTL-CACHE  (ersätter st.cache_data på servern)
@@ -113,7 +114,7 @@ UNIVERSE = {
 }
 TICKER_THEME = {t: k for k, v in UNIVERSE.items() for t in v}
 ALL_TICKERS = sorted({t for v in UNIVERSE.values() for t in v})
-INDICES = [("S&P 500", "^GSPC"), ("Nasdaq", "^IXIC"), ("Stockholm", "^OMX")]
+INDICES = [("S&P 500", "^GSPC"), ("Nasdaq", "^NDX"), ("Bitcoin", "BTC-USD")]
 
 # =====================================================================
 #  HJÄLPARE  (samma logik som app.py, utan Streamlit)
@@ -282,18 +283,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Gzip-komprimering: kapar 1.24 MB index.html till ~250-600 KB och krymper all JSON.
+app.add_middleware(GZipMiddleware, minimum_size=600)
 
-# Tvinga webbläsaren att ALLTID hämta färsk index.html (aldrig cacha gammal version)
-_NOCACHE = {"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0", "Pragma": "no-cache", "Expires": "0"}
 
+# index.html: tillåt cache MEN revalidera varje gång (no-cache + ETag).
+# -> aterbesok = 304 (laddar direkt), efter deploy = ny ETag = farsk fil.
 @app.get("/", response_class=HTMLResponse)
-def index():
+def index(request: Request):
     import os
     p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "index.html")
-    if os.path.exists(p):
-        with open(p, encoding="utf-8") as fh:
-            return HTMLResponse(fh.read(), headers=_NOCACHE)
-    return HTMLResponse("<h1>GRABIT API</h1><p>index.html saknas i repot.</p>", headers=_NOCACHE)
+    if not os.path.exists(p):
+        return HTMLResponse("<h1>GRABIT API</h1><p>index.html saknas i repot.</p>",
+                            headers={"Cache-Control": "no-cache"})
+    st = os.stat(p)
+    etag = f'W/"{int(st.st_mtime)}-{st.st_size}"'
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers={"ETag": etag, "Cache-Control": "no-cache"})
+    with open(p, encoding="utf-8") as fh:
+        html = fh.read()
+    return HTMLResponse(html, headers={"ETag": etag, "Cache-Control": "no-cache"})
 
 
 # ---- Statiska assets (hero-video + poster) -------------------------
@@ -879,12 +888,40 @@ def ownership(ticker: str):
     return {"ticker": ticker.upper(), **_ownership(ticker.upper())}
 
 
+def _index_quote(ticker):
+    """(senaste pris, dagsforandring %) for ett index/krypto via dagliga barer."""
+    try:
+        df, _ = fetch(ticker)
+    except Exception:
+        return None, 0.0
+    if df is None or len(df) < 2:
+        return None, 0.0
+    c = df["Close"].dropna()
+    if len(c) < 2:
+        return None, 0.0
+    last = float(c.iloc[-1])
+    prev = float(c.iloc[-2])
+    pct = (last / prev - 1) * 100 if prev else 0.0
+    return last, round(pct, 2)
+
+
+def _fmt_idx_price(p):
+    if p is None:
+        return "—"
+    if p >= 10000:
+        return f"{p:,.0f}"
+    if p >= 1000:
+        return f"{p:,.1f}"
+    return f"{p:,.2f}"
+
+
 @app.get("/api/indices")
 def indices():
     out = []
     for name, tk in INDICES:
-        lbl, pct = regime_of(tk)
-        out.append({"name": name, "label": lbl, "pct": round(pct, 1)})
+        price, pct = _index_quote(tk)
+        out.append({"name": name, "tk": tk, "price": price,
+                    "priceStr": _fmt_idx_price(price), "pct": pct})
     return {"indices": out}
 
 

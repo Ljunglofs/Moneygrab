@@ -716,6 +716,7 @@ body{background:
   <section class="screen" id="s-marknad">
     <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" style="width:18px;height:18px;color:#8a93a3;flex:none"><circle cx="11" cy="11" r="7.5"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg><input id="q" placeholder="Sök ticker, bolag eller tema…" oninput="onSearch(this.value)"></div>
     <div id="search-res"></div>
+    <div class="sect" style="margin-top:6px"><h2>Grabit Screen</h2></div>
     <div class="rsheet rs-inline"><div class="rs-chips" id="rs-chips"></div><div class="rs-meta" id="rs-meta">Välj filter ovan</div><div id="rs-list"></div></div>
     <div id="discover">
       <div id="scanner"></div>
@@ -1460,11 +1461,15 @@ function mapEvents(arr){
 async function load(){
   if(!CONFIG.API_BASE){render(DEMO);return;}
   const B=CONFIG.API_BASE.replace(/\/$/,""); const d=JSON.parse(JSON.stringify(DEMO)); let live=false;
-  try{const r=await fetch(B+"/api/overview",{cache:"no-store"}); if(r.ok){mapOverview(await r.json(),d); live=true;}}catch(e){}
-  try{const r=await fetch(B+"/api/screen",{cache:"no-store"}); if(r.ok){const s=await r.json(); mapScreen(s.rows||[],d); live=true;}}catch(e){}
-  try{const r=await fetch(B+"/api/signals",{cache:"no-store"}); if(r.ok){const s=await r.json(); if(Array.isArray(s.feed)&&s.feed.length){d.feed=s.feed;live=true;}}}catch(e){}
-  try{const r=await fetch(B+"/api/news",{cache:"no-store"}); if(r.ok){const j=await r.json(); if(Array.isArray(j.news)&&j.news.length){d.news=j.news;live=true;}}}catch(e){}
-  try{const r=await fetch(B+"/api/events",{cache:"no-store"}); if(r.ok){const j=await r.json(); if(Array.isArray(j.events)&&j.events.length){d.events=mapEvents(j.events);live=true;}}}catch(e){}
+  const J=async(path)=>{try{const r=await fetch(B+path,{cache:"no-store"});if(r.ok)return await r.json();}catch(e){}return null;};
+  const [ov,sc,sg,nw,ev]=await Promise.all([
+    J("/api/overview"),J("/api/screen"),J("/api/signals"),J("/api/news"),J("/api/events")
+  ]);
+  if(ov){mapOverview(ov,d);live=true;}
+  if(sc){mapScreen(sc.rows||[],d);live=true;}
+  if(sg&&Array.isArray(sg.feed)&&sg.feed.length){d.feed=sg.feed;live=true;}
+  if(nw&&Array.isArray(nw.news)&&nw.news.length){d.news=nw.news;live=true;}
+  if(ev&&Array.isArray(ev.events)&&ev.events.length){d.events=mapEvents(ev.events);live=true;}
   $("#demo-flag").textContent = live ? ("Live · "+B.replace(/^https?:\/\//,"")) : "API svarar inte \u2014 visar demo-data";
   render(d);
 }
