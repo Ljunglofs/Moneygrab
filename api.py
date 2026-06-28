@@ -475,6 +475,20 @@ def _fh_market_cap(ticker):
     _FH_CACHE[k] = mc
     return mc
 
+def _fh_profile(ticker):
+    """Finnhub profile2 (gratis, exakt per ticker): namn, bransch, land. Auktoritativ identitet."""
+    k = ("prof", ticker)
+    if k in _FH_CACHE:
+        return _FH_CACHE[k]
+    j = _finnhub("/stock/profile2", {"symbol": ticker}) or {}
+    out = {"name": (j.get("name") or "").strip(),
+           "industry": (j.get("finnhubIndustry") or "").strip(),
+           "country": (j.get("country") or "").strip(),
+           "logo": j.get("logo") or "", "weburl": j.get("weburl") or ""}
+    _FH_CACHE[k] = out
+    return out
+
+
 def _fh_insider_buys(ticker):
     """Antal insider-KOP (transactionCode P, positiv forandring)."""
     k = ("ins", ticker)
@@ -1103,7 +1117,8 @@ def _company_news(ticker):
 def _analyst(ticker):
     """Analytiker: konsensus (gratis recommendation) + riktkurs (price-target, ofta premium)."""
     out = {"target": None, "high": None, "low": None,
-           "consensus": None, "rating": None, "n": None}
+           "consensus": None, "rating": None, "n": None,
+           "source": None, "asof": None, "currency": "USD"}
     rec = _finnhub("/stock/recommendation", {"symbol": ticker})
     if isinstance(rec, list) and rec:
         r = rec[0]
@@ -1122,13 +1137,49 @@ def _analyst(ticker):
         out["target"] = pt.get("targetMean")
         out["high"] = pt.get("targetHigh")
         out["low"] = pt.get("targetLow")
+        out["source"] = "finnhub"
+    # Grabit Riktkurs (AI) hämtas separat via /api/stock/{ticker}/target -> kortet laddar snabbt.
+    return out
+
+
+@cached(1800)
+def _company_insider(ticker):
+    """Senaste insider-transaktioner (Finnhub, gratis). P=köp, S=sälj."""
+    j = _finnhub("/stock/insider-transactions", {"symbol": ticker})
+    out = []
+    for t in (j or {}).get("data", []):
+        code = (t.get("transactionCode") or "").upper()
+        if code not in ("P", "S"):
+            continue
+        chg = t.get("change") or 0
+        out.append({
+            "name": (t.get("name") or "").strip(),
+            "buy": code == "P",
+            "shares": abs(int(chg)) if chg else 0,
+            "price": t.get("transactionPrice") or 0,
+            "date": (t.get("transactionDate") or "")[:10],
+        })
+        if len(out) >= 14:
+            break
     return out
 
 
 @app.get("/api/stock/{ticker}/extras")
 def stock_extras(ticker: str):
     ticker = ticker.upper()
-    return {"news": _company_news(ticker), "analyst": _analyst(ticker)}
+    return {"news": _company_news(ticker), "analyst": _analyst(ticker), "insider": _company_insider(ticker)}
+
+
+@app.get("/api/stock/{ticker}/target")
+def stock_target(ticker: str):
+    """Grabit Riktkurs (AI + webbsök) — separat endpoint så aktiekortet visar resten direkt."""
+    tk = ticker.upper()
+    ai = _ai_price_target(tk, _fh_profile(tk).get("name", ""))
+    if ai and ai.get("target"):
+        return {"target": ai["target"], "high": ai["high"], "low": ai["low"],
+                "asof": ai.get("asof") or None, "currency": ai.get("currency") or "USD",
+                "source": "grabit"}
+    return {"target": None, "source": None}
 
 
 @app.get("/api/overview")
@@ -1374,7 +1425,7 @@ def _ai_company(tk: str, name: str = "") -> dict:
             '"sector": "<sektor på ett ord, t.ex. Teknik, Energi, Finans, Konsument, '
             'Hälsa, Industri, Råvaror, Fastighet, Kommunikation>", '
             '"summary": "<2 korta meningar om vad bolaget gör och varför det är intressant, på svenska>"}\n'
-            "Känner du inte till tickern – sätt alla fält till tom sträng."
+            "Känner du inte till EXAKT vilket bolag tickern avser – sätt ALLA fält till tom sträng. Gissa aldrig ett annat bolag."
         )
         resp = client.messages.create(
             model=AI_MODEL, max_tokens=400,
@@ -1398,16 +1449,71 @@ def company_blurb(ticker: str):
     tk = ticker.upper().strip()
     if tk in _company_blurb_cache:
         return _company_blurb_cache[tk]
-    # AI direkt — Claude vet bolagen, funkar på Render, ger svenska.
-    # (Hoppar yfinance.info som HÄNGER på Render där Yahoo blockar.)
-    ai = _ai_company(tk)
-    name = ai.get("name") or tk
-    sector = ai.get("sector") or ""
+    # Identiteten förankras i Finnhub profile2 (exakt per ticker) -> AI gissar aldrig fel bolag.
+    prof = _fh_profile(tk)
+    ai = _ai_company(tk, prof.get("name", ""))
+    name = prof.get("name") or ai.get("name") or tk
+    sector = prof.get("industry") or ai.get("sector") or ""
     summary = ai.get("summary") or ""
-    out = {"ticker": tk, "name": name, "sector": sector, "summary": summary}
+    out = {"ticker": tk, "name": name, "sector": sector,
+           "summary": summary, "country": prof.get("country", "")}
     if sector or summary:
         _company_blurb_cache[tk] = out
     return out
+
+
+# ---------- GRABIT RIKTKURS: AI + webbsök hämtar analytiker-konsensus ----------
+_ai_pt_cache: dict = {}
+
+def _ai_price_target(ticker: str, name: str = ""):
+    """Grabit Riktkurs: konsensus-riktkurs via Claude + web_search. Ungefärlig, källmärkt."""
+    if ticker in _ai_pt_cache:
+        return _ai_pt_cache[ticker]
+    client = _anthropic_client()
+    if client is None:
+        return None
+    try:
+        import json as _j
+        import re as _re3
+        who = ticker + (f' ("{name}")' if name and name != ticker else "")
+        prompt = (
+            f"Sök upp den senaste Wall Street-analytikerkonsensusen (price target) för aktien {who}. "
+            "Gäller ENBART denna exakta ticker/bolag. Är du osäker på vilket bolag det är: sätt target till null. "
+            "Använd webbsök. Svara ENBART med giltig JSON, ingen text runt, inga kodblock:\n"
+            '{"target": <snitt-riktkurs som tal eller null>, "high": <högsta eller null>, '
+            '"low": <lägsta eller null>, "n": <antal analytiker eller null>, '
+            '"asof": "<t.ex. juni 2026 eller tom sträng>", "currency": "<t.ex. USD>"}\n'
+            "Använd ENDAST siffror du kan belägga från sökresultaten. "
+            "Hittar du ingen tillförlitlig riktkurs: sätt target, high, low och n till null."
+        )
+        resp = client.messages.create(
+            model=AI_MODEL, max_tokens=600,
+            messages=[{"role": "user", "content": prompt}],
+            tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 3}],
+        )
+        text = "".join(getattr(b, "text", "") for b in resp.content
+                       if getattr(b, "type", "") == "text").strip()
+        m = _re3.search(r"\{.*\}", text, _re3.S)
+        if not m:
+            return None
+        d = _j.loads(m.group(0))
+
+        def _num(x):
+            try:
+                return round(float(x), 2)
+            except Exception:
+                return None
+
+        out = {"target": _num(d.get("target")), "high": _num(d.get("high")),
+               "low": _num(d.get("low")), "n": d.get("n"),
+               "asof": str(d.get("asof", "") or "").strip(),
+               "currency": str(d.get("currency", "USD") or "USD").strip()}
+        if out["target"]:
+            _ai_pt_cache[ticker] = out
+            return out
+        return None
+    except Exception:
+        return None
 
 
 # =====================================================================

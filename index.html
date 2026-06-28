@@ -1016,18 +1016,34 @@ function demoAnswer(q){const s=q.toLowerCase();const hot=DEMO.hetaste;
   return `Bra fråga! I demo-läge kan jag inte göra live-analys ännu. Koppla API_BASE till din Render-backend så svarar Grabit AI på riktigt – med din scanner, setups, nivåer och nyhetsläge för "${q}".`;}
 
 let _curStock=null;const _liveStock={};
+function scoreGauge(score10){
+  var s=Math.max(0,Math.min(10,+score10||0));
+  var p=Math.round(s*10), col=scoreColor(s);
+  var R=46, C=2*Math.PI*R, off=C*(1-p/100);
+  var lbl=s>=7.5?'Very Bullish':s>=6?'Bullish':s>=4.5?'Neutral':s>0?'Bearish':'\u2014';
+  return '<div class="sh-left"><div class="k2">Smart Score</div>'
+    +'<div class="sh-num" style="color:'+col+'">'+p+'<span>/100</span></div>'
+    +'<div class="sh-lbl" style="color:'+col+'">'+lbl+'</div></div>'
+    +'<div class="sh-ring"><svg viewBox="0 0 120 120">'
+    +'<circle class="sg-track" cx="60" cy="60" r="'+R+'"></circle>'
+    +'<circle class="sg-arc" cx="60" cy="60" r="'+R+'" stroke="'+col+'" stroke-dasharray="'+C.toFixed(1)+'" stroke-dashoffset="'+off.toFixed(1)+'" transform="rotate(-90 60 60)"></circle>'
+    +'<g fill="none" stroke="'+col+'" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity=".95"><path d="M47 64 L60 51 L73 64"></path><path d="M47 73 L60 60 L73 73"></path></g>'
+    +'</svg></div>';
+}
 function openStock(tkr){_curStock=tkr;const d=stockData(tkr,_liveStock[tkr]);
   $("#st-tk").textContent=tkr;$("#st-star").textContent="\u2606";
   const dCol=d.day>=0?"var(--pos)":"var(--neg)",sCol=scoreColor(d.score);
   const tot=((d.mom+d.sent+d.tech)/3);
   $("#st-body").innerHTML=`
     <div class="st-hero sthero-fill"><div class="sthero-in">${lic(tkr,60,sCol)}<div class="sthero-tx"><div class="sthero-tk">${tkr} <span class="sthero-flag">${d.flag||""}</span></div><div class="sthero-nm">${d.name}</div><div class="sthero-sub">${d.bors||""}</div></div></div></div>
-    <div class="st-grid2">
-      <div class="st-box st-score2"><div class="k2">GRABIT Score</div><div class="sc num" style="color:${sCol}">${d.score.toFixed(1)}</div><div class="sctag" style="color:${sCol}">${d.tag.split(" ")[0].toUpperCase()}</div></div>
-      <div class="st-box st-price2"><div class="k2">Dagens kurs</div><div class="p2 num">${d.cur}${d.price.toLocaleString("sv-SE")}</div><div class="c2" style="color:${dCol}">${d.day>=0?"+":""}${d.day}% i dag</div></div>
-    </div>
+    <div class="st-box score-hero">${scoreGauge(d.score)}</div>
+    <div class="st-box st-price2 price-wide"><div class="k2">Dagens kurs</div><div class="p2 num">${d.cur}${d.price.toLocaleString("sv-SE")}</div><div class="c2" style="color:${dCol}">${d.day>=0?"+":""}${d.day}% i dag</div></div>
     <div class="st-sec">Analytiker</div>
     <div id="st-analyst" class="anl-card"><div class="anl-load">Laddar analytikerdata…</div></div>
+    <div class="st-sec">Smart Money</div>
+    <div id="st-smart" class="sm-card"><div class="anl-load">Laddar…</div></div>
+    <div class="st-sec">Insiderköp</div>
+    <div id="st-insider" class="ins-list"><div class="anl-load">Laddar insider…</div></div>
     <div class="st-sec">Om bolaget</div>
     <div class="st-box about secgfx-wrap"><div class="secgfx" style="background-image:url('${IMGS.goldwave}')"></div><div class="ab-facts"><div><span>Sektor</span><b>${d.sector}</b></div><div><span>Marknad</span><b>${d.bors}</b></div><div><span>Land</span><b>${d.land} ${d.flag}</b></div></div><p class="blurb">${d.desc}</p></div>
     <div class="verdict secgfx-wrap" style="border-color:${d.vcolor}66;background:linear-gradient(160deg,${d.vcolor}1f,#090A0B)"><div class="secgfx gverdict" style="background-image:url('${IMGS.verdict_chart}')"></div><div class="vd-top"><span class="vd-badge" style="background:${d.vcolor}">${d.verdict}</span><span class="vd-hit">Träffsäkerhet <b style="color:${d.vcolor}">${d.hitrate}%</b></span></div><div class="vd-line">${d.verdict==='UNDVIK'?'Avvakta – ingen entry rekommenderas just nu.':'Köp '+d.cur+d.entryLo+'–'+d.cur+d.entryHi+'  ·  Stop '+d.cur+d.stop+'  ·  Mål '+d.cur+d.t2}</div><div class="vd-sub">${d.score>=7.5?'AI-slutsats: stark setup med bekräftad trend och stigande relativ styrka. R/R 1:2.3.':d.score>=6?'AI-slutsats: blandad bild – vänta på bekräftelse (volym + utbrott) innan entry.':'AI-slutsats: svag setup – hög risk. Undvik tills trend och volym förbättras.'}</div></div>
@@ -1081,8 +1097,7 @@ function openStock(tkr){_curStock=tkr;const d=stockData(tkr,_liveStock[tkr]);
     <div class="why">${d.bull.map(x=>`<div class="row"><span class="pts pos">+${x[1]}</span><span>${x[0]}</span></div>`).join("")}</div>
     <div class="st-sec">Potentiella risker</div>
     <div class="why">${d.risks.map(x=>`<div class="row"><span class="pts neg">${x[1]}</span><span>${x[0]}</span></div>`).join("")}</div>
-    <div class="st-sec">Graf</div>
-    <div class="st-chart">${candleChart(tkr)}</div>
+
     <div class="st-sec">Fråga Grabit</div>
     <div class="ask secgfx-wrap"><div class="secgfx gglobe" style="background-image:url('${IMGS.globe}')"></div><div class="in"><input id="ask-q" placeholder="Fråga AI om ${tkr}…" onkeydown="if(event.key==='Enter')askGrabit('${tkr}',this.value)">
       <button onclick="askGrabit('${tkr}',document.getElementById('ask-q').value)">&#10148;</button></div>
@@ -1095,6 +1110,7 @@ function openStock(tkr){_curStock=tkr;const d=stockData(tkr,_liveStock[tkr]);
   if(CONFIG.API_BASE&&_liveCo[tkr]===undefined)fetchCompany(tkr);
 }
 var _stockExtras={};
+var _grabitTgt={};
 function _timeAgo(ts){if(!ts)return "";var s=Math.floor(Date.now()/1000-ts);if(s<3600)return Math.max(1,Math.floor(s/60))+" min sedan";if(s<86400)return Math.floor(s/3600)+" tim sedan";return Math.floor(s/86400)+" d sedan";}
 function analystHTML(an,price){
   if(!an)return '<div class="anl-empty">Ingen analytikerdata</div>';
@@ -1103,7 +1119,9 @@ function analystHTML(an,price){
     var up=(price&&an.target)?((an.target/price-1)*100):null;
     out+='<div class="anl-tgt"><div class="anl-big">$'+Number(an.target).toFixed(2)+'</div>';
     if(up!=null){var upc=up>=0?'var(--pos)':'var(--neg)';out+='<div class="anl-up" style="color:'+upc+'">'+(up>=0?'\u25B2 +':'\u25BC ')+up.toFixed(1)+'%</div>';}
-    out+='<div class="anl-k2">riktkurs (snitt)</div></div>';
+    var isAI=(an.source==='grabit');
+    out+='<div class="anl-k2">'+(isAI?'Grabit Riktkurs':'Riktkurs (snitt)')+(an.asof?(' \u00b7 '+an.asof):'')+'</div></div>';
+    if(isAI)out+='<div class="anl-cav">Ungef\u00e4rlig \u00b7 sammanst\u00e4lld av Grabit AI via webbs\u00f6k</div>';
     if(an.low&&an.high){
       out+='<div class="anl-range"><span>L\u00e5g $'+Number(an.low).toFixed(2)+'</span><span>H\u00f6g $'+Number(an.high).toFixed(2)+'</span></div>';
       var pos=an.high>an.low?((an.target-an.low)/(an.high-an.low)*100):50;
@@ -1129,9 +1147,50 @@ function newsHTML(news){
     return '<a class="news-item" href="'+(n.url||'#')+'" target="_blank" rel="noopener">'+img+'<div class="news-tx"><div class="news-h">'+(n.headline||'')+'</div><div class="news-m">'+meta+'</div></div></a>';
   }).join('');
 }
+function smartMoneyHTML(insider){
+  if(!insider||!insider.length)return '<div class="anl-empty">Ingen insider-aktivitet</div>';
+  var buys=insider.filter(function(t){return t.buy;}).length, sells=insider.length-buys;
+  var maxSh=Math.max.apply(null,insider.map(function(t){return t.shares||0;}).concat([1]));
+  var bars=insider.slice(0,12).map(function(t){
+    var h=30+Math.round(60*Math.min(1,(t.shares||0)/maxSh));
+    return '<div class="sm-bar '+(t.buy?'pos':'neg')+'" style="height:'+h+'%"></div>';
+  }).join('');
+  var tone=buys>sells?'pos':(sells>buys?'neg':'mut');
+  return '<div class="sm-head"><div><div class="sm-k">Smart Money</div><div class="sm-sub">Insider-intensitet</div></div>'
+    +'<div class="sm-sum '+tone+'">'+buys+' k\u00f6p \u00b7 '+sells+' s\u00e4lj</div></div>'
+    +'<div class="sm-bars">'+bars+'</div>';
+}
+function insiderHTML(list){
+  if(!list||!list.length)return '<div class="anl-empty">Inga insider-transaktioner</div>';
+  return list.slice(0,6).map(function(t){
+    var badge=t.buy?'<span class="ins-b pos">K\u00d6P</span>':'<span class="ins-b neg">S\u00c4LJ</span>';
+    var sh=t.shares?Number(t.shares).toLocaleString('sv-SE'):'';
+    var meta=sh+(t.price?(' @ $'+t.price):'')+(t.date?(' \u00b7 '+t.date):'');
+    return '<div class="ins-item">'+badge+'<div class="ins-tx"><div class="ins-n">'+(t.name||'\u2014')+'</div><div class="ins-m">'+meta+'</div></div></div>';
+  }).join('');
+}
 function renderExtras(tkr,j,price){
-  var a=document.getElementById("st-analyst");if(a)a.innerHTML=analystHTML(j&&j.analyst,price);
   var nv=document.getElementById("st-news");if(nv)nv.innerHTML=newsHTML(j&&j.news);
+  var iv=document.getElementById("st-insider");if(iv)iv.innerHTML=insiderHTML(j&&j.insider);
+  var sm=document.getElementById("st-smart");if(sm)sm.innerHTML=smartMoneyHTML(j&&j.insider);
+  var a=document.getElementById("st-analyst");if(!a)return;
+  var an=j&&j.analyst;
+  a.innerHTML=analystHTML(an,price);
+  if(an&&!an.target){a.innerHTML='<div class="anl-pending">Grabit Riktkurs h\u00e4mtas\u2026</div>'+a.innerHTML;loadGrabitTarget(tkr,price);}
+}
+function loadGrabitTarget(tkr,price){
+  if(!CONFIG.API_BASE)return;
+  if(_grabitTgt[tkr]!==undefined){mergeTarget(tkr,price);return;}
+  fetch(CONFIG.API_BASE.replace(/\/$/,"")+"/api/stock/"+encodeURIComponent(tkr)+"/target",{cache:"no-store"})
+    .then(function(r){return r.json();})
+    .then(function(t){_grabitTgt[tkr]=t||{target:null};mergeTarget(tkr,price);})
+    .catch(function(){_grabitTgt[tkr]={target:null};mergeTarget(tkr,price);});
+}
+function mergeTarget(tkr,price){
+  var t=_grabitTgt[tkr],ex=_stockExtras[tkr];
+  if(!ex||!ex.analyst)return;
+  if(t&&t.target){ex.analyst.target=t.target;ex.analyst.high=t.high;ex.analyst.low=t.low;ex.analyst.source=t.source;ex.analyst.asof=t.asof;ex.analyst.currency=t.currency;}
+  var a=document.getElementById("st-analyst");if(a)a.innerHTML=analystHTML(ex.analyst,price);
 }
 function loadStockExtras(tkr,price){
   if(!CONFIG.API_BASE){var a=document.getElementById("st-analyst");if(a)a.innerHTML=analystHTML(null);var nv=document.getElementById("st-news");if(nv)nv.innerHTML=newsHTML([]);return;}
@@ -1436,7 +1495,7 @@ function onSearch(v){const q=v.trim().toUpperCase();const res=$("#search-res");
   $("#discover").style.display="none";
   const hits=Object.keys(NAMES).filter(tk=>tk.includes(q)||(NAMES[tk]||"").toUpperCase().includes(q));
   const th=THEMES.filter(t=>t.key.toUpperCase().includes(q));
-  let html="";
+  let html="",_sent="";
   if(th.length){html+=`<div class="sect"><h2>Teman</h2></div><div class="card">`+
     th.map(t=>`<div class="qrow"><div class="lic" style="width:36px;height:36px;color:${t.c};background:${t.c}1f">${t.ic}</div>
       <div class="nm"><div class="t">${t.key}</div><div class="s">${t.n} bolag</div></div><div class="chg mut">&rarr;</div></div>`).join("")+`</div>`;}
@@ -1682,6 +1741,15 @@ async function loadDaily(){
   }catch(e){}
 }
 /* ===== AI-analys i aktievyn (setup + nyheter) ===== */
+var BULL_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 5.5C4 7 4.5 9.5 7 10.2"/><path d="M18.5 5.5C20 7 19.5 9.5 17 10.2"/><path d="M7 10C7 14.5 9 17.5 12 17.5C15 17.5 17 14.5 17 10"/><circle cx="9.8" cy="12.2" r="0.7" fill="currentColor" stroke="none"/><circle cx="14.2" cy="12.2" r="0.7" fill="currentColor" stroke="none"/><path d="M10.6 14.8H13.4"/></svg>';
+var BEAR_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7.2" r="2.3"/><circle cx="17" cy="7.2" r="2.3"/><circle cx="12" cy="13" r="6"/><circle cx="9.8" cy="12" r="0.7" fill="currentColor" stroke="none"/><circle cx="14.2" cy="12" r="0.7" fill="currentColor" stroke="none"/><circle cx="12" cy="15.2" r="1.2"/></svg>';
+var FLAT_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12H17"/><path d="M14 8.5L17.5 12L14 15.5"/></svg>';
+function sentimentEmblem(sc){
+  var map={pos:['var(--pos)','Bullish',BULL_SVG],neg:['var(--neg)','Bearish',BEAR_SVG]};
+  var m=map[sc]||['var(--mut)','Neutral',FLAT_SVG];
+  return '<div class="ai-emblem"><div class="ai-em-ic" style="color:'+m[0]+';border-color:'+m[0]+'55">'+m[2]+'</div>'
+    +'<div class="ai-em-t" style="color:'+m[0]+'">'+m[1]+'</div></div>';
+}
 async function loadStockAI(tkr){
   const B=CONFIG.API_BASE?CONFIG.API_BASE.replace(/\/$/,""):"";
   if(!B||typeof fetch==="undefined")return;
@@ -1696,9 +1764,10 @@ async function loadStockAI(tkr){
   try{const nR=await fetch(B+"/api/ai_news/"+encodeURIComponent(tkr),{cache:"no-store"});const nJ=await nR.json();
     if(nJ&&nJ.text){const sc=nJ.sentiment,lbl=sc==="pos"?"Positivt":sc==="neg"?"Negativt":sc==="neu"?"Neutralt":"";
       const col=sc==="pos"?"var(--pos)":sc==="neg"?"var(--neg)":"var(--mut)";
-      const clean=nJ.text.replace(/Stämpel:.*/i,"").replace(/</g,"&lt;").trim();
+      const clean=nJ.text.replace(/Stämpel:.*/i,"").replace(/</g,"&lt;").trim();_sent=sc;
       html+='<div class="st-ai-row"><b>Nyheter '+(lbl?'<i style="font-style:normal;color:'+col+'">· '+lbl+'</i>':'')+'</b><span>'+clean+'</span></div>';}}catch(e){}
   if(!html){card.remove();return;}
+  if(_sent)html=sentimentEmblem(_sent)+html;
   card.querySelector(".st-ai-b").innerHTML=html;
 }
 if(typeof openStock==="function"){
@@ -1909,12 +1978,46 @@ async function loadPolyInsiders(force){
 .anl-seg{height:100%}.anl-seg.pos{background:var(--pos)}.anl-seg.neu{background:#6b7280}.anl-seg.neg{background:var(--neg)}
 .anl-leg{display:flex;justify-content:space-between;font-size:11px;margin-top:6px}
 .anl-leg .mut{color:var(--mut)}
+.anl-pending{color:var(--gold);font-size:11px;margin-bottom:8px;opacity:.85}
+.anl-cav{color:var(--mut);font-size:10.5px;font-style:italic;margin:7px 0 2px}
 .news-list{display:flex;flex-direction:column;gap:9px}
 .news-item{display:flex;gap:11px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;text-decoration:none}
 .news-img{flex:none;width:58px;height:58px;border-radius:9px;background-size:cover;background-position:center;background-color:#15181d}
 .news-tx{min-width:0}
 .news-h{color:var(--txt);font-size:13.5px;font-weight:600;line-height:1.32;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .news-m{color:var(--mut);font-size:11px;margin-top:5px}
+.ai-emblem{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.ai-em-ic{flex:none;width:48px;height:48px;border-radius:13px;border:1px solid;display:flex;align-items:center;justify-content:center}
+.ai-em-ic svg{width:28px;height:28px}
+.ai-em-t{font-size:20px;font-weight:800;letter-spacing:-.3px}
+.score-hero{display:flex;align-items:center;justify-content:space-between;gap:14px}
+.sh-left{display:flex;flex-direction:column;gap:1px;min-width:0}
+.sh-num{font-size:40px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-1px}
+.sh-num span{font-size:15px;font-weight:600;color:var(--mut);margin-left:3px;letter-spacing:0}
+.sh-lbl{font-size:14px;font-weight:700;margin-top:4px}
+.sh-ring{flex:none;width:104px;height:104px}
+.sh-ring svg{width:100%;height:100%;display:block}
+.sg-track{fill:none;stroke:rgba(255,255,255,.07);stroke-width:9}
+.sg-arc{fill:none;stroke-width:9;stroke-linecap:round;transition:stroke-dashoffset .9s cubic-bezier(.2,.8,.2,1)}
+.price-wide{margin-top:11px}
+.sm-card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+.sm-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:11px}
+.sm-k{font-size:14px;font-weight:700;color:var(--txt)}
+.sm-sub{font-size:11px;color:var(--mut);margin-top:2px}
+.sm-sum{font-size:12.5px;font-weight:700}
+.sm-sum.pos{color:var(--pos)}.sm-sum.neg{color:var(--neg)}.sm-sum.mut{color:var(--mut)}
+.sm-bars{display:flex;align-items:flex-end;gap:5px;height:46px}
+.sm-bar{flex:1;border-radius:3px;min-height:6px}
+.sm-bar.pos{background:linear-gradient(180deg,var(--pos),rgba(34,197,94,.32))}
+.sm-bar.neg{background:linear-gradient(180deg,var(--neg),rgba(255,59,48,.32))}
+.ins-list{display:flex;flex-direction:column;gap:7px}
+.ins-item{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:11px;padding:9px 11px}
+.ins-b{flex:none;font-size:10px;font-weight:800;letter-spacing:.5px;padding:3px 7px;border-radius:6px}
+.ins-b.pos{color:var(--pos);background:rgba(34,197,94,.13)}
+.ins-b.neg{color:var(--neg);background:rgba(255,59,48,.13)}
+.ins-tx{min-width:0}
+.ins-n{color:var(--txt);font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ins-m{color:var(--mut);font-size:11px;margin-top:2px;font-variant-numeric:tabular-nums}
 </style>
 </body>
 </html>
