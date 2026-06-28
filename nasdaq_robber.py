@@ -56,12 +56,13 @@ class Config:
     RISK_PCT       = 0.01         # 1% risk per trade
 
     # --- Confidence (0-100) ---  summerar till 100 över de TA-komponenter boten faktiskt mäter
-    CONF_WEIGHTS = {
-        "trend_htf": 18, "trend_ema": 17,   # Trend 35
-        "mom_rsi": 12,  "mom_macd": 13,     # Momentum 25
-        "struktur": 20,                     # Struktur 20
-        "trigger": 10,                      # Trigger 10
-        "volym": 10,                        # Volym 10
+    CONF_WEIGHTS = {                        # summa 100 -- ICT-baserad
+        "trend": 22,   # HTF-bias + EMA-stack + momentum (partiellt)
+        "sweep": 22,   # Liquidity sweep
+        "mss":   22,   # Market Structure Shift / CHOCH
+        "fvg":   17,   # Fair Value Gap (retestad)
+        "ob":    11,   # Order Block (retestad)
+        "volym":  6,   # Relativ volym
     }
     CONF_GREEN    = int(os.environ.get("CONF_GREEN",  "90"))   # gron A+ / godkand
     CONF_YELLOW   = int(os.environ.get("CONF_YELLOW", "80"))   # gul / bevaka
@@ -267,39 +268,136 @@ def build_signal(ticker, df, bias):
 # ==================================================================
 # CONFIDENCE 0-100  (additivt -- ror inte score_long/score_short)
 # ==================================================================
-def _components(cur, prev, bias, side):
-    """Strukturerad bool-checklista, PARALLELL till score_long/short.
-    OBS: hall villkoren i synk med score_long/score_short om de andras."""
-    c = {}
+def _swings(H, L, k=2):
+    """Fraktal-swingar: k barer pa varje sida."""
+    sh, sl = [], []
+    n = len(H)
+    for i in range(k, n - k):
+        if H[i] > max(H[i-k:i]) and H[i] >= max(H[i+1:i+k+1]):
+            sh.append(i)
+        if L[i] < min(L[i-k:i]) and L[i] <= min(L[i+1:i+k+1]):
+            sl.append(i)
+    return sh, sl
+
+
+def detect_sweep(df, side, lookback=20):
+    """Liquidity sweep: wick bortom tidigare extrem som sedan stanger tillbaka (rejection)."""
+    H = df["High"].to_numpy(); L = df["Low"].to_numpy(); C = df["Close"].to_numpy()
+    n = len(C)
+    if n < 6:
+        return False, None
+    a = max(0, n - lookback - 2); b = n - 2
+    if b <= a:
+        return False, None
     if side == "LONG":
-        c["trend_htf"] = (bias == "LONG")
-        c["trend_ema"] = bool(cur.Close > cur.ema20 > cur.ema50)
-        c["mom_rsi"]   = bool(Config.RSI_LONG_LOW < cur.rsi < Config.RSI_LONG_HIGH)
-        c["mom_macd"]  = bool(cur.macd_hist > 0 and cur.macd_hist > prev.macd_hist)
-        c["struktur"]  = bool(cur.Low > prev.Low)
-        c["trigger"]   = bool(prev.Low <= prev.ema20 and cur.Close > cur.ema20)
+        prior_low = float(L[a:b].min())
+        for i in (n - 2, n - 1):
+            if L[i] < prior_low and C[i] > prior_low:
+                return True, round(prior_low, 2)
     else:
-        c["trend_htf"] = (bias == "SHORT")
-        c["trend_ema"] = bool(cur.Close < cur.ema20 < cur.ema50)
-        c["mom_rsi"]   = bool(Config.RSI_SHORT_LOW < cur.rsi < Config.RSI_SHORT_HIGH)
-        c["mom_macd"]  = bool(cur.macd_hist < 0 and cur.macd_hist < prev.macd_hist)
-        c["struktur"]  = bool(cur.High < prev.High)
-        c["trigger"]   = bool(prev.High >= prev.ema20 and cur.Close < cur.ema20)
-    c["volym"] = bool(cur.rel_vol >= Config.MIN_REL_VOLUME)
-    return c
+        prior_high = float(H[a:b].max())
+        for i in (n - 2, n - 1):
+            if H[i] > prior_high and C[i] < prior_high:
+                return True, round(prior_high, 2)
+    return False, None
 
 
-def compute_confidence(cur, prev, bias, side):
-    comps = _components(cur, prev, bias, side)
-    w = Config.CONF_WEIGHTS
-    conf = sum(w.get(k, 0) for k, v in comps.items() if v)
+def detect_mss(df, side, k=2):
+    """Market Structure Shift: stang bortom senaste bekraftade motsatta swing."""
+    H = df["High"].to_numpy(); L = df["Low"].to_numpy(); C = df["Close"].to_numpy()
+    n = len(C)
+    sh, sl = _swings(H, L, k)
+    cur = float(C[-1])
+    if side == "LONG":
+        prior = [i for i in sh if i <= n - 1 - k]
+        if not prior:
+            return False, None
+        lvl = float(H[prior[-1]])
+        return bool(cur > lvl), round(lvl, 2)
+    else:
+        prior = [i for i in sl if i <= n - 1 - k]
+        if not prior:
+            return False, None
+        lvl = float(L[prior[-1]])
+        return bool(cur < lvl), round(lvl, 2)
+
+
+def detect_fvg(df, side, lookback=20):
+    """Fair Value Gap (3-candle imbalance) som priset retestar pa sista baren."""
+    H = df["High"].to_numpy(); L = df["Low"].to_numpy(); C = df["Close"].to_numpy()
+    n = len(C)
+    lo = max(2, n - lookback)
+    for k in range(n - 2, lo - 1, -1):
+        if side == "LONG" and H[k-2] < L[k]:
+            gb, gt = float(H[k-2]), float(L[k])
+            retest = (L[-1] <= gt) and (C[-1] >= gb)
+            return bool(retest), (round(gb, 2), round(gt, 2))
+        if side == "SHORT" and L[k-2] > H[k]:
+            gt, gb = float(L[k-2]), float(H[k])
+            retest = (H[-1] >= gb) and (C[-1] <= gt)
+            return bool(retest), (round(gb, 2), round(gt, 2))
+    return False, None
+
+
+def detect_ob(df, side, lookback=20, impulse_atr=0.8):
+    """Order Block: sista motsatt-fargade candle fore en impuls i ratt riktning, retestad."""
+    O = df["Open"].to_numpy(); H = df["High"].to_numpy()
+    L = df["Low"].to_numpy(); C = df["Close"].to_numpy()
+    n = len(C)
+    atr = float(df["atr"].iloc[-1]) if "atr" in df.columns else 0.0
+    if atr <= 0:
+        atr = float(np.nanmean(H[-20:] - L[-20:])) or 1.0
+    for k in range(n - 3, max(0, n - lookback) - 1, -1):
+        if k + 2 > n - 1:
+            continue
+        if side == "LONG":
+            if C[k] < O[k] and C[k+1] > H[k] and (C[k+2] - C[k]) > impulse_atr * atr:
+                ob_bot = float(min(O[k], C[k], L[k])); ob_top = float(max(O[k], C[k]))
+                if L[-1] <= ob_top:
+                    return True, (round(ob_bot, 2), round(ob_top, 2))
+        else:
+            if C[k] > O[k] and C[k+1] < L[k] and (C[k] - C[k+2]) > impulse_atr * atr:
+                ob_top = float(max(O[k], C[k], H[k])); ob_bot = float(min(O[k], C[k]))
+                if H[-1] >= ob_bot:
+                    return True, (round(ob_bot, 2), round(ob_top, 2))
+    return False, None
+
+
+def compute_confidence(df, bias, side):
+    """0-100 ur trend + ICT-detektorer + volym. Ror inte score_long/short."""
+    cur, prev = df.iloc[-1], df.iloc[-2]
+    if side == "LONG":
+        htf = (bias == "LONG")
+        ema = bool(cur.Close > cur.ema20 > cur.ema50)
+        mom = bool((cur.macd_hist > 0 and cur.macd_hist > prev.macd_hist)
+                   or (Config.RSI_LONG_LOW < cur.rsi < Config.RSI_LONG_HIGH))
+    else:
+        htf = (bias == "SHORT")
+        ema = bool(cur.Close < cur.ema20 < cur.ema50)
+        mom = bool((cur.macd_hist < 0 and cur.macd_hist < prev.macd_hist)
+                   or (Config.RSI_SHORT_LOW < cur.rsi < Config.RSI_SHORT_HIGH))
+    trend_frac = (int(htf) + int(ema) + int(mom)) / 3.0
+    vol = bool(cur.rel_vol >= Config.MIN_REL_VOLUME)
+    sweep, sweep_lvl = detect_sweep(df, side)
+    mss,   mss_lvl   = detect_mss(df, side)
+    fvg,   fvg_zone  = detect_fvg(df, side)
+    ob,    ob_zone   = detect_ob(df, side)
+    W = Config.CONF_WEIGHTS
+    conf = (W["trend"] * trend_frac
+            + (W["sweep"] if sweep else 0)
+            + (W["mss"]   if mss   else 0)
+            + (W["fvg"]   if fvg   else 0)
+            + (W["ob"]    if ob    else 0)
+            + (W["volym"] if vol   else 0))
     conf = max(0, min(100, int(round(conf))))
     groups = {
-        "Trend":    comps["trend_htf"] or comps["trend_ema"],
-        "Momentum": comps["mom_rsi"] or comps["mom_macd"],
-        "Struktur": comps["struktur"],
-        "Trigger":  comps["trigger"],
-        "Volym":    comps["volym"],
+        "Trend": trend_frac >= 0.5, "Liquidity Sweep": bool(sweep), "MSS": bool(mss),
+        "FVG": bool(fvg), "Order Block": bool(ob), "Volym": vol,
+    }
+    comps = {
+        "trend_frac": round(trend_frac, 2), "htf": htf, "ema": ema, "mom": mom,
+        "sweep": bool(sweep), "sweep_lvl": sweep_lvl, "mss": bool(mss), "mss_lvl": mss_lvl,
+        "fvg": bool(fvg), "fvg_zone": fvg_zone, "ob": bool(ob), "ob_zone": ob_zone, "volym": vol,
     }
     return conf, comps, groups
 
@@ -380,8 +478,9 @@ def format_alert(sig):
     bias_txt = ("Bullish " + check) if sig["bias"] == "LONG" else \
                (("Bearish " + check) if sig["bias"] == "SHORT" else "Neutral")
     groups = sig.get("groups") or {}
-    core = "   ".join(f"{k}: {check if v else cross}" for k, v in groups.items())
-    ict = f"Liquidity Sweep: {wait}   MSS: {wait}   FVG: {wait}   Order Block: {wait}"
+    _it = list(groups.items())
+    core_lines = ["   ".join(f"{k}: {check if v else cross}" for k, v in _it[i:i+3])
+                  for i in range(0, len(_it), 3)]
     tgs = sig["targets"]; rr = Config.TARGETS_R
     tplines = "   ".join(f"TP{i+1}: {t}" for i, t in enumerate(tgs))
     rrtxt = " / ".join(f"1:{r:g}" for r in rr)
@@ -390,10 +489,8 @@ def format_alert(sig):
         f"\U0001F525 Confidence: <b>{conf}/100</b>  \u00b7  {tier}",
         f"HTF Bias: {bias_txt}",
     ]
-    if core:
-        lines.append(core)
+    lines += core_lines
     lines += [
-        ict,
         "\u2500\u2500\u2500\u2500\u2500",
         f"Entry: <b>{sig['price']}</b>",
         f"SL: {sig['stop']}   (risk {sig['risk_per_share']}/enhet)",
@@ -479,7 +576,7 @@ def scan_once():
             bias = htf_bias(htf)
             sig = build_signal(ticker, mtf, bias)
             if sig:
-                conf, comps, groups = compute_confidence(mtf.iloc[-1], mtf.iloc[-2], bias, sig["side"])
+                conf, comps, groups = compute_confidence(mtf, bias, sig["side"])
                 sig["confidence"] = conf; sig["groups"] = groups; sig["components"] = comps
 
             if sig and is_fresh(sig, state):
