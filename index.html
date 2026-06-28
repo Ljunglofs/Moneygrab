@@ -1026,6 +1026,8 @@ function openStock(tkr){_curStock=tkr;const d=stockData(tkr,_liveStock[tkr]);
       <div class="st-box st-score2"><div class="k2">GRABIT Score</div><div class="sc num" style="color:${sCol}">${d.score.toFixed(1)}</div><div class="sctag" style="color:${sCol}">${d.tag.split(" ")[0].toUpperCase()}</div></div>
       <div class="st-box st-price2"><div class="k2">Dagens kurs</div><div class="p2 num">${d.cur}${d.price.toLocaleString("sv-SE")}</div><div class="c2" style="color:${dCol}">${d.day>=0?"+":""}${d.day}% i dag</div></div>
     </div>
+    <div class="st-sec">Analytiker</div>
+    <div id="st-analyst" class="anl-card"><div class="anl-load">Laddar analytikerdata…</div></div>
     <div class="st-sec">Om bolaget</div>
     <div class="st-box about secgfx-wrap"><div class="secgfx" style="background-image:url('${IMGS.goldwave}')"></div><div class="ab-facts"><div><span>Sektor</span><b>${d.sector}</b></div><div><span>Marknad</span><b>${d.bors}</b></div><div><span>Land</span><b>${d.land} ${d.flag}</b></div></div><p class="blurb">${d.desc}</p></div>
     <div class="verdict secgfx-wrap" style="border-color:${d.vcolor}66;background:linear-gradient(160deg,${d.vcolor}1f,#090A0B)"><div class="secgfx gverdict" style="background-image:url('${IMGS.verdict_chart}')"></div><div class="vd-top"><span class="vd-badge" style="background:${d.vcolor}">${d.verdict}</span><span class="vd-hit">Träffsäkerhet <b style="color:${d.vcolor}">${d.hitrate}%</b></span></div><div class="vd-line">${d.verdict==='UNDVIK'?'Avvakta – ingen entry rekommenderas just nu.':'Köp '+d.cur+d.entryLo+'–'+d.cur+d.entryHi+'  ·  Stop '+d.cur+d.stop+'  ·  Mål '+d.cur+d.t2}</div><div class="vd-sub">${d.score>=7.5?'AI-slutsats: stark setup med bekräftad trend och stigande relativ styrka. R/R 1:2.3.':d.score>=6?'AI-slutsats: blandad bild – vänta på bekräftelse (volym + utbrott) innan entry.':'AI-slutsats: svag setup – hög risk. Undvik tills trend och volym förbättras.'}</div></div>
@@ -1073,6 +1075,8 @@ function openStock(tkr){_curStock=tkr;const d=stockData(tkr,_liveStock[tkr]);
       <div class="er"><span class="k">Rel. volym</span><span class="v">${d.relvol}x</span></div></div>
     <div class="st-sec">Katalysatorer &amp; nyheter</div>
     <div class="exit">${d.catalysts.map(c=>`<div class="er"><span class="k">${c[0]}</span><span class="v" style="color:var(--gold2)">${c[1]}</span></div>`).join("")}</div>
+    <div class="st-sec">Senaste nyheter</div>
+    <div id="st-news" class="news-list"><div class="anl-load">Laddar nyheter…</div></div>
     <div class="st-sec">Varför vi är bullish</div>
     <div class="why">${d.bull.map(x=>`<div class="row"><span class="pts pos">+${x[1]}</span><span>${x[0]}</span></div>`).join("")}</div>
     <div class="st-sec">Potentiella risker</div>
@@ -1084,10 +1088,57 @@ function openStock(tkr){_curStock=tkr;const d=stockData(tkr,_liveStock[tkr]);
       <button onclick="askGrabit('${tkr}',document.getElementById('ask-q').value)">&#10148;</button></div>
       <div class="chips">${["Varför rör sig "+tkr+"?","Hur ser riskbilden ut?","Jämför "+tkr,"Nästa kursmål?"].map(q=>`<button onclick="askGrabit('${tkr}','${q}')">${q}</button>`).join("")}</div>
       <div class="ans" id="ask-ans"></div></div>`;
+  loadStockExtras(tkr, d.price);
   document.getElementById("stock").classList.add("on");
   document.getElementById("stock").scrollTop=0;
   if(CONFIG.API_BASE&&_liveStock[tkr]===undefined)fetchLiveStock(tkr);
   if(CONFIG.API_BASE&&_liveCo[tkr]===undefined)fetchCompany(tkr);
+}
+var _stockExtras={};
+function _timeAgo(ts){if(!ts)return "";var s=Math.floor(Date.now()/1000-ts);if(s<3600)return Math.max(1,Math.floor(s/60))+" min sedan";if(s<86400)return Math.floor(s/3600)+" tim sedan";return Math.floor(s/86400)+" d sedan";}
+function analystHTML(an,price){
+  if(!an)return '<div class="anl-empty">Ingen analytikerdata</div>';
+  var out='';
+  if(an.target){
+    var up=(price&&an.target)?((an.target/price-1)*100):null;
+    out+='<div class="anl-tgt"><div class="anl-big">$'+Number(an.target).toFixed(2)+'</div>';
+    if(up!=null){var upc=up>=0?'var(--pos)':'var(--neg)';out+='<div class="anl-up" style="color:'+upc+'">'+(up>=0?'\u25B2 +':'\u25BC ')+up.toFixed(1)+'%</div>';}
+    out+='<div class="anl-k2">riktkurs (snitt)</div></div>';
+    if(an.low&&an.high){
+      out+='<div class="anl-range"><span>L\u00e5g $'+Number(an.low).toFixed(2)+'</span><span>H\u00f6g $'+Number(an.high).toFixed(2)+'</span></div>';
+      var pos=an.high>an.low?((an.target-an.low)/(an.high-an.low)*100):50;
+      pos=Math.max(2,Math.min(98,pos));
+      out+='<div class="anl-bar"><div class="anl-bar-av" style="left:'+pos.toFixed(0)+'%"></div></div>';
+    }
+  }
+  if(an.consensus){
+    var c=an.consensus,tot=(c.strongBuy+c.buy+c.hold+c.sell+c.strongSell)||1;
+    var buy=c.strongBuy+c.buy,hold=c.hold,sell=c.sell+c.strongSell;
+    out+='<div class="anl-rate">'+(an.rating?'<b>'+an.rating+'</b>':'')+(an.n?' \u00b7 '+an.n+' analytiker':'')+'</div>';
+    out+='<div class="anl-cons"><div class="anl-seg pos" style="width:'+(buy/tot*100)+'%"></div><div class="anl-seg neu" style="width:'+(hold/tot*100)+'%"></div><div class="anl-seg neg" style="width:'+(sell/tot*100)+'%"></div></div>';
+    out+='<div class="anl-leg"><span style="color:var(--pos)">K\u00f6p '+buy+'</span><span class="mut">H\u00e5ll '+hold+'</span><span style="color:var(--neg)">S\u00e4lj '+sell+'</span></div>';
+  }
+  if(!out)out='<div class="anl-empty">Ingen analytikerdata tillg\u00e4nglig</div>';
+  return out;
+}
+function newsHTML(news){
+  if(!news||!news.length)return '<div class="anl-empty">Inga nyheter just nu</div>';
+  return news.map(function(n){
+    var img=n.image?'<div class="news-img" style="background-image:url('+JSON.stringify(n.image)+')"></div>':'';
+    var meta=(n.source||'')+(n.ts?' \u00b7 '+_timeAgo(n.ts):'');
+    return '<a class="news-item" href="'+(n.url||'#')+'" target="_blank" rel="noopener">'+img+'<div class="news-tx"><div class="news-h">'+(n.headline||'')+'</div><div class="news-m">'+meta+'</div></div></a>';
+  }).join('');
+}
+function renderExtras(tkr,j,price){
+  var a=document.getElementById("st-analyst");if(a)a.innerHTML=analystHTML(j&&j.analyst,price);
+  var nv=document.getElementById("st-news");if(nv)nv.innerHTML=newsHTML(j&&j.news);
+}
+function loadStockExtras(tkr,price){
+  if(!CONFIG.API_BASE){var a=document.getElementById("st-analyst");if(a)a.innerHTML=analystHTML(null);var nv=document.getElementById("st-news");if(nv)nv.innerHTML=newsHTML([]);return;}
+  if(_stockExtras[tkr]){renderExtras(tkr,_stockExtras[tkr],price);return;}
+  fetch(CONFIG.API_BASE.replace(/\/$/,"")+"/api/stock/"+encodeURIComponent(tkr)+"/extras",{cache:"no-store"})
+    .then(function(r){return r.json();}).then(function(j){_stockExtras[tkr]=j;renderExtras(tkr,j,price);})
+    .catch(function(){renderExtras(tkr,{news:[],analyst:null},price);});
 }
 // Hämtar riktig analys för en aktie och lägger den över demo-basen.
 // Backend: GET /api/stock/{ticker} -> { analysis:{last,score10,rsi,ret_5,ret_20,rel_vol,pct_from_high}, company:{name,sector}, ... }
@@ -1842,6 +1893,28 @@ async function loadPolyInsiders(force){
 /* === Research inbäddad i Research-fliken (neutralisera sheet-overlay) === */
 .rs-inline{position:static!important;inset:auto!important;transform:none!important;z-index:auto!important;max-width:none!important;background:transparent!important;overflow:visible!important;transition:none!important}
 .rs-inline .rs-chips{position:static!important;top:auto!important;background:transparent!important}
+
+/* ---- Aktiekort: analytiker + nyheter ---- */
+.anl-card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+.anl-load,.anl-empty{color:var(--mut);font-size:13px;padding:4px 0}
+.anl-tgt{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+.anl-big{font-size:30px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--txt);letter-spacing:-.5px}
+.anl-up{font-size:14px;font-weight:700}
+.anl-k2{color:var(--mut);font-size:11px;width:100%;margin-top:-2px}
+.anl-range{display:flex;justify-content:space-between;color:var(--mut);font-size:11px;margin:13px 2px 5px}
+.anl-bar{position:relative;height:6px;border-radius:3px;background:linear-gradient(90deg,var(--neg),#6b7280,var(--pos))}
+.anl-bar-av{position:absolute;top:-3px;width:3px;height:12px;background:#fff;border-radius:2px;transform:translateX(-50%);box-shadow:0 0 0 2px rgba(0,0,0,.4)}
+.anl-rate{margin:13px 0 7px;font-size:14px;color:var(--txt)}
+.anl-cons{display:flex;height:8px;border-radius:4px;overflow:hidden;background:#1a1d22}
+.anl-seg{height:100%}.anl-seg.pos{background:var(--pos)}.anl-seg.neu{background:#6b7280}.anl-seg.neg{background:var(--neg)}
+.anl-leg{display:flex;justify-content:space-between;font-size:11px;margin-top:6px}
+.anl-leg .mut{color:var(--mut)}
+.news-list{display:flex;flex-direction:column;gap:9px}
+.news-item{display:flex;gap:11px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;text-decoration:none}
+.news-img{flex:none;width:58px;height:58px;border-radius:9px;background-size:cover;background-position:center;background-color:#15181d}
+.news-tx{min-width:0}
+.news-h{color:var(--txt);font-size:13.5px;font-weight:600;line-height:1.32;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.news-m{color:var(--mut);font-size:11px;margin-top:5px}
 </style>
 </body>
 </html>

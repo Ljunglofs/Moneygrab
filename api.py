@@ -1072,6 +1072,65 @@ def stock(ticker: str):
     return payload
 
 
+# ---------- AKTIEKORT: nyheter + analytiker (riktkurs/konsensus) ----------
+@cached(900)
+def _company_news(ticker):
+    """Bolagsnyheter via Finnhub /company-news (gratis-nivå)."""
+    import datetime as _dt
+    if not os.getenv("FINNHUB_API_KEY"):
+        return []
+    today = _dt.date.today()
+    frm = today - _dt.timedelta(days=14)
+    j = _finnhub("/company-news", {"symbol": ticker, "from": str(frm), "to": str(today)})
+    out = []
+    for n in (j or []):
+        h = (n.get("headline") or "").strip()
+        if not h:
+            continue
+        out.append({
+            "headline": h,
+            "source": n.get("source", "") or "",
+            "url": n.get("url", "") or "",
+            "ts": int(n.get("datetime", 0) or 0),
+            "image": n.get("image", "") or "",
+        })
+        if len(out) >= 6:
+            break
+    return out
+
+
+@cached(1800)
+def _analyst(ticker):
+    """Analytiker: konsensus (gratis recommendation) + riktkurs (price-target, ofta premium)."""
+    out = {"target": None, "high": None, "low": None,
+           "consensus": None, "rating": None, "n": None}
+    rec = _finnhub("/stock/recommendation", {"symbol": ticker})
+    if isinstance(rec, list) and rec:
+        r = rec[0]
+        sb = int(r.get("strongBuy", 0) or 0); b = int(r.get("buy", 0) or 0)
+        h = int(r.get("hold", 0) or 0); se = int(r.get("sell", 0) or 0)
+        ss = int(r.get("strongSell", 0) or 0)
+        tot = sb + b + h + se + ss
+        out["consensus"] = {"strongBuy": sb, "buy": b, "hold": h, "sell": se, "strongSell": ss}
+        out["n"] = tot
+        if tot:
+            sc = (sb * 2 + b - se - ss * 2) / tot
+            out["rating"] = ("Starkt köp" if sc >= 1.2 else "Köp" if sc >= 0.4
+                             else "Håll" if sc > -0.4 else "Sälj" if sc > -1.2 else "Starkt sälj")
+    pt = _finnhub("/stock/price-target", {"symbol": ticker})
+    if isinstance(pt, dict) and pt.get("targetMean"):
+        out["target"] = pt.get("targetMean")
+        out["high"] = pt.get("targetHigh")
+        out["low"] = pt.get("targetLow")
+    return out
+
+
+@app.get("/api/stock/{ticker}/extras")
+def stock_extras(ticker: str):
+    ticker = ticker.upper()
+    return {"news": _company_news(ticker), "analyst": _analyst(ticker)}
+
+
 @app.get("/api/overview")
 def overview():
     """Komponerar startsidan: index, veckans urval, hetast, dagens bull, faktorer.
