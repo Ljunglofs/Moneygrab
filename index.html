@@ -716,8 +716,6 @@ body{background:
   <section class="screen" id="s-marknad">
     <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" style="width:18px;height:18px;color:#8a93a3;flex:none"><circle cx="11" cy="11" r="7.5"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg><input id="q" placeholder="Sök ticker, bolag eller tema…" oninput="onSearch(this.value)"></div>
     <div id="search-res"></div>
-    <div class="sect" style="margin-top:6px"><h2>Grabit Screen</h2></div>
-    <div class="rsheet rs-inline"><div class="rs-chips" id="rs-chips"></div><div class="rs-meta" id="rs-meta">Välj filter ovan</div><div id="rs-list"></div></div>
     <div id="discover">
       <div id="scanner"></div>
       <div class="sect"><h2>Kategorier</h2></div>
@@ -760,7 +758,7 @@ body{background:
   <button class="ac" id="st-star" onclick="this.textContent=this.textContent==='\u2605'?'\u2606':'\u2605'">&#9734;</button>
 </div><div class="st-body" id="st-body"></div></div>
 <div class="stock mcdetail" id="mcdetail"><div class="st-hd"><button class="bk" onclick="closeMonthly()">&#8592;</button><div class="tk">Månadens case</div><span style="width:38px;display:inline-block"></span></div><div class="st-body" id="mc-body"></div></div>
-<div class="stock rsheet" id="rsheet"><div class="st-hd"><button class="bk" onclick="closeResearch()">&#8592;</button><div class="tk">Research</div><span style="width:34px;flex:none"></span></div></div>
+<div class="stock rsheet" id="rsheet"><div class="st-hd"><button class="bk" onclick="closeResearch()">&#8592;</button><div class="tk">Grabit Screen</div><span style="width:34px;flex:none"></span></div><div class="rs-chips" id="rs-chips"></div><div class="rs-meta" id="rs-meta">Välj filter ovan</div><div id="rs-list"></div></div>
 
 <div class="stock" id="screener"><div class="st-hd">
   <button class="bk" onclick="closeScreener()">&#8592;</button>
@@ -1349,7 +1347,7 @@ function renderScanner(s){
   const g=s.gainers.map(x=>row(x.tkr,(x.chg>=0?'+':'')+x.chg.toFixed(1)+'%','var(--pos)',null,x.chg>=0)).join("");
   const v=s.volume.map(x=>row(x.tkr,x.x.toFixed(1)+'x','var(--gold2)','var(--gold2)',true)).join("");
   window._screeners=s.screeners;
-  const scr=s.screeners.map((c,i)=>`<div class="scr-card card" style="--c:${c.c}" onclick="openScreener(${i})"><div class="scr-ic" style="color:${c.c};background:${c.c}1a;border-color:${c.c}55">${I[c.ic]||I.dot}</div><div class="scr-t">${c.n}</div><div class="scr-d">${c.d}</div><div class="scr-pill" style="color:${c.c};border-color:${c.c}66">${c.pill}</div></div>`).join("");
+  const scr=s.screeners.map((c,i)=>`<div class="scr-card card" style="--c:${c.c}" onclick="openScreener(${i})"><div class="scr-ic" style="color:${c.c};background:${c.c}1a;border-color:${c.c}55">${I[c.ic]||I.dot}</div><div class="scr-t">${c.n}</div><div class="scr-d">${c.d}</div><div class="scr-pill" style="color:${c.c};border-color:${c.c}66">${c.pill}</div></div>`).join("")+`<div class="scr-card card" style="--c:#F5C542" onclick="openResearch()"><div class="scr-ic" style="color:#F5C542;background:#F5C5421a;border-color:#F5C54255">${I.compass||I.dot}</div><div class="scr-t">Grabit Screen</div><div class="scr-d">Filtrera bolag — kurs, volym, tema</div><div class="scr-pill" style="color:#F5C542;border-color:#F5C54266">40 bolag</div></div>`;
   const hero=`<div class="theme-hero" onclick="go('marknad')" style="background-image:linear-gradient(100deg,#0A0E12 34%,rgba(10,14,18,.55) 58%,rgba(10,14,18,.1) 100%),url('${IMGS.rocket}')"><div class="th-k">HETASTA TEMAN JUST NU</div><div class="th-h">Space &amp; Defense</div><div class="th-s">Stark momentum · Flera breakout-setups</div><div class="th-pill">3 TOPPSETUPS</div></div>`;
   return `<div class="sect"><h2>Populära screeners</h2></div>
     <div class="scr-grid">${scr}</div>
@@ -1481,7 +1479,6 @@ function go(s){document.querySelectorAll(".screen").forEach(x=>x.classList.remov
   document.getElementById("s-"+s)?.classList.add("on");
   if(s==="daytrade")loadDaytrade();
   if(s==="smart"){loadPoly();loadPolyInsiders();}
-  if(s==="marknad"){try{rsChips();if(!window._rsAuto){window._rsAuto=true;runResearch();}}catch(e){}}
   document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("on",b.dataset.s===s));
   window.scrollTo({top:0,behavior:"instant"});}
 I.grabit='<img class="gimg" src="'+IMGS.grabit+'" alt="">';
@@ -1621,7 +1618,7 @@ async function runResearch(){
       +'<div class="rs-r"><div class="rs-px">$'+last.toFixed(2)+'</div>'+(sc!=null?'<div class="rs-sc" style="color:'+scCol+'">'+sc+'/10</div>':'')+'</div></div>';
   }).join("");
 }
-function openResearch(){go('marknad');}
+function openResearch(){var sh=document.getElementById("rsheet");if(sh)sh.classList.add("on");try{rsChips();runResearch();}catch(e){}}
 function closeResearch(){document.getElementById("rsheet").classList.remove("on");}
 /* ===== Dagens läge (AI) på Översikt ===== */
 async function loadDaily(){

@@ -55,6 +55,25 @@ class Config:
     ACCOUNT_SIZE   = 100_000      # SEK, för positionsstorleksförslag
     RISK_PCT       = 0.01         # 1% risk per trade
 
+    # --- Confidence (0-100) ---  summerar till 100 över de TA-komponenter boten faktiskt mäter
+    CONF_WEIGHTS = {
+        "trend_htf": 18, "trend_ema": 17,   # Trend 35
+        "mom_rsi": 12,  "mom_macd": 13,     # Momentum 25
+        "struktur": 20,                     # Struktur 20
+        "trigger": 10,                      # Trigger 10
+        "volym": 10,                        # Volym 10
+    }
+    CONF_GREEN    = int(os.environ.get("CONF_GREEN",  "90"))   # gron A+ / godkand
+    CONF_YELLOW   = int(os.environ.get("CONF_YELLOW", "80"))   # gul / bevaka
+    CONF_MIN_SEND = int(os.environ.get("CONF_MIN_SEND","80"))  # under denna: tyst (men shadow-loggas)
+    SHADOW_LOG    = os.environ.get("SHADOW_LOG", "robber_shadow.jsonl")
+
+    # --- Auto-trade (cTrader) -- AVSTANGD som default. Kan inte lagga riktig order
+    #     utan att BADE AUTO_TRADE=1 OCH AUTO_TRADE_LIVE=1 ar satta. ---
+    AUTO_TRADE      = os.environ.get("AUTO_TRADE", "0") == "1"
+    AUTO_TRADE_LIVE = os.environ.get("AUTO_TRADE_LIVE", "0") == "1"
+    AUTO_TRADE_MIN  = int(os.environ.get("AUTO_TRADE_MIN", "90"))
+
     # --- Session (svensk tid, DST-säkert via zoneinfo) ---
     LOCAL_TZ          = "Europe/Stockholm"
     SESSION_START     = (6, 0)            # 06:00 svensk tid
@@ -246,6 +265,81 @@ def build_signal(ticker, df, bias):
 
 
 # ==================================================================
+# CONFIDENCE 0-100  (additivt -- ror inte score_long/score_short)
+# ==================================================================
+def _components(cur, prev, bias, side):
+    """Strukturerad bool-checklista, PARALLELL till score_long/short.
+    OBS: hall villkoren i synk med score_long/score_short om de andras."""
+    c = {}
+    if side == "LONG":
+        c["trend_htf"] = (bias == "LONG")
+        c["trend_ema"] = bool(cur.Close > cur.ema20 > cur.ema50)
+        c["mom_rsi"]   = bool(Config.RSI_LONG_LOW < cur.rsi < Config.RSI_LONG_HIGH)
+        c["mom_macd"]  = bool(cur.macd_hist > 0 and cur.macd_hist > prev.macd_hist)
+        c["struktur"]  = bool(cur.Low > prev.Low)
+        c["trigger"]   = bool(prev.Low <= prev.ema20 and cur.Close > cur.ema20)
+    else:
+        c["trend_htf"] = (bias == "SHORT")
+        c["trend_ema"] = bool(cur.Close < cur.ema20 < cur.ema50)
+        c["mom_rsi"]   = bool(Config.RSI_SHORT_LOW < cur.rsi < Config.RSI_SHORT_HIGH)
+        c["mom_macd"]  = bool(cur.macd_hist < 0 and cur.macd_hist < prev.macd_hist)
+        c["struktur"]  = bool(cur.High < prev.High)
+        c["trigger"]   = bool(prev.High >= prev.ema20 and cur.Close < cur.ema20)
+    c["volym"] = bool(cur.rel_vol >= Config.MIN_REL_VOLUME)
+    return c
+
+
+def compute_confidence(cur, prev, bias, side):
+    comps = _components(cur, prev, bias, side)
+    w = Config.CONF_WEIGHTS
+    conf = sum(w.get(k, 0) for k, v in comps.items() if v)
+    conf = max(0, min(100, int(round(conf))))
+    groups = {
+        "Trend":    comps["trend_htf"] or comps["trend_ema"],
+        "Momentum": comps["mom_rsi"] or comps["mom_macd"],
+        "Struktur": comps["struktur"],
+        "Trigger":  comps["trigger"],
+        "Volym":    comps["volym"],
+    }
+    return conf, comps, groups
+
+
+def _shadow_log(sig, sent):
+    """Loggar varje kandidat-setup (aven de under trosklen) for senare validering."""
+    try:
+        rec = {
+            "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "ticker": sig["ticker"], "side": sig["side"],
+            "score7": sig.get("score"), "confidence": sig.get("confidence"),
+            "entry": sig["price"], "sl": sig["stop"], "targets": sig["targets"],
+            "rr": Config.TARGETS_R, "bias": sig["bias"],
+            "components": sig.get("components"), "bar_time": sig.get("bar_time"),
+            "sent": bool(sent),
+        }
+        with open(Config.SHADOW_LOG, "a") as f:
+            f.write(json.dumps(rec) + "\n")
+    except Exception as e:
+        print("shadow-log fel:", e)
+
+
+def maybe_autotrade(sig):
+    """cTrader-exekvering -- AVSTANGD som default.
+    Lagger ALDRIG en riktig order utan bade AUTO_TRADE=1 och AUTO_TRADE_LIVE=1."""
+    if not Config.AUTO_TRADE:
+        return
+    if sig.get("confidence", 0) < Config.AUTO_TRADE_MIN:
+        return
+    intent = (f"[auto] {sig['side']} {sig['ticker']} @ {sig['price']} "
+              f"SL {sig['stop']} TP {sig['targets']} (conf {sig.get('confidence')})")
+    if not Config.AUTO_TRADE_LIVE:
+        print(intent, "-- LIVE av, ingen order lagd (torrkorning)")
+        return
+    # === LIVE cTrader-exekvering laggs har (kraver creds + uttestning) ===
+    # Avsiktligt ej implementerad: ingen oprovad bot ska kunna fyra skarpt.
+    print(intent, "-- AUTO_TRADE_LIVE=1 men exekvering ej aktiverad i kod (sakerhetssparr)")
+
+
+# ==================================================================
 # LARM / STATE
 # ==================================================================
 def send_telegram(text):
@@ -269,23 +363,44 @@ def send_telegram(text):
         return False
 
 
-def format_alert(sig):
-    side_txt = "KÖP" if sig["side"] == "LONG" else "SÄLJ"
-    emoji = "\U0001F7E2" if sig["side"] == "LONG" else "\U0001F534"
-    name = Config.NAMES.get(sig["ticker"], sig["ticker"])
-    tlines = "\n".join(f"  T{i+1} ({r}R): {t}"
-                       for i, (t, r) in enumerate(zip(sig["targets"], Config.TARGETS_R)))
-    reasons = "\n".join(f"  \u2713 {r}" for r in sig["reasons"])
-    return (
-        f"{emoji} <b>{side_txt} {name}</b> ({sig['ticker']})  "
-        f"[{sig['score']}/{sig['max_score']}]\n"
-        f"Pris: <b>{sig['price']}</b>   ATR: {sig['atr']}\n"
-        f"Stop: {sig['stop']}   (risk {sig['risk_per_share']}/enhet)\n"
-        f"{tlines}\n"
-        f"HTF-bias: {sig['bias']}\n"
-        f"<i>Confluence:</i>\n{reasons}"
-    )
+def _tier(conf):
+    if conf >= Config.CONF_GREEN:  return "\U0001F7E2", "A+ GODKÄND"
+    if conf >= Config.CONF_YELLOW: return "\U0001F7E1", "BEVAKA"
+    return "\U0001F534", "SVAG"
 
+
+def format_alert(sig):
+    check, cross, wait = "\u2705", "\u274C", "\u23F3"
+    side_txt = "LONG" if sig["side"] == "LONG" else "SHORT"
+    name = Config.NAMES.get(sig["ticker"], sig["ticker"])
+    conf = sig.get("confidence")
+    if conf is None:
+        conf = int(round(sig["score"] / max(1, sig.get("max_score", 7)) * 100))
+    dot, tier = _tier(conf)
+    bias_txt = ("Bullish " + check) if sig["bias"] == "LONG" else \
+               (("Bearish " + check) if sig["bias"] == "SHORT" else "Neutral")
+    groups = sig.get("groups") or {}
+    core = "   ".join(f"{k}: {check if v else cross}" for k, v in groups.items())
+    ict = f"Liquidity Sweep: {wait}   MSS: {wait}   FVG: {wait}   Order Block: {wait}"
+    tgs = sig["targets"]; rr = Config.TARGETS_R
+    tplines = "   ".join(f"TP{i+1}: {t}" for i, t in enumerate(tgs))
+    rrtxt = " / ".join(f"1:{r:g}" for r in rr)
+    lines = [
+        f"{dot} <b>{side_txt} \u2013 {name}</b>  ({sig['ticker']})",
+        f"\U0001F525 Confidence: <b>{conf}/100</b>  \u00b7  {tier}",
+        f"HTF Bias: {bias_txt}",
+    ]
+    if core:
+        lines.append(core)
+    lines += [
+        ict,
+        "\u2500\u2500\u2500\u2500\u2500",
+        f"Entry: <b>{sig['price']}</b>",
+        f"SL: {sig['stop']}   (risk {sig['risk_per_share']}/enhet)",
+        tplines,
+        f"Risk/Reward: {rrtxt}",
+    ]
+    return "\n".join(lines)
 
 def load_state():
     try:
@@ -363,17 +478,27 @@ def scan_once():
             mtf = add_indicators(mtf)
             bias = htf_bias(htf)
             sig = build_signal(ticker, mtf, bias)
+            if sig:
+                conf, comps, groups = compute_confidence(mtf.iloc[-1], mtf.iloc[-2], bias, sig["side"])
+                sig["confidence"] = conf; sig["groups"] = groups; sig["components"] = comps
 
             if sig and is_fresh(sig, state):
-                msg = format_alert(sig)
-                ctx = poly_context(sig["ticker"])
-                if ctx:
-                    msg = msg + "\n\n" + ctx
-                print(msg, "\n")
-                send_telegram(msg)
+                send_ok = sig["confidence"] >= Config.CONF_MIN_SEND
+                _shadow_log(sig, sent=send_ok)
                 state[f"{sig['ticker']}:{sig['side']}"] = sig["bar_time"]
-                fired += 1
-                results[ticker] = f"LARM {sig['side']} {sig['score']}/7"
+                if send_ok:
+                    msg = format_alert(sig)
+                    ctx = poly_context(sig["ticker"])
+                    if ctx:
+                        msg = msg + "\n\n" + ctx
+                    print(msg, "\n")
+                    send_telegram(msg)
+                    fired += 1
+                    results[ticker] = f"LARM {sig['side']} {sig['confidence']}/100"
+                    maybe_autotrade(sig)
+                else:
+                    results[ticker] = f"under tröskel ({sig['confidence']}/100) -- shadow-loggad"
+                    print(f"{ticker}: {results[ticker]}")
             else:
                 why = "ingen setup" if not sig else "redan larmat denna bar"
                 results[ticker] = f"{why} (bias {bias})"
