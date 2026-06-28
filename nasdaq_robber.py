@@ -51,9 +51,14 @@ class Config:
 
     # --- Risk ---
     ATR_STOP_MULT  = 1.3          # stop = swing-buffert eller ATR*mult (tightast vinner ej, säkrast)
-    TARGETS_R      = [1.5, 2.5, 4.0]   # mål i R-multiplar
+    TARGETS_R      = [2.0, 2.67]  # TP1 ~2R, TP2 ~2.67R  (≈300/400 kr vid 150 kr risk)
     ACCOUNT_SIZE   = 100_000      # SEK, för positionsstorleksförslag
-    RISK_PCT       = 0.01         # 1% risk per trade
+    RISK_PCT       = 0.01         # 1% risk per trade (appens förslag)
+
+    # --- Live-risk (cTrader) ---  storlek sizas så SL-avståndet = RISK_PER_TRADE_KR
+    RISK_PER_TRADE_KR = int(os.environ.get("RISK_PER_TRADE_KR", "150"))   # max förlust per trade
+    RISK_BUDGET_KR    = int(os.environ.get("RISK_BUDGET_KR", "2600"))     # hård kill-switch (total drawdown)
+    MAX_OPEN          = int(os.environ.get("MAX_OPEN", "1"))              # max samtidiga positioner
 
     # --- Confidence (0-100) ---  summerar till 100 över de TA-komponenter boten faktiskt mäter
     CONF_WEIGHTS = {                        # summa 100 -- ICT-baserad
@@ -496,6 +501,8 @@ def format_alert(sig):
         f"SL: {sig['stop']}   (risk {sig['risk_per_share']}/enhet)",
         tplines,
         f"Risk/Reward: {rrtxt}",
+        f"Plan: risk {Config.RISK_PER_TRADE_KR} kr  \u00b7  TP-mål "
+        + " / ".join(f"~{int(round(Config.RISK_PER_TRADE_KR*r))} kr" for r in Config.TARGETS_R),
     ]
     return "\n".join(lines)
 
@@ -552,6 +559,7 @@ STATUS = {
 def scan_once():
     from zoneinfo import ZoneInfo
     state = load_state()
+    tradable = in_session()   # 06-22 mån-fre: trade-larm/auto tillåtna. Annars: bevaka + shadow.
     fired = 0
     feed = "yfinance"
     print(f"[scan] kalla={feed}")
@@ -580,7 +588,8 @@ def scan_once():
                 sig["confidence"] = conf; sig["groups"] = groups; sig["components"] = comps
 
             if sig and is_fresh(sig, state):
-                send_ok = sig["confidence"] >= Config.CONF_MIN_SEND
+                strong  = sig["confidence"] >= Config.CONF_MIN_SEND
+                send_ok = strong and tradable          # larm bara i handelsfönstret
                 _shadow_log(sig, sent=send_ok)
                 state[f"{sig['ticker']}:{sig['side']}"] = sig["bar_time"]
                 if send_ok:
@@ -593,6 +602,9 @@ def scan_once():
                     fired += 1
                     results[ticker] = f"LARM {sig['side']} {sig['confidence']}/100"
                     maybe_autotrade(sig)
+                elif strong and not tradable:
+                    results[ticker] = f"\U0001F319 natt-setup {sig['confidence']}/100 (bevakad, ej skickad)"
+                    print(f"{ticker}: {results[ticker]}")
                 else:
                     results[ticker] = f"under tröskel ({sig['confidence']}/100) -- shadow-loggad"
                     print(f"{ticker}: {results[ticker]}")
@@ -799,6 +811,29 @@ def poly_context(ticker):
     return "\n".join(lines)
 
 
+def morning_brief():
+    """\U0001F305 Kort lagesbild vid handelsstart: trend + natt-range (Asien) per instrument."""
+    lines = ["\U0001F305 <b>Morgonbrief</b> \u2013 laget infor dagen"]
+    for ticker in Config.TICKERS:
+        name = Config.NAMES.get(ticker, ticker)
+        try:
+            htf = fetch_ohlcv(ticker, Config.HTF_TIMEFRAME, Config.HTF_LOOKBACK_DAYS)
+            mtf = fetch_ohlcv(ticker, Config.MTF_TIMEFRAME, Config.MTF_LOOKBACK_DAYS)
+            if len(htf) < 50 or len(mtf) < 10:
+                lines.append(f"\u2022 <b>{name}</b>: data saknas"); continue
+            bias = htf_bias(htf)
+            recent = mtf.iloc[-32:]                       # ~8h = natt/Asien-range
+            hi = float(recent["High"].max()); lo = float(recent["Low"].min())
+            price = float(mtf["Close"].iloc[-1])
+            tag = ("\U0001F7E2 Bullish" if bias == "LONG"
+                   else ("\U0001F534 Bearish" if bias == "SHORT" else "\u26AA Neutral"))
+            lines.append(f"\u2022 <b>{name}</b>: {tag} \u00b7 natt-range {lo:.1f}\u2013{hi:.1f} \u00b7 nu {price:.1f}")
+        except Exception as e:
+            lines.append(f"\u2022 <b>{name}</b>: fel ({e})")
+    lines.append("\n<i>Skannar dygnet runt \u00b7 trade-larm 06:00\u201322:00.</i>")
+    send_telegram("\n".join(lines))
+
+
 def run_loop():
     print("=== NASDAQ ROBBER startad ===")
     if not Config.ALPACA_KEY or not Config.ALPACA_SECRET:
@@ -809,21 +844,25 @@ def run_loop():
         "\u2705 <b>NASDAQ ROBBER startad</b>\n"
         f"Bevakar: {names}\n"
         f"Setup {Config.MTF_TIMEFRAME} / bias {Config.HTF_TIMEFRAME} \u00b7 larm vid \u2265{Config.MIN_SCORE}/7\n"
-        "Data: yfinance (futures, dygnet runt) \u00b7 session 06:00\u201322:00 m\u00e5n\u2013fre\n"
+        "Skannar 24/7 \u00b7 trade-larm 06:00\u201322:00 m\u00e5n\u2013fre \u00b7 \U0001F305 morgonbrief 06:00\n"
         f"+ Polymarket-monitor: larm vid trades \u2265 ${int(POLY_MIN_USD):,}"
     )
     print(f"Startup-ping till Telegram: {'OK' if ok else 'MISSLYCKADES (kolla TOKEN/CHAT_ID)'}")
     from zoneinfo import ZoneInfo
     STATUS["started"] = datetime.now(ZoneInfo(Config.LOCAL_TZ)).isoformat(timespec="seconds")
+    last_win = None
     while True:
         try:
-            sess = in_session()
-            STATUS["in_session"] = sess
-            if sess:
-                scan_once()
-            else:
-                print("Utanför session — vilar.")
-            poly_scan()  # Polymarket 24/7, oberoende av aktie-session
+            win = in_session()                 # 06-22 mån-fre = handelsfönster
+            STATUS["in_session"] = win
+            if win and last_win is False:       # precis öppnat -> morgonbrief
+                try:
+                    morning_brief()
+                except Exception as e:
+                    print("morgonbrief-fel:", e)
+            last_win = win
+            scan_once()                         # skannar 24/7 (håller koll på natten/Asien)
+            poly_scan()                         # Polymarket 24/7
         except Exception as e:
             # En miss i en cykel får ALDRIG döda tråden / värd-appen.
             print(f"Robber loop-fel (hoppar över cykel): {e}")
