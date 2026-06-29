@@ -44,8 +44,8 @@ class Config:
 
     # --- Confluence thresholds ---
     MIN_SCORE      = int(os.environ.get("ROBBER_MIN_SCORE", "5"))  # av 7; sänk t.ex. till 4 via env för fler larm
-    RSI_LONG_LOW, RSI_LONG_HIGH   = 50, 70
-    RSI_SHORT_LOW, RSI_SHORT_HIGH = 30, 50
+    RSI_LONG_LOW, RSI_LONG_HIGH   = 50, 82   # tak höjt: stark RSI i en pump = momentum, inte svaghet
+    RSI_SHORT_LOW, RSI_SHORT_HIGH = 18, 50   # golv sänkt: stark nedmomentum räknas
     MIN_REL_VOLUME = 1.2          # volym mot 20-snitt
     MIN_ATR_PCT    = 0.0008       # filtrera bort död chop (ATR/pris)
 
@@ -69,9 +69,9 @@ class Config:
         "ob":    11,   # Order Block (retestad)
         "volym":  6,   # Relativ volym
     }
-    CONF_GREEN    = int(os.environ.get("CONF_GREEN",  "90"))   # gron A+ / godkand
-    CONF_YELLOW   = int(os.environ.get("CONF_YELLOW", "70"))   # gul / bevaka
-    CONF_MIN_SEND = int(os.environ.get("CONF_MIN_SEND","70"))  # under denna: tyst (men shadow-loggas)
+    CONF_GREEN    = int(os.environ.get("CONF_GREEN",  "75"))   # gron A+ (stark konfluens)
+    CONF_YELLOW   = int(os.environ.get("CONF_YELLOW", "55"))   # gul / bevaka
+    CONF_MIN_SEND = int(os.environ.get("CONF_MIN_SEND","55"))  # 5/7-basen ar triggern; confidence ar betyget
     SHADOW_LOG    = os.environ.get("SHADOW_LOG", "robber_shadow.jsonl")
 
     # --- Auto-trade (cTrader) -- AVSTANGD som default. Kan inte lagga riktig order
@@ -193,8 +193,8 @@ def score_long(cur, prev, bias) -> tuple[int, list]:
     if cur.rel_vol >= Config.MIN_REL_VOLUME:
         s += 1; reasons.append(f"Relativ volym {cur.rel_vol:.1f}x")
     # pullback-reclaim: förra baren nära/under ema20, nu tillbaka över
-    if prev.Low <= prev.ema20 and cur.Close > cur.ema20:
-        s += 1; reasons.append("Pullback + reclaim av EMA20")
+    if (prev.Low <= prev.ema20 and cur.Close > cur.ema20) or (cur.Close > prev.High):
+        s += 1; reasons.append("Pullback-reclaim / breakout")
     # högre lågpunkt (enkel struktur)
     if cur.Low > prev.Low:
         s += 1; reasons.append("Högre lågpunkt")
@@ -213,8 +213,8 @@ def score_short(cur, prev, bias) -> tuple[int, list]:
         s += 1; reasons.append("MACD-hist fallande < 0")
     if cur.rel_vol >= Config.MIN_REL_VOLUME:
         s += 1; reasons.append(f"Relativ volym {cur.rel_vol:.1f}x")
-    if prev.High >= prev.ema20 and cur.Close < cur.ema20:
-        s += 1; reasons.append("Studs + reject av EMA20")
+    if (prev.High >= prev.ema20 and cur.Close < cur.ema20) or (cur.Close < prev.Low):
+        s += 1; reasons.append("Studs-reject / breakdown")
     if cur.High < prev.High:
         s += 1; reasons.append("Lägre högpunkt")
     return s, reasons
