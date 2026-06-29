@@ -70,8 +70,8 @@ class Config:
         "volym":  6,   # Relativ volym
     }
     CONF_GREEN    = int(os.environ.get("CONF_GREEN",  "90"))   # gron A+ / godkand
-    CONF_YELLOW   = int(os.environ.get("CONF_YELLOW", "80"))   # gul / bevaka
-    CONF_MIN_SEND = int(os.environ.get("CONF_MIN_SEND","80"))  # under denna: tyst (men shadow-loggas)
+    CONF_YELLOW   = int(os.environ.get("CONF_YELLOW", "70"))   # gul / bevaka
+    CONF_MIN_SEND = int(os.environ.get("CONF_MIN_SEND","70"))  # under denna: tyst (men shadow-loggas)
     SHADOW_LOG    = os.environ.get("SHADOW_LOG", "robber_shadow.jsonl")
 
     # --- Auto-trade (cTrader) -- AVSTANGD som default. Kan inte lagga riktig order
