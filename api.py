@@ -275,7 +275,7 @@ def regime_of(ticker):
 
 
 import gc as _gc
-SCAN_CHUNK = int(os.environ.get("SCAN_CHUNK", "150"))   # Pro 4GB: större bitar = snabbare svep, gott om minne
+SCAN_CHUNK = int(os.environ.get("SCAN_CHUNK", "40"))   # Starter 512MB-säkert. Mer RAM? Höj via env SCAN_CHUNK.
 
 @cached(600)
 def scan_universe(theme_key: Optional[str] = None) -> list:
