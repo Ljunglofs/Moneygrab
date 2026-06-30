@@ -24,8 +24,12 @@ from ta.volatility import AverageTrueRange
 # ==================================================================
 class Config:
     # --- Universe ---
-    TICKERS = ["NQ=F", "GC=F", "BTC-USD"]   # US100 (Nasdaq futures), Guld futures, Bitcoin – via yfinance (dygnet-runt-data)
+    TICKERS = ["NQ=F"]   # Nasdaq-only (US100). Lägg tillbaka "GC=F","BTC-USD" för fler instrument.
     NAMES   = {"NQ=F": "US100", "GC=F": "Guld", "BTC-USD": "Bitcoin"}
+    # Killzone-viktning (confidence-justering efter svensk tid) — Nasdaq lever på US-sessionen
+    KZ_OPEN = int(os.environ.get("KZ_OPEN", "12"))    # bonus: US-öppning 15:30-17:30
+    KZ_US   = int(os.environ.get("KZ_US",   "6"))     # bonus: övrig US-session 17:30-22:00
+    KZ_OFF  = int(os.environ.get("KZ_OFF",  "-15"))   # straff: natt/Asien/EU-morgon (lågvolym-chop)
 
     # --- Timeframes (Alpaca-format) ---
     HTF_TIMEFRAME     = "1Hour"   # high-timeframe bias
@@ -556,6 +560,20 @@ STATUS = {
 }
 
 
+def killzone_adjust(now_local):
+    """Confidence-justering för Nasdaq efter session (svensk tid).
+    US cash-sessionen 15:30-22:00 är prime (öppningen 15:30-17:30 bäst);
+    förmarknad/överlapp neutral; natt/Asien/EU-morgon är lågvolym-chop och straffas."""
+    h = now_local.hour + now_local.minute / 60.0
+    if 15.5 <= h < 17.5:
+        return Config.KZ_OPEN, "NY open killzone"
+    if 17.5 <= h < 22.0:
+        return Config.KZ_US, "US-session"
+    if 13.0 <= h < 15.5:
+        return 0, "EU/US-överlapp"
+    return Config.KZ_OFF, "lågvolym/chop"
+
+
 def scan_once():
     from zoneinfo import ZoneInfo
     state = load_state()
@@ -585,7 +603,10 @@ def scan_once():
             sig = build_signal(ticker, mtf, bias)
             if sig:
                 conf, comps, groups = compute_confidence(mtf, bias, sig["side"])
+                kz_delta, kz_label = killzone_adjust(datetime.now(ZoneInfo(Config.LOCAL_TZ)))
+                conf = max(0, min(100, conf + kz_delta))
                 sig["confidence"] = conf; sig["groups"] = groups; sig["components"] = comps
+                sig["killzone"] = kz_label; sig["kz_delta"] = kz_delta
 
             if sig and is_fresh(sig, state):
                 strong  = sig["confidence"] >= Config.CONF_MIN_SEND
@@ -594,6 +615,9 @@ def scan_once():
                 state[f"{sig['ticker']}:{sig['side']}"] = sig["bar_time"]
                 if send_ok:
                     msg = format_alert(sig)
+                    if sig.get("killzone"):
+                        _d = sig.get("kz_delta", 0)
+                        msg += f"\n\U0001F551 {sig['killzone']}" + (f" ({_d:+d})" if _d else "")
                     ctx = poly_context(sig["ticker"])
                     if ctx:
                         msg = msg + "\n\n" + ctx
