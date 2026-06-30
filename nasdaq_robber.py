@@ -56,6 +56,10 @@ class Config:
     # --- Risk ---
     ATR_STOP_MULT  = 1.3          # stop = swing-buffert eller ATR*mult (tightast vinner ej, säkrast)
     TARGETS_R      = [2.0, 2.67]  # TP1 ~2R, TP2 ~2.67R  (≈300/400 kr vid 150 kr risk)
+    # Nivå-medvetna TP: snäpp R-målet till närmaste logiska nivå (PDH/PDL, runda tal)
+    SNAP_TP    = os.environ.get("SNAP_TP", "1") == "1"
+    ROUND_STEP = float(os.environ.get("ROUND_STEP", "100"))   # runda nivåer (NQ: 100-punkterssteg)
+    SNAP_WIN_R = float(os.environ.get("SNAP_WIN_R", "0.6"))    # snäpp-fönster ovanför R-målet (i R)
     ACCOUNT_SIZE   = 100_000      # SEK, för positionsstorleksförslag
     RISK_PCT       = 0.01         # 1% risk per trade (appens förslag)
 
@@ -224,6 +228,53 @@ def score_short(cur, prev, bias) -> tuple[int, list]:
     return s, reasons
 
 
+def _tp_levels(df, price):
+    """Logiska nivåer nära priset: gårdagens high/low (PDH/PDL) + runda tal."""
+    levels = {}
+    try:
+        dates = np.array([t.date() for t in df.index])
+        uniq = sorted(set(dates.tolist()))
+        if len(uniq) >= 2:
+            m = dates == uniq[-2]
+            levels[round(float(df["High"].values[m].max()), 2)] = "PDH"
+            levels[round(float(df["Low"].values[m].min()), 2)]  = "PDL"
+    except Exception:
+        pass
+    step = Config.ROUND_STEP
+    if step > 0:
+        base = round(price / step) * step
+        for k in range(-4, 5):
+            v = round(base + k * step, 2)
+            levels.setdefault(v, f"rund {v:g}")
+    return levels
+
+
+def _snap_targets(targets, price, stop, side, levels):
+    """Behåll R som golv, men snäpp varje TP till närmaste logiska nivå inom ett fönster."""
+    if not Config.SNAP_TP or not levels:
+        return list(targets), ["" for _ in targets]
+    risk = abs(price - stop) or 1e-9
+    win, tol = risk * Config.SNAP_WIN_R, risk * 0.05
+    out, labs = [], []
+    items = sorted(levels.items())
+    for bt in targets:
+        cand, lab, best = bt, "", win + tol + 1
+        for v, name in items:
+            lo, hi = (bt - tol, bt + win) if side == "LONG" else (bt - win, bt + tol)
+            if lo <= v <= hi and abs(v - bt) < best:
+                best, cand, lab = abs(v - bt), round(v, 2), name
+        out.append(cand); labs.append(lab)
+    for i in range(len(out)):                      # håll bortom entry
+        beyond = out[i] > price if side == "LONG" else out[i] < price
+        if not beyond:
+            out[i], labs[i] = targets[i], ""
+    for i in range(1, len(out)):                   # håll ordning TP1<TP2 (resp. omvänt)
+        bad = out[i] <= out[i-1] if side == "LONG" else out[i] >= out[i-1]
+        if bad:
+            out[i], labs[i] = targets[i], ""
+    return out, labs
+
+
 def build_signal(ticker, df, bias):
     cur, prev = df.iloc[-1], df.iloc[-2]
     price = round(float(cur.Close), 2)
@@ -263,12 +314,14 @@ def build_signal(ticker, df, bias):
     if risk <= 0:
         return None
 
+    targets, tp_labels = _snap_targets(targets, price, stop, side, _tp_levels(df, price))
+
     shares = math.floor((Config.ACCOUNT_SIZE * Config.RISK_PCT) / risk)
 
     return {
         "ticker": ticker, "side": side, "score": score, "max_score": 7,
         "price": price, "atr": round(atr, 2), "stop": stop,
-        "risk_per_share": round(risk, 2), "targets": targets,
+        "risk_per_share": round(risk, 2), "targets": targets, "tp_labels": tp_labels,
         "shares": shares, "bias": bias, "reasons": reasons,
         "bar_time": df.index[-1].isoformat(),
     }
@@ -491,7 +544,10 @@ def format_alert(sig):
     core_lines = ["   ".join(f"{k}: {check if v else cross}" for k, v in _it[i:i+3])
                   for i in range(0, len(_it), 3)]
     tgs = sig["targets"]; rr = Config.TARGETS_R
-    tplines = "   ".join(f"TP{i+1}: {t}" for i, t in enumerate(tgs))
+    _labs = sig.get("tp_labels") or []
+    tplines = "   ".join(
+        f"TP{i+1}: {t}" + (f" ({_labs[i]})" if i < len(_labs) and _labs[i] else "")
+        for i, t in enumerate(tgs))
     rrtxt = " / ".join(f"1:{r:g}" for r in rr)
     lines = [
         f"{dot} <b>{side_txt} \u2013 {name}</b>  ({sig['ticker']})",
