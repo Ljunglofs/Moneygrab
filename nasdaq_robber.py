@@ -88,6 +88,7 @@ class Config:
     TRADE_MAX_HRS = float(os.environ.get("TRADE_MAX_HRS", "24"))   # timeout om varken TP/SL nås
     TRACK_SHADOW  = os.environ.get("TRACK_SHADOW", "0") == "1"     # följ även osända kandidater (default bara sända)
     NOTIFY_CLOSE  = os.environ.get("NOTIFY_CLOSE", "1") == "1"     # notis när en trade stänger
+    STATS_ANY_CHAT = os.environ.get("STATS_ANY_CHAT", "0") == "1"  # svara på /stats från valfri chat (default bara ägaren)
 
     # --- Auto-trade (cTrader) -- AVSTANGD som default. Kan inte lagga riktig order
     #     utan att BADE AUTO_TRADE=1 OCH AUTO_TRADE_LIVE=1 ar satta. ---
@@ -647,7 +648,7 @@ def stats_text():
     return "\n".join(out)
 
 
-def send_telegram(text):
+def send_telegram(text, chat_id=None):
     if not Config.TELEGRAM_TOKEN or not Config.CHAT_ID:
         miss = []
         if not Config.TELEGRAM_TOKEN: miss.append("TELEGRAM_TOKEN")
@@ -657,7 +658,7 @@ def send_telegram(text):
     import requests
     url = f"https://api.telegram.org/bot{Config.TELEGRAM_TOKEN}/sendMessage"
     try:
-        r = requests.post(url, json={"chat_id": Config.CHAT_ID, "text": text,
+        r = requests.post(url, json={"chat_id": chat_id or Config.CHAT_ID, "text": text,
                                      "parse_mode": "HTML"}, timeout=10)
         if r.status_code != 200:
             print(f"Telegram-API {r.status_code}: {r.text[:200]}")
@@ -1065,6 +1066,61 @@ def morning_brief():
     send_telegram("\n".join(lines))
 
 
+def _open_text():
+    trades = _jload(Config.OPEN_TRADES, [])
+    if not trades:
+        return "Inga \u00f6ppna trades just nu."
+    out = [f"\U0001F4C2 <b>\u00d6ppna trades: {len(trades)}</b>"]
+    for t in trades[:20]:
+        out.append(f"{Config.NAMES.get(t['ticker'], t['ticker'])} {t['side']} \u00b7 entry {t['entry']} "
+                   f"\u00b7 SL {t['sl']} \u00b7 TP {t['targets'][0]} \u00b7 conf {t.get('confidence')}")
+    return "\n".join(out)
+
+
+def command_listener():
+    """Lyssnar p\u00e5 Telegram-kommandon (/stats, /open) via long-polling i egen tr\u00e5d."""
+    if not Config.TELEGRAM_TOKEN:
+        return
+    import requests
+    base = f"https://api.telegram.org/bot{Config.TELEGRAM_TOKEN}"
+    offset = None
+    try:                                   # dr\u00e4nera gamla updates -> svara bara p\u00e5 nya kommandon
+        r = requests.get(f"{base}/getUpdates", params={"timeout": 0}, timeout=15).json()
+        if r.get("ok") and r.get("result"):
+            offset = r["result"][-1]["update_id"] + 1
+    except Exception:
+        pass
+    print("Kommando-lyssnare ig\u00e5ng (/stats).")
+    while True:
+        try:
+            params = {"timeout": 30}
+            if offset is not None:
+                params["offset"] = offset
+            r = requests.get(f"{base}/getUpdates", params=params, timeout=40).json()
+            if not r.get("ok"):
+                time.sleep(5); continue
+            for upd in r.get("result", []):
+                offset = upd["update_id"] + 1
+                msg = upd.get("message") or upd.get("channel_post") or {}
+                text = (msg.get("text") or "").strip()
+                if not text:
+                    continue
+                chat_id = str((msg.get("chat") or {}).get("id", ""))
+                if not Config.STATS_ANY_CHAT and chat_id != str(Config.CHAT_ID):
+                    continue
+                cmd = text.split()[0].lower().split("@")[0]
+                if cmd in ("/stats", "/statistik"):
+                    send_telegram(stats_text(), chat_id)
+                elif cmd == "/open":
+                    send_telegram(_open_text(), chat_id)
+                elif cmd in ("/start", "/help"):
+                    send_telegram("\U0001F916 <b>NASDAQ ROBBER</b>\nKommandon:\n"
+                                  "/stats \u2013 tr\u00e4ffprocent &amp; R\n/open \u2013 \u00f6ppna trades", chat_id)
+        except Exception as e:
+            print("command-listener fel:", e)
+            time.sleep(5)
+
+
 def run_loop():
     print("=== NASDAQ ROBBER startad ===")
     if not Config.ALPACA_KEY or not Config.ALPACA_SECRET:
@@ -1079,6 +1135,8 @@ def run_loop():
         f"+ Polymarket-monitor: larm vid trades \u2265 ${int(POLY_MIN_USD):,}"
     )
     print(f"Startup-ping till Telegram: {'OK' if ok else 'MISSLYCKADES (kolla TOKEN/CHAT_ID)'}")
+    import threading as _th
+    _th.Thread(target=command_listener, daemon=True, name="cmd-listener").start()
     from zoneinfo import ZoneInfo
     STATUS["started"] = datetime.now(ZoneInfo(Config.LOCAL_TZ)).isoformat(timespec="seconds")
     last_win = None
