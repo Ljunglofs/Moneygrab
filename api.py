@@ -273,17 +273,25 @@ def regime_of(ticker):
     return "BLANDAD", pct
 
 
+import gc as _gc
+SCAN_CHUNK = int(os.environ.get("SCAN_CHUNK", "150"))   # Pro 4GB: större bitar = snabbare svep, gott om minne
+
 @cached(600)
 def scan_universe(theme_key: Optional[str] = None) -> list:
-    """Scannar hela universumet (eller ett tema). Cachas 10 min."""
+    """Scannar universumet i bitar och tömmer råprisdata mellan varje bit.
+    Håller minnet nere på Render Starter (512 MB) -> inga OOM-omstarter."""
     tickers = UNIVERSE.get(theme_key, []) if theme_key else ALL_TICKERS
-    prefetch(tickers)                 # batch-hämta allt i få Yahoo-anrop
     out = []
-    for t in tickers:
-        a = scan(t)
-        if a:
-            a["hetta"] = hetta_of(a)
-            out.append(_jsonable(a))
+    for i in range(0, len(tickers), SCAN_CHUNK):
+        chunk = tickers[i:i + SCAN_CHUNK]
+        prefetch(chunk)               # hämta bara denna bit
+        for t in chunk:
+            a = scan(t)
+            if a:
+                a["hetta"] = hetta_of(a)
+                out.append(_jsonable(a))
+        _PREFETCH.clear()             # släpp råa prisdataframes direkt
+        _gc.collect()                 # ge minnet tillbaka till OS
     return out
 
 # =====================================================================
