@@ -81,6 +81,13 @@ class Config:
     CONF_YELLOW   = int(os.environ.get("CONF_YELLOW", "55"))   # gul / bevaka
     CONF_MIN_SEND = int(os.environ.get("CONF_MIN_SEND","55"))  # 5/7-basen ar triggern; confidence ar betyget
     SHADOW_LOG    = os.environ.get("SHADOW_LOG", "robber_shadow.jsonl")
+    # --- Trade-journal (utfall + stats) ---
+    DATA_DIR      = os.environ.get("DATA_DIR", ".")   # peka på Render Persistent Disk (t.ex. /var/data) för beständighet
+    OPEN_TRADES   = os.path.join(DATA_DIR, "robber_open_trades.json")
+    OUTCOMES_LOG  = os.path.join(DATA_DIR, "robber_outcomes.jsonl")
+    TRADE_MAX_HRS = float(os.environ.get("TRADE_MAX_HRS", "24"))   # timeout om varken TP/SL nås
+    TRACK_SHADOW  = os.environ.get("TRACK_SHADOW", "0") == "1"     # följ även osända kandidater (default bara sända)
+    NOTIFY_CLOSE  = os.environ.get("NOTIFY_CLOSE", "1") == "1"     # notis när en trade stänger
 
     # --- Auto-trade (cTrader) -- AVSTANGD som default. Kan inte lagga riktig order
     #     utan att BADE AUTO_TRADE=1 OCH AUTO_TRADE_LIVE=1 ar satta. ---
@@ -502,6 +509,144 @@ def maybe_autotrade(sig):
 # ==================================================================
 # LARM / STATE
 # ==================================================================
+def _jload(path, default):
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except Exception:
+        return default
+
+
+def _jsave(path, obj):
+    try:
+        with open(path, "w") as f:
+            json.dump(obj, f)
+    except Exception as e:
+        print("journal-skrivfel:", e)
+
+
+def open_trade(sig, sent):
+    """Lägg en signal som öppen trade att följa upp (TP1/SL)."""
+    if not sent and not Config.TRACK_SHADOW:
+        return
+    trades = _jload(Config.OPEN_TRADES, [])
+    tid = f"{sig['ticker']}:{sig['side']}:{sig['bar_time']}"
+    if any(t.get("id") == tid for t in trades):
+        return
+    trades.append({
+        "id": tid, "ticker": sig["ticker"], "side": sig["side"],
+        "entry": sig["price"], "sl": sig["stop"], "targets": sig["targets"],
+        "confidence": sig.get("confidence"), "score7": sig.get("score"),
+        "killzone": sig.get("killzone", ""), "bias": sig.get("bias"),
+        "sent": bool(sent),
+        "opened_ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "bar_time": sig["bar_time"],
+    })
+    _jsave(Config.OPEN_TRADES, trades)
+
+
+def _eval_trade(t, df, r1):
+    """(outcome, R, tid) eller (None,None,None) om fortfarande öppen. SL först vid krock."""
+    side, sl, tp1 = t["side"], t["sl"], t["targets"][0]
+    try:
+        after = df[df.index > pd.Timestamp(t["bar_time"])]
+    except Exception:
+        after = df.iloc[0:0]
+    for ts, row in after.iterrows():
+        hi, lo = float(row["High"]), float(row["Low"])
+        sl_hit = (lo <= sl) if side == "LONG" else (hi >= sl)
+        tp_hit = (hi >= tp1) if side == "LONG" else (lo <= tp1)
+        if sl_hit:
+            return "SL", -1.0, ts
+        if tp_hit:
+            return "TP1", round(float(r1), 2), ts
+    try:
+        age_h = (datetime.now(timezone.utc) - datetime.fromisoformat(t["opened_ts"])).total_seconds() / 3600.0
+    except Exception:
+        age_h = 0.0
+    if age_h > Config.TRADE_MAX_HRS and len(df):
+        last = float(df["Close"].iloc[-1]); risk = abs(t["entry"] - t["sl"]) or 1e-9
+        r = (last - t["entry"]) / risk if side == "LONG" else (t["entry"] - last) / risk
+        return "timeout", round(r, 2), df.index[-1]
+    return None, None, None
+
+
+def settle_trades(ticker, df):
+    """Stänger öppna trades för en ticker som nått TP1/SL/timeout. Returnerar stängda."""
+    trades = _jload(Config.OPEN_TRADES, [])
+    if not trades:
+        return []
+    r1 = Config.TARGETS_R[0]
+    still, closed = [], []
+    for t in trades:
+        if t.get("ticker") != ticker:
+            still.append(t); continue
+        outcome, r, when = _eval_trade(t, df, r1)
+        if outcome is None:
+            still.append(t); continue
+        rec = {**t, "outcome": outcome, "r": r,
+               "closed_ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+               "closed_bar": str(when)}
+        try:
+            with open(Config.OUTCOMES_LOG, "a") as f:
+                f.write(json.dumps(rec) + "\n")
+        except Exception as e:
+            print("outcome-skrivfel:", e)
+        closed.append(rec)
+    if closed:
+        _jsave(Config.OPEN_TRADES, still)
+    return closed
+
+
+def _summarize(rows):
+    n = len(rows)
+    if not n:
+        return None
+    wins = sum(1 for r in rows if r.get("outcome") == "TP1")
+    losses = sum(1 for r in rows if r.get("outcome") == "SL")
+    tos = sum(1 for r in rows if r.get("outcome") == "timeout")
+    decided = wins + losses
+    totR = sum(float(r.get("r") or 0) for r in rows)
+    return dict(n=n, wins=wins, losses=losses, tos=tos,
+                wr=(wins / decided * 100) if decided else 0.0,
+                totR=totR, avgR=totR / n)
+
+
+def stats_text():
+    """Läser outcomes-loggen och bygger en stats-rapport."""
+    recs = []
+    try:
+        with open(Config.OUTCOMES_LOG) as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    recs.append(json.loads(line))
+    except Exception:
+        pass
+    rows = [r for r in recs if r.get("sent")] or recs
+    s = _summarize(rows)
+    if not s:
+        return "\U0001F4CA <b>Robber-stats</b>: inga avgjorda trades \u00e4n."
+    out = [
+        "\U0001F4CA <b>Robber-stats</b>",
+        f"Trades: {s['n']}  \u00b7  \u2705 {s['wins']}  \u274c {s['losses']}"
+        + (f"  \u23F1 {s['tos']}" if s['tos'] else ""),
+        f"Tr\u00e4ffprocent: <b>{s['wr']:.0f}%</b>",
+        f"Summa: <b>{s['totR']:+.1f}R</b>  \u00b7  snitt {s['avgR']:+.2f}R/trade",
+    ]
+    from collections import defaultdict
+    by = defaultdict(list)
+    for r in rows:
+        by[r.get("killzone") or "-"].append(r)
+    if len(by) > 1:
+        out.append("\u2500" * 5)
+        for kz, rws in sorted(by.items(), key=lambda x: -len(x[1])):
+            ss = _summarize(rws)
+            if ss:
+                out.append(f"{kz}: {ss['n']}st \u00b7 {ss['wr']:.0f}% \u00b7 {ss['totR']:+.1f}R")
+    return "\n".join(out)
+
+
 def send_telegram(text):
     if not Config.TELEGRAM_TOKEN or not Config.CHAT_ID:
         miss = []
@@ -655,6 +800,11 @@ def scan_once():
                 print(f"{ticker}: {results[ticker]}"); continue
 
             mtf = add_indicators(mtf)
+            for _c in settle_trades(ticker, mtf):
+                if Config.NOTIFY_CLOSE and _c.get("sent"):
+                    _e = "\u2705" if _c["outcome"] == "TP1" else ("\u274c" if _c["outcome"] == "SL" else "\u23F1")
+                    send_telegram(f"{_e} <b>{Config.NAMES.get(ticker, ticker)} {_c['side']}</b> st\u00e4ngd: "
+                                  f"{_c['outcome']} ({_c['r']:+.2f}R) \u00b7 entry {_c['entry']}")
             bias = htf_bias(htf)
             sig = build_signal(ticker, mtf, bias)
             if sig:
@@ -668,6 +818,7 @@ def scan_once():
                 strong  = sig["confidence"] >= Config.CONF_MIN_SEND
                 send_ok = strong and tradable          # larm bara i handelsfönstret
                 _shadow_log(sig, sent=send_ok)
+                open_trade(sig, send_ok)
                 state[f"{sig['ticker']}:{sig['side']}"] = sig["bar_time"]
                 if send_ok:
                     msg = format_alert(sig)
@@ -940,6 +1091,10 @@ def run_loop():
                     morning_brief()
                 except Exception as e:
                     print("morgonbrief-fel:", e)
+                try:
+                    send_telegram(stats_text())
+                except Exception as e:
+                    print("stats-fel:", e)
             last_win = win
             scan_once()                         # skannar 24/7 (håller koll på natten/Asien)
             poly_scan()                         # Polymarket 24/7
