@@ -70,12 +70,14 @@ class Config:
 
     # --- Confidence (0-100) ---  summerar till 100 över de TA-komponenter boten faktiskt mäter
     CONF_WEIGHTS = {                        # summa 100 -- ICT-baserad
-        "trend": 22,   # HTF-bias + EMA-stack + momentum (partiellt)
-        "sweep": 22,   # Liquidity sweep
-        "mss":   22,   # Market Structure Shift / CHOCH
-        "fvg":   17,   # Fair Value Gap (retestad)
-        "ob":    11,   # Order Block (retestad)
-        "volym":  6,   # Relativ volym
+        "trend":     20,   # HTF-bias + EMA-stack + momentum (partiellt)
+        "sweep":     20,   # Liquidity sweep
+        "bos":       16,   # Break of Structure -- brytning MED htf-bias (fortsättning)
+        "choch":      8,   # Change of Character -- brytning MOT htf-bias (tidig vändning, svagare tills bekräftad)
+        "fvg":       14,   # Fair Value Gap (retestad)
+        "ob":        10,   # Order Block (retestad)
+        "volym":      4,   # Relativ volym
+        "orderflow":  8,   # Volymproxy köp/säljtryck (CLV x volym, ackumulerat)
     }
     CONF_GREEN    = int(os.environ.get("CONF_GREEN",  "75"))   # gron A+ (stark konfluens)
     CONF_YELLOW   = int(os.environ.get("CONF_YELLOW", "55"))   # gul / bevaka
@@ -433,6 +435,27 @@ def detect_ob(df, side, lookback=20, impulse_atr=0.8):
     return False, None
 
 
+def detect_orderflow(df, side, lookback=10):
+    """Volymproxy for orderflow (ingen tick-data tillganglig via yfinance for NQ).
+    Close-Location-Value (Chaikin-stil) x volym, ackumulerat over `lookback` barer:
+    stangning nara high med volym = kopptryck, nara low med volym = saljtryck.
+    Returnerar (aligned: bool, norm: -1..1 dar norm ar nettotryckets andel av total volym)."""
+    H = df["High"].to_numpy(); L = df["Low"].to_numpy()
+    C = df["Close"].to_numpy(); V = df["Volume"].to_numpy()
+    n = len(C)
+    a = max(0, n - lookback)
+    if n - a < 3:
+        return False, 0.0
+    rng = H[a:n] - L[a:n]
+    rng = np.where(rng == 0, np.nan, rng)
+    clv = ((C[a:n] - L[a:n]) - (H[a:n] - C[a:n])) / rng
+    clv = np.nan_to_num(clv, nan=0.0)
+    vol_sum = float(np.nansum(V[a:n])) or 1.0
+    norm = float(np.nansum(clv * V[a:n])) / vol_sum   # -1..1
+    aligned = (norm > 0.15) if side == "LONG" else (norm < -0.15)
+    return bool(aligned), round(norm, 2)
+
+
 def compute_confidence(df, bias, side):
     """0-100 ur trend + ICT-detektorer + volym. Ror inte score_long/short."""
     cur, prev = df.iloc[-1], df.iloc[-2]
@@ -450,24 +473,32 @@ def compute_confidence(df, bias, side):
     vol = bool(cur.rel_vol >= Config.MIN_REL_VOLUME)
     sweep, sweep_lvl = detect_sweep(df, side)
     mss,   mss_lvl   = detect_mss(df, side)
+    # BOS = strukturbrytning MED htf-bias (fortsättning) -> stark signal
+    # CHoCH = strukturbrytning MOT htf-bias, eller bias NEUTRAL -> tidig vändning, svagare tills bekräftad
+    bos   = bool(mss and bias == side)
+    choch = bool(mss and not bos)
     fvg,   fvg_zone  = detect_fvg(df, side)
     ob,    ob_zone   = detect_ob(df, side)
+    flow_ok, flow_delta = detect_orderflow(df, side)
     W = Config.CONF_WEIGHTS
     conf = (W["trend"] * trend_frac
-            + (W["sweep"] if sweep else 0)
-            + (W["mss"]   if mss   else 0)
-            + (W["fvg"]   if fvg   else 0)
-            + (W["ob"]    if ob    else 0)
-            + (W["volym"] if vol   else 0))
+            + (W["sweep"]     if sweep   else 0)
+            + (W["bos"]       if bos     else 0)
+            + (W["choch"]     if choch   else 0)
+            + (W["fvg"]       if fvg     else 0)
+            + (W["ob"]        if ob      else 0)
+            + (W["volym"]     if vol     else 0)
+            + (W["orderflow"] if flow_ok else 0))
     conf = max(0, min(100, int(round(conf))))
     groups = {
-        "Trend": trend_frac >= 0.5, "Liquidity Sweep": bool(sweep), "MSS": bool(mss),
-        "FVG": bool(fvg), "Order Block": bool(ob), "Volym": vol,
+        "Trend": trend_frac >= 0.5, "Liquidity Sweep": bool(sweep), "BOS": bos, "CHoCH": choch,
+        "FVG": bool(fvg), "Order Block": bool(ob), "Volym": vol, "Orderflow": flow_ok,
     }
     comps = {
         "trend_frac": round(trend_frac, 2), "htf": htf, "ema": ema, "mom": mom,
-        "sweep": bool(sweep), "sweep_lvl": sweep_lvl, "mss": bool(mss), "mss_lvl": mss_lvl,
+        "sweep": bool(sweep), "sweep_lvl": sweep_lvl, "bos": bos, "choch": choch, "mss_lvl": mss_lvl,
         "fvg": bool(fvg), "fvg_zone": fvg_zone, "ob": bool(ob), "ob_zone": ob_zone, "volym": vol,
+        "orderflow": flow_ok, "orderflow_delta": flow_delta,
     }
     return conf, comps, groups
 
