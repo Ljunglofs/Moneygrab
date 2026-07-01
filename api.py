@@ -919,6 +919,63 @@ def events():
     return {"events": _events_list()}
 
 
+# ----- MAKROKALENDER (gratis, ingen nyckel — ForexFactory veckofeed) --
+_FF_IMPACT = {"High": "High", "Medium": "Medium", "Low": "Low", "Holiday": "Low"}
+_FF_COUNTRY_FLAG = {
+    "USD": "🇺🇸", "EUR": "🇪🇺", "GBP": "🇬🇧", "JPY": "🇯🇵", "CHF": "🇨🇭",
+    "CAD": "🇨🇦", "AUD": "🇦🇺", "NZD": "🇳🇿", "CNY": "🇨🇳", "SEK": "🇸🇪",
+}
+
+@cached(1800)
+def _macro_events():
+    """Kommande makrohändelser (räntebesked, CPI, NFP osv), gratis ForexFactory-feed.
+    Ingen API-nyckel krävs. Filtrerar bort låg-impact/helgdagar och sorterar tidsmässigt."""
+    import requests
+    import datetime as _dt
+    try:
+        r = requests.get("https://nfs.faireconomy.media/ff_calendar_thisweek.json", timeout=8)
+        r.raise_for_status()
+        raw = r.json()
+    except Exception:
+        return []
+    out = []
+    now = _dt.datetime.utcnow()
+    for e in (raw or []):
+        impact = _FF_IMPACT.get(e.get("impact", ""), "Low")
+        if impact == "Low":
+            continue  # bara Medium/High är relevant att visa
+        title = (e.get("title") or "").strip()
+        country = e.get("country") or ""
+        if not title:
+            continue
+        ts = e.get("date") or ""  # ISO 8601, t.ex. 2026-07-03T12:30:00-04:00
+        try:
+            dt = _dt.datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            date_s = dt.strftime("%d %b")
+            time_s = dt.strftime("%H:%M")
+            if dt.replace(tzinfo=None) < now - _dt.timedelta(hours=6):
+                continue  # redan passerat
+        except Exception:
+            date_s, time_s = "", ""
+            dt = None
+        out.append({
+            "date": date_s, "time": time_s,
+            "country": _FF_COUNTRY_FLAG.get(country, country),
+            "title": title, "impact": impact,
+            "forecast": e.get("forecast") or "", "previous": e.get("previous") or "",
+            "_sort": dt.isoformat() if dt else "9999",
+        })
+    out.sort(key=lambda x: x["_sort"])
+    for e in out:
+        e.pop("_sort", None)
+    return out[:15]
+
+
+@app.get("/api/macro")
+def macro():
+    return {"events": _macro_events()}
+
+
 # ----- GRAF: pris + volym över olika tidsramar -----------------------
 _RANGE = {
     "1d":  ("1d",  "5m"),
@@ -1616,14 +1673,21 @@ def ai_news(ticker: str):
     if not heads:
         return {"ticker": tk, "text": "", "sentiment": "", "headlines": []}
     sysp = ("Du är Grabit. Sammanfatta nyhetsläget för aktien på svenska i 1-2 meningar: "
-            "vad hände och varför det kan röra kursen. Avsluta med EN rad exakt: "
-            "'Stämpel: Positivt' eller 'Stämpel: Negativt' eller 'Stämpel: Neutralt'. "
-            "Tolka bara rubrikerna, hitta inte på.")
+            "vad hände och varför det kan röra kursen. Avsluta med EXAKT TVÅ rader:\n"
+            "'Stämpel: Positivt' eller 'Stämpel: Negativt' eller 'Stämpel: Neutralt'\n"
+            "'Kategori: X' där X är EN av: FDA, Kontrakt, Förvärv, Produktlansering, "
+            "Rapport, Analytiker, Personal, Marknad, Övrigt — välj den som bäst matchar "
+            "huvudnyheten. Tolka bara rubrikerna, hitta inte på.")
     txt = _ai_text("news:%s:%x" % (tk, hash(tuple(heads[:6])) & 0xffffff),
                    sysp, "Aktie %s. Rubriker:\n- %s" % (tk, "\n- ".join(heads[:6])), 240)
     low = txt.lower()
     senti = "pos" if "positivt" in low else "neg" if "negativt" in low else "neu" if "neutralt" in low else ""
-    return {"ticker": tk, "text": txt, "sentiment": senti, "headlines": heads[:6]}
+    _CAT_TAXONOMY = ["FDA", "Kontrakt", "Förvärv", "Produktlansering", "Rapport",
+                      "Analytiker", "Personal", "Marknad", "Övrigt"]
+    _CAT_LOOKUP = {c.lower(): c for c in _CAT_TAXONOMY}
+    kat_m = _re.search(r"Kategori:\s*(\w+)", txt, _re.I)
+    kategori = _CAT_LOOKUP.get(kat_m.group(1).strip().lower(), "") if kat_m else ""
+    return {"ticker": tk, "text": txt, "sentiment": senti, "headlines": heads[:6], "category": kategori}
 
 
 _SV_MONTHS = ["januari", "februari", "mars", "april", "maj", "juni", "juli",

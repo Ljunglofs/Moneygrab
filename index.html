@@ -225,6 +225,18 @@ main{padding:16px 16px 110px}
 .aibrief .ai-h{display:flex;align-items:center;gap:7px;font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--gold2);margin-bottom:8px}
 .aibrief .ai-h .dot2{width:6px;height:6px;border-radius:50%;background:var(--gold);box-shadow:0 0 7px var(--gold)}
 .aibrief p{font-size:12.5px;line-height:1.5;color:#cdd5e1}
+.cat-badge{display:inline-block;font-size:9.5px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;color:var(--gold2);background:rgba(245,197,66,.12);border:1px solid rgba(245,197,66,.35);border-radius:5px;padding:1px 6px;margin-left:6px;vertical-align:middle}
+.macrocal{padding:14px 15px}
+.macrocal .ai-h{display:flex;align-items:center;gap:7px;font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--gold2);margin-bottom:9px}
+.macrocal .ai-h .dot2{width:6px;height:6px;border-radius:50%;background:var(--gold);box-shadow:0 0 7px var(--gold)}
+.macro-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 0;border-top:1px solid rgba(255,255,255,.06)}
+.macro-row:first-of-type{border-top:none}
+.macro-dt{font-size:10.5px;color:var(--mut);width:74px;flex-shrink:0}
+.macro-mid{display:flex;align-items:center;gap:6px;flex:1;min-width:0}
+.macro-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.macro-ttl{font-size:12px;color:#cdd5e1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.macro-cc{font-size:10px;color:var(--mut);flex-shrink:0}
+.macro-vals{display:flex;flex-direction:column;align-items:flex-end;font-size:10px;color:var(--mut);flex-shrink:0}
 .tempg{padding:13px 12px;display:flex;flex-direction:column;align-items:center;justify-content:center}
 .tempg .tg-l{font-size:9.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--mut)}
 .tempg .tg-s{font-size:13px;font-weight:900;margin-top:2px}
@@ -707,6 +719,7 @@ body{background:
     <div class="sect"><h2>Kommande event</h2><a>Kalender</a></div>
     <div class="evrow" id="events"></div>
     <div class="sect"><h2>10 hetaste just nu</h2><a onclick="go('marknad')">Mer</a></div>
+    <div class="card macrocal" id="macrocal"></div>
     <div class="card" id="hetaste"></div>
     <div class="sect"><h2>Snabbval</h2></div>
     <div class="menuchips" id="menuchips"></div>
@@ -953,9 +966,9 @@ function stockData(tkr,live){live=live||{};const r=_rng(_seed(tkr));
   const rsi=live.rsi!=null?Math.round(live.rsi):Math.round(34+r()*52),relvol=live.relvol!=null?+(+live.relvol).toFixed(2):+(0.5+r()*1.9).toFixed(2),vol=+(3+r()*9).toFixed(1);
   const d20=live.d20!=null?+(+live.d20).toFixed(1):+((r()*60-8).toFixed(1)),d5=live.d5!=null?+(+live.d5).toFixed(1):+((r()*16-3).toFixed(1)),fromHi=live.fromHi!=null?+(+live.fromHi).toFixed(1):+(-(r()*22)).toFixed(1);
   const ema50=score>=6?"\u00f6ver":"under",ema200=score>=6.5?"\u00f6ver":"under";
-  const bos=score>=7?"Bekr\u00e4ftad \u2191":(score>=5.5?"Avvaktar":"Bruten \u2193");
-  const struktur=score>=6.5?"HH/HL":"LH/LL",trendstyrka=score>=8?"Stark":score>=6?"Medel":"Svag";
-  const setupG=score>=8.5?"A":score>=7?"B":"C",atr=+(price*0.04).toFixed(2);
+  const bos=live.bos||(score>=7?"Bekr\u00e4ftad \u2191":(score>=5.5?"Avvaktar":"Bruten \u2193"));
+  const struktur=live.struktur||(score>=6.5?"HH/HL":"LH/LL"),trendstyrka=score>=8?"Stark":score>=6?"Medel":"Svag";
+  const setupG=live.setupG||(score>=8.5?"A":score>=7?"B":"C"),atr=+(price*0.04).toFixed(2);
   const breakout=Math.round(score*8+r()*20),confidence=Math.round(35+score*5+r()*15),exitrisk=Math.round(40-score*3+r()*15);
   const bias=score>=6?"LONG":"NEUTRAL",conv=score>=8?"H\u00d6G":score>=6.5?"MEDEL":"L\u00c5G",riskp=vol>8?"F\u00d6RH\u00d6JD":"NORMAL",fakeb=score>=7?"L\u00c5G":"H\u00d6G";
   const bullPool=[["Stark trend & momentum",25],["N\u00e4ra 52v-topp",9],["Stigande bottnar",6],["RSI accelererar",5],["Sl\u00e5r index tydligt",5],["Veckotrend bullish",4],["Positiv ROC",3]];
@@ -974,8 +987,8 @@ function stockData(tkr,live){live=live||{};const r=_rng(_seed(tkr));
     bos,struktur,trendstyrka,setupG,atr,breakout:Math.min(99,breakout),confidence:Math.min(99,confidence),exitrisk:Math.max(4,Math.min(99,exitrisk)),
     bias,conv,riskp,fakeb,bull,risks,desc,mcap,verdict,vcolor,entryLo,entryHi,hitrate,catalysts,instOwn,insiderOwn,shortInt,
     t1:+(price*1.08).toFixed(2),t2:+(price*1.15).toFixed(2),stop:+(price*0.92).toFixed(2),
-    s1:+(price*0.96).toFixed(2),s2:+(price*0.93).toFixed(2),s3:+(price*0.90).toFixed(2),
-    r1:+(price*1.05).toFixed(2),r2:+(price*1.09).toFixed(2),r3:+(price*1.15).toFixed(2),
+    s1:live.obSupport!=null?live.obSupport:+(price*0.96).toFixed(2),s2:+(price*0.93).toFixed(2),s3:+(price*0.90).toFixed(2),
+    r1:+(price*1.05).toFixed(2),r2:live.obResist!=null?live.obResist:+(price*1.09).toFixed(2),r3:+(price*1.15).toFixed(2),
     trail:+(price*0.91).toFixed(2)};}
 
 
@@ -1052,7 +1065,7 @@ function openStock(tkr){_curStock=tkr;const d=stockData(tkr,_liveStock[tkr]);
       ${ring(d.sent,"#F5C542","Sentiment",d.sent>=8?"Positivt":"Neutralt")}
       ${ring(d.tech,"#FFB000","Teknik",d.tech>=8?"Mkt starkt":"Bra")}
       <div class="ring tot"><div class="rl">Total</div><div class="big" style="color:${sCol};margin-top:10px">${d.score.toFixed(1)}</div>
-        <div class="rt" style="color:${sCol};font-weight:700">${d.tag.split(" ")[0].toUpperCase()}</div></div></div>
+        <div class="rt" style="color:${sCol};font-weight:700">${d.tag.split(" ")[0].toUpperCase()}${d.relvol>=1.5?' <span style="color:#ffb46b">\uD83D\uDD25</span>':''}</div></div></div>
     <div class="bias"><div class="bi"><span>Bias</span><b style="color:${d.bias==='LONG'?'var(--pos)':'var(--gold2)'}">${d.bias}</b></div>
       <div class="bi"><span>Övertygelse</span><b>${d.conv}</b></div><div class="bi"><span>Riskprofil</span><b style="color:${d.riskp==='FÖRHÖJD'?'var(--neg)':'#cdd5e1'}">${d.riskp}</b></div>
       <div class="bi"><span>Setup</span><b style="color:var(--gold2)">${d.setupG}</b></div></div>
@@ -1060,14 +1073,14 @@ function openStock(tkr){_curStock=tkr;const d=stockData(tkr,_liveStock[tkr]);
     <div class="st-chart" id="st-area">${areaChart(tkr,d.day,d.day>=0?"#22c55e":"#ef4444")}</div>
     <div class="tf" id="st-tf">${["1D","1V","1M","3M","6M","1Å","5Å"].map((t,i)=>`<button class="${i===0?'on':''}" onclick="tfSwitch(this,'${tkr}',${i})">${t}</button>`).join("")}</div>
     <div class="st-sec">Nyckeltal</div>
-    <div class="nyck">${stat("RSI",d.rsi,d.rsi>70?'var(--neg)':d.rsi<35?'var(--pos)':'')}${stat("Mot topp",d.fromHi+'%')}${stat("Rel.vol",d.relvol+'x')}
+    <div class="nyck">${stat("RSI",d.rsi,d.rsi>70?'var(--neg)':d.rsi<35?'var(--pos)':'')}${stat("Mot topp",d.fromHi+'%')}${stat("Rel.vol",d.relvol+'x'+(d.relvol>=1.5?' \uD83D\uDD25':''),d.relvol>=1.5?'#ffb46b':'')}
       ${stat("Volatilitet",d.vol+'%')}${stat("EMA50",d.ema50,d.ema50==='över'?'var(--pos)':'var(--neg)')}${stat("EMA200",d.ema200,d.ema200==='över'?'var(--pos)':'var(--neg)')}</div>
     <div class="st-sec">Ägande</div>
     <div class="exit"><div class="er"><span class="k">Institutionellt ägande</span><span class="v">${d.instOwn}%</span></div>
       <div class="er"><span class="k">Insiderägande</span><span class="v">${d.insiderOwn}%</span></div>
       <div class="er"><span class="k">Blankat (short int.)</span><span class="v" style="color:${d.shortInt>10?'var(--neg)':d.shortInt<5?'var(--pos)':''}">${d.shortInt}%</span></div></div>
     <div class="st-sec">Struktur &amp; trend</div>
-    <div class="exit secgfx-wrap"><div class="secchart" style="background-image:linear-gradient(rgba(8,13,16,.6),rgba(8,13,16,.6)),url('${IMGS.struktur_chart}')"></div><div class="er"><span class="k">BOS</span><span class="v" style="color:${d.score>=7?'var(--pos)':'var(--neg)'}">${d.bos}</span></div>
+    <div class="exit secgfx-wrap"><div class="secchart" style="background-image:linear-gradient(rgba(8,13,16,.6),rgba(8,13,16,.6)),url('${IMGS.struktur_chart}')"></div><div class="er"><span class="k">BOS</span><span class="v" style="color:${d.bos.indexOf('\u2191')>-1?'var(--pos)':d.bos.indexOf('\u2193')>-1?'var(--neg)':'#cdd5e1'}">${d.bos}</span></div>
       <div class="er"><span class="k">Struktur</span><span class="v">${d.struktur}</span></div>
       <div class="er"><span class="k">Trendstyrka</span><span class="v">${d.trendstyrka}</span></div>
       <div class="er"><span class="k">Stöd (1 ATR)</span><span class="v">${d.cur}${d.s1}</span></div>
@@ -1215,6 +1228,11 @@ async function fetchLiveStock(tkr){
     if((p=n(a.ret_20))!=null)ov.d20=p;
     if((p=n(a.rel_vol))!=null)ov.relvol=p;
     if((p=n(a.pct_from_high))!=null)ov.fromHi=p;
+    if(typeof a.bos==="string"&&a.bos){ov.bos=a.bos==="BULLISH"?"Bekräftad ↑":(a.bos==="BEARISH"?"Bruten ↓":"Ingen bekräftad");}
+    if(typeof a.structure==="string"&&a.structure)ov.struktur=a.structure;
+    if(typeof a.setup_grade==="string"&&a.setup_grade)ov.setupG=a.setup_grade;
+    if((p=n(a.ob_support))!=null)ov.obSupport=p;
+    if((p=n(a.ob_resist))!=null)ov.obResist=p;
     if(typeof co.name==="string"&&co.name)ov.name=co.name;
     _liveStock[tkr]=Object.assign(_liveStock[tkr]||{},ov);
     if(_curStock===tkr)openStock(tkr);
@@ -1718,10 +1736,10 @@ async function runResearch(){
     const scCol=sc>=7?"var(--pos)":(sc>=4?"var(--gold)":"var(--neg)");
     const tags=[];
     if(r.theme)tags.push(r.theme);
-    if(r.rel_vol)tags.push("relvol "+(+r.rel_vol).toFixed(1));
+    if(r.rel_vol)tags.push((+r.rel_vol>=1.5?"\uD83D\uDD25 ":"")+"relvol "+(+r.rel_vol).toFixed(1)+"x");
     if(r.news_count)tags.push(r.news_count+" nyh");
     if(r.insider_buys)tags.push(r.insider_buys+" insider");
-    const tagH=tags.map(function(t){return '<span class="rs-tag">'+t+'</span>';}).join("");
+    const tagH=tags.map(function(t){return '<span class="rs-tag"'+(t.indexOf("\uD83D\uDD25")===0?' style="background:rgba(255,111,0,.18);border-color:rgba(255,111,0,.4);color:#ffb46b"':'')+'>'+t+'</span>';}).join("");
     return '<div class="rs-row" onclick="closeResearch();openStock(\''+tk+'\')">'
       +'<div class="rs-ic">'+tk.slice(0,3)+'</div>'
       +'<div class="rs-id"><div class="rs-tk">'+tk+'</div><div class="rs-nm">'+nm+'</div><div class="rs-tags">'+tagH+'</div></div>'
@@ -1764,8 +1782,9 @@ async function loadStockAI(tkr){
   try{const nR=await fetch(B+"/api/ai_news/"+encodeURIComponent(tkr),{cache:"no-store"});const nJ=await nR.json();
     if(nJ&&nJ.text){const sc=nJ.sentiment,lbl=sc==="pos"?"Positivt":sc==="neg"?"Negativt":sc==="neu"?"Neutralt":"";
       const col=sc==="pos"?"var(--pos)":sc==="neg"?"var(--neg)":"var(--mut)";
-      const clean=nJ.text.replace(/Stämpel:.*/i,"").replace(/</g,"&lt;").trim();_sent=sc;
-      html+='<div class="st-ai-row"><b>Nyheter '+(lbl?'<i style="font-style:normal;color:'+col+'">· '+lbl+'</i>':'')+'</b><span>'+clean+'</span></div>';}}catch(e){}
+      const clean=nJ.text.replace(/Stämpel:.*/i,"").replace(/Kategori:.*/i,"").replace(/</g,"&lt;").trim();_sent=sc;
+      const katH=nJ.category?' <span class="cat-badge">'+nJ.category.replace(/</g,"&lt;")+'</span>':'';
+      html+='<div class="st-ai-row"><b>Nyheter '+(lbl?'<i style="font-style:normal;color:'+col+'">· '+lbl+'</i>':'')+katH+'</b><span>'+clean+'</span></div>';}}catch(e){}
   if(!html){card.remove();return;}
   if(_sent)html=sentimentEmblem(_sent)+html;
   card.querySelector(".st-ai-b").innerHTML=html;
@@ -1774,7 +1793,29 @@ if(typeof openStock==="function"){
   const _origOpenStock=openStock;
   window.openStock=function(tkr){_origOpenStock(tkr);try{loadStockAI(tkr);}catch(e){}};
 }
-load();loadMonthly();loadDaily();
+/* ===== Makrokalender på Översikt ===== */
+function macroImpactColor(imp){
+  if(imp==="High")return"var(--neg)";if(imp==="Medium")return"var(--gold2)";return"#7c8a9a";
+}
+async function loadMacro(){
+  const el=document.getElementById("macrocal");if(!el)return;
+  const B=CONFIG.API_BASE?CONFIG.API_BASE.replace(/\/$/,""):"";
+  if(!B||typeof fetch==="undefined")return;
+  try{
+    const r=await fetch(B+"/api/macro",{cache:"no-store"});const j=await r.json();
+    const rows=(j&&j.events)||[];
+    if(!rows.length){el.style.display="none";return;}
+    const rowsH=rows.slice(0,6).map(function(e){
+      return '<div class="macro-row"><div class="macro-dt">'+(e.date||"")+' '+(e.time||"")+'</div>'
+        +'<div class="macro-mid"><span class="macro-dot" style="background:'+macroImpactColor(e.impact)+'"></span>'
+        +'<span class="macro-ttl">'+String(e.title||"").replace(/</g,"&lt;")+'</span>'
+        +'<span class="macro-cc">'+(e.country||"")+'</span></div>'
+        +'<div class="macro-vals">'+(e.forecast?'<span>prog. '+e.forecast+'</span>':'')+(e.previous?'<span>fg. '+e.previous+'</span>':'')+'</div></div>';
+    }).join("");
+    el.innerHTML='<div class="ai-h"><span class="dot2"></span>Makrohändelser · denna vecka</div>'+rowsH;
+  }catch(e){el.style.display="none";}
+}
+load();loadMonthly();loadDaily();loadMacro();
 function fgInfo(s){s=+s||0;
   if(s>=75)return{label:"Extrem girighet",col:"#22c55e"};
   if(s>=55)return{label:"Girighet",col:"#22c55e"};
