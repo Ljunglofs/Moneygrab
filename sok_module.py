@@ -193,6 +193,7 @@ def analyze(df):
     pct_from_high = (last / hi52 - 1) * 100      # 0 = på topp, negativt = under
     rng_pos = (last - lo52) / (hi52 - lo52) * 100 if hi52 > lo52 else 50
 
+    ret_1 = (last / close.iloc[-2] - 1) * 100 if len(close) > 2 else 0
     ret_5 = (last / close.iloc[-6] - 1) * 100 if len(close) > 6 else 0
     ret_20 = (last / close.iloc[-21] - 1) * 100 if len(close) > 21 else 0
 
@@ -314,7 +315,7 @@ def analyze(df):
         "last": last, "rsi": rsi, "atr_pct": atr_pct,
         "ema20": ema20, "ema50": ema50, "ema200": ema200,
         "pct_from_high": pct_from_high, "rng_pos": rng_pos,
-        "ret_5": ret_5, "ret_20": ret_20, "rel_vol": rel_vol, "tight": tight,
+        "ret_1": ret_1, "ret_5": ret_5, "ret_20": ret_20, "rel_vol": rel_vol, "tight": tight,
         "strength": strength, "momentum": momentum, "setup": setup,
         "total": total, "score10": score10,
         "macd_below": macd_below, "macd_falling": macd_falling,

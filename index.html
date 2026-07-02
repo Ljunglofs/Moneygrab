@@ -1226,6 +1226,7 @@ async function fetchLiveStock(tkr){
     if((p=n(a.score10))!=null)ov.score=p;
     if((p=n(a.rsi))!=null)ov.rsi=p;
     if((p=n(a.ret_5))!=null){ov.d5=p;ov.day=p;}
+    if((p=n(a.ret_1))!=null)ov.day=p;
     if((p=n(a.ret_20))!=null)ov.d20=p;
     if((p=n(a.rel_vol))!=null)ov.relvol=p;
     if((p=n(a.pct_from_high))!=null)ov.fromHi=p;
@@ -1590,10 +1591,11 @@ function mapScreen(rows,d){
   if(S&&S[2])S[2].pill=cMicro+" BOLAG";
   if(S&&S[3])S[3].pill=cRisk+" VARNINGSFLAGGOR";
   d.scanner.confirmed=cBull; d.scanner.early=cEarly; d.scanner.riskCount=cRisk;
-  // Vinnare/förlorare ur skannern (5-dagars rörelse)
-  const byRet=[...rows].sort((a,b)=>(+b.ret_5||0)-(+a.ret_5||0));
-  d.winners=byRet.slice(0,6).map(r=>({tkr:r.ticker,chg:+(+r.ret_5||0).toFixed(1)}));
-  d.losers=byRet.slice(-6).reverse().map(r=>({tkr:r.ticker,chg:+(+r.ret_5||0).toFixed(1)}));
+  // Vinnare/förlorare ur skannern (dagens rörelse; ret_5 som fallback om backend är äldre)
+  const dchg=r=>(r.ret_1!=null?+r.ret_1:(+r.ret_5||0));
+  const byRet=[...rows].sort((a,b)=>dchg(b)-dchg(a));
+  d.winners=byRet.slice(0,6).map(r=>({tkr:r.ticker,chg:+dchg(r).toFixed(1)}));
+  d.losers=byRet.slice(-6).reverse().map(r=>({tkr:r.ticker,chg:+dchg(r).toFixed(1)}));
   // Sentiment-mätare ur marknadsbredd (andel bull av bull+bear)
   const isBull=r=>r.label==="BULL"||r.label==="MOMENTUM"||r.label==="Rocketcase";
   const isBear=r=>r.label==="BEAR"||r.label==="AVSVALNING";
@@ -2154,7 +2156,7 @@ function initPortfolio(skipFetch){
       +'<div class="s">'+h.qty+' st · GAV '+h.avg+' '+c+'</div></div>'
       +'<div style="text-align:right" onclick="openStock(\''+h.tkr+'\')">'
       +'<div class="num" style="font-weight:700">'+(val!=null?pfFmt(val)+' '+c:'–')+'</div>'
-      +'<div style="color:'+col+';font-size:12px;font-variant-numeric:tabular-nums">'+(pl!=null?((pl>=0?"+":"")+pl.toFixed(1)+"%"):"hämtar…")+'</div></div>'
+      +'<div style="color:'+col+';font-size:12px;font-variant-numeric:tabular-nums">'+(pl!=null?((pl>=0?"+":"")+pl.toFixed(1)+"%"):(last?"GAV saknas":"hämtar…"))+'</div></div>'
       +'<div class="pf2-del" onclick="pfDel('+i+')">✕</div></div>';
   }).join(""):'<div class="pf2-empty">Inga innehav ännu. Lägg till din första aktie ovan — ticker, antal och GAV.</div>';
 
@@ -2173,7 +2175,7 @@ function initPortfolio(skipFetch){
     +'<input id="pf-avg" placeholder="GAV" inputmode="decimal" style="max-width:78px">'
     +'<button onclick="pfAdd()">+</button></div>'
     +'<div class="card">'+rowsH+'</div>'
-    +(H.length?'<button class="pf2-aibtn" id="pf-aibtn" onclick="pfReview()">🤖 Granska portföljen med Grabit AI</button>':'')
+    +(H.length?'<button class="pf2-aibtn" id="pf-aibtn" onclick="pfReview()">Granska portföljen med Grabit AI</button>':'')
     +'<div id="pf-airesult"></div>';
   if(H.length&&!skipFetch)pfRefresh();
 }
@@ -2219,11 +2221,13 @@ async function pfReview(){
     var j=await r.json();
     if(j&&j.text){box.innerHTML='<div class="pf2-ai"><div class="ai-h"><span class="dot2" style="width:6px;height:6px;border-radius:50%;background:var(--gold);display:inline-block"></span>Grabit AI · portföljgranskning</div><div class="ai-tx"></div></div>';
       box.querySelector(".ai-tx").textContent=j.text;}
-    else box.innerHTML='<div class="pf2-ai"><div class="ai-tx" style="color:#7c8a9a">Kunde inte granska just nu — kontrollera att innehaven har giltiga tickers och försök igen.</div></div>';
+    else{var msg=(j&&j.error)?("Granskningen misslyckades: "+j.error):"Kunde inte granska just nu — kontrollera att innehaven har giltiga tickers och försök igen.";
+      box.innerHTML='<div class="pf2-ai"><div class="ai-tx" style="color:#7c8a9a"></div></div>';
+      box.querySelector(".ai-tx").textContent=msg;}
   }catch(e){
     box.innerHTML='<div class="pf2-ai"><div class="ai-tx" style="color:#7c8a9a">Nätverksfel — försök igen om en stund.</div></div>';
   }
-  if(btn){btn.disabled=false;btn.textContent="🤖 Granska portföljen med Grabit AI";}
+  if(btn){btn.disabled=false;btn.textContent="Granska portföljen med Grabit AI";}
 }
 
 /* Ladda portföljen när fliken öppnas + direkt vid start */

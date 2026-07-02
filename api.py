@@ -1653,12 +1653,16 @@ def _ai_price_target(ticker: str, name: str = ""):
 _AI_TEXT_CACHE: dict = {}
 
 
+_AI_LAST_ERR = {"err": ""}
+
+
 def _ai_text(cache_key: str, system: str, user: str, max_tokens: int = 220) -> str:
     """Generisk cachad Claude-text. Tom sträng om nyckel saknas/fel."""
     if cache_key in _AI_TEXT_CACHE:
         return _AI_TEXT_CACHE[cache_key]
     client = _anthropic_client()
     if client is None:
+        _AI_LAST_ERR["err"] = "ANTHROPIC_API_KEY saknas eller klienten kunde inte skapas"
         return ""
     try:
         kw = {"model": AI_MODEL, "max_tokens": max_tokens,
@@ -1670,8 +1674,11 @@ def _ai_text(cache_key: str, system: str, user: str, max_tokens: int = 220) -> s
                        if getattr(b, "type", "") == "text").strip()
         if text:
             _AI_TEXT_CACHE[cache_key] = text
+            _AI_LAST_ERR["err"] = ""
         return text
-    except Exception:
+    except Exception as e:
+        _AI_LAST_ERR["err"] = f"{type(e).__name__}: {e}"
+        print("AI-fel:", _AI_LAST_ERR["err"])
         return ""
 
 
@@ -1932,7 +1939,10 @@ def ai_portfolio(payload: PfPayload):
          + _dt.datetime.utcnow().strftime("%Y%m%d%H")).encode()).hexdigest()
     user = ("PORTFÖLJ (vikter: %s)\n\n%s\n\nGranska portföljen." % (wline or "—", "\n".join(lines)))
     txt = _ai_text(key, sysp, user, 700)
-    return {"text": txt, "positions": positions, "total": round(total, 2)}
+    out = {"text": txt, "positions": positions, "total": round(total, 2)}
+    if not txt:
+        out["error"] = _AI_LAST_ERR.get("err") or "AI-svaret blev tomt"
+    return out
 
 
 @app.get("/api/signals")
