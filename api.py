@@ -926,18 +926,25 @@ _FF_COUNTRY_FLAG = {
     "CAD": "🇨🇦", "AUD": "🇦🇺", "NZD": "🇳🇿", "CNY": "🇨🇳", "SEK": "🇸🇪",
 }
 
-@cached(1800)
+_MACRO_LAST_GOOD = {"ts": 0.0, "events": []}
+
 def _macro_events():
     """Kommande makrohändelser (räntebesked, CPI, NFP osv), gratis ForexFactory-feed.
-    Ingen API-nyckel krävs. Filtrerar bort låg-impact/helgdagar och sorterar tidsmässigt."""
+    Ingen API-nyckel krävs. Filtrerar bort låg-impact/helgdagar och sorterar tidsmässigt.
+    Senast lyckade svar behålls i minnet: misslyckas hämtningen (t.ex. Cloudflare
+    blockerar Render-IP) returneras det gamla istället för tomt."""
     import requests
     import datetime as _dt
+    now_ts = time.time()
+    # Färskt nog? (2h) -> använd cache direkt, spara anrop
+    if _MACRO_LAST_GOOD["events"] and now_ts - _MACRO_LAST_GOOD["ts"] < 7200:
+        return _MACRO_LAST_GOOD["events"]
     try:
         r = requests.get("https://nfs.faireconomy.media/ff_calendar_thisweek.json", timeout=8)
         r.raise_for_status()
         raw = r.json()
     except Exception:
-        return []
+        return _MACRO_LAST_GOOD["events"]  # senast kända istället för tomt
     out = []
     now = _dt.datetime.utcnow()
     for e in (raw or []):
@@ -968,7 +975,11 @@ def _macro_events():
     out.sort(key=lambda x: x["_sort"])
     for e in out:
         e.pop("_sort", None)
-    return out[:15]
+    out = out[:15]
+    if out:
+        _MACRO_LAST_GOOD["events"] = out
+        _MACRO_LAST_GOOD["ts"] = now_ts
+    return out or _MACRO_LAST_GOOD["events"]
 
 
 @app.get("/api/macro")
@@ -1785,6 +1796,91 @@ def _alpaca_news_latest(symbols):
         return out
     except Exception:
         return {}
+
+
+# =====================================================================
+#  PORTFÖLJ  ·  lätta kurser + AI-granskning av användarens innehav
+# =====================================================================
+@app.get("/api/quotes")
+def quotes(tickers: str = ""):
+    """Lätta kurser för portföljen. ?tickers=AAPL,NVDA,VOLV-B.ST (max 30).
+    Använder scan() som redan är cachad/förvärmd -> billigt."""
+    out = {}
+    for tk in [t.strip().upper() for t in tickers.split(",") if t.strip()][:30]:
+        a = scan(tk)
+        if not a:
+            continue
+        out[tk] = {
+            "last": a.get("last"),
+            "score": a.get("score10"),
+            "label": a.get("label", ""),
+            "ret_5": round(float(a.get("ret_5") or 0), 1),
+        }
+    return {"quotes": out}
+
+
+class PfPayload(BaseModel):
+    holdings: list = []
+
+
+@app.post("/api/ai_portfolio")
+def ai_portfolio(payload: PfPayload):
+    """Grabit AI granskar användarens portfölj. Body:
+    {"holdings":[{"tkr":"NVDA","qty":10,"avg":95.5}, ...]}"""
+    import hashlib
+    import datetime as _dt
+    holds = []
+    for h in (payload.holdings or [])[:30]:
+        if not isinstance(h, dict):
+            continue
+        tk = str(h.get("tkr", "")).strip().upper()
+        try:
+            qty = float(h.get("qty") or 0)
+            avg = float(h.get("avg") or 0)
+        except Exception:
+            continue
+        if tk and qty > 0:
+            holds.append({"tkr": tk, "qty": qty, "avg": avg})
+    if not holds:
+        return {"text": "", "positions": [], "error": "Inga innehav skickades."}
+
+    positions, lines, total = [], [], 0.0
+    for h in holds:
+        a = scan(h["tkr"]) or {}
+        last = float(a.get("last") or 0)
+        val = last * h["qty"] if last else 0.0
+        pl = ((last - h["avg"]) / h["avg"] * 100) if (last and h["avg"]) else None
+        total += val
+        positions.append({
+            "tkr": h["tkr"], "qty": h["qty"], "avg": h["avg"],
+            "last": last or None, "value": round(val, 2) if val else None,
+            "pl_pct": round(pl, 1) if pl is not None else None,
+            "score": a.get("score10"), "label": a.get("label", ""),
+        })
+        if a:
+            lines.append(_fmt_stock_ctx(a) +
+                         f"\n  INNEHAV: {h['qty']:g} st · GAV {h['avg']:g} · "
+                         f"P/L {('%+.1f%%' % pl) if pl is not None else '—'}")
+        else:
+            lines.append(f"- {h['tkr']} · {h['qty']:g} st · GAV {h['avg']:g} · "
+                         "(ingen live-data hittades för tickern)")
+    for p in positions:
+        p["weight"] = round(p["value"] / total * 100, 1) if (p["value"] and total) else None
+
+    wline = " · ".join(f"{p['tkr']} {p['weight']}%" for p in positions if p["weight"])
+    sysp = ("Du är Grabit, en skarp svensk portföljanalytiker. Granska portföljen "
+            "sakligt och konkret på svenska. Struktur: 1) Helhetsbild (2-3 meningar), "
+            "2) Styrkor, 3) Risker — var extra tydlig med koncentration (vikter), "
+            "korrelation mellan innehav och tekniskt svaga positioner, 4) Kort "
+            "kommentar per innehav (en rad var). Använd BARA siffrorna i underlaget, "
+            "hitta aldrig på. Inga köp/säljråd — men var rak med vad som sticker ut. "
+            "Ingen markdown-formatering, skriv löpande text med radbrytningar.")
+    key = "pf:" + hashlib.md5(
+        ("|".join(f"{h['tkr']}:{h['qty']}:{h['avg']}" for h in holds)
+         + _dt.datetime.utcnow().strftime("%Y%m%d%H")).encode()).hexdigest()
+    user = ("PORTFÖLJ (vikter: %s)\n\n%s\n\nGranska portföljen." % (wline or "—", "\n".join(lines)))
+    txt = _ai_text(key, sysp, user, 700)
+    return {"text": txt, "positions": positions, "total": round(total, 2)}
 
 
 @app.get("/api/signals")

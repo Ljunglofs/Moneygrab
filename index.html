@@ -715,7 +715,7 @@ body{background:
     <div class="mcase" id="mcase" style="display:none" onclick="openMonthly()"></div>
     <div class="sect"><h2>Dagens lägen</h2><a onclick="go('marknad')">Visa alla</a></div>
     <div class="picks" id="picks"></div>
-    <div class="rscard" id="rscard" onclick="openResearch()"><div class="rsc-l"><span class="rsc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="16.2" y1="16.2" x2="21" y2="21"/></svg></span><span class="rsc-tx"><b>RESEARCH</b><i>Filtrera bolag — kurs, volym, tema, nyheter, insiders</i></span></div><span class="rsc-go">&#8594;</span></div>
+    <div class="rscard" id="rscard" onclick="go('marknad')"><div class="rsc-l"><span class="rsc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="16.2" y1="16.2" x2="21" y2="21"/></svg></span><span class="rsc-tx"><b>RESEARCH</b><i>Filtrera bolag — kurs, volym, tema, nyheter, insiders</i></span></div><span class="rsc-go">&#8594;</span></div>
     <div class="sect"><h2>Kommande event</h2><a>Kalender</a></div>
     <div class="evrow" id="events"></div>
     <div class="sect"><h2>10 hetaste just nu</h2><a onclick="go('marknad')">Mer</a></div>
@@ -1434,7 +1434,7 @@ function render(d){
   if($("#winners"))$("#winners").innerHTML=qlist(d.winners);
   if($("#losers"))$("#losers").innerHTML=qlist(d.losers);
   if($("#scanner")&&d.scanner)$("#scanner").innerHTML=renderScanner(d.scanner);
-  if($("#pf")&&d.portfolio)$("#pf").innerHTML=renderPortfolio(d.portfolio);
+  /* Portföljen renderas nu av initPortfolio() (lokala innehav + live-kurser) */
 }
 function qlist(arr){return arr.map(x=>{const c=x.chg>=0?"var(--pos)":"var(--neg)";
   return `<div class="qrow" onclick="openStock('${x.tkr}')">${lic(x.tkr,36,scoreColor(7))}<div class="nm"><div class="t">${x.tkr}</div>
@@ -1826,23 +1826,48 @@ if(typeof openStock==="function"){
 function macroImpactColor(imp){
   if(imp==="High")return"var(--neg)";if(imp==="Medium")return"var(--gold2)";return"#7c8a9a";
 }
+function macroRows(rows){
+  return rows.slice(0,6).map(function(e){
+    return '<div class="macro-row"><div class="macro-dt">'+(e.date||"")+' '+(e.time||"")+'</div>'
+      +'<div class="macro-mid"><span class="macro-dot" style="background:'+macroImpactColor(e.impact)+'"></span>'
+      +'<span class="macro-ttl">'+String(e.title||"").replace(/</g,"&lt;")+'</span>'
+      +'<span class="macro-cc">'+(e.country||"")+'</span></div>'
+      +'<div class="macro-vals">'+(e.forecast?'<span>prog. '+e.forecast+'</span>':'')+(e.previous?'<span>fg. '+e.previous+'</span>':'')+'</div></div>';
+  }).join("");
+}
+var _FF_FLAG={USD:"🇺🇸",EUR:"🇪🇺",GBP:"🇬🇧",JPY:"🇯🇵",CHF:"🇨🇭",CAD:"🇨🇦",AUD:"🇦🇺",NZD:"🇳🇿",CNY:"🇨🇳",SEK:"🇸🇪"};
+async function macroDirect(){
+  /* Fallback: hämta ForexFactory-feeden direkt i webbläsaren (användarens IP,
+     inte Renders datacenter-IP som kan blockeras). */
+  const r=await fetch("https://nfs.faireconomy.media/ff_calendar_thisweek.json",{cache:"no-store"});
+  const raw=await r.json();const now=Date.now();
+  return (raw||[]).map(function(e){
+    const imp=e.impact==="High"?"High":(e.impact==="Medium"?"Medium":"Low");
+    if(imp==="Low"||!e.title)return null;
+    let d=null;try{d=new Date(e.date);}catch(x){}
+    if(d&&d.getTime()<now-6*3600*1000)return null;
+    return{date:d?d.toLocaleDateString("sv-SE",{day:"2-digit",month:"short"}):"",
+      time:d?d.toLocaleTimeString("sv-SE",{hour:"2-digit",minute:"2-digit"}):"",
+      country:_FF_FLAG[e.country]||e.country||"",title:e.title,impact:imp,
+      forecast:e.forecast||"",previous:e.previous||"",_s:d?d.getTime():9e15};
+  }).filter(Boolean).sort(function(a,b){return a._s-b._s;});
+}
 async function loadMacro(){
   const el=document.getElementById("macrocal");if(!el)return;
   const B=CONFIG.API_BASE?CONFIG.API_BASE.replace(/\/$/,""):"";
-  if(!B||typeof fetch==="undefined")return;
+  if(typeof fetch==="undefined")return;
+  let rows=[];
   try{
-    const r=await fetch(B+"/api/macro",{cache:"no-store"});const j=await r.json();
-    const rows=(j&&j.events)||[];
-    if(!rows.length){el.style.display="none";return;}
-    const rowsH=rows.slice(0,6).map(function(e){
-      return '<div class="macro-row"><div class="macro-dt">'+(e.date||"")+' '+(e.time||"")+'</div>'
-        +'<div class="macro-mid"><span class="macro-dot" style="background:'+macroImpactColor(e.impact)+'"></span>'
-        +'<span class="macro-ttl">'+String(e.title||"").replace(/</g,"&lt;")+'</span>'
-        +'<span class="macro-cc">'+(e.country||"")+'</span></div>'
-        +'<div class="macro-vals">'+(e.forecast?'<span>prog. '+e.forecast+'</span>':'')+(e.previous?'<span>fg. '+e.previous+'</span>':'')+'</div></div>';
-    }).join("");
-    el.innerHTML='<div class="ai-h"><span class="dot2"></span>Makrohändelser · denna vecka</div>'+rowsH;
-  }catch(e){el.style.display="none";}
+    if(B){const r=await fetch(B+"/api/macro",{cache:"no-store"});const j=await r.json();rows=(j&&j.events)||[];}
+  }catch(e){}
+  if(!rows.length){try{rows=await macroDirect();}catch(e){}}
+  el.style.display="";
+  if(!rows.length){
+    el.innerHTML='<div class="ai-h"><span class="dot2"></span>Makrohändelser · denna vecka</div>'
+      +'<div class="macro-row"><div class="macro-mid"><span class="macro-ttl" style="color:#7c8a9a">Kalendern kunde inte hämtas just nu — försöker igen automatiskt.</span></div></div>';
+    return;
+  }
+  el.innerHTML='<div class="ai-h"><span class="dot2"></span>Makrohändelser · denna vecka</div>'+macroRows(rows);
 }
 load();loadMonthly();loadDaily();loadMacro();
 function fgInfo(s){s=+s||0;
@@ -2089,5 +2114,125 @@ async function loadPolyInsiders(force){
 .ins-n{color:var(--txt);font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ins-m{color:var(--mut);font-size:11px;margin-top:2px;font-variant-numeric:tabular-nums}
 </style>
+<style>
+/* ===== Portfölj (T1) ===== */
+#pf .pf2-head{background:#0E141A!important;border:1px solid rgba(255,255,255,.07)!important;border-radius:14px!important;padding:16px!important;margin-bottom:11px!important}
+#pf .pf2-tl{color:#8a93a3;font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+#pf .pf2-tot{color:#EDEFF2;font-size:26px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:4px}
+#pf .pf2-sub{font-size:12.5px;margin-top:4px;font-variant-numeric:tabular-nums}
+#pf .pf2-add{display:flex;gap:7px;margin-bottom:11px}
+#pf .pf2-add input{flex:1;min-width:0;background:#0E141A;border:1px solid rgba(255,255,255,.09);border-radius:10px;color:#EDEFF2;font-size:13px;padding:10px 11px;outline:none}
+#pf .pf2-add input:focus{border-color:rgba(245,197,66,.45)}
+#pf .pf2-add button{flex:none;background:rgba(245,197,66,.12);border:1px solid rgba(245,197,66,.5);color:#F5C542;font-weight:800;font-size:13px;border-radius:10px;padding:0 15px}
+#pf .pf2-del{flex:none;width:26px;height:26px;border-radius:50%;border:1px solid rgba(255,255,255,.1);color:#7c8a9a;font-size:12px;line-height:24px;text-align:center;margin-left:8px}
+#pf .pf2-ai{background:#0E141A!important;border:1px solid rgba(255,255,255,.07);border-left:2px solid #F5C542!important;border-radius:14px;padding:15px;margin-top:11px}
+#pf .pf2-ai .ai-h{display:flex;align-items:center;gap:7px;font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--gold2,#F5C542);margin-bottom:8px}
+#pf .pf2-ai .ai-tx{color:#dfe7ee;font-size:13.5px;line-height:1.55;white-space:pre-wrap}
+#pf .pf2-aibtn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:11px;padding:13px;border-radius:12px;background:rgba(245,197,66,.1);border:1px solid rgba(245,197,66,.5);color:#F5C542;font-weight:800;font-size:13.5px;letter-spacing:.02em}
+#pf .pf2-empty{color:#7c8a9a;font-size:13px;padding:16px;text-align:center}
+</style>
+<script>
+/* ===== Portfölj 2.0 · lokala innehav + live-kurser + Grabit AI-granskning ===== */
+var PF_KEY="grabit_pf";
+function pfLoad(){try{return JSON.parse(localStorage.getItem(PF_KEY)||"[]");}catch(e){return[];}}
+function pfSave(a){try{localStorage.setItem(PF_KEY,JSON.stringify(a));}catch(e){}}
+function pfCcy(tk){if(/\.ST$/.test(tk))return"kr";if(/\.(PA|DE|AS)$/.test(tk))return"€";if(/\.(TO|V)$/.test(tk))return"C$";return"$";}
+function pfFmt(n){return (+n||0).toLocaleString("sv-SE",{maximumFractionDigits:0});}
+var _PF_Q={};
+
+function initPortfolio(skipFetch){
+  var el=document.getElementById("pf");if(!el)return;
+  var H=pfLoad();
+  var rowsH=H.length?H.map(function(h,i){
+    var q=_PF_Q[h.tkr]||{},last=q.last,c=pfCcy(h.tkr);
+    var val=last?h.qty*last:null;
+    var pl=(last&&h.avg)?((last-h.avg)/h.avg*100):null;
+    var col=pl==null?"#7c8a9a":(pl>=0?"var(--pos)":"var(--neg)");
+    return '<div class="qrow"><div style="flex:1;min-width:0" onclick="openStock(\''+h.tkr+'\')">'
+      +'<div class="t" style="font-weight:700">'+h.tkr+(q.score!=null?' <span style="color:#8a93a3;font-weight:600;font-size:11px">· '+q.score+'/10</span>':'')+'</div>'
+      +'<div class="s">'+h.qty+' st · GAV '+h.avg+' '+c+'</div></div>'
+      +'<div style="text-align:right" onclick="openStock(\''+h.tkr+'\')">'
+      +'<div class="num" style="font-weight:700">'+(val!=null?pfFmt(val)+' '+c:'–')+'</div>'
+      +'<div style="color:'+col+';font-size:12px;font-variant-numeric:tabular-nums">'+(pl!=null?((pl>=0?"+":"")+pl.toFixed(1)+"%"):"hämtar…")+'</div></div>'
+      +'<div class="pf2-del" onclick="pfDel('+i+')">✕</div></div>';
+  }).join(""):'<div class="pf2-empty">Inga innehav ännu. Lägg till din första aktie ovan — ticker, antal och GAV.</div>';
+
+  /* Totalsummor per valuta (ingen påhittad FX-konvertering) */
+  var tot={},plW=0,plB=0;
+  H.forEach(function(h){var q=_PF_Q[h.tkr]||{};if(!q.last)return;var c=pfCcy(h.tkr);
+    tot[c]=(tot[c]||0)+h.qty*q.last;
+    if(h.avg){plW+=h.qty*q.last;plB+=h.qty*h.avg;}});
+  var totS=Object.keys(tot).map(function(c){return pfFmt(tot[c])+" "+c;}).join(" + ")||"–";
+  var totPl=plB?((plW-plB)/plB*100):null;
+  var plS=totPl!=null?'<span style="color:'+(totPl>=0?"var(--pos)":"var(--neg)")+'">'+(totPl>=0?"+":"")+totPl.toFixed(1)+'% totalt</span>':'';
+
+  el.innerHTML='<div class="pf2-head"><div class="pf2-tl">Totalt värde</div><div class="pf2-tot">'+totS+'</div><div class="pf2-sub">'+plS+'</div></div>'
+    +'<div class="pf2-add"><input id="pf-tk" placeholder="Ticker" autocapitalize="characters" autocomplete="off">'
+    +'<input id="pf-qty" placeholder="Antal" inputmode="decimal" style="max-width:78px">'
+    +'<input id="pf-avg" placeholder="GAV" inputmode="decimal" style="max-width:78px">'
+    +'<button onclick="pfAdd()">+</button></div>'
+    +'<div class="card">'+rowsH+'</div>'
+    +(H.length?'<button class="pf2-aibtn" id="pf-aibtn" onclick="pfReview()">🤖 Granska portföljen med Grabit AI</button>':'')
+    +'<div id="pf-airesult"></div>';
+  if(H.length&&!skipFetch)pfRefresh();
+}
+
+async function pfRefresh(){
+  var H=pfLoad();if(!H.length)return;
+  var B=CONFIG.API_BASE?CONFIG.API_BASE.replace(/\/$/,""):"";if(!B)return;
+  try{
+    var r=await fetch(B+"/api/quotes?tickers="+encodeURIComponent(H.map(function(h){return h.tkr;}).join(",")),{cache:"no-store"});
+    var j=await r.json();var q=(j&&j.quotes)||{};var changed=false;
+    Object.keys(q).forEach(function(k){_PF_Q[k]=q[k];changed=true;});
+    if(changed){
+      /* Behåll ev. text i inmatningsfälten vid omritning */
+      var tk=document.getElementById("pf-tk"),keep=null;
+      if(tk)keep={t:tk.value,q:document.getElementById("pf-qty").value,a:document.getElementById("pf-avg").value};
+      initPortfolio(true);
+      if(keep){var t2=document.getElementById("pf-tk");if(t2){t2.value=keep.t;document.getElementById("pf-qty").value=keep.q;document.getElementById("pf-avg").value=keep.a;}}
+    }
+  }catch(e){}
+}
+
+function pfAdd(){
+  var tk=(document.getElementById("pf-tk").value||"").trim().toUpperCase();
+  var qty=parseFloat(String(document.getElementById("pf-qty").value).replace(",","."));
+  var avg=parseFloat(String(document.getElementById("pf-avg").value).replace(",","."));
+  if(!tk||!(qty>0)){var i=document.getElementById("pf-tk");if(i)i.focus();return;}
+  var H=pfLoad();
+  var ex=H.find(function(h){return h.tkr===tk;});
+  if(ex){var nq=ex.qty+qty;ex.avg=((ex.avg*ex.qty)+((avg||ex.avg)*qty))/nq;ex.avg=Math.round(ex.avg*100)/100;ex.qty=nq;}
+  else H.push({tkr:tk,qty:qty,avg:(avg>0?avg:0)});
+  pfSave(H);initPortfolio();
+}
+function pfDel(i){var H=pfLoad();H.splice(i,1);pfSave(H);initPortfolio();}
+
+async function pfReview(){
+  var H=pfLoad();if(!H.length)return;
+  var B=CONFIG.API_BASE?CONFIG.API_BASE.replace(/\/$/,""):"";if(!B)return;
+  var btn=document.getElementById("pf-aibtn"),box=document.getElementById("pf-airesult");
+  if(btn){btn.disabled=true;btn.textContent="Grabit AI analyserar…";}
+  try{
+    var r=await fetch(B+"/api/ai_portfolio",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({holdings:H})});
+    var j=await r.json();
+    if(j&&j.text){box.innerHTML='<div class="pf2-ai"><div class="ai-h"><span class="dot2" style="width:6px;height:6px;border-radius:50%;background:var(--gold);display:inline-block"></span>Grabit AI · portföljgranskning</div><div class="ai-tx"></div></div>';
+      box.querySelector(".ai-tx").textContent=j.text;}
+    else box.innerHTML='<div class="pf2-ai"><div class="ai-tx" style="color:#7c8a9a">Kunde inte granska just nu — kontrollera att innehaven har giltiga tickers och försök igen.</div></div>';
+  }catch(e){
+    box.innerHTML='<div class="pf2-ai"><div class="ai-tx" style="color:#7c8a9a">Nätverksfel — försök igen om en stund.</div></div>';
+  }
+  if(btn){btn.disabled=false;btn.textContent="🤖 Granska portföljen med Grabit AI";}
+}
+
+/* Ladda portföljen när fliken öppnas + direkt vid start */
+(function(){
+  try{
+    var _g=go;
+    go=function(s){_g(s);if(s==="portfolj"){try{initPortfolio();}catch(e){}}};
+  }catch(e){}
+  try{initPortfolio();}catch(e){}
+})();
+</script>
 </body>
 </html>
