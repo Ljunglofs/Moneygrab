@@ -926,24 +926,45 @@ _FF_COUNTRY_FLAG = {
     "CAD": "🇨🇦", "AUD": "🇦🇺", "NZD": "🇳🇿", "CNY": "🇨🇳", "SEK": "🇸🇪",
 }
 
-_MACRO_LAST_GOOD = {"ts": 0.0, "events": []}
+_MACRO_LAST_GOOD = {"ts": 0.0, "events": [], "err": "", "src": ""}
+
+_MACRO_HEADERS = {
+    "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                   "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"),
+    "Accept": "application/json,text/plain,*/*",
+    "Accept-Language": "en-US,en;q=0.9,sv;q=0.8",
+    "Referer": "https://www.forexfactory.com/",
+    "Cache-Control": "no-cache",
+}
+_MACRO_URLS = [
+    "https://nfs.faireconomy.media/ff_calendar_thisweek.json",
+    "https://cdn-nfs.faireconomy.media/ff_calendar_thisweek.json",
+]
 
 def _macro_events():
     """Kommande makrohändelser (räntebesked, CPI, NFP osv), gratis ForexFactory-feed.
-    Ingen API-nyckel krävs. Filtrerar bort låg-impact/helgdagar och sorterar tidsmässigt.
-    Senast lyckade svar behålls i minnet: misslyckas hämtningen (t.ex. Cloudflare
-    blockerar Render-IP) returneras det gamla istället för tomt."""
+    Cloudflare blockerar requests utan browser-headers -> vi skickar riktiga headers
+    och provar två hosts. Senast lyckade svar behålls i minnet som fallback."""
     import requests
     import datetime as _dt
     now_ts = time.time()
     # Färskt nog? (2h) -> använd cache direkt, spara anrop
     if _MACRO_LAST_GOOD["events"] and now_ts - _MACRO_LAST_GOOD["ts"] < 7200:
         return _MACRO_LAST_GOOD["events"]
-    try:
-        r = requests.get("https://nfs.faireconomy.media/ff_calendar_thisweek.json", timeout=8)
-        r.raise_for_status()
-        raw = r.json()
-    except Exception:
+    raw, errs = None, []
+    for url in _MACRO_URLS:
+        try:
+            r = requests.get(url, headers=_MACRO_HEADERS, timeout=8)
+            if r.status_code != 200:
+                errs.append("%s -> HTTP %s" % (url.split("//")[1].split("/")[0], r.status_code))
+                continue
+            raw = r.json()
+            _MACRO_LAST_GOOD["src"] = url
+            break
+        except Exception as e:
+            errs.append("%s -> %s" % (url.split("//")[1].split("/")[0], type(e).__name__))
+    _MACRO_LAST_GOOD["err"] = "; ".join(errs)
+    if raw is None:
         return _MACRO_LAST_GOOD["events"]  # senast kända istället för tomt
     out = []
     now = _dt.datetime.utcnow()
@@ -985,6 +1006,18 @@ def _macro_events():
 @app.get("/api/macro")
 def macro():
     return {"events": _macro_events()}
+
+
+@app.get("/api/macro/debug")
+def macro_debug():
+    """Felsökning: visar senaste fel, källa och cache-status för makrokalendern."""
+    ev = _macro_events()
+    return {
+        "events_count": len(ev),
+        "last_error": _MACRO_LAST_GOOD.get("err", ""),
+        "source": _MACRO_LAST_GOOD.get("src", ""),
+        "cache_age_s": int(time.time() - _MACRO_LAST_GOOD["ts"]) if _MACRO_LAST_GOOD["ts"] else None,
+    }
 
 
 # ----- GRAF: pris + volym över olika tidsramar -----------------------
