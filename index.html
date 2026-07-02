@@ -19,7 +19,7 @@
   --line:rgba(255,255,255,.08); --line2:rgba(255,255,255,.14);
   --txt:#f4f6fb; --mut:#94a3bb; --mut2:#5b677d;
   --gold:#F5C542; --gold2:#FFD166; --goldsoft:rgba(245,197,66,.14);
-  --cyan:#22d3ee; --pos:#22c55e; --neg:#FF3B30; --neutral:#94a3bb; --purp:#a78bfa;
+  --cyan:#22d3ee; --pos:#22d3ee; --neg:#FF3B30; --neutral:#94a3bb; --purp:#a78bfa;
   --r:18px; --rs:13px; --f:'Space Grotesk','Inter',system-ui,sans-serif; --disp:'Rajdhani',sans-serif;
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -803,15 +803,15 @@ const NAMES={},DOMAINS={};UNIVERSE.forEach(x=>{NAMES[x.t]=x.n;if(x.d)DOMAINS[x.t
 
 const THEMES = [
   { key:"AI-infra",        ic:"&#129516;", c:"#22d3ee", n:14, tk:["NVDA","AVGO","AMD","CRDO","SMCI"] },
-  { key:"Halvledare",      ic:"&#128268;", c:"#22c55e", n:9,  tk:["SIVE","MRVL","NVTS"] },
+  { key:"Halvledare",      ic:"&#128268;", c:"#22d3ee", n:9,  tk:["SIVE","MRVL","NVTS"] },
   { key:"Quantum",         ic:"&#9883;",   c:"#a78bfa", n:5,  tk:["IONQ","QUBT","RGTI"] },
   { key:"Rare earth",      ic:"&#9935;",   c:"#F5C542", n:4,  tk:["USAR","MP"] },
   { key:"Nuclear/Energi",  ic:"&#9889;",   c:"#facc15", n:11, tk:["OKLO","SMR","VST","CEG"] },
   { key:"Försvar/Drönare", ic:"&#128737;", c:"#FF3B30", n:7,  tk:["KTOS","AVAV","ONDS"] },
-  { key:"Lidar/Phys.AI",   ic:"&#128663;", c:"#34d399", n:6,  tk:["OUST","LAZR","AEVA"] },
+  { key:"Lidar/Phys.AI",   ic:"&#128663;", c:"#38bdf8", n:6,  tk:["OUST","LAZR","AEVA"] },
   { key:"Space",           ic:"&#128640;", c:"#f472b6", n:5,  tk:["RKLB","ASTS","RDW"] },
   { key:"Mjukvara/AI",     ic:"&#128187;", c:"#818cf8", n:8,  tk:["PLTR","NVDA","TSLA"] },
-  { key:"Bio/Hälsa",       ic:"&#129516;", c:"#2dd4bf", n:6,  tk:["RXRX","HIMS"] }
+  { key:"Bio/Hälsa",       ic:"&#129516;", c:"#7dd3fc", n:6,  tk:["RXRX","HIMS"] }
 ];
 
 const DEMO = {
@@ -827,7 +827,7 @@ const DEMO = {
   scanner:{
     gainers:[], volume:[], setup:[], riskoff:[],
     screeners:[
-      {n:"Bekräftade utbrott",d:"Score ≥ 8 · volym över snitt",c:"#22c55e",ic:"trend",pill:"—",filt:"bull"},
+      {n:"Bekräftade utbrott",d:"Score ≥ 8 · volym över snitt",c:"#22d3ee",ic:"trend",pill:"—",filt:"bull"},
       {n:"Tidiga signaler",d:"Rel. styrka vänder upp",c:"#22d3ee",ic:"pulse",pill:"—",filt:"early"},
       {n:"Microcaps < $5",d:"Hög risk · hög potential",c:"#a78bfa",ic:"flame",pill:"—",filt:"micro"},
       {n:"Risk Off",d:"BOS↓ · blankningstryck",c:"#FF3B30",ic:"shield",pill:"—",filt:"risk"}
@@ -866,7 +866,7 @@ function areaPath(data,W,H){const mx=Math.max(...data),mn=Math.min(...data),rg=(
   for(let i=1;i<pts.length;i++)p+=" L "+pts[i][0].toFixed(1)+" "+pts[i][1].toFixed(1);
   return{line:p,area:p+` L ${W} ${H} L 0 ${H} Z`,last:pts[pts.length-1]};}
 function areaChart(tkr,bias,col){const W=460,H=150,d=_series(tkr,48,bias),a=areaPath(d,W,H);
-  const up=bias>=0,c=col||(up?"#22c55e":"#FF3B30");
+  const up=bias>=0,c=col||(up?"#22d3ee":"#FF3B30");
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" preserveAspectRatio="none" style="display:block;height:150px">
     <defs><linearGradient id="ag${_seed(tkr)%9999}" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="${c}" stop-opacity=".28"/><stop offset="1" stop-color="${c}" stop-opacity="0"/></linearGradient></defs>
@@ -879,7 +879,7 @@ function candleChart(tkr){const W=460,H=180,n=34,base=_series(tkr,n+1,1),r=_rng(
   // MA20-linje
   const ma=cl.map((_,i)=>{const a=cl.slice(Math.max(0,i-19),i+1);return a.reduce((x,y)=>x+y,0)/a.length;});
   let mp="M";ma.forEach((m,i)=>{mp+=` ${(i*cw+cw/2).toFixed(1)} ${y(m).toFixed(1)}`;});
-  for(let i=0;i<n;i++){const o=op[i],c=cl[i],up=c>=o,col=up?"#22c55e":"#FF3B30";
+  for(let i=0;i<n;i++){const o=op[i],c=cl[i],up=c>=o,col=up?"#22d3ee":"#FF3B30";
     const hi=Math.max(o,c)*(1+r()*0.012),lo=Math.min(o,c)*(1-r()*0.012);const x=i*cw+cw/2;
     s+=`<line x1="${x.toFixed(1)}" y1="${y(hi).toFixed(1)}" x2="${x.toFixed(1)}" y2="${y(lo).toFixed(1)}" stroke="${col}" stroke-width="1"/>`;
     s+=`<rect x="${(i*cw+cw*0.18).toFixed(1)}" y="${y(Math.max(o,c)).toFixed(1)}" width="${(cw*0.64).toFixed(1)}" height="${Math.max(1,Math.abs(y(o)-y(c))).toFixed(1)}" fill="${col}" rx="1"/>`;
@@ -977,7 +977,7 @@ function stockData(tkr,live){live=live||{};const r=_rng(_seed(tkr));
   const desc=live.desc||DESC[base]||((SECT[tkr]?SECT[tkr]+"-bolag noterat i "+land+". ":"Bolag noterat i "+land+". ")+"Ingår i GRABIT-universumet inom temat "+(SECT[tkr]||"tematisk tillväxt")+". "+(score>=7?"Visar just nu stark teknisk profil med stigande relativ styrka och bekräftad trend.":"Bygger upp en setup – trend och volym är ännu inte fullt bekräftade, så avvakta läget."));
   const mcap=fmtCap(price*(50e6+r()*3.2e9));
   const verdict=score>=7.5?"KÖP":score>=6?"AVVAKTA":"UNDVIK";
-  const vcolor=score>=7.5?"#22C55E":score>=6?"#F5C542":"#FF3B30";
+  const vcolor=score>=7.5?"#22d3ee":score>=6?"#F5C542":"#FF3B30";
   const entryLo=+(price*0.99).toFixed(2),entryHi=+(price*1.013).toFixed(2),hitrate=Math.min(86,Math.round(48+score*4+r()*6));
   const catPool=[["Kvartalsrapport","28 maj"],["Analytikeruppgradering","denna vecka"],["Sektorn i medvind","pågår"],["Institutionellt inflöde","senaste 10 d"],["Breakout-nivå nära","nu"],["Insynsköp registrerat","nyligen"]];
   const ci=Math.floor(r()*3),catalysts=catPool.slice(ci,ci+3);
@@ -1049,6 +1049,12 @@ function openStock(tkr){_curStock=tkr;const d=stockData(tkr,_liveStock[tkr]);
   const tot=((d.mom+d.sent+d.tech)/3);
   $("#st-body").innerHTML=`
     <div class="st-hero sthero-fill"><div class="sthero-in">${lic(tkr,60,sCol)}<div class="sthero-tx"><div class="sthero-tk">${tkr} <span class="sthero-flag">${d.flag||""}</span></div><div class="sthero-nm">${d.name}</div><div class="sthero-sub">${d.bors||""}</div></div></div></div>
+    <div class="st-sec">Fråga Grabit</div>
+    <div class="ask secgfx-wrap"><div class="secgfx gglobe" style="background-image:url('${IMGS.globe}')"></div><div class="in"><input id="ask-q" placeholder="Fråga AI om ${tkr}…" onkeydown="if(event.key==='Enter')askGrabit('${tkr}',this.value)">
+      <button onclick="askGrabit('${tkr}',document.getElementById('ask-q').value)">&#10148;</button></div>
+      <div class="chips">${["Varför rör sig "+tkr+"?","Hur ser riskbilden ut?","Jämför "+tkr,"Nästa kursmål?"].map(q=>`<button onclick="askGrabit('${tkr}','${q}')">${q}</button>`).join("")}</div>
+      <div class="ans" id="ask-ans"></div></div>
+    <div id="st-ai-slot"></div>
     <div class="st-box score-hero">${scoreGauge(d.score)}</div>
     <div class="st-box st-price2 price-wide"><div class="k2">Dagens kurs</div><div class="p2 num">${d.cur}${d.price.toLocaleString("sv-SE")}</div><div class="c2" style="color:${dCol}">${d.day>=0?"+":""}${d.day}% i dag</div></div>
     <div class="st-sec">Analytiker</div>
@@ -1061,7 +1067,7 @@ function openStock(tkr){_curStock=tkr;const d=stockData(tkr,_liveStock[tkr]);
     <div class="st-box about secgfx-wrap"><div class="secgfx" style="background-image:url('${IMGS.goldwave}')"></div><div class="ab-facts"><div><span>Sektor</span><b>${d.sector}</b></div><div><span>Marknad</span><b>${d.bors}</b></div><div><span>Land</span><b>${d.land} ${d.flag}</b></div></div><p class="blurb">${d.desc}</p></div>
     <div class="verdict secgfx-wrap" style="border-color:${d.vcolor}66;background:linear-gradient(160deg,${d.vcolor}1f,#090A0B)"><div class="secgfx gverdict" style="background-image:url('${IMGS.verdict_chart}')"></div><div class="vd-top"><span class="vd-badge" style="background:${d.vcolor}">${d.verdict}</span><span class="vd-hit">Träffsäkerhet <b style="color:${d.vcolor}">${d.hitrate}%</b></span></div><div class="vd-line">${d.verdict==='UNDVIK'?'Avvakta – ingen entry rekommenderas just nu.':'Köp '+d.cur+d.entryLo+'–'+d.cur+d.entryHi+'  ·  Stop '+d.cur+d.stop+'  ·  Mål '+d.cur+d.t2}</div><div class="vd-sub">${d.score>=7.5?'AI-slutsats: stark setup med bekräftad trend och stigande relativ styrka. R/R 1:2.3.':d.score>=6?'AI-slutsats: blandad bild – vänta på bekräftelse (volym + utbrott) innan entry.':'AI-slutsats: svag setup – hög risk. Undvik tills trend och volym förbättras.'}</div></div>
     <div class="st-sec">GRABIT Score</div>
-    <div class="rings">${ring(d.mom,"#22C55E","Momentum",d.mom>=8?"Starkt":"Bra")}
+    <div class="rings">${ring(d.mom,"#22d3ee","Momentum",d.mom>=8?"Starkt":"Bra")}
       ${ring(d.sent,"#F5C542","Sentiment",d.sent>=8?"Positivt":"Neutralt")}
       ${ring(d.tech,"#FFB000","Teknik",d.tech>=8?"Mkt starkt":"Bra")}
       <div class="ring tot"><div class="rl">Total</div><div class="big" style="color:${sCol};margin-top:10px">${d.score.toFixed(1)}</div>
@@ -1070,7 +1076,7 @@ function openStock(tkr){_curStock=tkr;const d=stockData(tkr,_liveStock[tkr]);
       <div class="bi"><span>Övertygelse</span><b>${d.conv}</b></div><div class="bi"><span>Riskprofil</span><b style="color:${d.riskp==='FÖRHÖJD'?'var(--neg)':'#cdd5e1'}">${d.riskp}</b></div>
       <div class="bi"><span>Setup</span><b style="color:var(--gold2)">${d.setupG}</b></div></div>
     <div class="nyck" style="margin-top:11px">${stat("5 dagar",(d.d5>=0?'+':'')+d.d5+'%',d.d5>=0?'var(--pos)':'var(--neg)')}${stat("20 dagar",(d.d20>=0?'+':'')+d.d20+'%',d.d20>=0?'var(--pos)':'var(--neg)')}${stat("Börsvärde",d.mcap)}</div>
-    <div class="st-chart" id="st-area">${areaChart(tkr,d.day,d.day>=0?"#22c55e":"#ef4444")}</div>
+    <div class="st-chart" id="st-area">${areaChart(tkr,d.day,d.day>=0?"#22d3ee":"#ef4444")}</div>
     <div class="tf" id="st-tf">${["1D","1V","1M","3M","6M","1Å","5Å"].map((t,i)=>`<button class="${i===0?'on':''}" onclick="tfSwitch(this,'${tkr}',${i})">${t}</button>`).join("")}</div>
     <div class="st-sec">Nyckeltal</div>
     <div class="nyck">${stat("RSI",d.rsi,d.rsi>70?'var(--neg)':d.rsi<35?'var(--pos)':'')}${stat("Mot topp",d.fromHi+'%')}${stat("Rel.vol",d.relvol+'x'+(d.relvol>=1.5?' \uD83D\uDD25':''),d.relvol>=1.5?'#ffb46b':'')}
@@ -1104,18 +1110,13 @@ function openStock(tkr){_curStock=tkr;const d=stockData(tkr,_liveStock[tkr]);
       <div class="er"><span class="k">Rel. volym</span><span class="v">${d.relvol}x</span></div></div>
     <div class="st-sec">Katalysatorer &amp; nyheter</div>
     <div class="exit">${d.catalysts.map(c=>`<div class="er"><span class="k">${c[0]}</span><span class="v" style="color:var(--gold2)">${c[1]}</span></div>`).join("")}</div>
-    <div class="st-sec">Senaste nyheter</div>
-    <div id="st-news" class="news-list"><div class="anl-load">Laddar nyheter…</div></div>
     <div class="st-sec">Varför vi är bullish</div>
     <div class="why">${d.bull.map(x=>`<div class="row"><span class="pts pos">+${x[1]}</span><span>${x[0]}</span></div>`).join("")}</div>
     <div class="st-sec">Potentiella risker</div>
     <div class="why">${d.risks.map(x=>`<div class="row"><span class="pts neg">${x[1]}</span><span>${x[0]}</span></div>`).join("")}</div>
 
-    <div class="st-sec">Fråga Grabit</div>
-    <div class="ask secgfx-wrap"><div class="secgfx gglobe" style="background-image:url('${IMGS.globe}')"></div><div class="in"><input id="ask-q" placeholder="Fråga AI om ${tkr}…" onkeydown="if(event.key==='Enter')askGrabit('${tkr}',this.value)">
-      <button onclick="askGrabit('${tkr}',document.getElementById('ask-q').value)">&#10148;</button></div>
-      <div class="chips">${["Varför rör sig "+tkr+"?","Hur ser riskbilden ut?","Jämför "+tkr,"Nästa kursmål?"].map(q=>`<button onclick="askGrabit('${tkr}','${q}')">${q}</button>`).join("")}</div>
-      <div class="ans" id="ask-ans"></div></div>`;
+    <div class="st-sec">Senaste nyheter</div>
+    <div id="st-news" class="news-list"><div class="anl-load">Laddar nyheter…</div></div>`;
   loadStockExtras(tkr, d.price);
   document.getElementById("stock").classList.add("on");
   document.getElementById("stock").scrollTop=0;
@@ -1254,7 +1255,7 @@ async function fetchCompany(tkr){
   }catch(e){}
 }
 function tfSwitch(btn,tkr,i){btn.parentNode.querySelectorAll("button").forEach(b=>b.classList.remove("on"));btn.classList.add("on");
-  const d=stockData(tkr);$("#st-area").innerHTML=areaChart(tkr+"_"+i,d.day,d.day>=0?"#22c55e":"#FF3B30");}
+  const d=stockData(tkr);$("#st-area").innerHTML=areaChart(tkr+"_"+i,d.day,d.day>=0?"#22d3ee":"#FF3B30");}
 function closeStock(){document.getElementById("stock").classList.remove("on");}
 // ---- Screener-vy: lista aktier som matchar ett kort ----------------
 function _screenRows(){
@@ -1355,7 +1356,7 @@ function licDom(dom,size,fallback){
   const img=logoImg(dom);
   return `<div class="lic" style="width:${size}px;height:${size}px">${fallback||""}${img}</div>`;
 }
-const scoreColor=v=>v>=8.5?"#22c55e":v>=7?"#F5C542":"#22d3ee";
+const scoreColor=v=>v>=8.5?"#22d3ee":v>=7?"#F5C542":"#22d3ee";
 function spark(data,color){const w=52,h=26,mx=Math.max(...data),mn=Math.min(...data),rg=(mx-mn)||1;
   const pts=data.map((d,i)=>`${(i/(data.length-1)*w).toFixed(1)},${(h-2-((d-mn)/rg)*(h-4)).toFixed(1)}`).join(" ");
   return `<svg class="spark" viewBox="0 0 ${w} ${h}"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;}
@@ -1445,7 +1446,7 @@ function wlist(arr){return arr.map(x=>`<div class="qrow" onclick="openStock('${x
   <div class="wtag" style="color:#FF3B30">${x.tag||"BOS&#8595;"}</div></div></div>`).join("");}
 
 function radarSVG(){
-  const blips=[[72,64,'#22c55e'],[150,86,'#3b82f6'],[128,150,'#22c55e'],[84,162,'#22c55e'],[150,128,'#FF3B30']];
+  const blips=[[72,64,'#22d3ee'],[150,86,'#3b82f6'],[128,150,'#22d3ee'],[84,162,'#22d3ee'],[150,128,'#FF3B30']];
   const dots=blips.map((p,i)=>`<circle cx="${p[0]}" cy="${p[1]}" r="4" fill="${p[2]}" style="filter:drop-shadow(0 0 5px ${p[2]})"><animate attributeName="opacity" values="0.4;1;0.4" dur="${2+i*0.4}s" repeatCount="indefinite"/></circle>`).join("");
   let ticks="";
   for(let a=0;a<360;a+=6){const rad=a*Math.PI/180,r1=93,r2=(a%30===0?83:89),x1=100+r1*Math.cos(rad),y1=100+r1*Math.sin(rad),x2=100+r2*Math.cos(rad),y2=100+r2*Math.sin(rad);ticks+=`<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="rgba(90,160,215,.45)" stroke-width="1"/>`;}
@@ -1479,7 +1480,7 @@ function renderScanner(s){
   const hero=`<div class="theme-hero" onclick="go('marknad')" style="background-image:linear-gradient(100deg,#0A0E12 34%,rgba(10,14,18,.55) 58%,rgba(10,14,18,.1) 100%),url('${IMGS.rocket}')"><div class="th-k">HETASTA TEMAN JUST NU</div><div class="th-h">Space &amp; Defense</div><div class="th-s">Stark momentum · Flera breakout-setups</div><div class="th-pill">3 TOPPSETUPS</div></div>`;
   return `<div class="sect"><h2>Populära screeners</h2></div>
     <div class="scr-grid">${scr}</div>
-    <div class="card scanner2"><div class="sc2-top"><span class="sc2-title">SEKTORSCANNER</span><span class="sc2-live"><i></i>Live</span></div><div class="sc2-body"><div class="sc2-radar">${radarSVG()}</div><div class="sc2-rows"><div class="sc2-row"><span class="sc2-ic" style="--c:#22c55e"><svg viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="1.9"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.4" fill="#22c55e" stroke="none"/><line x1="12" y1="2.5" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="21.5"/><line x1="2.5" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="21.5" y2="12"/></svg></span><span class="sc2-lbl">Bekräftade setups</span><b class="sc2-num" style="color:#22c55e">${s.confirmed??"–"}</b></div><div class="sc2-row"><span class="sc2-ic" style="--c:#22d3ee"><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-6 4 12 2-6h6"/></svg></span><span class="sc2-lbl">Tidiga signaler</span><b class="sc2-num" style="color:#22d3ee">${s.early??"–"}</b></div><div class="sc2-row"><span class="sc2-ic" style="--c:#FF3B30"><svg viewBox="0 0 24 24" fill="none" stroke="#FF3B30" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/><line x1="12" y1="8" x2="12" y2="12.5"/><circle cx="12" cy="16" r="0.7" fill="#FF3B30" stroke="none"/></svg></span><span class="sc2-lbl">Risk off</span><b class="sc2-num" style="color:#FF3B30">${s.riskCount??"–"}</b></div></div></div></div>
+    <div class="card scanner2"><div class="sc2-top"><span class="sc2-title">SEKTORSCANNER</span><span class="sc2-live"><i></i>Live</span></div><div class="sc2-body"><div class="sc2-radar">${radarSVG()}</div><div class="sc2-rows"><div class="sc2-row"><span class="sc2-ic" style="--c:#22d3ee"><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.9"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.4" fill="#22d3ee" stroke="none"/><line x1="12" y1="2.5" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="21.5"/><line x1="2.5" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="21.5" y2="12"/></svg></span><span class="sc2-lbl">Bekräftade setups</span><b class="sc2-num" style="color:#22d3ee">${s.confirmed??"–"}</b></div><div class="sc2-row"><span class="sc2-ic" style="--c:#22d3ee"><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-6 4 12 2-6h6"/></svg></span><span class="sc2-lbl">Tidiga signaler</span><b class="sc2-num" style="color:#22d3ee">${s.early??"–"}</b></div><div class="sc2-row"><span class="sc2-ic" style="--c:#FF3B30"><svg viewBox="0 0 24 24" fill="none" stroke="#FF3B30" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/><line x1="12" y1="8" x2="12" y2="12.5"/><circle cx="12" cy="16" r="0.7" fill="#FF3B30" stroke="none"/></svg></span><span class="sc2-lbl">Risk off</span><b class="sc2-num" style="color:#FF3B30">${s.riskCount??"–"}</b></div></div></div></div>
     <div class="scan-grid">${mini('Top Gainers','var(--pos)',g)}${mini('Högsta volym','var(--gold2)',v)}</div>
     ${hero}`;
 }
@@ -1599,8 +1600,8 @@ function mapScreen(rows,d){
   const nb=rows.filter(isBull).length, ne=rows.filter(isBear).length, tt=nb+ne;
   const gs=tt?Math.round(nb/tt*100):50;
   let gst,gc;
-  if(gs>=75){gst="SUPER BULLISH";gc="#22c55e";}
-  else if(gs>=55){gst="BULLISH";gc="#22c55e";}
+  if(gs>=75){gst="SUPER BULLISH";gc="#22d3ee";}
+  else if(gs>=55){gst="BULLISH";gc="#22d3ee";}
   else if(gs>=40){gst="NEUTRAL";gc="#F5C542";}
   else{gst="BEARISH";gc="#FF3B30";}
   d.gauge={score:gs,state:gst,color:gc};
@@ -1789,8 +1790,8 @@ async function loadDaily(){
   }catch(e){}
 }
 /* ===== AI-analys i aktievyn (setup + nyheter) ===== */
-var BULL_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 5.5C4 7 4.5 9.5 7 10.2"/><path d="M18.5 5.5C20 7 19.5 9.5 17 10.2"/><path d="M7 10C7 14.5 9 17.5 12 17.5C15 17.5 17 14.5 17 10"/><circle cx="9.8" cy="12.2" r="0.7" fill="currentColor" stroke="none"/><circle cx="14.2" cy="12.2" r="0.7" fill="currentColor" stroke="none"/><path d="M10.6 14.8H13.4"/></svg>';
-var BEAR_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7.2" r="2.3"/><circle cx="17" cy="7.2" r="2.3"/><circle cx="12" cy="13" r="6"/><circle cx="9.8" cy="12" r="0.7" fill="currentColor" stroke="none"/><circle cx="14.2" cy="12" r="0.7" fill="currentColor" stroke="none"/><circle cx="12" cy="15.2" r="1.2"/></svg>';
+var BULL_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 17L9.5 11L13.5 14.5L20.5 7"/><path d="M15 7H20.5V12.5"/></svg>';
+var BEAR_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7L9.5 13L13.5 9.5L20.5 17"/><path d="M15 17H20.5V11.5"/></svg>';
 var FLAT_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12H17"/><path d="M14 8.5L17.5 12L14 15.5"/></svg>';
 function sentimentEmblem(sc){
   var map={pos:['var(--pos)','Bullish',BULL_SVG],neg:['var(--neg)','Bearish',BEAR_SVG]};
@@ -1801,10 +1802,10 @@ function sentimentEmblem(sc){
 async function loadStockAI(tkr){
   const B=CONFIG.API_BASE?CONFIG.API_BASE.replace(/\/$/,""):"";
   if(!B||typeof fetch==="undefined")return;
-  const body=document.getElementById("st-body");if(!body)return;
+  const slot=document.getElementById("st-ai-slot")||document.getElementById("st-body");if(!slot)return;
   const card=document.createElement("div");card.className="st-box st-ai";
   card.innerHTML='<div class="st-ai-h"><span class="dot2"></span>GRABIT AI</div><div class="st-ai-b">Analyserar…</div>';
-  body.appendChild(card);
+  slot.innerHTML="";slot.appendChild(card);
   let html="";
   try{const sR=await fetch(B+"/api/ai_setup/"+encodeURIComponent(tkr),{cache:"no-store"});const sJ=await sR.json();
     if(sJ&&sJ.text)html+='<div class="st-ai-row"><b>Setup</b><span>'+sJ.text.replace(/</g,"&lt;")+'</span></div>';}catch(e){}
@@ -1871,8 +1872,8 @@ async function loadMacro(){
 }
 load();loadMonthly();loadDaily();loadMacro();
 function fgInfo(s){s=+s||0;
-  if(s>=75)return{label:"Extrem girighet",col:"#22c55e"};
-  if(s>=55)return{label:"Girighet",col:"#22c55e"};
+  if(s>=75)return{label:"Extrem girighet",col:"#22d3ee"};
+  if(s>=55)return{label:"Girighet",col:"#22d3ee"};
   if(s>=45)return{label:"Neutral",col:"#F5C542"};
   if(s>=25)return{label:"Rädsla",col:"#FF9F0A"};
   return{label:"Extrem rädsla",col:"#FF3B30"};}
@@ -1968,8 +1969,8 @@ async function loadPolyInsiders(force){
 .sc2-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px}
 .sc2-title{font-weight:900!important;font-size:15px!important;letter-spacing:.13em!important;text-transform:uppercase!important;color:#eaf2f8!important;position:relative;padding-bottom:8px}
 .sc2-title::after{content:"";position:absolute;left:0;bottom:0;width:34px;height:3px;border-radius:2px;background:#22d3ee}
-.sc2-live{display:inline-flex;align-items:center;gap:6px;font-weight:800!important;font-size:13px!important;color:#22c55e!important}
-.sc2-live i{width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 7px #22c55e;animation:sc2pulse 1.8s ease-in-out infinite}
+.sc2-live{display:inline-flex;align-items:center;gap:6px;font-weight:800!important;font-size:13px!important;color:#22d3ee!important}
+.sc2-live i{width:8px;height:8px;border-radius:50%;background:#22d3ee;box-shadow:0 0 7px #22d3ee;animation:sc2pulse 1.8s ease-in-out infinite}
 @keyframes sc2pulse{0%,100%{opacity:1}50%{opacity:.45}}
 .sc2-body{display:flex;align-items:center;gap:14px;margin-top:6px}
 .sc2-radar{flex:none;width:43%;max-width:240px;display:flex;justify-content:center;align-items:center}
@@ -1991,13 +1992,13 @@ async function loadPolyInsiders(force){
 .fgcard{background:#0E0F11!important;border:1px solid rgba(255,255,255,.07)!important;border-radius:16px!important;padding:13px 15px 12px!important;margin:4px 0 12px!important;box-shadow:none!important;overflow:hidden!important}
 .fgcard .fg-head{display:flex;align-items:center;justify-content:space-between}
 .fgcard .fg-t{font-weight:800!important;font-size:11px!important;letter-spacing:.1em!important;text-transform:uppercase!important;color:var(--mut,#8b97a3)!important}
-.fgcard .fg-live{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#22c55e}
-.fgcard .fg-live i{width:6px;height:6px;border-radius:50%;background:#22c55e;display:inline-block}
+.fgcard .fg-live{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#22d3ee}
+.fgcard .fg-live i{width:6px;height:6px;border-radius:50%;background:#22d3ee;display:inline-block}
 .fgcard .fg-row{display:flex;align-items:baseline;justify-content:space-between;margin-top:7px}
 .fgcard .fg-n{font-family:var(--disp);font-weight:900!important;font-size:26px!important;letter-spacing:-.02em!important;font-feature-settings:"tnum"}
 .fgcard .fg-n small{font-size:12px;font-weight:700;color:var(--mut,#8b97a3)}
 .fgcard .fg-st{font-weight:900;font-size:14px;letter-spacing:.01em}
-.fgcard .fg-bar{position:relative;height:6px;border-radius:3px;margin:10px 0 5px;background:linear-gradient(90deg,#FF3B30,#F5C542 50%,#22c55e)}
+.fgcard .fg-bar{position:relative;height:6px;border-radius:3px;margin:10px 0 5px;background:linear-gradient(90deg,#FF3B30,#F5C542 50%,#22d3ee)}
 .fgcard .fg-dot{position:absolute;top:50%;width:12px;height:12px;border-radius:50%;background:#0E0F11;border:2px solid #fff;transform:translate(-50%,-50%)}
 .fgcard .fg-ends{display:flex;justify-content:space-between;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mut,#8b97a3)}
 .fgcard .fg-exp{margin-top:9px;font-size:11.5px;line-height:1.45;color:var(--mut,#8b97a3)}
@@ -2015,13 +2016,13 @@ async function loadPolyInsiders(force){
 .pulse-head{display:flex;align-items:center;gap:10px}
 .pulse-title{font-family:var(--disp);font-weight:900;font-size:19px;letter-spacing:.05em;color:#fff;line-height:1}
 .pulse-live{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:800;letter-spacing:.1em;color:var(--gold2,#FFD166)}
-.pulse-live i{width:6px;height:6px;border-radius:50%;background:var(--pos,#22c55e);display:inline-block}
+.pulse-live i{width:6px;height:6px;border-radius:50%;background:var(--pos,#22d3ee);display:inline-block}
 .pulse-sub{font-size:11px;font-weight:800;letter-spacing:.14em;color:var(--mut,#8b97a3);margin-top:3px}
 .pulse-read{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-top:8px}
 .pulse-n{font-family:var(--disp);font-weight:900;font-size:36px;line-height:1;letter-spacing:-.02em;font-feature-settings:"tnum"}
 .pulse-n small{font-size:15px;font-weight:700;color:var(--mut,#8b97a3)}
 .pulse-st{font-family:var(--disp);font-weight:900;font-size:19px;letter-spacing:.02em}
-.pulse-bar{position:relative;height:6px;border-radius:3px;margin:12px 0 5px;background:linear-gradient(90deg,#FF3B30,#F5C542 50%,#22c55e)}
+.pulse-bar{position:relative;height:6px;border-radius:3px;margin:12px 0 5px;background:linear-gradient(90deg,#FF3B30,#F5C542 50%,#22d3ee)}
 .pulse-dot{position:absolute;top:50%;width:13px;height:13px;border-radius:50%;background:#0E0F11;border:2px solid var(--gold,#F5C542);transform:translate(-50%,-50%);box-shadow:0 0 8px rgba(245,197,66,.5)}
 .pulse-ends{display:flex;justify-content:space-between;font-size:10px;font-weight:800;letter-spacing:.1em;color:var(--mut,#8b97a3)}
 .pulse-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;padding-top:9px;border-top:1px solid rgba(255,255,255,.06);font-size:11.5px;color:var(--mut,#8b97a3)}
@@ -2029,7 +2030,7 @@ async function loadPolyInsiders(force){
 @media(max-width:360px){.pulse-wrap{grid-template-columns:30% 1fr;gap:10px}.pulse-n{font-size:30px}.pulse-st{font-size:16px}}
 .fgmini-card{background:#0E0F11!important;border:1px solid rgba(255,255,255,.07)!important;border-radius:18px!important;padding:14px 12px!important;display:flex!important;flex-direction:column;align-items:center;justify-content:center;text-align:center;margin:0!important}
 .fgmini-l{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--mut,#8b97a3);display:flex;align-items:center;gap:6px}
-.fgmini-l i.live{width:6px;height:6px;border-radius:50%;background:var(--pos,#22c55e);display:inline-block}
+.fgmini-l i.live{width:6px;height:6px;border-radius:50%;background:var(--pos,#22d3ee);display:inline-block}
 .fgmini-radar{margin:4px 0 2px;width:104px;max-width:104px}
 .fgmini-n{font-family:var(--disp);font-weight:900;font-size:29px;line-height:1;letter-spacing:-.02em;margin-top:3px;font-feature-settings:"tnum"}
 .fgmini-n small{font-size:13px;font-weight:700;color:var(--mut,#8b97a3)}
