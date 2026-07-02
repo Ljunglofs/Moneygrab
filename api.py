@@ -630,8 +630,11 @@ def robber_test():
 def robber_status():
     """Visar om skannings-traden lever och vad senaste skanningen gav.
     thread_alive=false betyder att roboten ALDRIG startade (fel startkommando
-    eller saknade Alpaca-nycklar) — aven om /api/robber/test fungerar."""
+    eller saknade Alpaca-nycklar) — aven om /api/robber/test fungerar.
+    shadow_tail = senaste kandidaterna (aven under trosklen) med confidence,
+    sa man ser direkt om setups finns men stoppas av CONF_MIN_SEND."""
     import threading
+    import json as _json
     alive = any(t.name == "nasdaq-robber" and t.is_alive() for t in threading.enumerate())
     out = {"thread_alive": alive}
     try:
@@ -642,7 +645,23 @@ def robber_status():
             "alpaca_keys": bool(R.Config.ALPACA_KEY and R.Config.ALPACA_SECRET),
             "tickers": R.Config.TICKERS,
             "min_score": R.Config.MIN_SCORE,
+            "conf_min_send": R.Config.CONF_MIN_SEND,
         }
+        # Senaste 15 kandidaterna ur shadow-loggen (nyast forst)
+        try:
+            with open(R.Config.SHADOW_LOG) as f:
+                rows = [_json.loads(x) for x in f.readlines()[-15:] if x.strip()]
+            out["shadow_tail"] = [
+                {"ts": r.get("ts"), "side": r.get("side"),
+                 "score7": r.get("score7"), "confidence": r.get("confidence"),
+                 "sent": r.get("sent")} for r in reversed(rows)]
+            confs = [r.get("confidence") or 0 for r in rows]
+            out["shadow_best_conf"] = max(confs) if confs else None
+        except Exception:
+            out["shadow_tail"] = []
+            out["shadow_note"] = ("Ingen shadow-logg hittad — antingen inga kandidater "
+                                  "sedan senaste deploy, eller sa saknas Persistent Disk "
+                                  "(DATA_DIR) sa filen nollstalldes.")
         if not alive:
             out["hint"] = ("Traden lever inte. Kontrollera att Render Start Command ar "
                            "'uvicorn grabit_entry:app ...' OCH att APCA_API_KEY_ID/APCA_API_SECRET_KEY finns.")
