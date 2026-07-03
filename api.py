@@ -1796,6 +1796,39 @@ def ai_debug(ticker: str = "GLW"):
     return out
 
 
+@app.get("/api/robber/exec", include_in_schema=False)
+def robber_exec_status():
+    """Status för exekveringen: läge, spärrar, konto, positioner, öppna ordrar."""
+    from nasdaq_robber import Config as RC, _alp_get, _alp_base, _EXEC
+    out = {
+        "mode": RC.EXECUTE,
+        "ticker": RC.EXEC_TICKER,
+        "min_conf": RC.EXEC_MIN_CONF,
+        "max_pos_usd": RC.MAX_POS_USD,
+        "dagsforlustgrans_pct": RC.DAILY_LOSS_LIMIT_PCT,
+        "pausad_idag": _EXEC.get("halted", False),
+        "endpoint": _alp_base(),
+        "nycklar_finns": bool(RC.APCA_KEY and RC.APCA_SECRET),
+    }
+    if RC.EXECUTE in ("paper", "live") and out["nycklar_finns"]:
+        try:
+            a = _alp_get("/v2/account")
+            out["equity"] = a.get("equity")
+            out["gardagens_equity"] = a.get("last_equity")
+            out["kop_kraft"] = a.get("buying_power")
+            out["positioner"] = [
+                {"symbol": p.get("symbol"), "antal": p.get("qty"),
+                 "snitt": p.get("avg_entry_price"), "pl_usd": p.get("unrealized_pl")}
+                for p in _alp_get("/v2/positions")]
+            out["oppna_ordrar"] = [
+                {"symbol": o.get("symbol"), "side": o.get("side"),
+                 "typ": o.get("type"), "antal": o.get("qty"), "status": o.get("status")}
+                for o in _alp_get("/v2/orders?status=open")]
+        except Exception as e:
+            out["fel"] = str(e)[:200]
+    return out
+
+
 def _ai_text(cache_key: str, system: str, user: str, max_tokens: int = 220) -> str:
     """Generisk cachad Claude-text. Tom sträng om nyckel saknas/fel."""
     if cache_key in _AI_TEXT_CACHE:

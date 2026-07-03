@@ -10,6 +10,7 @@ import os
 import time
 import json
 import math
+import requests
 from datetime import datetime, timezone, timedelta
 
 import numpy as np
@@ -87,11 +88,17 @@ class Config:
     NOTIFY_CLOSE  = os.environ.get("NOTIFY_CLOSE", "1") == "1"     # notis när en trade stänger
     STATS_ANY_CHAT = os.environ.get("STATS_ANY_CHAT", "0") == "1"  # svara på /stats från valfri chat (default bara ägaren)
 
-    # --- Auto-trade (cTrader) -- AVSTANGD som default. Kan inte lagga riktig order
-    #     utan att BADE AUTO_TRADE=1 OCH AUTO_TRADE_LIVE=1 ar satta. ---
-    AUTO_TRADE      = os.environ.get("AUTO_TRADE", "0") == "1"
-    AUTO_TRADE_LIVE = os.environ.get("AUTO_TRADE_LIVE", "0") == "1"
-    AUTO_TRADE_MIN  = int(os.environ.get("AUTO_TRADE_MIN", "90"))
+    # --- EXEKVERING via Alpaca (paper ar default-vagen) --------------
+    # EXECUTE=off  -> bara signaler (som idag)
+    # EXECUTE=paper -> riktiga bracketordrar i Alpaca PAPER (latsaspengar)
+    # EXECUTE=live  -> riktiga pengar; kraver DESSUTOM EXEC_LIVE_OK=JA
+    EXECUTE       = os.environ.get("EXECUTE", "off").strip().lower()
+    EXEC_TICKER   = os.environ.get("EXEC_TICKER", "QQQ").upper()
+    EXEC_MIN_CONF = int(os.environ.get("EXEC_MIN_CONF", "72"))
+    MAX_POS_USD   = float(os.environ.get("MAX_POS_USD", "5000"))
+    DAILY_LOSS_LIMIT_PCT = float(os.environ.get("DAILY_LOSS_LIMIT_PCT", "3"))
+    APCA_KEY      = os.environ.get("APCA_API_KEY_ID", "")
+    APCA_SECRET   = os.environ.get("APCA_API_SECRET_KEY", "")
 
     # --- Session (svensk tid, DST-säkert via zoneinfo) ---
     LOCAL_TZ          = "Europe/Stockholm"
@@ -523,20 +530,143 @@ def _shadow_log(sig, sent):
 
 
 def maybe_autotrade(sig):
-    """cTrader-exekvering -- AVSTANGD som default.
-    Lagger ALDRIG en riktig order utan bade AUTO_TRADE=1 och AUTO_TRADE_LIVE=1."""
-    if not Config.AUTO_TRADE:
+    """Exekvering via Alpaca. Styrs av env EXECUTE=off|paper|live."""
+    if Config.EXECUTE in ("paper", "live"):
+        execute_signal(sig)
+    else:
+        print("[exec] EXECUTE=off -- signal skickad men ingen order "
+              "(satt EXECUTE=paper i Render for att handla i Alpaca paper)")
+
+
+# ==================================================================
+# EXEKVERING -- Alpaca bracketordrar (paper forst, live bakom dubbelspärr)
+# ==================================================================
+_EXEC = {"day": "", "halted": False}
+
+
+def _alp_base():
+    return ("https://api.alpaca.markets" if Config.EXECUTE == "live"
+            else "https://paper-api.alpaca.markets")
+
+
+def _alp_hdr():
+    return {"APCA-API-KEY-ID": Config.APCA_KEY,
+            "APCA-API-SECRET-KEY": Config.APCA_SECRET}
+
+
+def _alp_get(path, base=None):
+    r = requests.get((base or _alp_base()) + path, headers=_alp_hdr(), timeout=10)
+    r.raise_for_status()
+    return r.json()
+
+
+def _alp_post(path, payload):
+    r = requests.post(_alp_base() + path, headers=_alp_hdr(), json=payload, timeout=10)
+    if r.status_code >= 400:
+        raise RuntimeError(f"Alpaca {r.status_code}: {r.text[:200]}")
+    return r.json()
+
+
+def _exec_last_price():
+    j = _alp_get(f"/v2/stocks/{Config.EXEC_TICKER}/trades/latest?feed=iex",
+                 base="https://data.alpaca.markets")
+    return float(j["trade"]["p"])
+
+
+def execute_signal(sig):
+    """Lagger en bracketorder (entry + SL + TP) i Alpaca utifran en NQ-signal.
+
+    Sakerhetssparrar, i ordning:
+      1. live kraver EXEC_LIVE_OK=JA utover EXECUTE=live
+      2. confidence under EXEC_MIN_CONF -> ingen order
+      3. borsen maste vara oppen (bracket kraver RTH)
+      4. dagsforlustgrans: equity < gardagens * (1 - DAILY_LOSS_LIMIT_PCT%) -> paus till nasta dag
+      5. max EN position/oppen order i EXEC_TICKER at gangen
+      6. storlek: risk = equity * RISK_PCT, cappad av MAX_POS_USD
+    NQ-nivaerna oversatts till EXEC_TICKER via PROCENT (inte dollar), sa
+    SL/TP far exakt samma relativa avstand som signalen."""
+    mode = Config.EXECUTE
+    if mode == "live" and os.environ.get("EXEC_LIVE_OK", "") != "JA":
+        print("[exec] EXECUTE=live men EXEC_LIVE_OK=JA saknas -- ingen order (dubbelsparr)")
         return
-    if sig.get("confidence", 0) < Config.AUTO_TRADE_MIN:
+    if not (Config.APCA_KEY and Config.APCA_SECRET):
+        print("[exec] APCA_API_KEY_ID/SECRET saknas -- kan inte handla")
         return
-    intent = (f"[auto] {sig['side']} {sig['ticker']} @ {sig['price']} "
-              f"SL {sig['stop']} TP {sig['targets']} (conf {sig.get('confidence')})")
-    if not Config.AUTO_TRADE_LIVE:
-        print(intent, "-- LIVE av, ingen order lagd (torrkorning)")
+    conf = sig.get("confidence", 0)
+    if conf < Config.EXEC_MIN_CONF:
+        print(f"[exec] conf {conf} < {Config.EXEC_MIN_CONF} -- skippar")
         return
-    # === LIVE cTrader-exekvering laggs har (kraver creds + uttestning) ===
-    # Avsiktligt ej implementerad: ingen oprovad bot ska kunna fyra skarpt.
-    print(intent, "-- AUTO_TRADE_LIVE=1 men exekvering ej aktiverad i kod (sakerhetssparr)")
+    try:
+        # dagsaterstallning av spärren
+        from zoneinfo import ZoneInfo as _ZI
+        today = datetime.now(_ZI("America/New_York")).strftime("%Y-%m-%d")
+        if _EXEC["day"] != today:
+            _EXEC["day"] = today
+            _EXEC["halted"] = False
+        if _EXEC["halted"]:
+            print("[exec] pausad (dagsforlustgrans) -- ingen order idag")
+            return
+
+        clock = _alp_get("/v2/clock")
+        if not clock.get("is_open"):
+            print("[exec] borsen stangd -- bracketorder kraver oppen bors, skippar")
+            return
+
+        acct = _alp_get("/v2/account")
+        eq = float(acct.get("equity") or 0)
+        last_eq = float(acct.get("last_equity") or eq)
+        if last_eq and eq < last_eq * (1 - Config.DAILY_LOSS_LIMIT_PCT / 100):
+            _EXEC["halted"] = True
+            send_telegram(f"\U0001F6D1 <b>ROBBER EXEC pausad</b>: dagsforlustgransen "
+                          f"({Config.DAILY_LOSS_LIMIT_PCT}%) nadd. Ateraktiveras imorgon.")
+            return
+
+        for p in _alp_get("/v2/positions"):
+            if p.get("symbol") == Config.EXEC_TICKER:
+                print("[exec] position redan oppen i", Config.EXEC_TICKER, "-- skippar")
+                return
+        if _alp_get(f"/v2/orders?status=open&symbols={Config.EXEC_TICKER}"):
+            print("[exec] oppen order finns redan -- skippar")
+            return
+
+        # Oversatt NQ-nivaer -> exec-tickern via procentavstand
+        e = float(sig["price"]); s = float(sig["stop"]); t1 = float(sig["targets"][0])
+        stop_pct = abs(e - s) / e
+        tp_pct   = abs(t1 - e) / e
+        q = _exec_last_price()
+        is_long = sig["side"] == "LONG"
+        stop_px = round(q * (1 - stop_pct) if is_long else q * (1 + stop_pct), 2)
+        tp_px   = round(q * (1 + tp_pct)   if is_long else q * (1 - tp_pct), 2)
+
+        risk_usd = eq * Config.RISK_PCT
+        qty = math.floor(risk_usd / max(q * stop_pct, 0.01))
+        qty = min(qty, math.floor(Config.MAX_POS_USD / max(q, 0.01)))
+        if qty < 1:
+            print(f"[exec] qty<1 (risk {risk_usd:.0f} USD, stop {stop_pct*100:.2f}%) -- skippar")
+            return
+
+        order = _alp_post("/v2/orders", {
+            "symbol": Config.EXEC_TICKER, "qty": str(qty),
+            "side": "buy" if is_long else "sell",
+            "type": "market", "time_in_force": "day",
+            "order_class": "bracket",
+            "take_profit": {"limit_price": f"{tp_px:.2f}"},
+            "stop_loss":   {"stop_price": f"{stop_px:.2f}"},
+        })
+        tag = "PAPER" if mode == "paper" else "LIVE \u26A0\uFE0F"
+        send_telegram(
+            f"\U0001F916 <b>ROBBER EXEC [{tag}]</b>\n"
+            f"{'KOPT' if is_long else 'BLANKAT'} {qty} {Config.EXEC_TICKER} @ ~${q:.2f}\n"
+            f"SL ${stop_px:.2f} ({stop_pct*100:.2f}%)  \u00b7  TP ${tp_px:.2f} ({tp_pct*100:.2f}%)\n"
+            f"Fran {sig['ticker']}-signal, conf {conf}/100")
+        print(f"[exec] {tag}-order lagd: {order.get('id', '?')} "
+              f"{qty}x{Config.EXEC_TICKER} SL {stop_px} TP {tp_px}")
+    except Exception as ex:
+        print(f"[exec] FEL: {ex}")
+        try:
+            send_telegram(f"\u26A0\uFE0F ROBBER EXEC-fel: {str(ex)[:180]}")
+        except Exception:
+            pass
 
 
 # ==================================================================
