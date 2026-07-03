@@ -37,14 +37,9 @@ class Config:
     MTF_TIMEFRAME     = "15Min"   # setup/entry timeframe
     MTF_LOOKBACK_DAYS = 12
 
-    # --- Alpaca data ---
-    ALPACA_KEY      = os.environ.get("APCA_API_KEY_ID", "")
-    ALPACA_SECRET   = os.environ.get("APCA_API_SECRET_KEY", "")
-    ALPACA_DATA_URL = "https://data.alpaca.markets/v2/stocks"
-    # Feed väljs automatiskt efter klockslag (se current_feed):
-    #   overnight-sessionen -> OVERNIGHT_FEED, annars DAY_FEED.
-    DAY_FEED        = "iex"        # gratis dagtid/pre-market/ordinarie
-    OVERNIGHT_FEED  = "overnight"  # gratis Basic; "boats" om Algo Trader Plus
+    # --- Data ---
+    # Datakälla är yfinance (NQ=F handlas nästan dygnet runt). Alpaca-lagret
+    # är borttaget — det användes inte längre och gav vilseledande varningar.
 
     # --- Confluence thresholds ---
     MIN_SCORE      = int(os.environ.get("ROBBER_MIN_SCORE", "5"))  # av 7; sänk t.ex. till 4 via env för fler larm
@@ -107,27 +102,22 @@ class Config:
     # --- Loop ---
     BAR_MINUTES   = 15
     BUFFER_SEC    = 20            # vänta efter bar-stängning innan hämtning
-    STATE_FILE    = "robber_state.json"
-
     TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
     CHAT_ID        = os.environ.get("CHAT_ID", "")
 
 
-# ==================================================================
-# DATA LAYER  — Alpaca (IEX free feed)
-# ==================================================================
-def current_feed() -> str:
-    """
-    Väljer Alpaca-feed efter aktuell New York-tid (DST-säkert).
-    Overnight-sessionen är 20:00–04:00 ET -> OVERNIGHT_FEED.
-    Övrig tid (pre-market/ordinarie/after-hours) -> DAY_FEED.
-    """
-    from zoneinfo import ZoneInfo
-    et = datetime.now(ZoneInfo("America/New_York"))
-    h = et.hour
-    if h >= 20 or h < 4:
-        return Config.OVERNIGHT_FEED
-    return Config.DAY_FEED
+# --- Persistens: alla robotens filer går via DATA_DIR ---------------
+# OBS: Renders filsystem är flyktigt — raderas vid varje deploy/omstart.
+# Sätt env DATA_DIR=/var/data (Render Persistent Disk) så överlever
+# dedupe-state, öppna trades och utfallslogg. Utan disk körs allt ändå,
+# men efter omstart nollställs state (ev. ett dubbelt larm på aktuell bar).
+Config.STATE_FILE  = os.path.join(Config.DATA_DIR, "robber_state.json")
+Config.SHADOW_LOG  = (Config.SHADOW_LOG if os.path.sep in Config.SHADOW_LOG
+                      else os.path.join(Config.DATA_DIR, Config.SHADOW_LOG))
+try:
+    os.makedirs(Config.DATA_DIR, exist_ok=True)
+except Exception as _e:
+    print(f"Robber: kunde inte skapa DATA_DIR ({Config.DATA_DIR}): {_e}")
 
 
 def fetch_ohlcv(ticker: str, timeframe: str, lookback_days: int) -> pd.DataFrame:
@@ -141,13 +131,24 @@ def fetch_ohlcv(ticker: str, timeframe: str, lookback_days: int) -> pd.DataFrame
               "15Min": "15m", "5Min": "5m", "1Min": "1m"}
     interval = iv_map.get(timeframe, "15m")
     period = f"{max(1, int(lookback_days))}d"
-    try:
-        df = yf.download(ticker, period=period, interval=interval,
-                         progress=False, auto_adjust=False, threads=False)
-    except Exception as e:
-        raise RuntimeError(f"yfinance fel ({ticker} {interval}): {e}")
+    df = None
+    for attempt in (1, 2):                      # en retry — Yahoo rate-limitar ofta Render-IP:n
+        try:
+            df = yf.download(ticker, period=period, interval=interval,
+                             progress=False, auto_adjust=False, threads=False)
+        except Exception as e:
+            print(f"[data] yfinance FEL ({ticker} {interval}, försök {attempt}/2): {e}")
+            df = None
+        if df is not None and not df.empty:
+            break
+        if attempt == 1:
+            time.sleep(5)
 
     if df is None or df.empty:
+        # Detta är skillnaden mellan "strikt config" och "riktigt datafel":
+        # syns denna rad i loggen är det Yahoo/nätet, inte dina trösklar.
+        print(f"[data] yfinance gav 0 rader för {ticker} ({interval}) — "
+              f"trolig rate-limit/blockad från Yahoo, inte ett configfel.")
         return pd.DataFrame(columns=["Open", "High", "Low", "Close", "Volume"])
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(0)
@@ -1154,9 +1155,9 @@ def command_listener():
 
 def run_loop():
     print("=== NASDAQ ROBBER startad ===")
-    if not Config.ALPACA_KEY or not Config.ALPACA_SECRET:
-        print("VARNING: ALPACA_KEY/ALPACA_SECRET saknas i miljön.")
     print(f"Tickers: {Config.TICKERS}  |  {Config.MTF_TIMEFRAME} setup / {Config.HTF_TIMEFRAME} bias  |  data=yfinance (futures)")
+    _persist = "PERSISTENT" if Config.DATA_DIR not in (".", "") else "FLYKTIG (nollställs vid omstart — sätt DATA_DIR=/var/data + Render Disk)"
+    print(f"State/journal: {Config.DATA_DIR}  [{_persist}]")
     names = ", ".join(Config.NAMES.get(t, t) for t in Config.TICKERS)
     ok = send_telegram(
         "\u2705 <b>NASDAQ ROBBER startad</b>\n"

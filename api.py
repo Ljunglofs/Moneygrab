@@ -20,11 +20,26 @@ import os
 import types
 from typing import Optional
 
-# ---- Neutralisera Streamlit-cache INNAN sok_module importeras -------
-import streamlit as st  # noqa
-_noop = lambda *a, **k: (lambda f: f)          # @st.cache_data(...) -> passthrough
-st.cache_data = _noop
-st.cache_resource = _noop
+# ---- Streamlit-SHIM: fejkmodul i stället för hela streamlit-paketet -------
+# API-servern behöver aldrig riktiga streamlit (bara @st.cache_data-dekoratorn
+# i sok_module m.fl. vid import). Shimmen sparar ~150 MB deps och flera
+# minuter byggtid på Render. UI-funktionerna (st.columns, st.metric ...)
+# anropas aldrig av API:t — men blir ofarliga no-ops om de ändå skulle nås.
+import sys as _sys
+
+def _st_passthrough(*a, **k):
+    # Funkar både som @st.cache_data och @st.cache_data(ttl=...)
+    if len(a) == 1 and callable(a[0]) and not k:
+        return a[0]
+    return lambda f: f
+
+_st = types.ModuleType("streamlit")
+_st.cache_data = _st_passthrough
+_st.cache_resource = _st_passthrough
+_st.session_state = {}
+_st.__getattr__ = lambda name: (lambda *a, **k: None)   # allt annat -> no-op
+_sys.modules["streamlit"] = _st
+import streamlit as st  # noqa  (= shimmen ovan)
 
 import numpy as np
 import pandas as pd
@@ -1873,7 +1888,8 @@ def quotes(tickers: str = ""):
             "last": a.get("last"),
             "score": a.get("score10"),
             "label": a.get("label", ""),
-            "ret_5": round(float(a.get("ret_5") or 0), 1),
+            "ret_1": round(float(a.get("ret_1") or 0), 1),   # dagens %
+            "ret_5": round(float(a.get("ret_5") or 0), 1),   # 5 dagar
         }
     return {"quotes": out}
 
@@ -1970,6 +1986,7 @@ def signals():
         struct = a.get("structure") or ""
         bos = a.get("bos") or ""
         ret5 = a.get("ret_5") or 0
+        ret1 = a.get("ret_1") or 0          # dagens % — det som visas vid kursen
         theme = a.get("theme") or "Signal"
         if sc >= 9:
             h, ic, c = "Ny extrem möjlighet", "flame", GOLD
@@ -1985,7 +2002,8 @@ def signals():
             det = "Tidigt mönster bildas. %s, score %s/10." % (struct or "relativ styrka", sc)
         feed.append({"tkr": tk, "i": ic, "c": c, "time": theme, "h": h, "detalj": det,
                      "score": sc, "kurs": "$" + _num(a.get("last")),
-                     "chg": round(float(ret5 or 0), 1)})
+                     "chg": round(float(ret1 or 0), 1),      # dagens %, inte 5d
+                     "chg5": round(float(ret5 or 0), 1)})
 
     by_tk = {a.get("ticker"): a for a in by}
     tops = [a.get("ticker") for a in by[:12]]
@@ -2002,7 +2020,8 @@ def signals():
                 feed.append({"tkr": tk, "i": "bank", "c": GREEN, "time": "Insider",
                              "h": "Insiderköp", "detalj": "%s insiderköp registrerade nyligen." % n,
                              "score": a.get("score10") or 0, "kurs": "$" + _num(a.get("last")),
-                             "chg": round(float(a.get("ret_5") or 0), 1)})
+                             "chg": round(float(a.get("ret_1") or 0), 1),
+                             "chg5": round(float(a.get("ret_5") or 0), 1)})
 
     # --- Nyheter (Alpaca) ---
     if _os.getenv("APCA_API_KEY_ID") and _os.getenv("APCA_API_SECRET_KEY"):
@@ -2013,7 +2032,8 @@ def signals():
                 feed.append({"tkr": tk, "i": "bell", "c": CYAN, "time": "Nyhet",
                              "h": "Ny nyhet", "detalj": heads[tk][:140],
                              "score": a.get("score10") or 0, "kurs": "$" + _num(a.get("last")),
-                             "chg": round(float(a.get("ret_5") or 0), 1)})
+                             "chg": round(float(a.get("ret_1") or 0), 1),
+                             "chg5": round(float(a.get("ret_5") or 0), 1)})
 
     return {"feed": feed[:16]}
 

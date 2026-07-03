@@ -3,7 +3,6 @@ uvicorn[standard]
 yfinance
 pandas
 numpy
-streamlit
 anthropic
 feedparser
 ta
