@@ -33,12 +33,36 @@ def _st_passthrough(*a, **k):
         return a[0]
     return lambda f: f
 
+def _st_getattr(name):
+    # VIKTIGT: dunder-attribut (__path__, __spec__, __all__ ...) får ALDRIG
+    # besvaras med en funktion — Pythons importsystem itererar __path__ vid
+    # "import streamlit.x" och kraschar då med
+    # "TypeError: 'function' object is not iterable". Rätt beteende är
+    # AttributeError, så importmaskineriet hanterar det själv.
+    if name.startswith("__") and name.endswith("__"):
+        raise AttributeError(name)
+    return lambda *a, **k: None
+
 _st = types.ModuleType("streamlit")
 _st.cache_data = _st_passthrough
 _st.cache_resource = _st_passthrough
 _st.session_state = {}
-_st.__getattr__ = lambda name: (lambda *a, **k: None)   # allt annat -> no-op
+_st.__getattr__ = _st_getattr
+_st.__path__ = []                      # markera som paket
+
+# Submoduler som repo-koden importerar explicit (sok_module, grabit_app):
+#   import streamlit.components.v1 as components
+_st_comp = types.ModuleType("streamlit.components")
+_st_comp.__path__ = []
+_st_v1 = types.ModuleType("streamlit.components.v1")
+_st_v1.html = lambda *a, **k: None
+_st_v1.iframe = lambda *a, **k: None
+_st_comp.v1 = _st_v1
+_st.components = _st_comp
+
 _sys.modules["streamlit"] = _st
+_sys.modules["streamlit.components"] = _st_comp
+_sys.modules["streamlit.components.v1"] = _st_v1
 import streamlit as st  # noqa  (= shimmen ovan)
 
 import numpy as np
