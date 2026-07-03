@@ -156,6 +156,11 @@ def fetch_ohlcv(ticker: str, timeframe: str, lookback_days: int) -> pd.DataFrame
         # syns denna rad i loggen är det Yahoo/nätet, inte dina trösklar.
         print(f"[data] yfinance gav 0 rader för {ticker} ({interval}) — "
               f"trolig rate-limit/blockad från Yahoo, inte ett configfel.")
+        try:
+            STATUS["data_fel_total"] = STATUS.get("data_fel_total", 0) + 1
+            STATUS["senaste_data_fel"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        except Exception:
+            pass
         return pd.DataFrame(columns=["Open", "High", "Low", "Close", "Volume"])
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(0)
@@ -921,6 +926,10 @@ def seconds_to_next_bar():
 STATUS = {
     "started": None, "last_scan": None, "last_feed": None,
     "in_session": None, "fired_total": 0, "fired_last": 0, "tickers": {},
+    "scans_total": 0,                 # antal genomforda scanningar sedan start
+    "data_fel_total": 0,              # antal ganger yfinance gett 0 rader/fel
+    "senaste_data_fel": None,         # nar det senast hande
+    "hogsta_conf_idag": 0,            # hogsta confidence som setts idag (aven under troskel)
 }
 
 
@@ -977,6 +986,12 @@ def scan_once():
                 sig["confidence"] = conf; sig["groups"] = groups; sig["components"] = comps
                 sig["killzone"] = kz_label; sig["kz_delta"] = kz_delta
 
+            if sig:
+                try:
+                    STATUS["hogsta_conf_idag"] = max(STATUS.get("hogsta_conf_idag", 0),
+                                                     int(sig.get("confidence", 0)))
+                except Exception:
+                    pass
             if sig and is_fresh(sig, state):
                 strong  = sig["confidence"] >= Config.CONF_MIN_SEND
                 send_ok = strong and tradable          # larm bara i handelsfönstret
@@ -1011,6 +1026,7 @@ def scan_once():
             print(f"{ticker} fel: {e}")
     save_state(state)
     STATUS["last_scan"] = datetime.now(ZoneInfo(Config.LOCAL_TZ)).isoformat(timespec="seconds")
+    STATUS["scans_total"] = STATUS.get("scans_total", 0) + 1
     STATUS["fired_last"] = fired
     STATUS["fired_total"] += fired
     STATUS["tickers"] = results
