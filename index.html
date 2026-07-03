@@ -974,7 +974,8 @@ function stockData(tkr,live){live=live||{};const r=_rng(_seed(tkr));
   const bullPool=[["Stark trend & momentum",25],["N\u00e4ra 52v-topp",9],["Stigande bottnar",6],["RSI accelererar",5],["Sl\u00e5r index tydligt",5],["Veckotrend bullish",4],["Positiv ROC",3]];
   const riskPool=[["Utbrott utan volym",-25],["H\u00f6g fake-breakout-risk",-12],["\u00d6verk\u00f6pt RSI",-8],["Svag relativ volym",-6],["Mots\u00e5nd n\u00e4ra",-5]];
   const bull=bullPool.slice(0,score>=7?6:4),risks=riskPool.slice(0,score>=7?2:4);
-  const desc=live.desc||DESC[base]||((SECT[tkr]?SECT[tkr]+"-bolag noterat i "+land+". ":"Bolag noterat i "+land+". ")+"Ingår i GRABIT-universumet inom temat "+(SECT[tkr]||"tematisk tillväxt")+". "+(score>=7?"Visar just nu stark teknisk profil med stigande relativ styrka och bekräftad trend.":"Bygger upp en setup – trend och volym är ännu inte fullt bekräftade, så avvakta läget."));
+  const liveOk=live.price!=null;
+  const desc=live.desc||DESC[base]||(((live.name||NAMES[tkr])&&(live.name||NAMES[tkr])!==tkr?(live.name||NAMES[tkr])+" är noterat i "+land+". ":"Bolag noterat i "+land+". ")+(SECT[tkr]?"Verkar inom "+SECT[tkr]+". ":"")+"Fullständig bolagsbeskrivning hämtas…");
   const mcap=fmtCap(price*(50e6+r()*3.2e9));
   const verdict=score>=7.5?"KÖP":score>=6?"AVVAKTA":"UNDVIK";
   const vcolor=score>=7.5?"#22d3ee":score>=6?"#F5C542":"#FF3B30";
@@ -982,7 +983,7 @@ function stockData(tkr,live){live=live||{};const r=_rng(_seed(tkr));
   const catPool=[["Kvartalsrapport","28 maj"],["Analytikeruppgradering","denna vecka"],["Sektorn i medvind","pågår"],["Institutionellt inflöde","senaste 10 d"],["Breakout-nivå nära","nu"],["Insynsköp registrerat","nyligen"]];
   const ci=Math.floor(r()*3),catalysts=catPool.slice(ci,ci+3);
   const instOwn=Math.round(28+r()*55),insiderOwn=+(r()*9).toFixed(1),shortInt=+(2+r()*16).toFixed(1);
-  return {tkr,name:live.name||NAMES[tkr]||tkr,land,bors,flag,cur,sector:live.sector||SECT[tkr]||"\u2014",dom:DOMAINS[tkr]||"",
+  return {tkr,name:live.name||NAMES[tkr]||tkr,land,bors,flag,cur,sector:live.sector||SECT[tkr]||"\u2014",dom:DOMAINS[tkr]||"",liveOk,
     price,day,score,mom,sent,tech,tag,rsi,relvol,vol,d20,d5,fromHi,ema50,ema200,
     bos,struktur,trendstyrka,setupG,atr,breakout:Math.min(99,breakout),confidence:Math.min(99,confidence),exitrisk:Math.max(4,Math.min(99,exitrisk)),
     bias,conv,riskp,fakeb,bull,risks,desc,mcap,verdict,vcolor,entryLo,entryHi,hitrate,catalysts,instOwn,insiderOwn,shortInt,
@@ -1065,7 +1066,7 @@ function openStock(tkr){_curStock=tkr;const d=stockData(tkr,_liveStock[tkr]);
     <div id="st-insider" class="ins-list"><div class="anl-load">Laddar insider…</div></div>
     <div class="st-sec">Om bolaget</div>
     <div class="st-box about secgfx-wrap"><div class="secgfx" style="background-image:url('${IMGS.goldwave}')"></div><div class="ab-facts"><div><span>Sektor</span><b>${d.sector}</b></div><div><span>Marknad</span><b>${d.bors}</b></div><div><span>Land</span><b>${d.land} ${d.flag}</b></div></div><p class="blurb">${d.desc}</p></div>
-    <div class="verdict secgfx-wrap" style="border-color:${d.vcolor}66;background:linear-gradient(160deg,${d.vcolor}1f,#090A0B)"><div class="secgfx gverdict" style="background-image:url('${IMGS.verdict_chart}')"></div><div class="vd-top"><span class="vd-badge" style="background:${d.vcolor}">${d.verdict}</span><span class="vd-hit">Träffsäkerhet <b style="color:${d.vcolor}">${d.hitrate}%</b></span></div><div class="vd-line">${d.verdict==='UNDVIK'?'Avvakta – ingen entry rekommenderas just nu.':'Köp '+d.cur+d.entryLo+'–'+d.cur+d.entryHi+'  ·  Stop '+d.cur+d.stop+'  ·  Mål '+d.cur+d.t2}</div><div class="vd-sub">${d.score>=7.5?'AI-slutsats: stark setup med bekräftad trend och stigande relativ styrka. R/R 1:2.3.':d.score>=6?'AI-slutsats: blandad bild – vänta på bekräftelse (volym + utbrott) innan entry.':'AI-slutsats: svag setup – hög risk. Undvik tills trend och volym förbättras.'}</div></div>
+    <div class="verdict secgfx-wrap" style="border-color:${d.vcolor}66;background:linear-gradient(160deg,${d.vcolor}1f,#090A0B)"><div class="secgfx gverdict" style="background-image:url('${IMGS.verdict_chart}')"></div><div class="vd-top"><span class="vd-badge" style="background:${d.liveOk?d.vcolor:'#7c8a9a'}">${d.liveOk?d.verdict:'LADDAR'}</span><span class="vd-hit">${d.liveOk?'Träffsäkerhet <b style="color:'+d.vcolor+'">'+d.hitrate+'%</b>':''}</span></div><div class="vd-line">${!d.liveOk?'Hämtar live-kurs… nivåer visas när riktig data laddats.':(d.verdict==='UNDVIK'?'Avvakta – ingen entry rekommenderas just nu.':'Köp '+d.cur+d.entryLo+'–'+d.cur+d.entryHi+'  ·  Stop '+d.cur+d.stop+'  ·  Mål '+d.cur+d.t2)}</div><div class="vd-sub">${!d.liveOk?'Grabit räknar entry, stop och mål på live-priset – aldrig på uppskattningar.':(d.score>=7.5?'AI-slutsats: stark setup med bekräftad trend och stigande relativ styrka. R/R 1:2.3.':d.score>=6?'AI-slutsats: blandad bild – vänta på bekräftelse (volym + utbrott) innan entry.':'AI-slutsats: svag setup – hög risk. Undvik tills trend och volym förbättras.')}</div></div>
     <div class="st-sec">GRABIT Score</div>
     <div class="rings">${ring(d.mom,"#22d3ee","Momentum",d.mom>=8?"Starkt":"Bra")}
       ${ring(d.sent,"#F5C542","Sentiment",d.sent>=8?"Positivt":"Neutralt")}
@@ -1524,15 +1525,49 @@ function onSearch(v){const q=v.trim().toUpperCase();const res=$("#search-res");
       <div class="nm"><div class="t">${tk}</div><div class="s">${NAMES[tk]}</div></div><div class="chg mut">Visa &rarr;</div></div>`).join("")
     :`<div class="empty">Inga lokala träffar på "${v}"</div>`)+`</div>`;
   // Extern sökning: testa tickern mot backend även om den saknas lokalt
-  const qTk=q.replace(/[^A-Z0-9.]/g,"");
-  if(qTk.length>=1&&qTk.length<=6&&!hits.includes(qTk)&&CONFIG.API_BASE){
+  const qTk=q.replace(/[^A-Z0-9.\-]/g,"");
+  if(qTk.length>=1&&qTk.length<=8&&!hits.includes(qTk)&&CONFIG.API_BASE){
     html+=`<div class="sect"><h2>Sök externt</h2></div><div class="card">
       <div class="qrow" id="ext-search" onclick="externalSearch('${qTk}')">
         <div class="lic" style="width:36px;height:36px;color:var(--gold);background:rgba(245,197,66,.12)">&#128269;</div>
         <div class="nm"><div class="t">${qTk}</div><div class="s">Hämta live-analys från Grabit-servern</div></div>
         <div class="chg" style="color:var(--gold)">Testa &rarr;</div></div></div>`;
   }
-  res.innerHTML=html;}
+  // Global namnsökning: hittar bolag utanför universumet ("Corning" -> GLW)
+  html+=`<div id="lookup-res"></div>`;
+  res.innerHTML=html;
+  if(v.trim().length>=2&&CONFIG.API_BASE)lookupSearch(v.trim(),hits);}
+
+let _lkTimer=null,_lkLast="";
+function lookupSearch(q,localHits){
+  clearTimeout(_lkTimer);
+  _lkTimer=setTimeout(async()=>{
+    const box=document.getElementById("lookup-res");
+    if(!box)return;
+    const B=CONFIG.API_BASE.replace(/\/$/,"");
+    _lkLast=q;
+    box.innerHTML=`<div class="sect"><h2>Globalt</h2></div><div class="card"><div class="empty">Söker globalt…</div></div>`;
+    try{
+      const r=await fetch(B+"/api/lookup?q="+encodeURIComponent(q),{cache:"no-store"});
+      if(_lkLast!==q)return;                      // ny sökning hann före
+      const j=await r.json();
+      const seen=new Set(localHits||[]);
+      const rows=(j.results||[]).filter(x=>!seen.has(x.symbol));
+      if(!rows.length){box.innerHTML="";return;}
+      box.innerHTML=`<div class="sect"><h2>Globalt</h2></div><div class="card">`+
+        rows.map(x=>{const nm=String(x.name||x.symbol).replace(/'/g,"&#39;").replace(/</g,"&lt;");
+          return `<div class="qrow" onclick="openExternal('${x.symbol}','${nm}')">
+            <div class="lic" style="width:36px;height:36px;color:var(--gold);background:rgba(245,197,66,.12)">${x.symbol.slice(0,2)}</div>
+            <div class="nm"><div class="t">${x.symbol}</div><div class="s">${nm}${x.exch?" · "+x.exch:""}</div></div>
+            <div class="chg" style="color:var(--gold)">Visa &rarr;</div></div>`;}).join("")+`</div>`;
+    }catch(e){if(box)box.innerHTML="";}
+  },350);
+}
+function openExternal(tk,name){
+  if(name)NAMES[tk]=name;
+  _liveStock[tk]=_liveStock[tk]||{};
+  openStock(tk);
+}
 
 async function externalSearch(tk){
   const row=document.getElementById("ext-search");
@@ -1818,7 +1853,24 @@ async function loadStockAI(tkr){
       const clean=nJ.text.replace(/Stämpel:.*/i,"").replace(/Kategori:.*/i,"").replace(/</g,"&lt;").trim();_sent=sc;
       const katH=nJ.category?' <span class="cat-badge">'+nJ.category.replace(/</g,"&lt;")+'</span>':'';
       html+='<div class="st-ai-row"><b>Nyheter '+(lbl?'<i style="font-style:normal;color:'+col+'">· '+lbl+'</i>':'')+katH+'</b><span>'+clean+'</span></div>';}}catch(e){}
-  if(!html){card.remove();return;}
+  if(!html){
+    // AI:n svarade inte (nyckel saknas/kallstart) — bygg faktabaserad sammanfattning
+    // av riktiga siffror i stället för att tyst ta bort kortet.
+    const lv=_liveStock[tkr]||{};
+    if(lv.price!=null){
+      const bits=[];
+      if(lv.score!=null)bits.push("Grabit score "+(+lv.score).toFixed(1)+"/10");
+      if(lv.day!=null)bits.push("idag "+(lv.day>=0?"+":"")+(+lv.day).toFixed(1)+"%");
+      if(lv.d5!=null)bits.push("5d "+(lv.d5>=0?"+":"")+(+lv.d5).toFixed(1)+"%");
+      if(lv.rsi!=null)bits.push("RSI "+Math.round(lv.rsi));
+      if(lv.relvol!=null)bits.push("rel.volym "+(+lv.relvol).toFixed(1)+"x");
+      if(lv.fromHi!=null)bits.push((+lv.fromHi).toFixed(0)+"% från 52v-topp");
+      html='<div class="st-ai-row"><b>Snabbfakta</b><span>'+bits.join(" · ")+'.</span></div>'
+          +'<div class="st-ai-row"><b>Obs</b><span>AI-texten kunde inte hämtas just nu – siffrorna ovan är live.</span></div>';
+    }else{
+      card.remove();return;
+    }
+  }
   if(_sent)html=sentimentEmblem(_sent)+html;
   card.querySelector(".st-ai-b").innerHTML=html;
 }

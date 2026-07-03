@@ -889,6 +889,54 @@ def universe():
     return {"themes": UNIVERSE, "ticker_theme": TICKER_THEME}
 
 
+# ----- GLOBAL TICKER-SÖKNING (namn -> symbol via Yahoo) --------------
+# Gör att sökningen hittar bolag som INTE ligger i universumet,
+# t.ex. "Corning" -> GLW. Frontend visar träffarna under "Globalt"
+# och öppnar dem via /api/stock/{ticker} som redan klarar valfri symbol.
+import requests as _rq
+
+@cached(3600)
+def _yahoo_lookup(q: str) -> list:
+    try:
+        r = _rq.get(
+            "https://query1.finance.yahoo.com/v1/finance/search",
+            params={"q": q, "quotesCount": 8, "newsCount": 0,
+                    "listsCount": 0, "enableFuzzyQuery": "true"},
+            headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) "
+                                   "AppleWebKit/537.36 (KHTML, like Gecko) "
+                                   "Chrome/124.0 Safari/537.36"},
+            timeout=8,
+        )
+        r.raise_for_status()
+        quotes = (r.json() or {}).get("quotes") or []
+    except Exception as e:
+        print(f"[lookup] yahoo-sök fel för '{q}': {e}")
+        return []
+    out = []
+    for it in quotes:
+        if it.get("quoteType") not in ("EQUITY", "ETF"):
+            continue
+        sym = (it.get("symbol") or "").upper()
+        if not sym:
+            continue
+        out.append({
+            "symbol": sym,
+            "name": it.get("shortname") or it.get("longname") or sym,
+            "exch": it.get("exchDisp") or it.get("exchange") or "",
+            "type": it.get("quoteType"),
+        })
+    return out[:8]
+
+
+@app.get("/api/lookup")
+def lookup(q: str = Query(..., min_length=1, max_length=40)):
+    """Sök bolag globalt på namn eller symbol. Cache 1h per fråga."""
+    q = q.strip()
+    if not q:
+        return {"results": []}
+    return {"results": _yahoo_lookup(q.lower())}
+
+
 # ----- NYHETER (riktig RSS via feedparser) ---------------------------
 @cached(600)
 def _news_list():
@@ -1599,6 +1647,23 @@ def company_blurb(ticker: str):
     name = prof.get("name") or ai.get("name") or tk
     sector = prof.get("industry") or ai.get("sector") or ""
     summary = ai.get("summary") or ""
+    # Fallback: AI:n svarade inte (nyckel saknas/timeout) -> bygg en saklig
+    # svensk beskrivning av verifierad Finnhub-data i stället för tom sträng.
+    # Då slipper frontenden falla tillbaka på sin generiska malltext.
+    if not summary and (prof.get("name") or prof.get("industry")):
+        land_map = {"US": "USA", "SE": "Sverige", "DE": "Tyskland", "FR": "Frankrike",
+                    "CA": "Kanada", "GB": "Storbritannien", "NL": "Nederländerna",
+                    "FI": "Finland", "NO": "Norge", "DK": "Danmark", "JP": "Japan",
+                    "CN": "Kina", "TW": "Taiwan", "AU": "Australien", "CH": "Schweiz"}
+        land = land_map.get(prof.get("country", ""), prof.get("country", ""))
+        parts = [name]
+        if prof.get("industry"):
+            parts.append("är verksamt inom " + prof["industry"])
+        if land:
+            parts.append("med säte i " + land)
+        summary = " ".join(parts) + "."
+        if prof.get("weburl"):
+            summary += " Webb: " + prof["weburl"].replace("https://", "").replace("http://", "").rstrip("/") + "."
     out = {"ticker": tk, "name": name, "sector": sector,
            "summary": summary, "country": prof.get("country", "")}
     if sector or summary:
@@ -1669,6 +1734,42 @@ _AI_TEXT_CACHE: dict = {}
 
 
 _AI_LAST_ERR = {"err": ""}
+
+
+@app.get("/api/ai/debug", include_in_schema=False)
+def ai_debug(ticker: str = "GLW"):
+    """Diagnos för AI-kedjan: nyckel, modell, testanrop, scan.
+    Öppna i mobilen: /api/ai/debug  (valfritt ?ticker=XXX)"""
+    out = {}
+    key = os.environ.get("ANTHROPIC_API_KEY", "")
+    out["key_finns"] = bool(key)
+    out["key_ser_ut_som"] = (key[:10] + "…" + key[-4:]) if len(key) > 16 else ("(för kort: %d tecken)" % len(key))
+    out["model"] = AI_MODEL
+    try:
+        import anthropic
+        out["anthropic_sdk"] = getattr(anthropic, "__version__", "?")
+    except Exception as e:
+        out["anthropic_sdk"] = f"IMPORT-FEL: {e}"
+        return out
+    # 1) Skarpt minianrop mot Anthropic
+    try:
+        client = anthropic.Anthropic(api_key=key)
+        r = client.messages.create(model=AI_MODEL, max_tokens=20,
+                                   messages=[{"role": "user", "content": "Svara bara: OK"}])
+        out["testanrop"] = "".join(getattr(b, "text", "") for b in r.content).strip() or "(tomt svar)"
+    except Exception as e:
+        out["testanrop"] = f"FEL {type(e).__name__}: {e}"
+    # 2) Kan servern ens scanna tickern? (ai_setup kräver detta FÖRE AI-anropet)
+    tk = ticker.upper().strip()
+    try:
+        a = scan(tk)
+        out["scan_" + tk] = ("OK, kurs %s" % a.get("last")) if a else "MISSLYCKADES (yfinance gav inget -> ai_setup returnerar tomt utan att ens fråga AI:n)"
+    except Exception as e:
+        out["scan_" + tk] = f"FEL: {e}"
+    # 3) Alpaca-nycklar (krävs för ai_news)
+    out["alpaca_nycklar_for_ai_news"] = bool(os.environ.get("APCA_API_KEY_ID")) and bool(os.environ.get("APCA_API_SECRET_KEY"))
+    out["senaste_ai_fel"] = _AI_LAST_ERR.get("err") or "(inget registrerat)"
+    return out
 
 
 def _ai_text(cache_key: str, system: str, user: str, max_tokens: int = 220) -> str:
