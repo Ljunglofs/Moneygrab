@@ -11,6 +11,10 @@ Env som kravs i Render:
 Prenumerationer sparas i DATA_DIR/push_subs.json (samma persistenta
 disk som robotens state). Doda prenumerationer (404/410 fran
 pushtjansten) rensas automatiskt vid utskick.
+
+Watchlist: varje prenumeration kan ha en lista bevakade tickers
+("_tickers", synkas fran appens portfolj). send_watchlist() skickar
+bara till dem som bevakar just den aktien — ingen spam till andra.
 """
 
 import os
@@ -53,17 +57,55 @@ def _save(subs):
         print(f"[push] kunde inte spara prenumerationer: {e}")
 
 
-def add_subscription(sub: dict) -> int:
-    """Sparar en prenumeration (dedup pa endpoint). Returnerar totalantal."""
+def _norm_tickers(tickers):
+    out = []
+    for t in (tickers or []):
+        t = str(t).strip().upper()
+        if t and t not in out:
+            out.append(t)
+    return out[:60]
+
+
+def add_subscription(sub: dict, tickers=None) -> int:
+    """Sparar en prenumeration (dedup pa endpoint). Returnerar totalantal.
+    `tickers` = bevakade aktier fran appens portfolj (None = behall gamla)."""
     with _lock:
         subs = _load()
         ep = (sub or {}).get("endpoint")
         if not ep:
             return len(subs)
+        old = next((s for s in subs if s.get("endpoint") == ep), None)
+        sub = dict(sub)
+        if tickers is not None:
+            sub["_tickers"] = _norm_tickers(tickers)
+        elif old and "_tickers" in old:
+            sub["_tickers"] = old["_tickers"]
         subs = [s for s in subs if s.get("endpoint") != ep]
         subs.append(sub)
         _save(subs)
         return len(subs)
+
+
+def set_tickers(endpoint: str, tickers) -> int:
+    """Uppdaterar vilka tickers en prenumerant bevakar. Returnerar antal tickers."""
+    tks = _norm_tickers(tickers)
+    with _lock:
+        subs = _load()
+        for s in subs:
+            if s.get("endpoint") == endpoint:
+                s["_tickers"] = tks
+        _save(subs)
+    return len(tks)
+
+
+def all_watch_tickers():
+    """Alla tickers som nagon prenumerant bevakar (unika, sorterade)."""
+    out = set()
+    with _lock:
+        subs = _load()
+    for s in subs:
+        out.update(s.get("_tickers") or [])
+    return sorted(out)
 
 
 def remove_subscription(endpoint: str) -> int:
@@ -77,8 +119,8 @@ def sub_count() -> int:
     return len(_load())
 
 
-def send_all(title: str, body: str, url: str = "/", tag: str = "grabit") -> dict:
-    """Skickar en notis till alla prenumeranter. Rensar doda endpoints.
+def _send_to(subs, title: str, body: str, url: str = "/", tag: str = "grabit") -> dict:
+    """Skickar en notis till angivna prenumeranter. Rensar doda endpoints.
     Returnerar {"skickade": n, "doda": n, "fel": n}."""
     if not (VAPID_PUBLIC and VAPID_PRIVATE):
         print("[push] VAPID-nycklar saknas -- inget utskick")
@@ -90,13 +132,11 @@ def send_all(title: str, body: str, url: str = "/", tag: str = "grabit") -> dict
         return {"skickade": 0, "doda": 0, "fel": 0, "not": "pywebpush saknas"}
 
     payload = json.dumps({"title": title, "body": body, "url": url, "tag": tag})
-    with _lock:
-        subs = _load()
     sent, dead, err = 0, [], 0
     for s in subs:
         try:
             webpush(
-                subscription_info=s,
+                subscription_info={k: v for k, v in s.items() if not k.startswith("_")},
                 data=payload,
                 vapid_private_key=VAPID_PRIVATE,
                 vapid_claims={"sub": VAPID_SUB},
@@ -119,3 +159,22 @@ def send_all(title: str, body: str, url: str = "/", tag: str = "grabit") -> dict
             _save(live)
     print(f"[push] '{title}' -> {sent} skickade, {len(dead)} rensade, {err} fel")
     return {"skickade": sent, "doda": len(dead), "fel": err}
+
+
+def send_all(title: str, body: str, url: str = "/", tag: str = "grabit") -> dict:
+    """Skickar en notis till ALLA prenumeranter (test + ROBBER-larm)."""
+    with _lock:
+        subs = _load()
+    return _send_to(subs, title, body, url, tag)
+
+
+def send_watchlist(ticker: str, title: str, body: str, url: str = "/") -> dict:
+    """Skickar en notis ENDAST till prenumeranter som bevakar `ticker`
+    (aktier i deras portfolj i appen). Prenumeranter utan bevakning
+    far ingenting — de har inte bett om bolagslarm."""
+    tk = (ticker or "").strip().upper()
+    with _lock:
+        subs = [s for s in _load() if tk in (s.get("_tickers") or [])]
+    if not subs:
+        return {"skickade": 0, "doda": 0, "fel": 0, "not": "inga bevakare av " + tk}
+    return _send_to(subs, title, body, url, tag="grabit-" + tk)

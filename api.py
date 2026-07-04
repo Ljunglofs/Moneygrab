@@ -483,8 +483,20 @@ def push_pubkey():
 async def push_subscribe(request: Request):
     import push_notify as PN
     sub = await request.json()
-    n = PN.add_subscription(sub)
+    tickers = None
+    if isinstance(sub, dict):
+        tickers = sub.pop("tickers", None)
+    n = PN.add_subscription(sub, tickers)
     return {"ok": True, "prenumeranter": n}
+
+
+@app.post("/api/push/watchlist")
+async def push_watchlist(request: Request):
+    """Synkar vilka tickers en prenumerant bevakar (= portfoljen i appen)."""
+    import push_notify as PN
+    body = await request.json() or {}
+    n = PN.set_tickers((body or {}).get("endpoint", ""), (body or {}).get("tickers") or [])
+    return {"ok": True, "bevakade": n}
 
 
 @app.post("/api/push/unsubscribe")
@@ -520,6 +532,7 @@ def push_status():
             "pubkey_format_ok": ok_format,   # True = 65 bytes okomprimerad P-256
             "pubkey_langd": len(pub),         # ska vara 87
             "pubkey_borjan": pub[:10],
+            "bevakade_tickers": PN.all_watch_tickers(),
             "lagring": PN.SUBS_FILE}
 
 
@@ -1212,7 +1225,8 @@ _FDA_ORD = ("fda", "pdufa", "crl", "approval", "approved", "clearance", "510(k)"
 def _fda_news():
     """FDA-relaterade nyheter for Bio-universumet via Alpaca News. Tyst [] vid fel."""
     import os as _os
-    k = _os.getenv("APCA_API_KEY_ID", ""); s = _os.getenv("APCA_API_SECRET_KEY", "")
+    k = _os.getenv("APCA_API_KEY_ID", "") or _os.getenv("ALPACA_KEY", "")
+    s = _os.getenv("APCA_API_SECRET_KEY", "") or _os.getenv("ALPACA_SECRET", "")
     bio = UNIVERSE.get("Bio", [])
     if not (k and s and bio):
         return []
@@ -1895,6 +1909,32 @@ def _ai_price_target(ticker: str, name: str = ""):
 #  fråga aldrig kostar mer än en gång i en varm process.
 # =====================================================================
 _AI_TEXT_CACHE: dict = {}
+_AI_CACHE_FILE = os.path.join(os.environ.get("DATA_DIR", "."), "ai_text_cache.json")
+
+
+def _ai_cache_load():
+    """Las senast sparade AI-texter fran disk sa de overlever omstart."""
+    import json as _j
+    try:
+        with open(_AI_CACHE_FILE) as f:
+            _AI_TEXT_CACHE.update(_j.load(f))
+    except Exception:
+        pass
+
+
+def _ai_cache_save():
+    import json as _j
+    try:
+        keep = dict(list(_AI_TEXT_CACHE.items())[-400:])
+        tmp = _AI_CACHE_FILE + ".tmp"
+        with open(tmp, "w") as f:
+            _j.dump(keep, f)
+        os.replace(tmp, _AI_CACHE_FILE)
+    except Exception:
+        pass
+
+
+_ai_cache_load()
 
 
 _AI_LAST_ERR = {"err": ""}
@@ -1989,6 +2029,7 @@ def _ai_text(cache_key: str, system: str, user: str, max_tokens: int = 220) -> s
         if text:
             _AI_TEXT_CACHE[cache_key] = text
             _AI_LAST_ERR["err"] = ""
+            _ai_cache_save()
         return text
     except Exception as e:
         _AI_LAST_ERR["err"] = f"{type(e).__name__}: {e}"
@@ -2047,6 +2088,11 @@ def ai_daily():
                    "INDEX: %s\nHETAST: %s\nMAKRO KOMMANDE: %s\nIdag är det %s.\nSkriv 'Dagens läge'."
                    % (idx_line, hot_line, ev_line or "(inga större händelser)",
                       _dt.date.today().strftime("%A %d %B")), 300)
+    if not txt:
+        # AI:n nere/nyckel saknas -> visa senaste lyckade "Dagens läge" i stället för tomt
+        stale = [v for k2, v in _AI_TEXT_CACHE.items() if k2.startswith("daily:")]
+        if stale:
+            txt = stale[-1]
     return {"text": txt, "indices": idx_line, "hot": hot_line, "makro": ev_line}
 
 
@@ -2058,7 +2104,8 @@ def ai_news(ticker: str):
     try:
         import os as _os
         import requests
-        k = _os.getenv("APCA_API_KEY_ID", ""); s = _os.getenv("APCA_API_SECRET_KEY", "")
+        k = _os.getenv("APCA_API_KEY_ID", "") or _os.getenv("ALPACA_KEY", "")
+        s = _os.getenv("APCA_API_SECRET_KEY", "") or _os.getenv("ALPACA_SECRET", "")
         if k and s:
             r = requests.get("https://data.alpaca.markets/v1beta1/news",
                              headers={"APCA-API-KEY-ID": k, "APCA-API-SECRET-KEY": s},
@@ -2494,3 +2541,92 @@ def _warmup_loop():
 @app.on_event("startup")
 def _start_warmup():
     _threading.Thread(target=_warmup_loop, daemon=True).start()
+
+
+# ---- Watchlist-push -------------------------------------------------
+# Skannar aktierna i anvandarnas portfoljer under USA:s handelstid och
+# pushar nar nagot viktigt hander: stor dagsrorelse eller starkt
+# setup-lage. Dedupliceras per dag sa samma larm inte skickas tva ganger.
+_WATCH_STATE_FILE = os.path.join(os.environ.get("DATA_DIR", "."), "push_watch_state.json")
+WATCH_MOVE_PCT = float(os.environ.get("GRABIT_WATCH_MOVE_PCT", "4"))   # larma vid +-4 % pa dagen
+WATCH_SCORE_MIN = int(os.environ.get("GRABIT_WATCH_SCORE_MIN", "8"))   # larma vid setup-score >= 8
+
+
+def _watch_state_load():
+    import json as _j
+    try:
+        with open(_WATCH_STATE_FILE) as f:
+            return _j.load(f)
+    except Exception:
+        return {}
+
+
+def _watch_state_save(st):
+    import json as _j
+    try:
+        tmp = _WATCH_STATE_FILE + ".tmp"
+        with open(tmp, "w") as f:
+            _j.dump(st, f)
+        os.replace(tmp, _WATCH_STATE_FILE)
+    except Exception:
+        pass
+
+
+def _us_market_open():
+    import datetime as _dt2
+    now = _dt2.datetime.utcnow()
+    if now.weekday() >= 5:
+        return False
+    return 13 <= now.hour < 21   # tacker 9:30-16:00 ET bade sommar- och vintertid
+
+
+def _watchlist_scan_once():
+    import push_notify as PN
+    import datetime as _dt2
+    tickers = PN.all_watch_tickers()
+    if not tickers:
+        return
+    st = _watch_state_load()
+    today = _dt2.date.today().isoformat()
+    for tk in tickers[:60]:
+        try:
+            a = scan(tk)
+        except Exception:
+            a = None
+        if not a:
+            continue
+        ret1 = float(a.get("ret_1") or 0)
+        score = int(a.get("score10") or 0)
+        last = a.get("last")
+        if abs(ret1) >= WATCH_MOVE_PCT:
+            key = "%s:%s:move:%s" % (tk, today, "upp" if ret1 > 0 else "ner")
+            if key not in st:
+                st[key] = 1
+                pil = "\U0001F4C8" if ret1 > 0 else "\U0001F4C9"
+                PN.send_watchlist(tk, "%s %s %+.1f%% idag" % (pil, tk, ret1),
+                                  "Kurs %s. En av dina bevakade aktier ror sig kraftigt." % (last,))
+        if score >= WATCH_SCORE_MIN:
+            key = "%s:%s:setup" % (tk, today)
+            if key not in st:
+                st[key] = 1
+                PN.send_watchlist(tk, "\U0001F3AF %s \u2014 setup %d/10" % (tk, score),
+                                  "%s har ett starkt tekniskt lage just nu%s." % (
+                                      tk, (" (" + a.get("label") + ")") if a.get("label") else ""))
+    st = {k: v for k, v in st.items() if (":%s:" % today) in k}
+    _watch_state_save(st)
+
+
+def _watchlist_loop():
+    time.sleep(90)   # lat servern boota och cachen varmas forst
+    while True:
+        try:
+            if _us_market_open():
+                _watchlist_scan_once()
+        except Exception as e:
+            print("Watchlist-push fel:", e)
+        time.sleep(600)   # var 10:e minut
+
+
+@app.on_event("startup")
+def _start_watchlist_push():
+    _threading.Thread(target=_watchlist_loop, daemon=True).start()

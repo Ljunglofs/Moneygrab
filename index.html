@@ -171,8 +171,8 @@ main{padding:16px 16px 110px}
 .sm-spark{width:42px;height:22px;flex:none;margin-left:auto}
 .sm-r{font-weight:800;font-size:13.5px;font-family:var(--disp);flex:none;min-width:40px;text-align:right}
 /* premium screener-kort (mockup) */
-.scr-grid{display:flex;gap:11px;overflow-x:auto;padding:2px 2px 6px;scrollbar-width:none}.scr-grid::-webkit-scrollbar{display:none}
-.scr-card{flex:none;width:166px;padding:16px 15px 15px;display:flex;flex-direction:column;cursor:pointer;border-top:2px solid var(--c)!important}
+.scr-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;padding:2px 2px 6px}.scr-grid::-webkit-scrollbar{display:none}
+.scr-card{min-width:0;padding:16px 15px 15px;display:flex;flex-direction:column;cursor:pointer;border-top:2px solid var(--c)!important}
 .scr-card:active{transform:scale(.985)}
 .scr-ic{width:54px;height:54px;border-radius:15px;display:grid;place-items:center;border:1px solid;margin-bottom:14px}
 .scr-ic svg{width:28px;height:28px;filter:drop-shadow(0 0 10px currentColor)}
@@ -726,6 +726,7 @@ body{background:
     <div class="evrow" id="events"></div>
     <div class="sect"><h2>10 hetaste just nu</h2><a onclick="go('marknad')">Mer</a></div>
     <div class="card macrocal" id="macrocal"></div>
+    <div class="card macrocal" id="fdacal" style="display:none"></div>
     <div class="card" id="hetaste"></div>
     <div class="sect"><h2>Snabbval</h2></div>
     <div class="menuchips" id="menuchips"></div>
@@ -1415,7 +1416,7 @@ function render(d){
   if($("#mkt-scroll"))$("#mkt-scroll").innerHTML=d.market.map(m=>{const c=m.chg>=0?"var(--pos)":"var(--neg)";
     return `<div class="mkt"><div class="mk">${m.k}</div><div class="mv num">${m.v}</div><div class="mc" style="color:${c}">${m.chg>=0?"+":""}${m.chg.toFixed(2)}%</div></div>`;}).join("");
   // AI-sammanfattning
-  if($("#aibrief"))$("#aibrief").innerHTML=`<div class="aichip-bg" style="background-image:url('${IMGS.aichip}')"></div><div class="ai-h"><span class="dot2"></span>AI · Marknadsläge</div><p>${d.aiSummary}</p>`;
+  if($("#aibrief"))$("#aibrief").innerHTML=`<div class="aichip-bg" style="background-image:url('${IMGS.aichip}')"></div>`+(window._aiBriefHTML||`<div class="ai-h"><span class="dot2"></span>AI · Marknadsläge</div><p>${d.aiSummary}</p>`);
   // tempmätare
   if($("#tempg")){const PULSE={BEARISH:"pulse_bear",BULLISH:"pulse_bull",NEUTRAL:"pulse_neutral","SUPER BULLISH":"pulse_super"};const pim=IMGS[PULSE[d.gauge.state]||"pulse_bear"];
     $("#tempg").innerHTML=`<div class="tg-l">Marknadsläge</div><div class="globewrap"><img class="globeimg" src="${pim}" alt=""><span class="globescore" style="color:${d.gauge.color}">${d.gauge.score}</span></div><div class="tg-s" style="color:${d.gauge.color}">${d.gauge.state}</div>`;}
@@ -1731,6 +1732,16 @@ if("serviceWorker" in navigator){window.addEventListener("load",function(){navig
     return { reg, sub: await reg.pushManager.getSubscription() };
   }
   (async()=>{ try{ const r = await getSub(); setOn(!!(r && r.sub)); }catch(e){} })();
+  // Håller serverns bild av bevakade aktier i synk med portföljen
+  window.pushSyncWatchlist = async function(){
+    try{
+      const r = await getSub(); if(!r || !r.sub) return;
+      const tks = (typeof pfLoad==="function"?pfLoad():[]).map(function(h){return h.tkr;}).filter(Boolean);
+      await fetch(CONFIG.API_BASE + "/api/push/watchlist", {method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({endpoint: r.sub.endpoint, tickers: tks})});
+    }catch(e){}
+  };
   bell.addEventListener("click", async ()=>{
     try{
       if(!("PushManager" in window)){ pToast("Din webbläsare stödjer inte push"); return; }
@@ -1762,9 +1773,11 @@ if("serviceWorker" in navigator){window.addEventListener("load",function(){navig
           sub = await r.reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: ku });
         }else{ throw se; }
       }
+      const body = sub.toJSON();
+      try{ body.tickers = (typeof pfLoad==="function"?pfLoad():[]).map(function(h){return h.tkr;}).filter(Boolean); }catch(e){ body.tickers = []; }
       const res = await fetch(CONFIG.API_BASE + "/api/push/subscribe", {method:"POST",
-        headers:{"Content-Type":"application/json"}, body: JSON.stringify(sub.toJSON())}).then(x=>x.json());
-      setOn(true); pToast("Notiser PÅ 🔔 — du får varje ROBBER-signal direkt");
+        headers:{"Content-Type":"application/json"}, body: JSON.stringify(body)}).then(x=>x.json());
+      setOn(true); pToast("Notiser PÅ 🔔 — du får larm för aktierna i din portfölj + ROBBER-signaler");
     }catch(e){ pToast("Kunde inte aktivera: " + (e && e.message ? e.message.slice(0,60) : "okänt fel")); }
   });
 })();
@@ -1902,22 +1915,32 @@ async function loadDaily(){
   if(!B||typeof fetch==="undefined")return;
   const el=document.getElementById("aibrief");if(!el)return;
   const head='<div class="ai-h"><span class="dot2"></span>AI · Dagens läge</div>';
+  const chip='<div class="aichip-bg" style="background-image:url(\''+((typeof IMGS!=="undefined"&&IMGS.aichip)||'')+'\')"></div>';
+  // show(html,true) sparar texten globalt så render() aldrig skriver över den med "Laddar…"
+  const show=function(html,remember){if(remember)window._aiBriefHTML=html;el.innerHTML=chip+html;};
   try{
     const r=await fetch(B+"/api/ai_daily",{cache:"no-store"});const j=await r.json();
     if(j&&j.text){
-      el.innerHTML=head+'<p>'+j.text.replace(/</g,"&lt;").replace(/\n/g,"<br>")+'</p>';
+      show(head+'<p>'+j.text.replace(/</g,"&lt;").replace(/\n/g,"<br>")+'</p>',true);
     }else if(j&&(j.indices||j.hot)){
       // AI:n tyst — visa ändå riktiga siffror i stället för ett tomt kort
       let p="";
       if(j.indices)p+='<p><b style="color:var(--gold2)">Index:</b> '+j.indices.replace(/</g,"&lt;")+'</p>';
       if(j.hot)p+='<p style="margin-top:6px"><b style="color:var(--gold2)">Hetast:</b> '+j.hot.replace(/</g,"&lt;")+'</p>';
-      el.innerHTML=head+p;
+      show(head+p,true);
+      _retryDaily();
     }else{
-      el.innerHTML=head+'<p style="color:#7c8a9a">Kunde inte hämtas just nu — uppdaterar automatiskt vid nästa besök.</p>';
+      show(head+'<p style="color:#7c8a9a">Kunde inte hämtas just nu — försöker igen automatiskt.</p>',false);
+      _retryDaily();
     }
   }catch(e){
-    el.innerHTML=head+'<p style="color:#7c8a9a">Kunde inte hämtas just nu — servern kan vara i kallstart.</p>';
+    show(head+'<p style="color:#7c8a9a">Kunde inte hämtas just nu — servern kan vara i kallstart. Försöker igen…</p>',false);
+    _retryDaily();
   }
+}
+function _retryDaily(){
+  window._dailyTries=(window._dailyTries||0)+1;
+  if(window._dailyTries<=5)setTimeout(loadDaily,30000);
 }
 /* ===== AI-analys i aktievyn (setup + nyheter) ===== */
 var BULL_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 17L9.5 11L13.5 14.5L20.5 7"/><path d="M15 7H20.5V12.5"/></svg>';
@@ -2021,7 +2044,22 @@ async function loadMacro(){
   }
   el.innerHTML='<div class="ai-h"><span class="dot2"></span>Makrohändelser · denna vecka</div>'+macroRows(rows);
 }
-load();loadMonthly();loadDaily();loadMacro();
+async function loadFda(){
+  const el=document.getElementById("fdacal");if(!el)return;
+  const B=CONFIG.API_BASE?CONFIG.API_BASE.replace(/\/$/,""):"";if(!B)return;
+  let rows=[];
+  try{const r=await fetch(B+"/api/fda",{cache:"no-store"});const j=await r.json();rows=(j&&j.news)||[];}catch(e){}
+  if(!rows.length){el.style.display="none";return;}
+  el.style.display="";
+  el.innerHTML='<div class="ai-h"><span class="dot2"></span>FDA-bevakning · Biotech</div>'+rows.slice(0,6).map(function(n){
+    var t='<div class="macro-row"><div class="macro-dt">'+String(n.tid||"").slice(5,16)+'</div>'
+      +'<div class="macro-mid"><span class="macro-dot" style="background:#22d3ee"></span>'
+      +'<span class="macro-ttl">'+(n.ticker?'<b style="color:var(--gold2)">'+n.ticker+'</b> · ':'')+String(n.rubrik||"").replace(/</g,"&lt;")+'</span></div>'
+      +'<div class="macro-vals"></div></div>';
+    return n.url?'<a href="'+n.url+'" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;display:block">'+t+'</a>':t;
+  }).join("");
+}
+load();loadMonthly();loadDaily();loadMacro();loadFda();
 function fgInfo(s){s=+s||0;
   if(s>=75)return{label:"Extrem girighet",col:"#22d3ee"};
   if(s>=55)return{label:"Girighet",col:"#22d3ee"};
@@ -2158,8 +2196,8 @@ async function loadPolyInsiders(force){
 .modeduo .tempg{display:flex;flex-direction:column;justify-content:center}
 .modeduo .fgcard{display:flex;flex-direction:column;justify-content:center}
 .modeduo .fgcard .fg-exp{font-size:11px;margin-top:8px}
-.askbanner{margin:10px 0 6px;border-radius:18px;overflow:hidden;cursor:pointer;line-height:0;border:1px solid rgba(245,197,66,.16);box-shadow:0 8px 30px rgba(0,0,0,.5),0 0 24px rgba(245,197,66,.06)}
-.askbanner img{width:100%;height:auto;display:block}
+.askbanner{margin:10px 0 6px;border-radius:18px;overflow:hidden;cursor:pointer;line-height:0;background:#05070a;border:1px solid rgba(245,197,66,.16);box-shadow:0 8px 30px rgba(0,0,0,.5),0 0 24px rgba(245,197,66,.06)}
+.askbanner img{width:100%;height:auto;display:block;transform:scale(1.045);transform-origin:50% 50%}
 .askbanner:active{transform:scale(.992)}
 .pulsecard{background:#0E0F11!important;border:1px solid rgba(245,197,66,.16)!important;border-radius:20px!important;padding:16px 18px!important;margin:6px 0 12px!important;box-shadow:0 8px 30px rgba(0,0,0,.5),0 0 26px rgba(245,197,66,.05)!important;overflow:hidden}
 .pulse-wrap{display:grid;grid-template-columns:33% 1fr;gap:14px;align-items:center}
@@ -2287,7 +2325,7 @@ async function loadPolyInsiders(force){
 /* ===== Portfölj 2.0 · lokala innehav + live-kurser + Grabit AI-granskning ===== */
 var PF_KEY="grabit_pf";
 function pfLoad(){try{return JSON.parse(localStorage.getItem(PF_KEY)||"[]");}catch(e){return[];}}
-function pfSave(a){try{localStorage.setItem(PF_KEY,JSON.stringify(a));}catch(e){}}
+function pfSave(a){try{localStorage.setItem(PF_KEY,JSON.stringify(a));}catch(e){}try{window.pushSyncWatchlist&&window.pushSyncWatchlist();}catch(e){}}
 function pfCcy(tk){if(/\.ST$/.test(tk))return"kr";if(/\.(PA|DE|AS)$/.test(tk))return"€";if(/\.(TO|V)$/.test(tk))return"C$";return"$";}
 function pfFmt(n){return (+n||0).toLocaleString("sv-SE",{maximumFractionDigits:0});}
 var _PF_Q={};
