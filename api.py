@@ -2606,14 +2606,13 @@ def _watchlist_scan_once():
             key = "%s:%s:move:%s" % (tk, today, "upp" if ret1 > 0 else "ner")
             if key not in st:
                 st[key] = 1
-                pil = "\U0001F4C8" if ret1 > 0 else "\U0001F4C9"
-                PN.send_watchlist(tk, "%s %s %+.1f%% idag" % (pil, tk, ret1),
+                PN.send_watchlist(tk, "%s %+.1f%% idag" % (tk, ret1),
                                   "Kurs %s. En av dina bevakade aktier ror sig kraftigt." % (last,))
         if score >= WATCH_SCORE_MIN:
             key = "%s:%s:setup" % (tk, today)
             if key not in st:
                 st[key] = 1
-                PN.send_watchlist(tk, "\U0001F3AF %s \u2014 setup %d/10" % (tk, score),
+                PN.send_watchlist(tk, "%s \u2014 setup %d/10" % (tk, score),
                                   "%s har ett starkt tekniskt lage just nu%s." % (
                                       tk, (" (" + a.get("label") + ")") if a.get("label") else ""))
     st = {k: v for k, v in st.items() if (":%s:" % today) in k}
@@ -2923,10 +2922,9 @@ def _price_alerts_scan():
             continue
         traff = last >= a["niva"] if a["riktning"] == "over" else last <= a["niva"]
         if traff:
-            pil = "\u2B06\uFE0F" if a["riktning"] == "over" else "\u2B07\uFE0F"
             jmf = "över" if a["riktning"] == "over" else "under"
             PN.send_to_endpoint(a["endpoint"],
-                                "%s %s %s din larmnivå" % (pil, a["ticker"], jmf),
+                                "%s %s din larmnivå" % (a["ticker"], jmf),
                                 "Kurs nu %s — din nivå var %s." % (round(last, 2), a["niva"]))
             utlosta.append(a["id"])
     if utlosta:
@@ -2988,7 +2986,7 @@ def _morning_push_once():
         kort += "\nTop Opportunity: %s (%s)" % (p.get("ticker"), p.get("score"))
     if not kort.strip():
         return
-    PN.send_all("GRABIT \u2600\uFE0F Morgonbrief", kort, url="/", tag="grabit-morgon")
+    PN.send_all("GRABIT · Morgonbrief", kort, url="/", tag="grabit-morgon")
     st["morgonbrief"] = today
     _daily_push_save(st)
 
@@ -3050,7 +3048,7 @@ def _earnings_alerts_once():
             continue
         skickade.append(key)
         nar = "imorgon" if dgr == 1 else ("om %d dagar" % dgr)
-        PN.send_watchlist(tk, "\U0001F4C5 %s rapporterar %s" % (tk, nar),
+        PN.send_watchlist(tk, "%s rapporterar %s" % (tk, nar),
                           "Rapportdatum %s. Rapporter kan ge stora rörelser — se över läget."
                           % ed.strftime("%d %b"))
     st["rapport_skickade"] = skickade[-200:]

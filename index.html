@@ -1060,7 +1060,7 @@ function openStock(tkr){_curStock=tkr;const d=stockData(tkr,_liveStock[tkr]);
   const dCol=d.day>=0?"var(--pos)":"var(--neg)",sCol=scoreColor(d.score);
   const tot=((d.mom+d.sent+d.tech)/3);
   $("#st-body").innerHTML=`
-    <div class="st-hero sthero-fill"><div class="sthero-in">${lic(tkr,60,sCol)}<div class="sthero-tx"><div class="sthero-tk">${tkr} <span class="sthero-flag">${d.flag||""}</span></div><div class="sthero-nm">${d.name}</div><div class="sthero-sub">${d.bors||""}</div></div><button class="st-alarm" onclick="event.stopPropagation();setPriceAlert('${tkr}',${d.price!=null?d.price:'null'})">\u{1F514}<i>PRISLARM</i></button></div></div>
+    <div class="st-hero sthero-fill"><div class="sthero-in">${lic(tkr,60,sCol)}<div class="sthero-tx"><div class="sthero-tk">${tkr} <span class="sthero-flag">${d.flag||""}</span></div><div class="sthero-nm">${d.name}</div><div class="sthero-sub">${d.bors||""}</div></div><button class="st-alarm" onclick="event.stopPropagation();setPriceAlert('${tkr}',${d.price!=null?d.price:'null'})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:17px;height:17px"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg><i>PRISLARM</i></button></div></div>
     <div id="st-ai-slot"></div>
     <div class="st-box score-hero">${scoreGauge(d.score)}</div>
     <div class="st-box st-price2 price-wide"><div class="k2">Dagens kurs</div><div class="p2 num">${d.cur}${d.price.toLocaleString("sv-SE")}</div><div class="c2" style="color:${dCol}">${d.day>=0?"+":""}${d.day}% i dag</div>${d.liveOk&&d.d5!=null?`<div class="c2" style="color:${d.d5>=0?"var(--pos)":"var(--neg)"};opacity:.85;font-size:12px;margin-top:2px">${d.d5>=0?"+":""}${d.d5}% senaste 5 dagarna</div>`:""}</div>
@@ -1791,7 +1791,7 @@ if("serviceWorker" in navigator){window.addEventListener("load",function(){navig
       try{ body.tickers = (typeof pfLoad==="function"?pfLoad():[]).map(function(h){return h.tkr;}).filter(Boolean); }catch(e){ body.tickers = []; }
       const res = await fetch(CONFIG.API_BASE + "/api/push/subscribe", {method:"POST",
         headers:{"Content-Type":"application/json"}, body: JSON.stringify(body)}).then(x=>x.json());
-      setOn(true); pToast("Notiser PÅ 🔔 — du får larm för aktierna i din portfölj + ROBBER-signaler");
+      setOn(true); pToast("Notiser PÅ — du får larm för aktierna i din portfölj + ROBBER-signaler");
     }catch(e){ pToast("Kunde inte aktivera: " + (e && e.message ? e.message.slice(0,60) : "okänt fel")); }
   });
 })();
@@ -2119,12 +2119,12 @@ async function loadFacit(){
   const st=j.stats||{};
   if(!st.antal){
     if(j.loggade_totalt>0){el.style.display="";
-      el.innerHTML='<div class="fc-h">📊 Grabits facit</div><div class="wl-empty">Varje börsdags setups loggas öppet — första utfallen visas efter en handelsvecka ('+j.loggade_totalt+' loggade hittills).</div>';}
+      el.innerHTML='<div class="fc-h">Grabits facit</div><div class="wl-empty">Varje börsdags setups loggas öppet — första utfallen visas efter en handelsvecka ('+j.loggade_totalt+' loggade hittills).</div>';}
     return;
   }
   el.style.display="";
   const rows=(j.rader||[]).map(function(e){return `<div class="fc-row"><span>${e.roll} · <b>${e.ticker}</b></span><span class="num" style="color:${e.utfall_pct>=0?"var(--pos)":"var(--neg)"};font-weight:800">${e.utfall_pct>=0?"+":""}${e.utfall_pct}%</span></div>`;}).join("");
-  el.innerHTML=`<div class="fc-h">📊 Grabits facit · senaste ${st.antal} setups</div>
+  el.innerHTML=`<div class="fc-h">Grabits facit · senaste ${st.antal} setups</div>
    <div class="fc-stats">
      <div class="fc-big"><b class="num" style="color:var(--gold2)">${st.traffprocent}%</b><i>Träffar</i></div>
      <div class="fc-big"><b class="num" style="color:${st.snitt_pct>=0?"var(--pos)":"var(--neg)"}">${st.snitt_pct>=0?"+":""}${st.snitt_pct}%</b><i>Snitt 5 dgr</i></div>
@@ -2146,7 +2146,7 @@ window.setPriceAlert=async function(tkr,px){
     if(!m){say("Skriv > eller < följt av pris, t.ex. >200");return;}
     var res=await fetch(CONFIG.API_BASE+"/api/alerts",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({endpoint:r.sub.endpoint,ticker:tkr,riktning:m[1]===">"?"over":"under",niva:parseFloat(m[2])})}).then(function(x){return x.json();});
-    say(res&&res.ok?("Larm satt 🔔 "+tkr+" "+m[1]+" "+m[2]):("Kunde inte sätta larmet"+(res&&res.fel?": "+res.fel:"")));
+    say(res&&res.ok?("Larm satt: "+tkr+" "+m[1]+" "+m[2]):("Kunde inte sätta larmet"+(res&&res.fel?": "+res.fel:"")));
   }catch(e){say("Kunde inte sätta larmet");}
 };
 load();loadMonthly();loadDaily();loadMacro();loadFda();loadTopOp();loadWatchrow();loadFacit();
