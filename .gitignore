@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+push_subs.json
+facit.json
+ai_text_cache.json
+push_watch_state.json
