@@ -17,8 +17,16 @@ import os
 import json
 import threading
 
-VAPID_PUBLIC  = os.environ.get("VAPID_PUBLIC_KEY", "")
-VAPID_PRIVATE = os.environ.get("VAPID_PRIVATE_KEY", "")
+def _ren(namn):
+    """Hamtar env-varde och stadar bort vanliga inklistringsfel:
+    citattecken, whitespace/radbrytningar, och 'NAMN=' om hela raden klistrats in."""
+    v = os.environ.get(namn, "").strip().strip('"').strip("'").strip()
+    if "=" in v and v.split("=", 1)[0].upper().startswith("VAPID"):
+        v = v.split("=", 1)[1].strip().strip('"').strip("'")
+    return "".join(v.split())  # ta bort ev. inbaddade mellanslag/radbrytningar
+
+VAPID_PUBLIC  = _ren("VAPID_PUBLIC_KEY")
+VAPID_PRIVATE = _ren("VAPID_PRIVATE_KEY")
 VAPID_SUB     = os.environ.get("VAPID_SUB", "mailto:info@hekab.nu")
 DATA_DIR      = os.environ.get("DATA_DIR", ".")
 SUBS_FILE     = os.path.join(DATA_DIR, "push_subs.json")

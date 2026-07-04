@@ -507,8 +507,19 @@ def push_test():
 @app.get("/api/push/status")
 def push_status():
     import push_notify as PN
+    pub = PN.VAPID_PUBLIC
+    ok_format = False
+    try:
+        import base64 as _b
+        raw = _b.urlsafe_b64decode(pub + "=" * (-len(pub) % 4))
+        ok_format = (len(raw) == 65 and raw[0] == 4)
+    except Exception:
+        pass
     return {"prenumeranter": PN.sub_count(),
-            "vapid_konfigurerad": bool(PN.VAPID_PUBLIC and PN.VAPID_PRIVATE),
+            "vapid_konfigurerad": bool(pub and PN.VAPID_PRIVATE),
+            "pubkey_format_ok": ok_format,   # True = 65 bytes okomprimerad P-256
+            "pubkey_langd": len(pub),         # ska vara 87
+            "pubkey_borjan": pub[:10],
             "lagring": PN.SUBS_FILE}
 
 

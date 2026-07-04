@@ -1730,8 +1730,21 @@ if("serviceWorker" in navigator){window.addEventListener("load",function(){navig
       const perm = await Notification.requestPermission();
       if(perm !== "granted"){ pToast("Notiser blockerade — tillåt i webbläsarens inställningar"); return; }
       const kr = await fetch(CONFIG.API_BASE + "/api/push/pubkey").then(x=>x.json());
-      if(!kr.key){ pToast("Servern saknar VAPID-nycklar"); return; }
-      const sub = await r.reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToU8(kr.key) });
+      let key = (kr.key||"").trim().replace(/^["']|["']$/g,"").replace(/\s+/g,"");
+      const m = key.match(/[A-Za-z0-9_-]{80,90}/); if(m) key = m[0];
+      if(!key){ pToast("Servern saknar VAPID-nycklar — kolla Render env"); return; }
+      const ku = b64ToU8(key);
+      if(ku.length !== 65 || ku[0] !== 4){ pToast("VAPID-nyckeln på servern är felformaterad ("+ku.length+" bytes, ska vara 65) — klistra in värdet utan citattecken"); return; }
+      let sub;
+      try{
+        sub = await r.reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: ku });
+      }catch(se){
+        if(String(se).indexOf("applicationServerKey")>-1){
+          const old = await r.reg.pushManager.getSubscription();
+          if(old) await old.unsubscribe();
+          sub = await r.reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: ku });
+        }else{ throw se; }
+      }
       const res = await fetch(CONFIG.API_BASE + "/api/push/subscribe", {method:"POST",
         headers:{"Content-Type":"application/json"}, body: JSON.stringify(sub.toJSON())}).then(x=>x.json());
       setOn(true); pToast("Notiser PÅ 🔔 — du får varje ROBBER-signal direkt");
