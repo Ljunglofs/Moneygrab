@@ -1147,7 +1147,26 @@ def _macro_events():
             break
     _MACRO_LAST_GOOD["err"] = "; ".join(errs)
     if raw is None:
-        return _MACRO_LAST_GOOD["events"]  # senast kända istället för tomt
+        # ForexFactory blockerad -> Finnhub economic calendar som backup
+        fh_key = os.getenv("FINNHUB_API_KEY", "")
+        if fh_key:
+            try:
+                today = _dt.date.today()
+                r = requests.get("https://finnhub.io/api/v1/calendar/economic",
+                                 params={"from": today.isoformat(),
+                                         "to": (today + _dt.timedelta(days=7)).isoformat(),
+                                         "token": fh_key}, timeout=10)
+                fh = (r.json() or {}).get("economicCalendar") or []
+                raw = [{"title": x.get("event", ""), "country": x.get("country", ""),
+                        "date": (x.get("time") or "").replace(" ", "T"),
+                        "impact": {"3": "High", "2": "Medium"}.get(str(x.get("impact", "")), "Low"),
+                        "forecast": x.get("estimate", ""), "previous": x.get("prev", "")}
+                       for x in fh]
+                _MACRO_LAST_GOOD["src"] = "finnhub"
+            except Exception as e:
+                _MACRO_LAST_GOOD["err"] += "; finnhub -> " + type(e).__name__
+        if raw is None:
+            return _MACRO_LAST_GOOD["events"]  # senast kända istället för tomt
     out = []
     now = _dt.datetime.utcnow()
     for e in (raw or []):
@@ -1183,6 +1202,46 @@ def _macro_events():
         _MACRO_LAST_GOOD["events"] = out
         _MACRO_LAST_GOOD["ts"] = now_ts
     return out or _MACRO_LAST_GOOD["events"]
+
+
+_FDA_ORD = ("fda", "pdufa", "crl", "approval", "approved", "clearance", "510(k)",
+            "advisory committee", "adcomm", "breakthrough therapy", "fast track",
+            "phase 3", "phase iii", "topline", "nda ", " bla ", "ind ")
+
+@cached(1800)
+def _fda_news():
+    """FDA-relaterade nyheter for Bio-universumet via Alpaca News. Tyst [] vid fel."""
+    import os as _os
+    k = _os.getenv("APCA_API_KEY_ID", ""); s = _os.getenv("APCA_API_SECRET_KEY", "")
+    bio = UNIVERSE.get("Bio", [])
+    if not (k and s and bio):
+        return []
+    try:
+        import requests as _rq
+        r = _rq.get("https://data.alpaca.markets/v1beta1/news",
+                    headers={"APCA-API-KEY-ID": k, "APCA-API-SECRET-KEY": s},
+                    params={"symbols": ",".join(bio[:40]), "limit": 50, "sort": "desc"},
+                    timeout=10)
+        out = []
+        for n in (r.json().get("news") or []):
+            h = (n.get("headline") or "").strip()
+            hl = " " + h.lower() + " "
+            if not h or not any(w in hl for w in _FDA_ORD):
+                continue
+            syms = [x for x in (n.get("symbols") or []) if x in bio]
+            out.append({"rubrik": h, "ticker": (syms[0] if syms else ""),
+                        "tid": (n.get("created_at") or "")[:16].replace("T", " "),
+                        "url": n.get("url") or ""})
+            if len(out) >= 8:
+                break
+        return out
+    except Exception:
+        return []
+
+
+@app.get("/api/fda")
+def fda():
+    return {"news": _fda_news()}
 
 
 @app.get("/api/macro")
@@ -1969,11 +2028,26 @@ def ai_daily():
         hot_line = ", ".join("%s %s/10" % (r["ticker"], r.get("score10", "?")) for r in hot)
     except Exception:
         hot_line = ""
-    sysp = ("Du är Grabit. Skriv en kort svensk marknadssammanfattning på 2-3 meningar "
-            "('Dagens läge') utifrån index och de hetaste aktierna. Sakligt, ingen "
-            "rådgivning, hitta inte på siffror utöver de givna.")
-    txt = _ai_text(key, sysp, "INDEX: %s\nHETAST: %s\nSkriv 'Dagens läge'." % (idx_line, hot_line), 240)
-    return {"text": txt, "indices": idx_line, "hot": hot_line}
+    # Dagens makrohändelser = "vad kan röra marknaden idag"
+    try:
+        ev = _macro_events()[:4]
+        ev_line = "; ".join("%s %s %s (%s)" % (e.get("date",""), e.get("time",""),
+                            e.get("title",""), e.get("impact","")) for e in ev)
+    except Exception:
+        ev_line = ""
+    sysp = ("Du är Grabit, svensk marknadsanalytiker. Skriv 'Dagens läge' i exakt detta format: "
+            "Börja med ETT av orden BULLISH, BEARISH eller NEUTRAL i versaler, följt av ' — ' "
+            "och en mening som motiverar riktningen utifrån indexrörelserna. "
+            "Sedan en mening om vad som sticker ut bland de hetaste aktierna (nämn 1-2 tickers). "
+            "Avsluta med en mening om vad som kan röra marknaden framöver, baserat på "
+            "makrohändelserna om sådana finns, annars på det allmänna läget (helgdag, tunn volym osv). "
+            "Max 4 meningar totalt. Vardaglig men skarp svenska. Ingen rådgivning, "
+            "hitta aldrig på siffror utöver de givna.")
+    txt = _ai_text(key, sysp,
+                   "INDEX: %s\nHETAST: %s\nMAKRO KOMMANDE: %s\nIdag är det %s.\nSkriv 'Dagens läge'."
+                   % (idx_line, hot_line, ev_line or "(inga större händelser)",
+                      _dt.date.today().strftime("%A %d %B")), 300)
+    return {"text": txt, "indices": idx_line, "hot": hot_line, "makro": ev_line}
 
 
 @app.get("/api/ai_news/{ticker}")
