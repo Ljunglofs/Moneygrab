@@ -396,6 +396,9 @@ def _icon180(): return _png(_ICON_180)
 def _iconmask(): return _png(_ICON_MASK)
 
 _MANIFEST = {
+    "id": "/",
+    "lang": "sv",
+    "categories": ["finance"],
     "name": "GRABIT",
     "short_name": "GRABIT",
     "description": "Spot the setup. Ignore the noise.",
@@ -471,6 +474,73 @@ self.addEventListener('notificationclick', e => {
 def _sw():
     return Response(content=_SW_JS, media_type="application/javascript",
                    headers={"Cache-Control": "no-cache", "Service-Worker-Allowed": "/"})
+
+
+# ---- Google Play (TWA): Digital Asset Links ------------------------
+# Kopplar Android-appen till webbappen så den kör i fullskärm utan
+# webbläsarram. Fyll i env-varsen i Render när Play-paketet är skapat:
+#   ANDROID_PACKAGE_NAME   t.ex. com.hekab.grabit
+#   ANDROID_CERT_SHA256    SHA-256 från Play Console -> App signing
+@app.get("/.well-known/assetlinks.json")
+def assetlinks():
+    import json as _j
+    pkg = os.environ.get("ANDROID_PACKAGE_NAME", "").strip()
+    sha = os.environ.get("ANDROID_CERT_SHA256", "").strip()
+    if not (pkg and sha):
+        return Response(content="[]", media_type="application/json")
+    data = [{
+        "relation": ["delegate_permission/common.handle_all_urls"],
+        "target": {"namespace": "android_app",
+                   "package_name": pkg,
+                   "sha256_cert_fingerprints": [f.strip() for f in sha.split(",") if f.strip()]},
+    }]
+    return Response(content=_j.dumps(data), media_type="application/json")
+
+
+_PRIVACY_HTML = """<!doctype html><html lang="sv"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GRABIT — Integritetspolicy</title>
+<style>body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#0A0E12;color:#e8edf5;
+max-width:680px;margin:0 auto;padding:28px 20px;line-height:1.6}
+h1{font-size:22px;color:#F5C542}h2{font-size:16px;margin-top:26px;color:#F5C542}
+p,li{font-size:14.5px;color:#c7d0dc}a{color:#F5C542}</style></head><body>
+<h1>Integritetspolicy för GRABIT</h1>
+<p>Senast uppdaterad: juli 2026. GRABIT är en app för teknisk aktieanalys.
+Vi samlar in så lite data som möjligt och säljer aldrig data vidare.</p>
+<h2>Vilka uppgifter behandlas?</h2>
+<ul>
+<li><b>Push-prenumeration</b> — om du slår på notiser sparas din webbläsares
+push-adress (en teknisk identifierare, ingen personlig information) på vår
+server så att vi kan skicka notiserna du bett om.</li>
+<li><b>Bevakade aktier</b> — tickersymbolerna i din portfölj/watchlist sparas
+tillsammans med push-prenumerationen så att larmen kan riktas rätt, samt dina
+egna prislarm (ticker och nivå).</li>
+<li><b>Lokalt i din enhet</b> — portföljens innehav sparas i din webbläsares
+lokala lagring och lämnar inte enheten i annat syfte än ovan.</li>
+</ul>
+<p>Vi använder inga annonsnätverk, ingen spårning över andra webbplatser och
+inga tredjeparts-analysverktyg. Inga konton, inga personuppgifter som namn,
+e-post eller telefonnummer samlas in.</p>
+<h2>Delas något med tredje part?</h2>
+<p>Nej. Kursdata och nyheter hämtas från externa källor (t.ex. Yahoo Finance)
+av vår server — dina uppgifter skickas inte dit. Push-notiser levereras via din
+webbläsares pushtjänst (t.ex. Google FCM), vilket är tekniskt nödvändigt för
+funktionen.</p>
+<h2>Radering</h2>
+<p>Stäng av notiserna i appen (klockan) så raderas din push-prenumeration,
+bevakade tickers och prislarm från servern. Rensa webbläsardata för att ta bort
+den lokala portföljen.</p>
+<h2>Viktigt om innehållet</h2>
+<p>GRABIT tillhandahåller teknisk analys och information — ingen finansiell
+rådgivning. Handel med värdepapper innebär risk och kan leda till förluster.</p>
+<h2>Kontakt</h2>
+<p>Frågor om integritet: <a href="mailto:info@hekab.nu">info@hekab.nu</a></p>
+</body></html>"""
+
+
+@app.get("/privacy", response_class=HTMLResponse)
+def privacy():
+    return HTMLResponse(content=_PRIVACY_HTML)
 
 
 # ---- Push-notiser (Web Push / VAPID) --------------------------------
