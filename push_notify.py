@@ -168,6 +168,16 @@ def send_all(title: str, body: str, url: str = "/", tag: str = "grabit") -> dict
     return _send_to(subs, title, body, url, tag)
 
 
+def send_to_endpoint(endpoint: str, title: str, body: str, url: str = "/",
+                     tag: str = "grabit-larm") -> dict:
+    """Skickar en notis till EN specifik prenumerant (t.ex. eget prislarm)."""
+    with _lock:
+        subs = [s for s in _load() if s.get("endpoint") == endpoint]
+    if not subs:
+        return {"skickade": 0, "doda": 0, "fel": 0, "not": "okand prenumerant"}
+    return _send_to(subs, title, body, url, tag)
+
+
 def send_watchlist(ticker: str, title: str, body: str, url: str = "/") -> dict:
     """Skickar en notis ENDAST till prenumeranter som bevakar `ticker`
     (aktier i deras portfolj i appen). Prenumeranter utan bevakning

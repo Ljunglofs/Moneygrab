@@ -2826,3 +2826,258 @@ def _facit_loop():
 @app.on_event("startup")
 def _start_facit():
     _threading.Thread(target=_facit_loop, daemon=True).start()
+
+
+# ---- Egna prislarm -----------------------------------------------------------
+# Användaren sätter "larma när TSLA går över 200" på aktiekortet. Larmet är
+# kopplat till push-prenumerationen och skickas bara till den personen.
+# Engångslarm: tas bort när det utlösts.
+_PALERT_FILE = os.path.join(os.environ.get("DATA_DIR", "."), "price_alerts.json")
+_palert_lock = _threading.Lock()
+
+
+def _palert_load():
+    import json as _j
+    try:
+        with open(_PALERT_FILE) as f:
+            return _j.load(f)
+    except Exception:
+        return []
+
+
+def _palert_save(rows):
+    import json as _j
+    try:
+        tmp = _PALERT_FILE + ".tmp"
+        with open(tmp, "w") as f:
+            _j.dump(rows[-500:], f)
+        os.replace(tmp, _PALERT_FILE)
+    except Exception as e:
+        print("Prislarm: kunde inte spara:", e)
+
+
+@app.post("/api/alerts")
+async def alerts_add(request: Request):
+    body = await request.json() or {}
+    ep = str(body.get("endpoint") or "").strip()
+    tk = str(body.get("ticker") or "").strip().upper()
+    riktning = "over" if body.get("riktning") == "over" else "under"
+    try:
+        niva = float(body.get("niva"))
+    except Exception:
+        return {"ok": False, "fel": "ogiltig nivå"}
+    if not ep or not tk or niva <= 0:
+        return {"ok": False, "fel": "endpoint, ticker och nivå krävs"}
+    with _palert_lock:
+        rows = _palert_load()
+        mina = [a for a in rows if a.get("endpoint") == ep]
+        if len(mina) >= 30:
+            return {"ok": False, "fel": "max 30 aktiva larm"}
+        nid = (max((a.get("id", 0) for a in rows), default=0) + 1)
+        rows.append({"id": nid, "endpoint": ep, "ticker": tk,
+                     "riktning": riktning, "niva": round(niva, 4)})
+        _palert_save(rows)
+    return {"ok": True, "id": nid,
+            "larm": [{k: a[k] for k in ("id", "ticker", "riktning", "niva")}
+                     for a in _palert_load() if a.get("endpoint") == ep]}
+
+
+@app.get("/api/alerts")
+def alerts_list(endpoint: str = ""):
+    return {"larm": [{k: a[k] for k in ("id", "ticker", "riktning", "niva")}
+                     for a in _palert_load() if a.get("endpoint") == endpoint]}
+
+
+@app.post("/api/alerts/remove")
+async def alerts_remove(request: Request):
+    body = await request.json() or {}
+    ep = str(body.get("endpoint") or "")
+    try:
+        aid = int(body.get("id"))
+    except Exception:
+        return {"ok": False}
+    with _palert_lock:
+        rows = [a for a in _palert_load()
+                if not (a.get("id") == aid and a.get("endpoint") == ep)]
+        _palert_save(rows)
+    return {"ok": True}
+
+
+def _price_alerts_scan():
+    import push_notify as PN
+    alerts = _palert_load()
+    if not alerts:
+        return
+    priser = {}
+    for tk in {a["ticker"] for a in alerts}:
+        try:
+            a = scan(tk)
+            if a and a.get("last") is not None:
+                priser[tk] = float(a["last"])
+        except Exception:
+            pass
+    utlosta = []
+    for a in alerts:
+        last = priser.get(a["ticker"])
+        if last is None:
+            continue
+        traff = last >= a["niva"] if a["riktning"] == "over" else last <= a["niva"]
+        if traff:
+            pil = "\u2B06\uFE0F" if a["riktning"] == "over" else "\u2B07\uFE0F"
+            jmf = "över" if a["riktning"] == "over" else "under"
+            PN.send_to_endpoint(a["endpoint"],
+                                "%s %s %s din larmnivå" % (pil, a["ticker"], jmf),
+                                "Kurs nu %s — din nivå var %s." % (round(last, 2), a["niva"]))
+            utlosta.append(a["id"])
+    if utlosta:
+        with _palert_lock:
+            rows = [a for a in _palert_load() if a.get("id") not in set(utlosta)]
+            _palert_save(rows)
+
+
+# ---- Morgonbrief + rapportvarningar -----------------------------------------
+_DAILY_PUSH_FILE = os.path.join(os.environ.get("DATA_DIR", "."), "daily_push_state.json")
+
+
+def _daily_push_state():
+    import json as _j
+    try:
+        with open(_DAILY_PUSH_FILE) as f:
+            return _j.load(f)
+    except Exception:
+        return {}
+
+
+def _daily_push_save(st):
+    import json as _j
+    try:
+        tmp = _DAILY_PUSH_FILE + ".tmp"
+        with open(tmp, "w") as f:
+            _j.dump(st, f)
+        os.replace(tmp, _DAILY_PUSH_FILE)
+    except Exception:
+        pass
+
+
+def _morning_push_once():
+    """Morgonbrief till alla prenumeranter strax före USA-öppning (en gång/dag)."""
+    import push_notify as PN
+    import datetime as _dt2
+    if os.environ.get("GRABIT_MORNING_PUSH", "1") != "1":
+        return
+    now = _dt2.datetime.utcnow()
+    if now.weekday() >= 5 or now.hour != 13:
+        return
+    st = _daily_push_state()
+    today = _dt2.date.today().isoformat()
+    if st.get("morgonbrief") == today:
+        return
+    if PN.sub_count() == 0:
+        return
+    try:
+        j = ai_daily()
+        text = (j.get("text") or j.get("indices") or "").strip()
+    except Exception:
+        text = ""
+    kort = (text[:200] + "…") if len(text) > 200 else text
+    try:
+        p = topop().get("pick")
+    except Exception:
+        p = None
+    if p:
+        kort += "\n\U0001F525 Top Opportunity: %s (%s)" % (p.get("ticker"), p.get("score"))
+    if not kort.strip():
+        return
+    PN.send_all("GRABIT \u2600\uFE0F Morgonbrief", kort, url="/", tag="grabit-morgon")
+    st["morgonbrief"] = today
+    _daily_push_save(st)
+
+
+def _next_earnings_date(tk):
+    """Nästa rapportdatum via yfinance. None om okänt."""
+    import datetime as _dt2
+    try:
+        cal = yf.Ticker(tk).calendar
+    except Exception:
+        return None
+    datum = None
+    try:
+        if isinstance(cal, dict):
+            ed = cal.get("Earnings Date")
+            if isinstance(ed, (list, tuple)) and ed:
+                datum = ed[0]
+            elif ed is not None:
+                datum = ed
+        elif cal is not None and hasattr(cal, "loc"):
+            datum = cal.loc["Earnings Date"][0]
+    except Exception:
+        return None
+    if datum is None:
+        return None
+    if hasattr(datum, "date") and not isinstance(datum, _dt2.date):
+        datum = datum.date()
+    if isinstance(datum, _dt2.datetime):
+        datum = datum.date()
+    return datum if isinstance(datum, _dt2.date) else None
+
+
+def _earnings_alerts_once():
+    """Varnar 3 dagar och 1 dag innan bevakade aktier rapporterar (en gång/dag)."""
+    import push_notify as PN
+    import datetime as _dt2
+    now = _dt2.datetime.utcnow()
+    if now.weekday() >= 5 or now.hour != 13:
+        return
+    st = _daily_push_state()
+    today = _dt2.date.today()
+    if st.get("rapportkoll") == today.isoformat():
+        return
+    st["rapportkoll"] = today.isoformat()
+    _daily_push_save(st)
+    skickade = st.setdefault("rapport_skickade", [])
+    for tk in PN.all_watch_tickers()[:40]:
+        try:
+            ed = _next_earnings_date(tk)
+        except Exception:
+            ed = None
+        if not ed:
+            continue
+        dgr = (ed - today).days
+        if dgr not in (1, 3):
+            continue
+        key = "%s:%s:%s" % (tk, ed.isoformat(), dgr)
+        if key in skickade:
+            continue
+        skickade.append(key)
+        nar = "imorgon" if dgr == 1 else ("om %d dagar" % dgr)
+        PN.send_watchlist(tk, "\U0001F4C5 %s rapporterar %s" % (tk, nar),
+                          "Rapportdatum %s. Rapporter kan ge stora rörelser — se över läget."
+                          % ed.strftime("%d %b"))
+    st["rapport_skickade"] = skickade[-200:]
+    _daily_push_save(st)
+
+
+def _daily_extra_loop():
+    import datetime as _dt2
+    time.sleep(240)   # låt cachen värmas först
+    while True:
+        try:
+            _morning_push_once()
+        except Exception as e:
+            print("Morgonbrief-fel:", e)
+        try:
+            _earnings_alerts_once()
+        except Exception as e:
+            print("Rapportvarning-fel:", e)
+        try:
+            now = _dt2.datetime.utcnow()
+            if now.weekday() < 5 and 7 <= now.hour < 21:   # täcker Sthlm + USA:s handelsdag
+                _price_alerts_scan()
+        except Exception as e:
+            print("Prislarm-fel:", e)
+        time.sleep(600)
+
+
+@app.on_event("startup")
+def _start_daily_extra():
+    _threading.Thread(target=_daily_extra_loop, daemon=True).start()
