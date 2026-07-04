@@ -2985,7 +2985,7 @@ def _morning_push_once():
     except Exception:
         p = None
     if p:
-        kort += "\n\U0001F525 Top Opportunity: %s (%s)" % (p.get("ticker"), p.get("score"))
+        kort += "\nTop Opportunity: %s (%s)" % (p.get("ticker"), p.get("score"))
     if not kort.strip():
         return
     PN.send_all("GRABIT \u2600\uFE0F Morgonbrief", kort, url="/", tag="grabit-morgon")

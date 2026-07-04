@@ -2081,7 +2081,7 @@ async function loadTopOp(){
   if(!p||!p.ticker){window._topTries=(window._topTries||0)+1;if(window._topTries<=5)setTimeout(loadTopOp,30000);return;}
   const col=scoreColor((p.score||0)/10);
   el.style.display="";
-  el.innerHTML=`<div class="to-k">🔥 Dagens Top Opportunity</div>
+  el.innerHTML=`<div class="to-k">Dagens Top Opportunity</div>
    <div class="to-row">${lic(p.ticker,44,col)}<div><div class="to-tk">${p.ticker}</div><div class="to-nm">${NAMES[p.ticker]||p.label||""}</div></div>
      <div class="to-score"><i>AI SCORE</i><b class="num">${p.score}</b></div></div>
    <div class="to-stats">
