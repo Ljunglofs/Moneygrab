@@ -723,7 +723,7 @@ body{background:
     <div class="card" id="hetaste"></div>
     <div class="sect"><h2>Snabbval</h2></div>
     <div class="menuchips" id="menuchips"></div>
-    <div class="demo-flag" id="demo-flag">Demo-data · koppla ditt API i CONFIG.API_BASE för live</div>
+    <div class="demo-flag" id="demo-flag">Ansluter till live-data…</div>
   </section>
 
   <section class="screen" id="s-marknad">
@@ -1667,7 +1667,18 @@ async function load(){
   if(sg&&Array.isArray(sg.feed)&&sg.feed.length){d.feed=sg.feed;live=true;}
   if(nw&&Array.isArray(nw.news)&&nw.news.length){d.news=nw.news;live=true;}
   if(ev&&Array.isArray(ev.events)&&ev.events.length){d.events=mapEvents(ev.events);live=true;}
-  $("#demo-flag").textContent = live ? ("Live · "+B.replace(/^https?:\/\//,"")) : "API svarar inte \u2014 visar demo-data";
+  const flag=$("#demo-flag");
+  if(live){
+    flag.textContent="Live \u00b7 "+B.replace(/^https?:\/\//,"");
+    flag.style.color="";
+    window._loadRetries=0;
+  }else{
+    // Servern svarar inte (deploy/kallstart) -- visa det TYDLIGT och forsok igen automatiskt
+    window._loadRetries=(window._loadRetries||0)+1;
+    flag.textContent="\u26A0\uFE0F Servern svarar inte \u2014 detta \u00e4r EXEMPELDATA, inte live. F\u00f6rs\u00f6ker igen\u2026 ("+window._loadRetries+")";
+    flag.style.color="var(--neg)";
+    if(window._loadRetries<=10)setTimeout(load,8000);
+  }
   render(d);
   if(live){try{localStorage.setItem("grabit_snap",JSON.stringify(d));}catch(e){}}
 }
