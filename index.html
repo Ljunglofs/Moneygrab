@@ -324,14 +324,20 @@ main{padding:16px 16px 110px}
 .exit .er{display:flex;justify-content:space-between;padding:11px 16px;border-bottom:1px solid var(--line);font-size:13.5px}
 .exit .er:last-child{border-bottom:none}
 .exit .er .k{color:var(--mut);font-weight:600}.exit .er .v{font-weight:800;letter-spacing:-.01em}
-.ask{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:15px 15px 16px}
+.ask{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px 15px 17px}
 .ask .in{display:flex;align-items:center;gap:10px;background:var(--bg2);border:1px solid var(--line);
-  border-radius:12px;padding:11px 14px}
-.ask .in input{flex:1;background:none;border:none;color:var(--txt);font-size:14px;outline:none}
-.ask .in button{color:var(--gold);font-size:18px;flex:none}
-.ask .chips{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px}
-.ask .chips button{font-size:12px;font-weight:600;color:#cdd5e1;background:var(--bg2);border:1px solid var(--line);
-  border-radius:9px;padding:7px 11px}
+  border-radius:14px;padding:6px 6px 6px 16px;transition:border-color .25s,box-shadow .25s}
+.ask .in:focus-within{border-color:rgba(245,197,66,.55);box-shadow:0 0 0 3px rgba(245,197,66,.09),0 0 22px rgba(245,197,66,.10)}
+.ask .in input{flex:1;background:none;border:none;color:var(--txt);font-size:14.5px;outline:none;min-width:0;padding:8px 0}
+.ask .in input::placeholder{color:#67788c}
+.ask .in button{flex:none;width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,var(--gold),#d9a616);color:#0a0d10;font-size:17px;font-weight:800;
+  box-shadow:0 3px 12px rgba(245,197,66,.28);transition:transform .15s,box-shadow .2s}
+.ask .in button:active{transform:scale(.92);box-shadow:0 1px 6px rgba(245,197,66,.35)}
+.ask .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:13px}
+.ask .chips button{font-size:12px;font-weight:700;color:#dfc98a;background:rgba(245,197,66,.06);
+  border:1px solid rgba(245,197,66,.22);border-radius:999px;padding:8px 13px;transition:background .2s,border-color .2s}
+.ask .chips button:active{background:rgba(245,197,66,.16);border-color:rgba(245,197,66,.45)}
 .ask .ans{margin-top:12px;font-size:13.5px;line-height:1.55;color:#cdd5e1;display:none}
 .ask .ans.on{display:block}
 .cat .ci svg{width:27px;height:27px;display:block}
@@ -1054,7 +1060,7 @@ function openStock(tkr){_curStock=tkr;const d=stockData(tkr,_liveStock[tkr]);
     <div class="st-box score-hero">${scoreGauge(d.score)}</div>
     <div class="st-box st-price2 price-wide"><div class="k2">Dagens kurs</div><div class="p2 num">${d.cur}${d.price.toLocaleString("sv-SE")}</div><div class="c2" style="color:${dCol}">${d.day>=0?"+":""}${d.day}% i dag</div>${d.liveOk&&d.d5!=null?`<div class="c2" style="color:${d.d5>=0?"var(--pos)":"var(--neg)"};opacity:.85;font-size:12px;margin-top:2px">${d.d5>=0?"+":""}${d.d5}% senaste 5 dagarna</div>`:""}</div>
     <div class="st-sec">Fråga Grabit</div>
-    <div class="ask secgfx-wrap"><div class="secgfx gglobe" style="background-image:url('${IMGS.globe}')"></div><div class="in"><input id="ask-q" placeholder="Fråga AI om ${tkr}…" onkeydown="if(event.key==='Enter')askGrabit('${tkr}',this.value)">
+    <div class="ask secgfx-wrap"><div class="secgfx gglobe" style="background-image:url('${IMGS.globe}')"></div><div class="in"><input id="ask-q" placeholder="Vad vill du veta om ${tkr}?" onkeydown="if(event.key==='Enter')askGrabit('${tkr}',this.value)">
       <button onclick="askGrabit('${tkr}',document.getElementById('ask-q').value)">&#10148;</button></div>
       <div class="chips">${["Varför rör sig "+tkr+"?","Hur ser riskbilden ut?","Jämför "+tkr,"Nästa kursmål?"].map(q=>`<button onclick="askGrabit('${tkr}','${q}')">${q}</button>`).join("")}</div>
       <div class="ans" id="ask-ans"></div></div>

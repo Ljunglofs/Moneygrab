@@ -156,9 +156,9 @@ UNIVERSE = {
     "Koppar": ["FCX","HBM","SCCO","TECK","RIO","BHP","VALE","ERO"],
     "Silver/Guld": ["AG","PAAS","GAU","NEM","GOLD","WPM","FNV","AEM","KGC","HMY","EGO","AU","CDE","HL","RGLD","SAND","BTG"],
     "Sverige": ["SUBGEN.ST","SMOL.ST","SHT-B.ST","ACCON.ST","SIVE.ST","OBDU-B.ST","XOM-B.ST","TERRNT-B.ST","VISC.ST","VOLV-B.ST","ERIC-B.ST","SEB-A.ST","SWED-A.ST","INVE-B.ST","ATCO-A.ST","SAND.ST","HEXA-B.ST","EVO.ST","ASSA-B.ST","SHB-A.ST","ABB.ST","ALFA.ST","SKF-B.ST","BOL.ST","TELIA.ST","SAAB-B.ST","NIBE-B.ST"],
-    "Bevakning": ["SUU","IMSR","AIRJ","ORBT","ENAFF","TRT","ABTC","AMPG","KEEL.TO","SOUN","BBAI","APLD","WULF"],
+    "Bevakning": ["IMSR","AIRJ","ORBT","ENAFF","TRT","ABTC","AMPG","KEEL.TO","SOUN","BBAI","APLD","WULF"],
     "Big Tech": ["AAPL","GOOGL","AMZN","META","NFLX","ADBE","CRM","ORCL","CSCO","QCOM","TXN","INTC","INTU","AMAT","MU","LRCX","KLAC","ADI","PANW","CDNS","ARM","DELL","HPQ","ACN","ADP"],
-    "SaaS/Moln": ["UBER","ABNB","SHOP","CRWD","DDOG","SNOW","NET","MDB","ZS","TEAM","PYPL","SQ","ABNB","VEEV","WIX","BOX","SMAR","PD","PCTY","PAYC","APPF","BL","FIVN","NICE","GWRE","MANH","TYL","SSNC","WK"],
+    "SaaS/Moln": ["UBER","ABNB","SHOP","CRWD","DDOG","SNOW","NET","MDB","ZS","TEAM","PYPL","XYZ","VEEV","WIX","BOX","PD","PCTY","PAYC","APPF","BL","FIVN","NICE","GWRE","MANH","TYL","SSNC","WK"],
     "Finans": ["JPM","BAC","WFC","GS","MS","C","V","MA","AXP","BLK","SCHW","SPGI","CB","PGR","COF","USB","PNC","TFC","BK","STT","MET","PRU","AIG","ALL","TRV","AFL","MMC","AON","ICE","CME","NDAQ","MCO","KKR"],
     "Hälsa": ["UNH","JNJ","LLY","PFE","MRK","ABBV","TMO","ABT","AMGN","GILD","MRNA","ISRG","VRTX","BMY","DHR","CVS","ELV","CI","HCA","MDT","SYK","BSX","BDX","ZTS","HUM","CNC","MCK","COR","CAH","IDXX","IQV","A","RMD","DXCM","EW"],
     "Konsument": ["WMT","COST","HD","NKE","MCD","SBUX","KO","PEP","PG","DIS","LOW","TGT","CMG","BKNG","MDLZ","PM","MO","CL","KMB","GIS","KHC","HSY","KDP","STZ","EL","CLX","SYY","KR","DG","DLTR","ROST","TJX","ORLY","AZO"],
@@ -1541,7 +1541,8 @@ except Exception:
         "Du hittar inte på siffror — vet du inte, säger du det."
     )
 
-AI_MODEL = os.environ.get("GRABIT_AI_MODEL", "claude-sonnet-4-6")
+AI_MODEL = os.environ.get("GRABIT_AI_MODEL", "claude-haiku-4-5")        # masstexter: setups, nyheter, bolagsinfo, dagens läge
+AI_MODEL_SMART = os.environ.get("GRABIT_AI_MODEL_SMART", "claude-sonnet-4-6")  # Fråga Grabit: få anrop, ska resonera vasst
 
 
 def _anthropic_client():
@@ -1674,7 +1675,7 @@ def ai(payload: AiPayload):
     try:
         try:
             resp = client.messages.create(
-                model=AI_MODEL,
+                model=AI_MODEL_SMART,
                 max_tokens=1500,
                 system=sys_live,
                 messages=msgs,
@@ -1683,7 +1684,7 @@ def ai(payload: AiPayload):
         except Exception:
             # SDK/modell stödjer kanske inte web_search -> kör utan, så AI:n aldrig dör
             resp = client.messages.create(
-                model=AI_MODEL,
+                model=AI_MODEL_SMART,
                 max_tokens=1024,
                 system=sys_live,
                 messages=msgs,
@@ -1849,6 +1850,7 @@ def ai_debug(ticker: str = "GLW"):
     out["key_finns"] = bool(key)
     out["key_ser_ut_som"] = (key[:10] + "…" + key[-4:]) if len(key) > 16 else ("(för kort: %d tecken)" % len(key))
     out["model"] = AI_MODEL
+    out["model_smart"] = AI_MODEL_SMART
     try:
         import anthropic
         out["anthropic_sdk"] = getattr(anthropic, "__version__", "?")
