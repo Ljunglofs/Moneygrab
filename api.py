@@ -169,7 +169,8 @@ UNIVERSE = {
 }
 TICKER_THEME = {t: k for k, v in UNIVERSE.items() for t in v}
 ALL_TICKERS = sorted({t for v in UNIVERSE.values() for t in v})
-INDICES = [("S&P 500", "^GSPC"), ("Nasdaq", "^NDX"), ("Bitcoin", "BTC-USD")]
+INDICES = [("Nasdaq", "^NDX"), ("S&P 500", "^GSPC"), ("Bitcoin", "BTC-USD"),
+           ("Guld", "GC=F"), ("Silver", "SI=F"), ("Olja WTI", "CL=F"), ("VIX", "^VIX")]
 
 # =====================================================================
 #  HJÄLPARE  (samma logik som app.py, utan Streamlit)
@@ -1616,6 +1617,9 @@ except Exception:
 
 AI_MODEL = os.environ.get("GRABIT_AI_MODEL", "claude-haiku-4-5")        # masstexter: setups, nyheter, bolagsinfo, dagens läge
 AI_MODEL_SMART = os.environ.get("GRABIT_AI_MODEL_SMART", "claude-sonnet-4-6")  # Fråga Grabit: få anrop, ska resonera vasst
+# Fable/Opus tänker alltid innan svaret och tankarna räknas in i max_tokens ->
+# ge rejält med utrymme så svaren aldrig klipps av.
+_SMART_MAXTOK = 6000 if ("fable" in AI_MODEL_SMART or "opus" in AI_MODEL_SMART) else 1500
 
 
 def _anthropic_client():
@@ -1749,7 +1753,7 @@ def ai(payload: AiPayload):
         try:
             resp = client.messages.create(
                 model=AI_MODEL_SMART,
-                max_tokens=1500,
+                max_tokens=_SMART_MAXTOK,
                 system=sys_live,
                 messages=msgs,
                 tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 4}],
@@ -1758,7 +1762,7 @@ def ai(payload: AiPayload):
             # SDK/modell stödjer kanske inte web_search -> kör utan, så AI:n aldrig dör
             resp = client.messages.create(
                 model=AI_MODEL_SMART,
-                max_tokens=1024,
+                max_tokens=_SMART_MAXTOK,
                 system=sys_live,
                 messages=msgs,
             )
@@ -2630,3 +2634,195 @@ def _watchlist_loop():
 @app.on_event("startup")
 def _start_watchlist_push():
     _threading.Thread(target=_watchlist_loop, daemon=True).start()
+
+
+# ---- Top Opportunity --------------------------------------------------------
+# Dagens starkaste setup med konkreta nivåer (entry/stopp/targets) från
+# levels-modulen. Rankas på setup-kvalitet + score + hetta.
+
+
+def _risk_of(atr_pct):
+    try:
+        a = float(atr_pct or 0)
+    except Exception:
+        return "MEDEL"
+    if a < 3:
+        return "LÅG"
+    if a <= 6:
+        return "MEDEL"
+    return "HÖG"
+
+
+def _pct_of(level, last):
+    try:
+        return round((float(level) - float(last)) / float(last) * 100, 1)
+    except Exception:
+        return None
+
+
+def _opp_of(r):
+    """Bygger ett presentationsobjekt (score 0-100, nivåer, risk) av en scan-rad."""
+    last = r.get("last")
+    sc100 = int(r.get("setup_score") or 0)
+    if sc100 <= 0:
+        sc100 = int(round(float(r.get("score10") or 0) * 10))
+    grade = str(r.get("setup_grade") or "C")
+    prob = {"A": "HÖG", "B": "MEDEL"}.get(grade, "LÅG")
+    up05 = _pct_of(r.get("atr_up_05"), last)
+    up1 = _pct_of(r.get("atr_up_1"), last)
+    stop = r.get("ob_support") or r.get("atr_dn_1")
+    move = None
+    if up05 is not None and up1 is not None:
+        move = "+%s%% – +%s%%" % (up05, up1)
+    return {
+        "ticker": r.get("ticker"), "pris": last,
+        "score": sc100, "grade": grade,
+        "sannolikhet": prob, "risk": _risk_of(r.get("atr_pct")),
+        "vantad_rorelse": move,
+        "entry": round(float(last), 2) if last is not None else None,
+        "stopp": round(float(stop), 2) if stop is not None else None,
+        "target1": round(float(r.get("atr_up_05")), 2) if r.get("atr_up_05") is not None else None,
+        "target2": round(float(r.get("atr_up_1")), 2) if r.get("atr_up_1") is not None else None,
+        "label": r.get("label", ""), "hetta": r.get("hetta", 0),
+        "score10": r.get("score10"), "levels_note": r.get("levels_note") or "",
+    }
+
+
+def _topop_rank(r):
+    return ((r.get("setup_score") or 0) * 0.6
+            + float(r.get("score10") or 0) * 4.0
+            + float(r.get("hetta") or 0) * 0.2)
+
+
+@app.get("/api/topop")
+def topop():
+    rows = [r for r in scan_universe(None)
+            if str(r.get("label")) in ("BULL", "MOMENTUM", "VÄNDNING", "Rocketcase", "NEUTRAL/BYGGER")]
+    if not rows:
+        return {"pick": None}
+    best = max(rows, key=_topop_rank)
+    return {"pick": _opp_of(best)}
+
+
+# ---- Facit / track record ---------------------------------------------------
+# Loggar dagens picks varje börsdag och utvärderar dem efter ~en handelsvecka.
+# Det är det här som visar att appen faktiskt levererar — öppet och ärligt.
+_FACIT_FILE = os.path.join(os.environ.get("DATA_DIR", "."), "facit.json")
+_FACIT_EVAL_DAGAR = 7      # kalenderdagar innan utfallet mäts (~5 handelsdagar)
+
+
+def _facit_load():
+    import json as _j
+    try:
+        with open(_FACIT_FILE) as f:
+            return _j.load(f)
+    except Exception:
+        return []
+
+
+def _facit_save(rows):
+    import json as _j
+    try:
+        tmp = _FACIT_FILE + ".tmp"
+        with open(tmp, "w") as f:
+            _j.dump(rows[-400:], f, ensure_ascii=False)
+        os.replace(tmp, _FACIT_FILE)
+    except Exception as e:
+        print("Facit: kunde inte spara:", e)
+
+
+def _facit_log_today():
+    import datetime as _dt2
+    today = _dt2.date.today()
+    if today.weekday() >= 5:
+        return
+    rows = _facit_load()
+    tid = today.isoformat()
+    if any(e.get("datum") == tid for e in rows):
+        return
+    scanned = scan_universe(None)
+    if not scanned:
+        return
+    by_score = sorted(scanned, key=lambda x: x.get("score10", 0), reverse=True)
+    bull_like = [r for r in by_score if str(r.get("label")) in ("BULL", "MOMENTUM", "Rocketcase")]
+    vand_like = [r for r in by_score if str(r.get("label")) == "VÄNDNING"]
+    val = [("Top Opportunity", max(scanned, key=_topop_rank)),
+           ("Dagens Bull", bull_like[0] if bull_like else None),
+           ("Veckans Setup", bull_like[1] if len(bull_like) > 1 else None),
+           ("Wildcard", vand_like[0] if vand_like else None)]
+    seen = set()
+    for roll, r in val:
+        if not r or not r.get("last") or r.get("ticker") in seen:
+            continue
+        seen.add(r.get("ticker"))
+        rows.append({"datum": tid, "roll": roll, "ticker": r["ticker"],
+                     "pris": round(float(r["last"]), 2),
+                     "score": int(r.get("setup_score") or 0) or int(round(float(r.get("score10") or 0) * 10)),
+                     "label": r.get("label", "")})
+    _facit_save(rows)
+    print("Facit: loggade %d picks för %s" % (len(seen), tid))
+
+
+def _facit_evaluate():
+    """Mäter utfall för ~en handelsvecka gamla picks. Max 3 per pass (yfinance-snällt)."""
+    import datetime as _dt2
+    if yf is None:
+        return
+    rows = _facit_load()
+    cutoff = (_dt2.date.today() - _dt2.timedelta(days=_FACIT_EVAL_DAGAR)).isoformat()
+    todo = [e for e in rows if "utfall_pct" not in e and e.get("datum", "9999") <= cutoff][:3]
+    if not todo:
+        return
+    for e in todo:
+        try:
+            h = yf.Ticker(e["ticker"]).history(start=e["datum"], auto_adjust=True)
+            if h is None or h.empty:
+                e["utfall_pct"] = 0.0
+            else:
+                closes = h["Close"].dropna()
+                ref = closes.iloc[:6]        # ~5 handelsdagar efter loggning
+                slut = float(ref.iloc[-1])
+                e["utfall_pct"] = round((slut - float(e["pris"])) / float(e["pris"]) * 100, 2)
+            e["traff"] = bool(e["utfall_pct"] > 0)
+        except Exception as ex:
+            print("Facit: kunde inte utvärdera %s: %s" % (e.get("ticker"), ex))
+    _facit_save(rows)
+
+
+@app.get("/api/facit")
+def facit():
+    rows = _facit_load()
+    klara = [e for e in rows if "utfall_pct" in e]
+    senaste = klara[-20:]
+    n = len(senaste)
+    if n:
+        traffar = sum(1 for e in senaste if e.get("traff"))
+        snitt = round(sum(e["utfall_pct"] for e in senaste) / n, 1)
+        basta = max(senaste, key=lambda e: e["utfall_pct"])
+        stats = {"antal": n, "traffar": traffar,
+                 "traffprocent": round(traffar / n * 100),
+                 "snitt_pct": snitt,
+                 "basta": {"ticker": basta["ticker"], "pct": basta["utfall_pct"]}}
+    else:
+        stats = {"antal": 0}
+    return {"stats": stats, "rader": list(reversed(senaste[-8:])),
+            "loggade_totalt": len(rows)}
+
+
+def _facit_loop():
+    import datetime as _dt2
+    time.sleep(180)   # låt warmup-cachen fyllas först
+    while True:
+        try:
+            now = _dt2.datetime.utcnow()
+            if now.weekday() < 5 and now.hour >= 14:   # efter USA-öppning
+                _facit_log_today()
+            _facit_evaluate()
+        except Exception as e:
+            print("Facit-fel:", e)
+        time.sleep(1800)   # var 30:e minut
+
+
+@app.on_event("startup")
+def _start_facit():
+    _threading.Thread(target=_facit_loop, daemon=True).start()
