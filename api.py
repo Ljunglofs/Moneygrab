@@ -1120,16 +1120,20 @@ def _macro_events():
         return _MACRO_LAST_GOOD["events"]
     raw, errs = None, []
     for url in _MACRO_URLS:
-        try:
-            r = requests.get(url, headers=_MACRO_HEADERS, timeout=8)
-            if r.status_code != 200:
-                errs.append("%s -> HTTP %s" % (url.split("//")[1].split("/")[0], r.status_code))
-                continue
-            raw = r.json()
-            _MACRO_LAST_GOOD["src"] = url
+        for _forsok in range(2):                      # 2 försök per host
+            try:
+                r = requests.get(url, headers=_MACRO_HEADERS, timeout=12)
+                if r.status_code != 200:
+                    errs.append("%s -> HTTP %s" % (url.split("//")[1].split("/")[0], r.status_code))
+                    break                              # samma svar lär komma igen
+                raw = r.json()
+                _MACRO_LAST_GOOD["src"] = url
+                break
+            except Exception as e:
+                errs.append("%s -> %s" % (url.split("//")[1].split("/")[0], type(e).__name__))
+                time.sleep(1.5)
+        if raw is not None:
             break
-        except Exception as e:
-            errs.append("%s -> %s" % (url.split("//")[1].split("/")[0], type(e).__name__))
     _MACRO_LAST_GOOD["err"] = "; ".join(errs)
     if raw is None:
         return _MACRO_LAST_GOOD["events"]  # senast kända istället för tomt
@@ -1172,7 +1176,11 @@ def _macro_events():
 
 @app.get("/api/macro")
 def macro():
-    return {"events": _macro_events()}
+    ev = _macro_events()
+    out = {"events": ev}
+    if not ev and _MACRO_LAST_GOOD.get("err"):
+        out["fel"] = _MACRO_LAST_GOOD["err"]
+    return out
 
 
 @app.get("/api/macro/debug")

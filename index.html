@@ -1050,14 +1050,14 @@ function openStock(tkr){_curStock=tkr;const d=stockData(tkr,_liveStock[tkr]);
   const tot=((d.mom+d.sent+d.tech)/3);
   $("#st-body").innerHTML=`
     <div class="st-hero sthero-fill"><div class="sthero-in">${lic(tkr,60,sCol)}<div class="sthero-tx"><div class="sthero-tk">${tkr} <span class="sthero-flag">${d.flag||""}</span></div><div class="sthero-nm">${d.name}</div><div class="sthero-sub">${d.bors||""}</div></div></div></div>
+    <div id="st-ai-slot"></div>
+    <div class="st-box score-hero">${scoreGauge(d.score)}</div>
+    <div class="st-box st-price2 price-wide"><div class="k2">Dagens kurs</div><div class="p2 num">${d.cur}${d.price.toLocaleString("sv-SE")}</div><div class="c2" style="color:${dCol}">${d.day>=0?"+":""}${d.day}% i dag</div>${d.liveOk&&d.d5!=null?`<div class="c2" style="color:${d.d5>=0?"var(--pos)":"var(--neg)"};opacity:.85;font-size:12px;margin-top:2px">${d.d5>=0?"+":""}${d.d5}% senaste 5 dagarna</div>`:""}</div>
     <div class="st-sec">Fråga Grabit</div>
     <div class="ask secgfx-wrap"><div class="secgfx gglobe" style="background-image:url('${IMGS.globe}')"></div><div class="in"><input id="ask-q" placeholder="Fråga AI om ${tkr}…" onkeydown="if(event.key==='Enter')askGrabit('${tkr}',this.value)">
       <button onclick="askGrabit('${tkr}',document.getElementById('ask-q').value)">&#10148;</button></div>
       <div class="chips">${["Varför rör sig "+tkr+"?","Hur ser riskbilden ut?","Jämför "+tkr,"Nästa kursmål?"].map(q=>`<button onclick="askGrabit('${tkr}','${q}')">${q}</button>`).join("")}</div>
       <div class="ans" id="ask-ans"></div></div>
-    <div id="st-ai-slot"></div>
-    <div class="st-box score-hero">${scoreGauge(d.score)}</div>
-    <div class="st-box st-price2 price-wide"><div class="k2">Dagens kurs</div><div class="p2 num">${d.cur}${d.price.toLocaleString("sv-SE")}</div><div class="c2" style="color:${dCol}">${d.day>=0?"+":""}${d.day}% i dag</div></div>
     <div class="st-sec">Analytiker</div>
     <div id="st-analyst" class="anl-card"><div class="anl-load">Laddar analytikerdata…</div></div>
     <div class="st-sec">Smart Money</div>
@@ -1870,11 +1870,24 @@ function closeResearch(){document.getElementById("rsheet").classList.remove("on"
 async function loadDaily(){
   const B=CONFIG.API_BASE?CONFIG.API_BASE.replace(/\/$/,""):"";
   if(!B||typeof fetch==="undefined")return;
+  const el=document.getElementById("aibrief");if(!el)return;
+  const head='<div class="ai-h"><span class="dot2"></span>AI · Dagens läge</div>';
   try{
     const r=await fetch(B+"/api/ai_daily",{cache:"no-store"});const j=await r.json();
-    if(j&&j.text){const el=document.getElementById("aibrief");
-      if(el)el.innerHTML='<div class="ai-h"><span class="dot2"></span>AI · Dagens läge</div><p>'+j.text.replace(/</g,"&lt;").replace(/\n/g,"<br>")+'</p>';}
-  }catch(e){}
+    if(j&&j.text){
+      el.innerHTML=head+'<p>'+j.text.replace(/</g,"&lt;").replace(/\n/g,"<br>")+'</p>';
+    }else if(j&&(j.indices||j.hot)){
+      // AI:n tyst — visa ändå riktiga siffror i stället för ett tomt kort
+      let p="";
+      if(j.indices)p+='<p><b style="color:var(--gold2)">Index:</b> '+j.indices.replace(/</g,"&lt;")+'</p>';
+      if(j.hot)p+='<p style="margin-top:6px"><b style="color:var(--gold2)">Hetast:</b> '+j.hot.replace(/</g,"&lt;")+'</p>';
+      el.innerHTML=head+p;
+    }else{
+      el.innerHTML=head+'<p style="color:#7c8a9a">Kunde inte hämtas just nu — uppdaterar automatiskt vid nästa besök.</p>';
+    }
+  }catch(e){
+    el.innerHTML=head+'<p style="color:#7c8a9a">Kunde inte hämtas just nu — servern kan vara i kallstart.</p>';
+  }
 }
 /* ===== AI-analys i aktievyn (setup + nyheter) ===== */
 var BULL_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 17L9.5 11L13.5 14.5L20.5 7"/><path d="M15 7H20.5V12.5"/></svg>';
@@ -1903,9 +1916,13 @@ async function loadStockAI(tkr){
       const katH=nJ.category?' <span class="cat-badge">'+nJ.category.replace(/</g,"&lt;")+'</span>':'';
       html+='<div class="st-ai-row"><b>Nyheter '+(lbl?'<i style="font-style:normal;color:'+col+'">· '+lbl+'</i>':'')+katH+'</b><span>'+clean+'</span></div>';}}catch(e){}
   if(!html){
-    // AI:n svarade inte (nyckel saknas/kallstart) — bygg faktabaserad sammanfattning
-    // av riktiga siffror i stället för att tyst ta bort kortet.
-    const lv=_liveStock[tkr]||{};
+    // AI:n svarade inte (nyckel saknas/kallstart/yfinance) — bygg faktabaserad
+    // sammanfattning av riktiga siffror. Kortet raderas ALDRIG: vänta in live-datan.
+    let lv=_liveStock[tkr]||{};
+    for(let i=0;i<4&&lv.price==null;i++){
+      await new Promise(r=>setTimeout(r,1200));
+      lv=_liveStock[tkr]||{};
+    }
     if(lv.price!=null){
       const bits=[];
       if(lv.score!=null)bits.push("Grabit score "+(+lv.score).toFixed(1)+"/10");
@@ -1917,7 +1934,7 @@ async function loadStockAI(tkr){
       html='<div class="st-ai-row"><b>Snabbfakta</b><span>'+bits.join(" · ")+'.</span></div>'
           +'<div class="st-ai-row"><b>Obs</b><span>AI-texten kunde inte hämtas just nu – siffrorna ovan är live.</span></div>';
     }else{
-      card.remove();return;
+      html='<div class="st-ai-row"><b>Obs</b><span>AI-analysen kunde inte hämtas just nu – servern kan vara i kallstart. Dra ner för att uppdatera.</span></div>';
     }
   }
   if(_sent)html=sentimentEmblem(_sent)+html;
