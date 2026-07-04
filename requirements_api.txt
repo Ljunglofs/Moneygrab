@@ -7,3 +7,4 @@ anthropic
 feedparser
 ta
 requests
+pywebpush

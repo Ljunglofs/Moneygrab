@@ -156,6 +156,11 @@ def fetch_ohlcv(ticker: str, timeframe: str, lookback_days: int) -> pd.DataFrame
         # syns denna rad i loggen är det Yahoo/nätet, inte dina trösklar.
         print(f"[data] yfinance gav 0 rader för {ticker} ({interval}) — "
               f"trolig rate-limit/blockad från Yahoo, inte ett configfel.")
+        try:
+            STATUS["data_fel_total"] = STATUS.get("data_fel_total", 0) + 1
+            STATUS["senaste_data_fel"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        except Exception:
+            pass
         return pd.DataFrame(columns=["Open", "High", "Low", "Close", "Volume"])
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(0)
@@ -661,6 +666,13 @@ def execute_signal(sig):
             f"Fran {sig['ticker']}-signal, conf {conf}/100")
         print(f"[exec] {tag}-order lagd: {order.get('id', '?')} "
               f"{qty}x{Config.EXEC_TICKER} SL {stop_px} TP {tp_px}")
+        try:
+            import push_notify as PN
+            PN.send_all(f"\U0001F916 ROBBER [{tag}]",
+                        f"{'KOPT' if is_long else 'BLANKAT'} {qty} {Config.EXEC_TICKER} @ ${q:.2f} \u00b7 SL ${stop_px:.2f} \u00b7 TP ${tp_px:.2f}",
+                        url="/", tag="robber-exec")
+        except Exception:
+            pass
     except Exception as ex:
         print(f"[exec] FEL: {ex}")
         try:
@@ -921,6 +933,10 @@ def seconds_to_next_bar():
 STATUS = {
     "started": None, "last_scan": None, "last_feed": None,
     "in_session": None, "fired_total": 0, "fired_last": 0, "tickers": {},
+    "scans_total": 0,                 # antal genomforda scanningar sedan start
+    "data_fel_total": 0,              # antal ganger yfinance gett 0 rader/fel
+    "senaste_data_fel": None,         # nar det senast hande
+    "hogsta_conf_idag": 0,            # hogsta confidence som setts idag (aven under troskel)
 }
 
 
@@ -977,6 +993,12 @@ def scan_once():
                 sig["confidence"] = conf; sig["groups"] = groups; sig["components"] = comps
                 sig["killzone"] = kz_label; sig["kz_delta"] = kz_delta
 
+            if sig:
+                try:
+                    STATUS["hogsta_conf_idag"] = max(STATUS.get("hogsta_conf_idag", 0),
+                                                     int(sig.get("confidence", 0)))
+                except Exception:
+                    pass
             if sig and is_fresh(sig, state):
                 strong  = sig["confidence"] >= Config.CONF_MIN_SEND
                 send_ok = strong and tradable          # larm bara i handelsfönstret
@@ -993,6 +1015,15 @@ def scan_once():
                         msg = msg + "\n\n" + ctx
                     print(msg, "\n")
                     send_telegram(msg)
+                    try:
+                        import push_notify as PN
+                        _pct = abs(float(sig["price"]) - float(sig["stop"])) / float(sig["price"]) * 100
+                        PN.send_all(
+                            f"\U0001F6A8 {sig['side']} {Config.NAMES.get(sig['ticker'], sig['ticker'])}",
+                            f"Conf {sig['confidence']}/100 \u00b7 entry {sig['price']} \u00b7 SL {_pct:.2f}% bort",
+                            url="/", tag="robber-signal")
+                    except Exception as _pe:
+                        print(f"[push] hoppade over: {_pe}")
                     fired += 1
                     results[ticker] = f"LARM {sig['side']} {sig['confidence']}/100"
                     maybe_autotrade(sig)
@@ -1011,6 +1042,7 @@ def scan_once():
             print(f"{ticker} fel: {e}")
     save_state(state)
     STATUS["last_scan"] = datetime.now(ZoneInfo(Config.LOCAL_TZ)).isoformat(timespec="seconds")
+    STATUS["scans_total"] = STATUS.get("scans_total", 0) + 1
     STATUS["fired_last"] = fired
     STATUS["fired_total"] += fired
     STATUS["tickers"] = results

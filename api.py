@@ -443,12 +443,73 @@ self.addEventListener('fetch', e => {
     return hit || net;
   })));
 });
+self.addEventListener('push', e => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (_) { d = { body: e.data && e.data.text() }; }
+  const title = d.title || 'GRABIT';
+  e.waitUntil(self.registration.showNotification(title, {
+    body: d.body || '',
+    tag: d.tag || 'grabit',
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
+    data: { url: d.url || '/' },
+    vibrate: [100, 40, 100],
+  }));
+});
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const url = (e.notification.data && e.notification.data.url) || '/';
+  e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then(ws => {
+    for (const w of ws) { if ('focus' in w) { w.navigate(url); return w.focus(); } }
+    return clients.openWindow(url);
+  }));
+});
 """
 
 @app.get("/sw.js")
 def _sw():
     return Response(content=_SW_JS, media_type="application/javascript",
                    headers={"Cache-Control": "no-cache", "Service-Worker-Allowed": "/"})
+
+
+# ---- Push-notiser (Web Push / VAPID) --------------------------------
+@app.get("/api/push/pubkey")
+def push_pubkey():
+    import push_notify as PN
+    return {"key": PN.VAPID_PUBLIC}
+
+
+@app.post("/api/push/subscribe")
+async def push_subscribe(request: Request):
+    import push_notify as PN
+    sub = await request.json()
+    n = PN.add_subscription(sub)
+    return {"ok": True, "prenumeranter": n}
+
+
+@app.post("/api/push/unsubscribe")
+async def push_unsubscribe(request: Request):
+    import push_notify as PN
+    body = await request.json()
+    n = PN.remove_subscription((body or {}).get("endpoint", ""))
+    return {"ok": True, "prenumeranter": n}
+
+
+@app.get("/api/push/test")
+def push_test():
+    """Skickar en testnotis till alla prenumeranter. Öppna i mobilen efter aktivering."""
+    import push_notify as PN
+    res = PN.send_all("GRABIT \U0001F514", "Testnotis — push-röret funkar!", url="/")
+    res["prenumeranter"] = PN.sub_count()
+    return res
+
+
+@app.get("/api/push/status")
+def push_status():
+    import push_notify as PN
+    return {"prenumeranter": PN.sub_count(),
+            "vapid_konfigurerad": bool(PN.VAPID_PUBLIC and PN.VAPID_PRIVATE),
+            "lagring": PN.SUBS_FILE}
 
 
 

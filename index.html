@@ -1690,6 +1690,55 @@ const manifest={name:"GRABIT",short_name:"GRABIT",display:"standalone",backgroun
 const ml=document.createElement("link");ml.rel="manifest";ml.href="/manifest.webmanifest";document.head.appendChild(ml);
 if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("/sw.js").catch(function(){});});}
 
+/* ---- PUSH-NOTISER: bell-knappen togglar prenumeration ---- */
+(function(){
+  const bell = document.querySelector(".bell");
+  if(!bell) return;
+  function pToast(t){
+    let el = document.getElementById("push-toast");
+    if(!el){ el = document.createElement("div"); el.id = "push-toast";
+      el.style.cssText = "position:fixed;left:50%;bottom:84px;transform:translateX(-50%);background:#101820;color:#F5C542;border:1px solid rgba(245,197,66,.35);padding:10px 18px;border-radius:12px;font:600 13px Inter,sans-serif;z-index:9999;box-shadow:0 6px 24px rgba(0,0,0,.5);transition:opacity .3s;max-width:86vw;text-align:center";
+      document.body.appendChild(el); }
+    el.textContent = t; el.style.opacity = "1";
+    clearTimeout(el._t); el._t = setTimeout(()=>{ el.style.opacity = "0"; }, 3200);
+  }
+  function b64ToU8(s){
+    const pad = "=".repeat((4 - s.length % 4) % 4);
+    const raw = atob((s + pad).replace(/-/g, "+").replace(/_/g, "/"));
+    return Uint8Array.from(raw, c => c.charCodeAt(0));
+  }
+  function setOn(on){ bell.style.color = on ? "#F5C542" : ""; bell.dataset.on = on ? "1" : "0"; }
+  async function getSub(){
+    if(!("serviceWorker" in navigator) || !("PushManager" in window)) return null;
+    const reg = await navigator.serviceWorker.ready;
+    return { reg, sub: await reg.pushManager.getSubscription() };
+  }
+  (async()=>{ try{ const r = await getSub(); setOn(!!(r && r.sub)); }catch(e){} })();
+  bell.addEventListener("click", async ()=>{
+    try{
+      if(!("PushManager" in window)){ pToast("Din webbläsare stödjer inte push"); return; }
+      const r = await getSub();
+      if(!r){ pToast("Notiser kräver att appen laddats klart"); return; }
+      if(r.sub){
+        const ep = r.sub.endpoint;
+        await r.sub.unsubscribe();
+        fetch(CONFIG.API_BASE + "/api/push/unsubscribe", {method:"POST",
+          headers:{"Content-Type":"application/json"}, body: JSON.stringify({endpoint: ep})}).catch(()=>{});
+        setOn(false); pToast("Notiser AV");
+        return;
+      }
+      const perm = await Notification.requestPermission();
+      if(perm !== "granted"){ pToast("Notiser blockerade — tillåt i webbläsarens inställningar"); return; }
+      const kr = await fetch(CONFIG.API_BASE + "/api/push/pubkey").then(x=>x.json());
+      if(!kr.key){ pToast("Servern saknar VAPID-nycklar"); return; }
+      const sub = await r.reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToU8(kr.key) });
+      const res = await fetch(CONFIG.API_BASE + "/api/push/subscribe", {method:"POST",
+        headers:{"Content-Type":"application/json"}, body: JSON.stringify(sub.toJSON())}).then(x=>x.json());
+      setOn(true); pToast("Notiser PÅ 🔔 — du får varje ROBBER-signal direkt");
+    }catch(e){ pToast("Kunde inte aktivera: " + (e && e.message ? e.message.slice(0,60) : "okänt fel")); }
+  });
+})();
+
 // ---- Månadens case ----
 let _MCASE=null;
 async function loadMonthly(){
