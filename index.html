@@ -767,6 +767,26 @@ body{background:
   </section>
 </main>
 
+<div id="trialbar" style="display:none" onclick="showPaywall()"></div>
+<div id="paywall" style="display:none">
+  <div class="pw-card">
+    <img src="" alt="" class="pw-icon" id="pw-icon" onerror="this.style.display='none'">
+    <div class="pw-title">GRABIT <span>PRO</span></div>
+    <div class="pw-sub" id="pw-sub">Din gratisvecka är slut.</div>
+    <div class="pw-feats">
+      <div>Dagens Top Opportunity med entry, stopp &amp; targets</div>
+      <div>AI-analys på alla aktier + Fråga Grabit</div>
+      <div>Push-larm för din watchlist, prislarm &amp; rapporter</div>
+      <div>Screeners, facit och hela scannern</div>
+    </div>
+    <div class="pw-price">149 kr<span>/månad</span></div>
+    <button class="pw-btn" onclick="buyPro()">Fortsätt med PRO</button>
+    <div class="pw-restore" onclick="restorePro()">Har du redan PRO? Återställ köp</div>
+    <div class="pw-fine">Prenumerationen hanteras och debiteras av Google Play.
+    Avsluta när som helst i Play Butik. Ingen finansiell rådgivning.</div>
+  </div>
+</div>
+
 <nav class="nav">
   <button class="on" data-s="hem"><span class="gi">${I.home}</span>Översikt</button>
   <button data-s="daytrade"><span class="gi">${I.trend}</span>Daytrade</button>
@@ -2149,6 +2169,73 @@ window.setPriceAlert=async function(tkr,px){
     say(res&&res.ok?("Larm satt: "+tkr+" "+m[1]+" "+m[2]):("Kunde inte sätta larmet"+(res&&res.fel?": "+res.fel:"")));
   }catch(e){say("Kunde inte sätta larmet");}
 };
+/* ===== GRABIT PRO · 7 dagar gratis, sen 149 kr/mån via Google Play =====
+   Körs bara inne i Play-appen (TWA) där Digital Goods API finns.
+   I vanlig webbläsare är appen öppen — där finns inget köp att göra. */
+var BILLING={SKU:"grabit_pro",svc:null,twa:false};
+async function billingInit(){
+  if(BILLING.svc)return true;
+  if(!("getDigitalGoodsService" in window))return false;
+  try{BILLING.svc=await window.getDigitalGoodsService("https://play.google.com/billing");BILLING.twa=!!BILLING.svc;return BILLING.twa;}catch(e){return false;}
+}
+async function proActive(){
+  try{
+    if(!BILLING.svc)return null;
+    var ps=await BILLING.svc.listPurchases();
+    return !!(ps&&ps.length&&ps.some(function(p){return p.itemId===BILLING.SKU;}));
+  }catch(e){return null;}
+}
+function showPaywall(msg){
+  var el=document.getElementById("paywall");if(!el)return;
+  var ic=document.getElementById("pw-icon");
+  if(ic&&!ic.src)ic.src=(CONFIG.API_BASE?CONFIG.API_BASE.replace(/\/$/,""):"")+"/icon-192.png";
+  if(msg){var su=document.getElementById("pw-sub");if(su)su.textContent=msg;}
+  el.style.display="flex";
+}
+function hidePaywall(){var el=document.getElementById("paywall");if(el)el.style.display="none";
+  var tb=document.getElementById("trialbar");if(tb)tb.style.display="none";}
+async function buyPro(){
+  var say=window.pToast||function(m){alert(m);};
+  try{
+    if(!(await billingInit())){say("Köp görs i GRABIT-appen från Play Butik");return;}
+    try{await BILLING.svc.getDetails([BILLING.SKU]);}catch(e){}
+    var req=new PaymentRequest(
+      [{supportedMethods:"https://play.google.com/billing",data:{sku:BILLING.SKU}}],
+      {total:{label:"GRABIT PRO",amount:{currency:"SEK",value:"0"}}});
+    var resp=await req.show();
+    var token=resp.details&&(resp.details.purchaseToken||resp.details.token);
+    await resp.complete("success");
+    try{fetch(CONFIG.API_BASE+"/api/billing/log",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({token:token||"",sku:BILLING.SKU})});}catch(e){}
+    localStorage.setItem("grabit_pro","1");
+    hidePaywall();say("Välkommen till GRABIT PRO!");
+  }catch(e){/* användaren avbröt köpet */}
+}
+async function restorePro(){
+  var say=window.pToast||function(m){alert(m);};
+  if(!(await billingInit())){say("Öppna GRABIT-appen från Play Butik för att återställa");return;}
+  var act=await proActive();
+  if(act){localStorage.setItem("grabit_pro","1");hidePaywall();say("PRO återställt!");}
+  else say("Ingen aktiv prenumeration hittades på det här Google-kontot");
+}
+async function paywallCheck(){
+  var twa=await billingInit();
+  if(!twa)return;   // vanlig webbläsare: ingen paywall
+  var act=await proActive();
+  if(act===true){localStorage.setItem("grabit_pro","1");return;}
+  if(act===null&&localStorage.getItem("grabit_pro")==="1")return;   // offline: släpp in betalande
+  if(act===false)localStorage.removeItem("grabit_pro");
+  var first=parseInt(localStorage.getItem("grabit_first")||"0",10);
+  if(!first){first=Date.now();localStorage.setItem("grabit_first",String(first));}
+  var kvar=7-Math.floor((Date.now()-first)/86400000);
+  if(kvar>0){
+    var tb=document.getElementById("trialbar");
+    if(tb){tb.textContent=(kvar===1?"Sista dagen":kvar+" dagar kvar")+" av gratisveckan · Skaffa PRO";tb.style.display="";}
+    return;
+  }
+  showPaywall();
+}
+paywallCheck();
 load();loadMonthly();loadDaily();loadMacro();loadFda();loadTopOp();loadWatchrow();loadFacit();
 function fgInfo(s){s=+s||0;
   if(s>=75)return{label:"Extrem girighet",col:"#22d3ee"};
@@ -2343,6 +2430,24 @@ async function loadPolyInsiders(force){
 .st-alarm{margin-left:auto;flex:none;background:rgba(245,197,66,.08);border:1px solid rgba(245,197,66,.45);border-radius:12px;color:var(--gold2);padding:8px 11px;font-size:17px;display:flex;flex-direction:column;align-items:center;gap:1px;cursor:pointer;line-height:1.1}
 .st-alarm i{font-style:normal;font-size:7.5px;letter-spacing:.09em;font-weight:800}
 .st-alarm:active{transform:scale(.95)}
+/* ===== GRABIT PRO · paywall ===== */
+#paywall{position:fixed;inset:0;z-index:999;background:rgba(5,7,10,.97);display:flex;align-items:center;justify-content:center;padding:22px}
+.pw-card{max-width:360px;width:100%;text-align:center;background:linear-gradient(160deg,#151a22,#0b0e13);border:1px solid rgba(245,197,66,.45);border-radius:22px;padding:26px 22px;box-shadow:0 20px 60px rgba(0,0,0,.6),0 0 44px rgba(245,197,66,.1)}
+.pw-icon{width:64px;height:64px;border-radius:16px;margin:0 auto 12px;display:block}
+.pw-title{font-family:var(--disp);font-size:24px;font-weight:800;letter-spacing:.06em}
+.pw-title span{color:var(--gold2)}
+.pw-sub{color:var(--mut);font-size:13.5px;margin-top:5px}
+.pw-feats{margin:16px 0 6px;text-align:left}
+.pw-feats div{font-size:13px;color:#c7d0dc;padding:7px 0 7px 24px;border-top:1px solid var(--line);position:relative}
+.pw-feats div:first-child{border-top:none}
+.pw-feats div::before{content:"";position:absolute;left:4px;top:13px;width:7px;height:7px;border-radius:50%;background:var(--gold2)}
+.pw-price{font-family:var(--disp);font-size:32px;font-weight:900;color:var(--gold2);margin:10px 0 2px}
+.pw-price span{font-size:14px;color:var(--mut);font-weight:600}
+.pw-btn{width:100%;margin-top:12px;background:linear-gradient(135deg,#F5C542,#E8A020);color:#14100a;font-weight:900;letter-spacing:.07em;border:none;border-radius:13px;padding:14px;font-size:14px;cursor:pointer}
+.pw-btn:active{transform:scale(.985)}
+.pw-restore{margin-top:12px;color:var(--gold2);font-size:12.5px;font-weight:700;cursor:pointer}
+.pw-fine{margin-top:12px;color:#5b6675;font-size:10.5px;line-height:1.5}
+#trialbar{position:fixed;left:50%;transform:translateX(-50%);bottom:74px;white-space:nowrap;z-index:60;background:rgba(21,26,34,.96);border:1px solid rgba(245,197,66,.4);color:var(--gold2);border-radius:99px;padding:8px 15px;font-size:12px;font-weight:800;letter-spacing:.03em;cursor:pointer;box-shadow:0 8px 26px rgba(0,0,0,.5)}
 .pulsecard{background:#0E0F11!important;border:1px solid rgba(245,197,66,.16)!important;border-radius:20px!important;padding:16px 18px!important;margin:6px 0 12px!important;box-shadow:0 8px 30px rgba(0,0,0,.5),0 0 26px rgba(245,197,66,.05)!important;overflow:hidden}
 .pulse-wrap{display:grid;grid-template-columns:33% 1fr;gap:14px;align-items:center}
 .pulse-radar{display:flex;justify-content:center;align-items:center}

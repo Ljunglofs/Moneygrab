@@ -3149,3 +3149,32 @@ def _daily_extra_loop():
 @app.on_event("startup")
 def _start_daily_extra():
     _threading.Thread(target=_daily_extra_loop, daemon=True).start()
+
+
+# ---- Play Billing: logga köptoken -------------------------------------------
+# Sparar purchase tokens från Play så prenumerationer kan verifieras mot
+# Google Play Developer API i nästa steg (server-side receipt validation).
+_BILLING_LOG = os.path.join(os.environ.get("DATA_DIR", "."), "billing_log.json")
+
+
+@app.post("/api/billing/log")
+async def billing_log(request: Request):
+    import json as _j
+    import datetime as _dt2
+    body = await request.json() or {}
+    try:
+        try:
+            with open(_BILLING_LOG) as f:
+                rows = _j.load(f)
+        except Exception:
+            rows = []
+        rows.append({"tid": _dt2.datetime.utcnow().isoformat(timespec="seconds"),
+                     "sku": str(body.get("sku", ""))[:64],
+                     "token": str(body.get("token", ""))[:512]})
+        tmp = _BILLING_LOG + ".tmp"
+        with open(tmp, "w") as f:
+            _j.dump(rows[-1000:], f)
+        os.replace(tmp, _BILLING_LOG)
+    except Exception as e:
+        print("Billing-logg fel:", e)
+    return {"ok": True}
