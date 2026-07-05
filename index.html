@@ -2344,7 +2344,6 @@ async function restorePro(){
 function proPromoInit(){
   try{
     if(localStorage.getItem("grabit_pro")==="1")return;
-    if(Date.now()<(+localStorage.getItem("grabit_promo_hide")||0))return;
     var el=document.getElementById("propromo");if(!el)return;
     var im=el.querySelector("img");if(im&&!im.src)im.src=IMGS.promo;
     setTimeout(function(){if(document.getElementById("paywall").style.display==="none")el.style.display="block";},5000);
@@ -2352,12 +2351,10 @@ function proPromoInit(){
 }
 function proPromoClose(ev){
   if(ev)ev.stopPropagation();
-  try{localStorage.setItem("grabit_promo_hide",String(Date.now()+3*86400000));}catch(e){}
   var el=document.getElementById("propromo");if(el)el.style.display="none";
 }
 function proPromoClick(){
   var el=document.getElementById("propromo");if(el)el.style.display="none";
-  try{localStorage.setItem("grabit_promo_hide",String(Date.now()+3*86400000));}catch(e){}
   showPaywall(null,true);
 }
 async function paywallCheck(){
@@ -2905,7 +2902,10 @@ async function pfReview(){
     {id:"screener",open:"openScreener",close:"closeScreener"}
   ];
   var ovStack=[], secStack=[], skip=0, popping=false;
-  function isOpen(id){var el=document.getElementById(id);return !!(el&&el.classList.contains("on"));}
+  function isOpen(id){
+    if(id==="__pw"){var p=document.getElementById("paywall");return !!(p&&p.style.display==="flex");}
+    var el=document.getElementById(id);return !!(el&&el.classList.contains("on"));
+  }
   OV.forEach(function(o){
     var fo=window[o.open];
     if(typeof fo==="function")window[o.open]=function(){
@@ -2924,6 +2924,24 @@ async function pfReview(){
       return r;
     };
   });
+  /* Köpsidan: backknappen stänger den när den är stängbar */
+  var pwHist=false;
+  var _sp=window.showPaywall;
+  if(typeof _sp==="function")window.showPaywall=function(msg,dis){
+    var r=_sp.apply(this,arguments);
+    if(dis&&!pwHist&&isOpen("__pw")){pwHist=true;ovStack.push("__pw");try{history.pushState({g:"pw"},"");}catch(e){}}
+    return r;
+  };
+  var _hp=window.hidePaywall;
+  if(typeof _hp==="function")window.hidePaywall=function(){
+    var r=_hp.apply(this,arguments);
+    if(pwHist){
+      pwHist=false;
+      var i=ovStack.lastIndexOf("__pw");if(i>-1)ovStack.splice(i,1);
+      if(!popping){skip++;try{history.back();}catch(e){}}
+    }
+    return r;
+  };
   var _g=window.go;
   window.go=function(sec){
     var cur=document.querySelector(".screen.on");
@@ -2939,8 +2957,12 @@ async function pfReview(){
     while(ovStack.length){
       var id=ovStack.pop();
       if(isOpen(id)){
-        var o=OV.filter(function(x){return x.id===id;})[0];
-        popping=true;try{window[o.close]();}catch(e){}popping=false;
+        popping=true;
+        try{
+          if(id==="__pw"){pwHist=false;window.hidePaywall();}
+          else window[OV.filter(function(x){return x.id===id;})[0].close]();
+        }catch(e){}
+        popping=false;
         return;
       }
     }
