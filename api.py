@@ -2557,8 +2557,8 @@ def signals():
 #  Entry/SL/TP/RR/confidence härleds ur VWAP, RSI, ATR och EMA-trend.
 # =====================================================================
 _DT_WATCH = [
-    ("^NDX", "US100", "Nasdaq 100 (cash)", True),
-    ("GC=F", "XAU",   "Guld",              True),
+    ("NQ=F", "US100", "Nasdaq 100 (termin)", True),
+    ("GC=F", "XAU",   "Guld",                True),
 ]
 _DT_INTERVAL = "15m"
 _DT_ATR_K = 0.6
@@ -2616,6 +2616,22 @@ def _dt_build(sym, ticker, name, pinned):
     else:
         bias = "wait"
 
+    # Hur färsk är sista 15m-baren? Stängd marknad -> aldrig aktiv riktning.
+    import datetime as _dtm
+    bar_txt, stale = "", False
+    try:
+        bar = df.index[-1]
+        bar_utc = bar.tz_convert("UTC").to_pydatetime() if bar.tzinfo else bar.to_pydatetime().replace(tzinfo=_dtm.timezone.utc)
+        age_h = (_dtm.datetime.now(_dtm.timezone.utc) - bar_utc).total_seconds() / 3600
+        stale = age_h > 2
+        from zoneinfo import ZoneInfo
+        loc = bar_utc.astimezone(ZoneInfo("Europe/Stockholm"))
+        bar_txt = loc.strftime("%H:%M") if age_h < 24 else loc.strftime("%a %H:%M")
+    except Exception:
+        pass
+    if stale:
+        bias = "wait"
+
     risk = max(_DT_ATR_K * atr, price * 0.0008)
     if bias == "long":
         entry = vwap if abs(price - vwap) < risk else price
@@ -2643,6 +2659,8 @@ def _dt_build(sym, ticker, name, pinned):
            f'<span class="sep">·</span>RSI {rsi:.0f}'
            f'<span class="sep">·</span>{"hög" if vol > vol_avg else "normal"} volym'
            f'<span class="sep">·</span>ATR {f(atr)}')
+    if bar_txt:
+        ctx += f'<span class="sep">·</span>{"stängt — data från " if stale else "uppd. "}{bar_txt}'
 
     return {
         "ticker": ticker, "name": name, "bias": bias, "pinned": pinned,
