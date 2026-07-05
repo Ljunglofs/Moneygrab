@@ -1201,6 +1201,9 @@ _MACRO_HEADERS = {
 _MACRO_URLS = [
     "https://nfs.faireconomy.media/ff_calendar_thisweek.json",
     "https://cdn-nfs.faireconomy.media/ff_calendar_thisweek.json",
+    # Renders datacenter-IP blockeras ibland av Cloudflare -> ta vägen via
+    # en proxy som hämtar från annan IP och alltid svarar med ren JSON.
+    "https://api.allorigins.win/raw?url=https%3A%2F%2Fnfs.faireconomy.media%2Fff_calendar_thisweek.json",
 ]
 
 def _macro_events():

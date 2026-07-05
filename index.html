@@ -162,14 +162,14 @@ main{padding:16px 16px 110px}
 .rm-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;color:var(--mut)}
 .rm-row:last-child{border-bottom:none}.rm-row b{font-family:var(--disp);font-size:17px}
 .live{color:var(--pos)!important;font-size:12px;font-weight:700;letter-spacing:.03em}
-.scan-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:11px}
-.scan-mini{padding:14px 13px;border-top:2px solid var(--ac,rgba(245,197,66,.25))!important}
+.scan-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:11px;margin-top:11px}
+.scan-mini{padding:14px 13px;border-top:2px solid var(--ac,rgba(245,197,66,.25))!important;min-width:0;overflow:hidden}
 .scan-mini .sm-row{border-bottom:1px solid rgba(255,255,255,.04)}.scan-mini .sm-row:last-child{border-bottom:none}
 .sm-row{display:flex;align-items:center;gap:9px;padding:8px 0;cursor:pointer}
 .sm-nm{min-width:0;display:flex;flex-direction:column;line-height:1.1}
 .sm-co{font-size:10px;color:#8a93a3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:62px;margin-top:2px;font-weight:600}
-.sm-spark{width:42px;height:22px;flex:none;margin-left:auto}
-.sm-r{font-weight:800;font-size:13.5px;font-family:var(--disp);flex:none;min-width:40px;text-align:right}
+.sm-spark{width:36px;height:22px;flex:0 1 36px;min-width:0;margin-left:auto}
+.sm-r{font-weight:800;font-size:clamp(11px,3.3vw,13.5px);font-family:var(--disp);flex:none;text-align:right}
 /* premium screener-kort (mockup) */
 .scr-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;padding:2px 2px 6px}.scr-grid::-webkit-scrollbar{display:none}
 .scr-card{min-width:0;padding:16px 15px 15px;display:flex;flex-direction:column;cursor:pointer;border-top:2px solid var(--c)!important}
@@ -599,7 +599,7 @@ body{background:
 .mc-sec p{font-size:13.5px;line-height:1.5;color:#cdd5e1}
 /* Daytrade */
 #s-daytrade{padding-bottom:90px}
-.dt-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-top:11px;cursor:pointer}
+.dt-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-top:11px}
 .dt-top{display:flex;align-items:center;gap:11px}
 .dt-pin{color:var(--gold);font-size:15px}
 .dt-id{flex:1;min-width:0}
@@ -1950,7 +1950,7 @@ async function loadDaytrade(force){
       const blab=bias==="long"?"LÅNG":bias==="short"?"KORT":"AVVAKTA";
       const conf=+s.confidence||0; const cc=conf>=70?"var(--pos)":conf>=50?"var(--gold)":"var(--mut)";
       const entry=(s.entryLabel&&s.entryLabel!=="—")?s.entryLabel:("$"+s.entry);
-      return `<div class="dt-card" style="border-color:${bc}44" onclick="openStock('${s.ticker}')">
+      return `<div class="dt-card" style="border-color:${bc}44">
         <div class="dt-top">${s.pinned?'<span class="dt-pin">★</span>':''}${lic(s.ticker,34,bc)}
           <div class="dt-id"><div class="dt-tk">${s.ticker}</div><div class="dt-co">${s.name||""}</div></div>
           <div class="dt-bias" style="background:${bc}1f;color:${bc}">${blab}</div></div>
@@ -2182,10 +2182,22 @@ function macroRows(rows){
 }
 var _FF_FLAG={USD:"🇺🇸",EUR:"🇪🇺",GBP:"🇬🇧",JPY:"🇯🇵",CHF:"🇨🇭",CAD:"🇨🇦",AUD:"🇦🇺",NZD:"🇳🇿",CNY:"🇨🇳",SEK:"🇸🇪"};
 async function macroDirect(){
-  /* Fallback: hämta ForexFactory-feeden direkt i webbläsaren (användarens IP,
-     inte Renders datacenter-IP som kan blockeras). */
-  const r=await fetch("https://nfs.faireconomy.media/ff_calendar_thisweek.json",{cache:"no-store"});
-  const raw=await r.json();const now=Date.now();
+  /* Fallback: hämta ForexFactory-feeden i webbläsaren. Direktfetch stoppas ofta
+     av CORS -> prova även CORS-proxyer som lägger på rätt headers. */
+  const FF="https://nfs.faireconomy.media/ff_calendar_thisweek.json";
+  const urls=[FF,
+    "https://api.allorigins.win/raw?url="+encodeURIComponent(FF),
+    "https://corsproxy.io/?url="+encodeURIComponent(FF)];
+  let raw=null;
+  for(const u of urls){
+    try{
+      const r=await fetch(u,{cache:"no-store"});
+      if(!r.ok)continue;
+      const j=await r.json();
+      if(j&&j.length){raw=j;break;}
+    }catch(e){}
+  }
+  const now=Date.now();
   return (raw||[]).map(function(e){
     const imp=e.impact==="High"?"High":(e.impact==="Medium"?"Medium":"Low");
     if(imp==="Low"||!e.title)return null;
@@ -2206,6 +2218,15 @@ async function loadMacro(){
     if(B){const r=await fetch(B+"/api/macro",{cache:"no-store"});const j=await r.json();rows=(j&&j.events)||[];}
   }catch(e){}
   if(!rows.length){try{rows=await macroDirect();}catch(e){}}
+  if(rows.length){
+    try{localStorage.setItem("grabit_macro",JSON.stringify({t:Date.now(),rows:rows}));}catch(e){}
+  }else{
+    /* sista utväg: senast lyckade hämtning (max 12 h gammal) */
+    try{
+      const c=JSON.parse(localStorage.getItem("grabit_macro")||"null");
+      if(c&&c.rows&&c.rows.length&&Date.now()-c.t<12*3600*1000)rows=c.rows;
+    }catch(e){}
+  }
   el.style.display="";
   if(!rows.length){
     el.innerHTML='<div class="ai-h"><span class="dot2"></span>Makrohändelser · denna vecka</div>'
@@ -2510,14 +2531,14 @@ async function loadPolyInsiders(force){
 .sc2-live i{width:8px;height:8px;border-radius:50%;background:#22d3ee;box-shadow:0 0 7px #22d3ee;animation:sc2pulse 1.8s ease-in-out infinite}
 @keyframes sc2pulse{0%,100%{opacity:1}50%{opacity:.45}}
 .sc2-body{display:flex;align-items:center;gap:14px;margin-top:6px}
-.sc2-radar{flex:none;width:43%;max-width:240px;display:flex;justify-content:center;align-items:center}
+.sc2-radar{flex:none;width:37%;max-width:220px;display:flex;justify-content:center;align-items:center}
 .sc2-rows{flex:1;min-width:0;display:flex;flex-direction:column}
 .sc2-row{display:flex;align-items:center;gap:11px;padding:12px 0}
 .sc2-row+.sc2-row{border-top:1px solid rgba(255,255,255,.07)}
 .sc2-ic{flex:none;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.05);background:color-mix(in srgb,var(--c) 14%,transparent);border:1px solid rgba(255,255,255,.12);border-color:color-mix(in srgb,var(--c) 38%,transparent)}
 .sc2-ic svg{width:19px;height:19px}
-.sc2-lbl{flex:1;min-width:0;font-weight:800!important;font-size:13px!important;letter-spacing:.05em!important;text-transform:uppercase!important;color:#c4ced8!important;line-height:1.25}
-.sc2-num{flex:none;font-weight:900!important;font-size:29px!important;letter-spacing:-.02em!important;font-feature-settings:"tnum";line-height:1}
+.sc2-lbl{flex:1;min-width:0;overflow-wrap:anywhere;font-weight:800!important;font-size:clamp(10.5px,3.1vw,13px)!important;letter-spacing:.05em!important;text-transform:uppercase!important;color:#c4ced8!important;line-height:1.25}
+.sc2-num{flex:none;font-weight:900!important;font-size:clamp(20px,6.4vw,29px)!important;letter-spacing:-.02em!important;font-feature-settings:"tnum";line-height:1}
 .fgcard .fg-gauge{display:flex;justify-content:center;margin:6px 0 0}
 .fgcard .fg-state2{text-align:center;font-weight:900!important;font-size:17px!important;letter-spacing:.01em;margin-top:-2px}
 .fgcard .fg-scale{display:flex;align-items:center;justify-content:space-between;margin-top:6px;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mut,#8b97a3)}
