@@ -2604,6 +2604,65 @@ def daytrade():
     return {"setups": _dt_all(), "interval": _DT_INTERVAL, "ts": int(time.time())}
 
 
+# ---------------------------------------------------------------------
+#  ROBOTSIGNALER (push)
+#  Nar daytrade-motorn far en ny riktning (long/kort) med tillracklig
+#  traffsakerhet pushas entry/stop/mal till ALLA prenumeranter —
+#  "sent as soon as we get a setup". Samma riktning pushas inte om
+#  forran efter 4 h eller efter att riktningen forst bytts.
+# ---------------------------------------------------------------------
+_DT_PUSH_STATE = {}   # ticker -> {"bias": ..., "ts": ...}
+_DT_PUSH_MIN_CONF = 70
+
+def _dt_signal_check():
+    try:
+        import push_notify as _pn
+    except Exception:
+        return
+    import datetime as _dt2
+    h = _dt2.datetime.utcnow().hour
+    if h < 6 or h >= 21:          # nattvila (08-23 svensk sommartid)
+        return
+    for setup in _dt_all():
+        tk = setup.get("ticker") or ""
+        bias = setup.get("bias") or "wait"
+        conf = int(setup.get("confidence") or 0)
+        st = _DT_PUSH_STATE.get(tk)
+        if bias not in ("long", "short") or conf < _DT_PUSH_MIN_CONF:
+            # riktningen forsvann -> tillat ny push nar den kommer tillbaka
+            if st and bias == "wait":
+                _DT_PUSH_STATE.pop(tk, None)
+            continue
+        if st and st.get("bias") == bias and time.time() - st.get("ts", 0) < 4 * 3600:
+            continue
+        _DT_PUSH_STATE[tk] = {"bias": bias, "ts": time.time()}
+        rikt = "LÅNG" if bias == "long" else "KORT"
+        title = "%s · %s-signal · %d%%" % (tk, rikt, conf)
+        body = ("Entry %s · Stop %s · Mål %s / %s · R/R %s"
+                % (setup.get("entryLabel"), setup.get("sl"),
+                   setup.get("tp1"), setup.get("tp2"), setup.get("rr")))
+        try:
+            r = _pn.send_all(title, body, url="/", tag="grabit-robber-" + tk)
+            print("[robber] %s %s conf=%d -> %s" % (tk, rikt, conf, r))
+        except Exception as e:
+            print("[robber] push-fel:", e)
+
+
+def _dt_signal_loop():
+    time.sleep(120)               # lat servern boota forst
+    while True:
+        try:
+            _dt_signal_check()
+        except Exception as e:
+            print("Robber-loop fel:", e)
+        time.sleep(300)           # var 5:e minut (motorn jobbar pa 15m-bars)
+
+
+@app.on_event("startup")
+def _start_dt_signals():
+    _threading.Thread(target=_dt_signal_loop, daemon=True).start()
+
+
 # =====================================================================
 #  BAKGRUNDS-WARMUP
 #  Värmer den tunga 193-ticker-skanningen (overview + screen) UTANFÖR

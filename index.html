@@ -776,9 +776,11 @@ body{background:
 </main>
 
 <div id="trialbar" style="display:none" onclick="showPaywall()"></div>
-<div id="propromo" style="display:none" onclick="proPromoClick()">
-  <button class="pp-x" onclick="proPromoClose(event)" aria-label="St&auml;ng">&#10005;</button>
-  <img alt="GRABIT PRO">
+<div id="propromo" style="display:none">
+  <div class="pp-in" onclick="proPromoClick()">
+    <button class="pp-x" onclick="proPromoClose(event)" aria-label="St&auml;ng">&#10005;</button>
+    <img alt="GRABIT PRO">
+  </div>
 </div>
 <div id="paywall" style="display:none">
   <div class="pw-card">
@@ -2399,7 +2401,7 @@ function proPromoInit(){
     if(localStorage.getItem("grabit_pro")==="1")return;
     var el=document.getElementById("propromo");if(!el)return;
     var im=el.querySelector("img");if(im&&!im.src)im.src=IMGS.promo;
-    setTimeout(function(){if(document.getElementById("paywall").style.display==="none")el.style.display="block";},5000);
+    setTimeout(function(){if(document.getElementById("paywall").style.display==="none")el.style.display="flex";},5000);
   }catch(e){}
 }
 function proPromoClose(ev){
@@ -2713,10 +2715,11 @@ body{background:radial-gradient(130% 55% at 50% -12%,rgba(245,197,66,.075),trans
 .mkt .mv{text-shadow:0 0 10px rgba(255,255,255,.12)}
 .fc-big{box-shadow:inset 0 1px 0 rgba(245,197,66,.08)}
 .askbanner{box-shadow:0 0 12px rgba(245,197,66,.25),0 0 38px rgba(245,197,66,.18),0 14px 44px rgba(0,0,0,.6)!important}
-#propromo{position:fixed;left:50%;transform:translateX(-50%);bottom:76px;z-index:58;width:min(94vw,430px);border-radius:16px;overflow:hidden;border:1px solid rgba(245,197,66,.45);box-shadow:0 14px 40px rgba(0,0,0,.65),0 0 30px rgba(245,197,66,.14);cursor:pointer;animation:ppIn .45s cubic-bezier(.2,.9,.3,1.1)}
-#propromo img{display:block;width:100%;height:auto}
-.pp-x{position:absolute;top:6px;right:6px;z-index:2;width:28px;height:28px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:rgba(5,7,10,.78);color:#cfd6e0;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center}
-@keyframes ppIn{from{opacity:0;transform:translateX(-50%) translateY(14px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+#propromo{position:fixed;inset:0;z-index:120;background:rgba(3,4,7,.84);display:flex;align-items:center;justify-content:center;padding:18px}
+.pp-in{position:relative;width:min(94vw,460px);border-radius:18px;overflow:hidden;border:1px solid rgba(245,197,66,.5);box-shadow:0 24px 70px rgba(0,0,0,.7),0 0 44px rgba(245,197,66,.16);cursor:pointer;animation:ppIn .45s cubic-bezier(.2,.9,.3,1.1)}
+.pp-in img{display:block;width:100%;height:auto}
+.pp-x{position:absolute;top:8px;right:8px;z-index:2;width:32px;height:32px;border-radius:50%;border:1px solid rgba(255,255,255,.3);background:rgba(5,7,10,.82);color:#e6ebf2;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+@keyframes ppIn{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}
 #trialbar{position:fixed;left:50%;transform:translateX(-50%);bottom:74px;white-space:nowrap;z-index:60;background:rgba(21,26,34,.96);border:1px solid rgba(245,197,66,.4);color:var(--gold2);border-radius:99px;padding:8px 15px;font-size:12px;font-weight:800;letter-spacing:.03em;cursor:pointer;box-shadow:0 8px 26px rgba(0,0,0,.5)}
 .pulsecard{background:#0E0F11!important;border:1px solid rgba(245,197,66,.16)!important;border-radius:20px!important;padding:16px 18px!important;margin:6px 0 12px!important;box-shadow:0 8px 30px rgba(0,0,0,.5),0 0 26px rgba(245,197,66,.05)!important;overflow:hidden}
 .pulse-wrap{display:grid;grid-template-columns:33% 1fr;gap:14px;align-items:center}
