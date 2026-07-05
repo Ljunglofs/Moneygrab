@@ -395,6 +395,11 @@ def _icon180(): return _png(_ICON_180)
 @app.get("/icon-maskable.png")
 def _iconmask(): return _png(_ICON_MASK)
 
+_BADGE_96 = "iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAYAAADimHc4AAACB0lEQVR42u2dQXLDMAwDbfz/z86501McSSDIxbm1RWySTi1te12EEEIIIYQQQgghhBBCyPbcqQt/nuf5M8h93wAwFP9voDAQd6fyE0GoY/lvvh4AG8pMgKCu5adAUOfyEyCoe/nVIWhC+ZUhaEr5VSFoUvkVIWha+dUgaGL5lSBoavlV7q/Jw1dYh6aX716PKN+7LlG+d31KH27Hc/+TENSh/GQI6vLKT4WgDuUnQ1CX8lMhqFP5iRDUrfw0COpYfhIEdS0/BYI6l58AQd3Lrw5BE8qvDEFTyq8KQZPKrwjhTi1/hR9Q4veVtEWv9gPc89ydyj9x3dX31863l7Mkp8zxzfW08+LuV6gDwrfX0YmbOD8eTkJ48/06eTPXZ/MJCG+/TyeJO38w7oTwyzvn50cROzZJKvgBpzZ/ljyMW7lNWMkPOLH9uexx9IqN8op+wO4DAEs3ZH45KlLZD9h5BGb5luSbw1IJfsCuQ2B2nb/CWVHnnzXAD7jwA67JEPADzOvCDzCvDz/ADAE/wAwBP8AMAT/ADAE/wAwBP8AMAT/APBd+gHk+/ADznPgB5nnxA8xz4weY58cPMEPADzBD0LTyq0HQxPIrQdDU8qtAiPEDkiC08wOSILTzA5IgtPMDkiC08wOSILTzA5IgtPMDkiC08wOSILTzA5IglJ8r5Z+oMRchhBBnPu/0HOiXefTMAAAAAElFTkSuQmCC"
+
+@app.get("/badge-96.png")
+def _badge96(): return _png(_BADGE_96)
+
 _MANIFEST = {
     "id": "/",
     "lang": "sv",
@@ -455,7 +460,7 @@ self.addEventListener('push', e => {
     body: d.body || '',
     tag: d.tag || 'grabit',
     icon: '/icon-192.png',
-    badge: '/icon-192.png',
+    badge: '/badge-96.png',
     data: { url: d.url || '/' },
     vibrate: [100, 40, 100],
   }));
