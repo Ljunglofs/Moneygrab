@@ -1018,10 +1018,13 @@ def scan_once():
                     try:
                         import push_notify as PN
                         _tps = sig.get("targets") or []
-                        _tp = (" \u00b7 TP1 " + str(_tps[0])) if _tps else ""
+                        _tp = (" | TP: " + str(_tps[0])) if _tps else ""
+                        _pil = "\U0001F4C8" if sig["side"] == "LONG" else "\U0001F4C9"
                         PN.send_all(
-                            f"\U0001F6A8 {sig['side']} {Config.NAMES.get(sig['ticker'], sig['ticker'])} \u00b7 {sig['confidence']}/100",
-                            f"Entry {sig['price']} \u00b7 SL {sig['stop']}{_tp}",
+                            f"\u26A1 NASDAQ ROBBER\u2122 \u00b7 {sig['confidence']}/100",
+                            (f"NEW ENTRY SIGNAL {_pil}\n"
+                             f"{sig['side']} \u00b7 {Config.NAMES.get(sig['ticker'], sig['ticker'])}\n"
+                             f"Entry: {sig['price']} | SL: {sig['stop']}{_tp}"),
                             url="/", tag="robber-signal")
                     except Exception as _pe:
                         print(f"[push] hoppade over: {_pe}")

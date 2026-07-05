@@ -70,8 +70,10 @@ def _robber_testsignal():
         tg_err = str(e)
     try:
         import push_notify as PN
-        PN.send_all("\U0001F9EA TESTSIGNAL \u00b7 LONG QQQ \u00b7 86/100",
-                    f"Entry {price} \u00b7 SL {stop} \u00b7 TP1 {targets[0]}",
+        PN.send_all("\u26A1 NASDAQ ROBBER\u2122 \u00b7 TESTSIGNAL",
+                    (f"NEW ENTRY SIGNAL \U0001F4C8\n"
+                     f"LONG \u00b7 QQQ\n"
+                     f"Entry: {price} | SL: {stop} | TP: {targets[0]}"),
                     url="/", tag="robber-test")
     except Exception as e:
         push_err = str(e)
