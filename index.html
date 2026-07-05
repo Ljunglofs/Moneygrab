@@ -1083,6 +1083,8 @@ function openStock(tkr){_curStock=tkr;const d=stockData(tkr,_liveStock[tkr]);
     <div id="st-ai-slot"></div>
     <div class="st-box score-hero">${scoreGauge(d.score)}</div>
     <div class="st-box st-price2 price-wide"><div class="k2">Dagens kurs</div><div class="p2 num">${d.cur}${d.price.toLocaleString("sv-SE")}</div><div class="c2" style="color:${dCol}">${d.day>=0?"+":""}${d.day}% i dag</div>${d.liveOk&&d.d5!=null?`<div class="c2" style="color:${d.d5>=0?"var(--pos)":"var(--neg)"};opacity:.85;font-size:12px;margin-top:2px">${d.d5>=0?"+":""}${d.d5}% senaste 5 dagarna</div>`:""}</div>
+    <div class="st-sec">Diagram &amp; nivåer</div>
+    <div class="st-box" id="st-chart" style="padding:14px"><div class="anl-load">Laddar diagram…</div></div>
     <div class="st-sec">Fråga Grabit</div>
     <div class="ask secgfx-wrap"><div class="secgfx gglobe" style="background-image:url('${IMGS.globe}')"></div><div class="in"><input id="ask-q" placeholder="Vad vill du veta om ${tkr}?" onkeydown="if(event.key==='Enter')askGrabit('${tkr}',this.value)">
       <button onclick="askGrabit('${tkr}',document.getElementById('ask-q').value)">&#10148;</button></div>
@@ -2027,9 +2029,54 @@ async function loadStockAI(tkr){
   if(_sent)html=sentimentEmblem(_sent)+html;
   card.querySelector(".st-ai-b").innerHTML=html;
 }
+async function loadStockChart(tkr){
+  const el=document.getElementById("st-chart");if(!el)return;
+  const B=CONFIG.API_BASE?CONFIG.API_BASE.replace(/\/$/,""):"";if(!B)return;
+  let pts=[],a=null;
+  try{const r=await fetch(B+"/api/chart/"+encodeURIComponent(tkr)+"?range=3mo",{cache:"no-store"});const j=await r.json();pts=(j&&j.points)||[];}catch(e){}
+  try{const r2=await fetch(B+"/api/stock/"+encodeURIComponent(tkr),{cache:"no-store"});const j2=await r2.json();a=(j2&&j2.analysis)||null;}catch(e){}
+  if(document.getElementById("st-chart")!==el)return;   // användaren bytte aktie
+  if(!pts||pts.length<5){el.innerHTML='<div class="anl-load">Diagrammet kunde inte hämtas just nu.</div>';return;}
+  const W=720,H=300,padL=8,padR=88,padT=14,padB=8;
+  const cs=pts.map(function(p){return +p.c;});
+  // nivåer från levels-motorn (samma som Top Opportunity)
+  const lv=[];
+  if(a){
+    const stopp=(a.ob_support!=null?a.ob_support:a.atr_dn_1);
+    if(stopp!=null)lv.push({v:+stopp,txt:"STOPP",c:"#FF4B4B"});
+    if(a.last!=null)lv.push({v:+a.last,txt:"ENTRY",c:"#F5C542"});
+    if(a.atr_up_05!=null)lv.push({v:+a.atr_up_05,txt:"T1",c:"#2BD576"});
+    if(a.atr_up_1!=null)lv.push({v:+a.atr_up_1,txt:"T2",c:"#2BD576"});
+  }
+  let lo=Math.min.apply(null,cs),hi=Math.max.apply(null,cs);
+  lv.forEach(function(l){if(l.v>lo*0.7&&l.v<hi*1.3){lo=Math.min(lo,l.v);hi=Math.max(hi,l.v);}});
+  const span=(hi-lo)||1;lo-=span*0.06;hi+=span*0.06;
+  const X=function(i){return padL+(W-padL-padR)*i/(cs.length-1);};
+  const Y=function(v){return padT+(H-padT-padB)*(1-(v-lo)/(hi-lo));};
+  let line="";cs.forEach(function(c,i){line+=(i?"L":"M")+X(i).toFixed(1)+" "+Y(c).toFixed(1);});
+  const up=cs[cs.length-1]>=cs[0], lc=up?"#2BD576":"#FF4B4B";
+  const fill=line+"L"+X(cs.length-1).toFixed(1)+" "+(H-padB)+"L"+X(0).toFixed(1)+" "+(H-padB)+"Z";
+  // linjer + etiketter, knuffa isär etiketter som krockar
+  const syn=lv.filter(function(l){return l.v>=lo&&l.v<=hi;})
+    .map(function(l){return {v:l.v,txt:l.txt,c:l.c,y:Y(l.v)};})
+    .sort(function(x,y){return x.y-y.y;});
+  for(let i=1;i<syn.length;i++){if(syn[i].ly==null)syn[i].ly=syn[i].y;if(syn[i-1].ly==null)syn[i-1].ly=syn[i-1].y;
+    if(syn[i].ly-syn[i-1].ly<15)syn[i].ly=syn[i-1].ly+15;}
+  const lvls=syn.map(function(l){
+    const y=l.y.toFixed(1),ly=(l.ly!=null?l.ly:l.y)+4;
+    return '<line x1="'+padL+'" x2="'+(W-padR)+'" y1="'+y+'" y2="'+y+'" stroke="'+l.c+'" stroke-width="1.4" stroke-dasharray="6 5" opacity=".85"/>'
+      +'<text x="'+(W-padR+7)+'" y="'+ly.toFixed(1)+'" fill="'+l.c+'" font-size="12.5" font-weight="700" font-family="inherit">'+l.txt+' '+fmtPx(l.v)+'</text>';
+  }).join("");
+  el.innerHTML='<div class="k2" style="margin-bottom:8px">3 månader'+(syn.length?' · entry, stopp &amp; targets':'')+'</div>'
+    +'<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block">'
+    +'<defs><linearGradient id="stcg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="'+lc+'" stop-opacity=".26"/><stop offset="100%" stop-color="'+lc+'" stop-opacity="0"/></linearGradient></defs>'
+    +'<path d="'+fill+'" fill="url(#stcg)"/>'
+    +'<path d="'+line+'" fill="none" stroke="'+lc+'" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>'
+    +lvls+'</svg>';
+}
 if(typeof openStock==="function"){
   const _origOpenStock=openStock;
-  window.openStock=function(tkr){_origOpenStock(tkr);try{loadStockAI(tkr);}catch(e){}};
+  window.openStock=function(tkr){_origOpenStock(tkr);try{loadStockAI(tkr);}catch(e){}try{loadStockChart(tkr);}catch(e){}};
 }
 /* ===== Makrokalender på Översikt ===== */
 function macroImpactColor(imp){
