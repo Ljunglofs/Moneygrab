@@ -1017,10 +1017,11 @@ def scan_once():
                     send_telegram(msg)
                     try:
                         import push_notify as PN
-                        _pct = abs(float(sig["price"]) - float(sig["stop"])) / float(sig["price"]) * 100
+                        _tps = sig.get("targets") or []
+                        _tp = (" \u00b7 TP1 " + str(_tps[0])) if _tps else ""
                         PN.send_all(
-                            f"\U0001F6A8 {sig['side']} {Config.NAMES.get(sig['ticker'], sig['ticker'])}",
-                            f"Conf {sig['confidence']}/100 \u00b7 entry {sig['price']} \u00b7 SL {_pct:.2f}% bort",
+                            f"\U0001F6A8 {sig['side']} {Config.NAMES.get(sig['ticker'], sig['ticker'])} \u00b7 {sig['confidence']}/100",
+                            f"Entry {sig['price']} \u00b7 SL {sig['stop']}{_tp}",
                             url="/", tag="robber-signal")
                     except Exception as _pe:
                         print(f"[push] hoppade over: {_pe}")

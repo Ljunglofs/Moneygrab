@@ -63,9 +63,17 @@ def _robber_testsignal():
 
     msg = ("🧪 <b>TESTSIGNAL</b> — ej skarp, bara ett rörtest.\n"
            "Så här ser ett riktigt larm ut:\n\n" + format_alert(sig))
+    tg_err = push_err = None
     try:
         send_telegram(msg)
     except Exception as e:
-        return {"ok": False, "error": f"telegram-fel: {e}"}
-    return {"ok": True, "sent": True,
-            "note": "Kolla Telegram — testlarmet ska ha kommit."}
+        tg_err = str(e)
+    try:
+        import push_notify as PN
+        PN.send_all("\U0001F9EA TESTSIGNAL \u00b7 LONG QQQ \u00b7 86/100",
+                    f"Entry {price} \u00b7 SL {stop} \u00b7 TP1 {targets[0]}",
+                    url="/", tag="robber-test")
+    except Exception as e:
+        push_err = str(e)
+    return {"ok": not (tg_err and push_err), "telegram_fel": tg_err, "push_fel": push_err,
+            "note": "Kolla Telegram OCH telefonens notiser — testlarmet ska ha kommit i båda."}
