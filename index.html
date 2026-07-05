@@ -600,7 +600,7 @@ body{background:
 /* Daytrade */
 #s-daytrade{padding-bottom:90px}
 .dt-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-top:11px;position:relative}
-.dt-tvlink{position:absolute;right:14px;bottom:12px;font-size:11.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--gold2);cursor:pointer}
+.dt-tvlink{display:block;text-align:right;margin-top:11px;padding-top:10px;border-top:1px solid rgba(255,255,255,.06);font-size:11.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--gold2);cursor:pointer}
 .dt-tvbox{margin-top:8px;border:1px solid rgba(245,197,66,.3);border-radius:16px;overflow:hidden;box-shadow:0 0 20px rgba(245,197,66,.08)}
 .tvwrap{padding:8px!important;overflow:hidden}
 .tv-frame{width:100%;height:430px;border:0;display:block;border-radius:12px;background:#050506}
@@ -1967,7 +1967,7 @@ async function loadDaytrade(force){
       const blab=bias==="long"?"LÅNG":bias==="short"?"KORT":"AVVAKTA";
       const conf=+s.confidence||0; const cc=conf>=70?"var(--pos)":conf>=50?"var(--gold)":"var(--mut)";
       const entry=(s.entryLabel&&s.entryLabel!=="—")?s.entryLabel:("$"+s.entry);
-      return `<div class="dt-card" style="border-color:${bc}44"><div class="dt-tvlink" onclick="dtTv(this,'${s.ticker}')">Livegraf \u203A</div>
+      return `<div class="dt-card" style="border-color:${bc}44">
         <div class="dt-top">${s.pinned?'<span class="dt-pin">★</span>':''}${lic(s.ticker,34,bc)}
           <div class="dt-id"><div class="dt-tk">${s.ticker}</div><div class="dt-co">${s.name||""}</div></div>
           <div class="dt-bias" style="background:${bc}1f;color:${bc}">${blab}</div></div>
@@ -1980,6 +1980,7 @@ async function loadDaytrade(force){
           <div><span>R/R</span><b>${s.rr}</b></div>
         </div>
         <div class="dt-foot"><span class="dt-conf" style="color:${cc}">Träffsäkerhet ${conf}%</span><span class="dt-ctx">${s.context||""}</span></div>
+        <div class="dt-tvlink" onclick="dtTv(this,'${s.ticker}')">Livegraf \u203A</div>
       </div>`;
     }).join("");
   }catch(e){wrap.innerHTML=`<div class="scl-empty">Kunde inte hämta daytrade just nu — försöker igen strax…</div>`;
@@ -2135,8 +2136,8 @@ async function loadStockAI(tkr){
   card.querySelector(".st-ai-b").innerHTML=html;
 }
 function tvSymbol(tkr){
-  if(tkr==="US100")return "CME_MINI:NQ1!";
-  if(tkr==="XAU")return "COMEX:GC1!";
+  if(tkr==="US100")return "CAPITALCOM:US100";
+  if(tkr==="XAU")return "OANDA:XAUUSD";
   if(/\.ST$/.test(tkr))return "OMXSTO:"+tkr.replace(/\.ST$/,"").replace(/-/g,"_");
   return tkr;  // US-tickers och övriga: låt TradingView matcha själv
 }
