@@ -1945,7 +1945,9 @@ async function loadDaytrade(force){
   try{
     const r=await fetch(CONFIG.API_BASE.replace(/\/$/,"")+"/api/daytrade",{cache:"no-store"});
     if(!r.ok)throw 0; const j=await r.json(); const setups=j.setups||[];
-    if(!setups.length){wrap.innerHTML=`<div class="scl-empty">Inga setups just nu.</div>`;return;}
+    if(!setups.length){wrap.innerHTML=`<div class="scl-empty">Inga setups just nu — försöker igen strax…</div>`;
+      window._dtRetry=(window._dtRetry||0)+1;if(window._dtRetry<=5)setTimeout(function(){loadDaytrade(true);},10000);return;}
+    window._dtRetry=0;
     wrap.innerHTML=setups.map(s=>{
       const bias=String(s.bias||"").toLowerCase();
       const bc=bias==="long"?"var(--pos)":bias==="short"?"var(--neg)":"var(--mut)";
@@ -1967,7 +1969,8 @@ async function loadDaytrade(force){
         <div class="dt-foot"><span class="dt-conf" style="color:${cc}">Träffsäkerhet ${conf}%</span><span class="dt-ctx">${s.context||""}</span></div>
       </div>`;
     }).join("");
-  }catch(e){wrap.innerHTML=`<div class="scl-empty">Kunde inte hämta daytrade just nu.</div>`;}
+  }catch(e){wrap.innerHTML=`<div class="scl-empty">Kunde inte hämta daytrade just nu — försöker igen strax…</div>`;
+    window._dtRetry=(window._dtRetry||0)+1;if(window._dtRetry<=5)setTimeout(function(){loadDaytrade(true);},10000);}
 }
 
 /* ===== Research (försidan) ===== */

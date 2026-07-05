@@ -2590,6 +2590,8 @@ def _dt_build(sym, ticker, name, pinned):
     }
 
 
+_DT_LAST_GOOD = {"ts": 0.0, "setups": []}
+
 @cached(180)
 def _dt_all():
     out = []
@@ -2601,6 +2603,12 @@ def _dt_all():
         except Exception:
             continue
     out.sort(key=lambda s: (not s["pinned"], -s["confidence"]))
+    if out:
+        _DT_LAST_GOOD["setups"] = out
+        _DT_LAST_GOOD["ts"] = time.time()
+    elif _DT_LAST_GOOD["setups"] and time.time() - _DT_LAST_GOOD["ts"] < 6 * 3600:
+        # Yahoo hickade (vanligt direkt efter omstart) -> visa senaste lyckade
+        return _DT_LAST_GOOD["setups"]
     return out
 
 
