@@ -599,7 +599,14 @@ body{background:
 .mc-sec p{font-size:13.5px;line-height:1.5;color:#cdd5e1}
 /* Daytrade */
 #s-daytrade{padding-bottom:90px}
-.dt-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-top:11px}
+.dt-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-top:11px;position:relative}
+.dt-tvlink{position:absolute;right:14px;bottom:12px;font-size:11.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--gold2);cursor:pointer}
+.dt-tvbox{margin-top:8px;border:1px solid rgba(245,197,66,.3);border-radius:16px;overflow:hidden;box-shadow:0 0 20px rgba(245,197,66,.08)}
+.tvwrap{padding:8px!important;overflow:hidden}
+.tv-frame{width:100%;height:430px;border:0;display:block;border-radius:12px;background:#050506}
+.tv-open{width:100%;background:none;border:1.5px dashed rgba(245,197,66,.4);border-radius:12px;padding:16px;cursor:pointer;text-align:center}
+.tv-open b{display:block;font-family:var(--disp);font-size:14px;letter-spacing:.05em;text-transform:uppercase;color:var(--gold2)}
+.tv-open i{font-style:normal;display:block;margin-top:3px;font-size:11.5px;color:#8a93a3}
 .dt-top{display:flex;align-items:center;gap:11px}
 .dt-pin{color:var(--gold);font-size:15px}
 .dt-id{flex:1;min-width:0}
@@ -1118,6 +1125,7 @@ function openStock(tkr){_curStock=tkr;const d=stockData(tkr,_liveStock[tkr]);
     <div class="st-box st-price2 price-wide"><div class="k2">Dagens kurs</div><div class="p2 num">${d.cur}${d.price.toLocaleString("sv-SE")}</div><div class="c2" style="color:${dCol}">${d.day>=0?"+":""}${d.day}% i dag</div>${d.liveOk&&d.d5!=null?`<div class="c2" style="color:${d.d5>=0?"var(--pos)":"var(--neg)"};opacity:.85;font-size:12px;margin-top:2px">${d.d5>=0?"+":""}${d.d5}% senaste 5 dagarna</div>`:""}</div>
     <div class="st-sec">Diagram &amp; nivåer</div>
     <div class="st-box" id="st-chart" style="padding:14px"><div class="anl-load">Laddar diagram…</div></div>
+    <div class="st-box tvwrap" id="st-tv"><button class="tv-open" onclick="tvChart('${tkr}',this.parentNode)"><b>Öppna livegraf</b><i>TradingView · candlesticks, indikatorer &amp; ritverktyg</i></button></div>
     <div class="st-sec">Fråga Grabit</div>
     <div class="ask secgfx-wrap"><div class="secgfx gglobe" style="background-image:url('${IMGS.globe}')"></div><div class="in"><input id="ask-q" placeholder="Vad vill du veta om ${tkr}?" onkeydown="if(event.key==='Enter')askGrabit('${tkr}',this.value)">
       <button onclick="askGrabit('${tkr}',document.getElementById('ask-q').value)">&#10148;</button></div>
@@ -1959,7 +1967,7 @@ async function loadDaytrade(force){
       const blab=bias==="long"?"LÅNG":bias==="short"?"KORT":"AVVAKTA";
       const conf=+s.confidence||0; const cc=conf>=70?"var(--pos)":conf>=50?"var(--gold)":"var(--mut)";
       const entry=(s.entryLabel&&s.entryLabel!=="—")?s.entryLabel:("$"+s.entry);
-      return `<div class="dt-card" style="border-color:${bc}44">
+      return `<div class="dt-card" style="border-color:${bc}44"><div class="dt-tvlink" onclick="dtTv(this,'${s.ticker}')">Livegraf \u203A</div>
         <div class="dt-top">${s.pinned?'<span class="dt-pin">★</span>':''}${lic(s.ticker,34,bc)}
           <div class="dt-id"><div class="dt-tk">${s.ticker}</div><div class="dt-co">${s.name||""}</div></div>
           <div class="dt-bias" style="background:${bc}1f;color:${bc}">${blab}</div></div>
@@ -2125,6 +2133,29 @@ async function loadStockAI(tkr){
   }
   if(_sent)html=sentimentEmblem(_sent)+html;
   card.querySelector(".st-ai-b").innerHTML=html;
+}
+function tvSymbol(tkr){
+  if(tkr==="US100")return "CME_MINI:NQ1!";
+  if(tkr==="XAU")return "COMEX:GC1!";
+  if(/\.ST$/.test(tkr))return "OMXSTO:"+tkr.replace(/\.ST$/,"").replace(/-/g,"_");
+  return tkr;  // US-tickers och övriga: låt TradingView matcha själv
+}
+function tvChart(tkr,el){
+  if(!el)return;
+  var sym=encodeURIComponent(tvSymbol(tkr));
+  el.innerHTML='<iframe class="tv-frame" loading="lazy" allowfullscreen '
+    +'src="https://s.tradingview.com/widgetembed/?symbol='+sym
+    +'&interval=60&theme=dark&style=1&locale=sv&hide_side_toolbar=1'
+    +'&allow_symbol_change=0&save_image=0&withdateranges=1'
+    +'&backgroundColor=%23050506&toolbarbg=%23050506"></iframe>';
+}
+function dtTv(btn,tkr){
+  var card=btn.closest(".dt-card");if(!card)return;
+  var next=card.nextElementSibling;
+  if(next&&next.classList.contains("dt-tvbox")){next.remove();btn.textContent="Livegraf \u203A";return;}
+  var box=document.createElement("div");box.className="dt-tvbox";
+  card.parentNode.insertBefore(box,card.nextSibling);
+  tvChart(tkr,box);btn.textContent="Stäng graf \u2715";
 }
 async function loadStockChart(tkr){
   const el=document.getElementById("st-chart");if(!el)return;
