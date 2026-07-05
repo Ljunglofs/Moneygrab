@@ -777,7 +777,7 @@ body{background:
 <div id="paywall" style="display:none">
   <div class="pw-card">
     <button class="pw-close" id="pw-close" onclick="hidePaywall()" aria-label="Stäng">&#10005;</button>
-    <div class="pw-logo">GRABIT<span class="pw-badge">PRO</span></div>
+    <div class="pw-logo"><img id="pw-brand" alt="GRABIT"><span class="pw-badge">PRO</span></div>
     <div class="pw-trial" id="pw-sub"><b>7 dagar gratis</b> — sedan</div>
     <div class="pw-big"><span class="pw-149">149 kr</span><span class="pw-per">/månad</span></div>
     <div class="pw-cancel">Avsluta när som helst.</div>
@@ -2242,6 +2242,8 @@ async function proActive(){
 }
 function showPaywall(msg,dismissable){
   var el=document.getElementById("paywall");if(!el)return;
+  var bi=document.getElementById("pw-brand");
+  if(bi&&!bi.src){var hb=document.querySelector(".brand");if(hb&&hb.src)bi.src=hb.src;}
   if(msg){var su=document.getElementById("pw-sub");if(su)su.textContent=msg;}
   var x=document.getElementById("pw-close");if(x)x.style.display=dismissable?"":"none";
   el.style.display="flex";
@@ -2490,7 +2492,8 @@ html,body{overflow-x:clip}
 #paywall{position:fixed;inset:0;z-index:999;background:rgba(4,5,8,.97);display:flex;align-items:center;justify-content:center;padding:14px}
 .pw-card{position:relative;max-width:392px;width:100%;max-height:94vh;overflow-y:auto;scrollbar-width:none;text-align:center;background:linear-gradient(170deg,#12151c,#08090d);border:1px solid rgba(245,197,66,.35);border-radius:24px;padding:24px 18px 18px;box-shadow:0 20px 60px rgba(0,0,0,.65),0 0 44px rgba(245,197,66,.09)}
 .pw-close{position:absolute;top:8px;right:10px;background:none;border:none;color:#5b6675;font-size:17px;cursor:pointer;padding:8px;display:none;z-index:2}
-.pw-logo{font-family:var(--disp);font-size:27px;font-weight:800;letter-spacing:.28em;color:#fff;display:flex;align-items:center;justify-content:center;gap:10px}
+.pw-logo{display:flex;align-items:center;justify-content:center;gap:12px}
+#pw-brand{height:46px;width:auto;display:block}
 .pw-badge{font-size:13px;letter-spacing:.12em;color:var(--gold2);border:1.5px solid rgba(245,197,66,.7);border-radius:10px;padding:4px 10px;flex:none}
 .pw-trial{margin-top:14px;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:#aeb7c4}
 .pw-trial b{color:var(--gold2);font-weight:800}
