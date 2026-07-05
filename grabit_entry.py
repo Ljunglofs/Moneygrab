@@ -38,13 +38,13 @@ def _robber_testsignal():
     except Exception as e:
         return {"ok": False, "error": f"kan inte importera roboten: {e}"}
 
-    price, atr, risk = 581.20, 1.85, 2.40
+    price, atr, risk = 18956.0, 32.0, 46.0
     stop    = round(price - risk, 2)
     targets = [round(price + risk * r, 2) for r in Config.TARGETS_R]
     shares  = math.floor((Config.ACCOUNT_SIZE * Config.RISK_PCT) / risk)
 
     sig = {
-        "side": "LONG", "ticker": "QQQ",
+        "side": "LONG", "ticker": "NQ=F",
         "score": 6, "max_score": 7,
         "price": price, "atr": atr, "stop": stop,
         "risk_per_share": round(risk, 2),
@@ -72,7 +72,7 @@ def _robber_testsignal():
         import push_notify as PN
         PN.send_all("\u26A1 NASDAQ ROBBER\u2122 \u00b7 TESTSIGNAL",
                     (f"NEW ENTRY SIGNAL \U0001F4C8\n"
-                     f"LONG \u00b7 QQQ\n"
+                     f"LONG \u00b7 US100\n"
                      f"Entry: {price} | SL: {stop} | TP: {targets[0]}"),
                     url="/", tag="robber-test")
     except Exception as e:
