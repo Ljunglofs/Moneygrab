@@ -735,6 +735,7 @@ body{background:
     <div class="sect"><h2>Snabbval</h2></div>
     <div class="menuchips" id="menuchips"></div>
     <div class="demo-flag" id="demo-flag">Ansluter till live-data…</div>
+  <div class="legal">GRABIT tillhandahåller teknisk analys och information — inte finansiell rådgivning. Handel med värdepapper innebär risk och kan leda till förluster. Historisk avkastning är ingen garanti för framtida resultat.</div>
   </section>
 
   <section class="screen" id="s-marknad">
@@ -751,18 +752,24 @@ body{background:
       <div class="sect"><h2>Förlorare i dag</h2></div>
       <div class="card" id="losers"></div>
     </div>
+  <div class="legal">GRABIT tillhandahåller teknisk analys och information — inte finansiell rådgivning. Handel med värdepapper innebär risk och kan leda till förluster. Historisk avkastning är ingen garanti för framtida resultat.</div>
   </section>
 
-  <section class="screen" id="s-signal"><div class="sigfilter" id="sigfilter"><button class="sigchip on" data-k="allt" onclick="setSig('allt')">Allt</button><button class="sigchip" data-k="setup" onclick="setSig('setup')">Setups</button><button class="sigchip" data-k="insider" onclick="setSig('insider')">Insiders</button><button class="sigchip" data-k="nyhet" onclick="setSig('nyhet')">Nyheter</button></div><div class="card feed" id="feed2" style="margin-top:8px"></div></section>
-  <section class="screen" id="s-daytrade"><div class="dt-head" id="dt-head"></div><div class="dt-list" id="dtlist"></div></section>
-  <section class="screen" id="s-portfolj"><div id="pf"></div></section>
-  <section class="screen" id="s-mer"><div class="placeholder"><span class="gi">&#9881;</span><h3>Mer</h3><p>Watchlist, nyheter, inställningar.</p></div></section>
+  <section class="screen" id="s-signal"><div class="sigfilter" id="sigfilter"><button class="sigchip on" data-k="allt" onclick="setSig('allt')">Allt</button><button class="sigchip" data-k="setup" onclick="setSig('setup')">Setups</button><button class="sigchip" data-k="insider" onclick="setSig('insider')">Insiders</button><button class="sigchip" data-k="nyhet" onclick="setSig('nyhet')">Nyheter</button></div><div class="card feed" id="feed2" style="margin-top:8px"></div><div class="legal">GRABIT tillhandahåller teknisk analys och information — inte finansiell rådgivning. Handel med värdepapper innebär risk och kan leda till förluster. Historisk avkastning är ingen garanti för framtida resultat.</div>
+  </section>
+  <section class="screen" id="s-daytrade"><div class="dt-head" id="dt-head"></div><div class="dt-list" id="dtlist"></div><div class="legal">GRABIT tillhandahåller teknisk analys och information — inte finansiell rådgivning. Handel med värdepapper innebär risk och kan leda till förluster. Historisk avkastning är ingen garanti för framtida resultat.</div>
+  </section>
+  <section class="screen" id="s-portfolj"><div id="pf"></div><div class="legal">GRABIT tillhandahåller teknisk analys och information — inte finansiell rådgivning. Handel med värdepapper innebär risk och kan leda till förluster. Historisk avkastning är ingen garanti för framtida resultat.</div>
+  </section>
+  <section class="screen" id="s-mer"><div class="placeholder"><span class="gi">&#9881;</span><h3>Mer</h3><p>Watchlist, nyheter, inställningar.</p></div><div class="legal">GRABIT tillhandahåller teknisk analys och information — inte finansiell rådgivning. Handel med värdepapper innebär risk och kan leda till förluster. Historisk avkastning är ingen garanti för framtida resultat.</div>
+  </section>
   <section class="screen" id="s-smart">
     <div class="sect" style="margin-top:4px"><h2>Smart Money</h2><a onclick="loadPoly(true);loadPolyInsiders(true)">Uppdatera</a></div>
     <div class="sect2">Marknader</div>
     <div id="poly-markets" class="poly-wrap"></div>
     <div class="sect2">Stora trades · smart money</div>
     <div id="poly-insiders" class="poly-wrap"></div>
+  <div class="legal">GRABIT tillhandahåller teknisk analys och information — inte finansiell rådgivning. Handel med värdepapper innebär risk och kan leda till förluster. Historisk avkastning är ingen garanti för framtida resultat.</div>
   </section>
 </main>
 
@@ -799,7 +806,7 @@ body{background:
   <button class="bk" onclick="closeStock()">&#8592;</button>
   <div class="tk" id="st-tk">—</div>
   <button class="ac" id="st-star" onclick="this.textContent=this.textContent==='\u2605'?'\u2606':'\u2605'">&#9734;</button>
-</div><div class="st-body" id="st-body"></div></div>
+</div><div class="st-body" id="st-body"></div><div class="legal">GRABIT tillhandahåller teknisk analys och information — inte finansiell rådgivning. Handel med värdepapper innebär risk och kan leda till förluster. Historisk avkastning är ingen garanti för framtida resultat.</div></div>
 <div class="stock mcdetail" id="mcdetail"><div class="st-hd"><button class="bk" onclick="closeMonthly()">&#8592;</button><div class="tk">Månadens case</div><span style="width:38px;display:inline-block"></span></div><div class="st-body" id="mc-body"></div></div>
 <div class="stock rsheet" id="rsheet"><div class="st-hd"><button class="bk" onclick="closeResearch()">&#8592;</button><div class="tk">Grabit Screen</div><span style="width:34px;flex:none"></span></div><div class="rs-chips" id="rs-chips"></div><div class="rs-meta" id="rs-meta">Välj filter ovan</div><div id="rs-list"></div></div>
 
@@ -2467,6 +2474,7 @@ async function loadPolyInsiders(force){
 .pk-go{color:var(--gold2);font-weight:800;font-size:10px;letter-spacing:.06em;margin-left:auto;white-space:nowrap}
 .pick .pk-bot{display:flex;align-items:center;gap:10px}
 .ai-more{margin-top:9px;color:var(--gold2);font-weight:800;font-size:12px;cursor:pointer}
+.legal{margin:20px 6px 8px;text-align:center;color:#4d5866;font-size:10.5px;line-height:1.55}
 /* ===== Månadens case — premiumlyft ===== */
 .mcase{padding:17px!important;border:1px solid rgba(245,197,66,.55)!important;background:radial-gradient(130% 170% at 100% 0%,rgba(245,197,66,.22),rgba(8,13,16,0) 55%),linear-gradient(160deg,#1a1407,#0C0F14)!important;box-shadow:0 14px 40px rgba(0,0,0,.55),0 0 36px rgba(245,197,66,.12)!important}
 .mc-tk{font-size:23px!important}
