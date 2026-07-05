@@ -1419,6 +1419,36 @@ function spark(data,color){const w=52,h=26,mx=Math.max(...data),mn=Math.min(...d
   const pts=data.map((d,i)=>`${(i/(data.length-1)*w).toFixed(1)},${(h-2-((d-mn)/rg)*(h-4)).toFixed(1)}`).join(" ");
   return `<svg class="spark" viewBox="0 0 ${w} ${h}"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;}
 function radarGauge(score,color){const cx=100,cy=100;const ang=(215-(score/100)*250)*Math.PI/180;const nx=cx+62*Math.cos(ang),ny=cy-62*Math.sin(ang);return `<svg viewBox="0 0 200 200" width="100%" style="max-width:150px" role="img" aria-label="Sentiment ${score} av 100"><g fill="none" stroke="${color}" stroke-opacity=".16" stroke-width="1.2"><circle cx="100" cy="100" r="34"/><circle cx="100" cy="100" r="52"/><circle cx="100" cy="100" r="70"/></g><path d="M 39.4 65 A 70 70 0 0 1 160.6 65" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-opacity=".55" style="filter:drop-shadow(0 0 5px ${color}aa)"/><line x1="100" y1="100" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" stroke="${color}" stroke-width="3.4" stroke-linecap="round"/><circle cx="100" cy="100" r="5" fill="${color}"/></svg>`;}
+function fgGauge(sc){sc=Math.max(0,Math.min(100,+sc||0));
+  var cx=100,cy=95,r=76;
+  function P(a,rr){a=a*Math.PI/180;return [cx+(rr||r)*Math.cos(a),cy-(rr||r)*Math.sin(a)];}
+  var A0=215,A1=-35,av=215-2.5*sc;
+  var st=P(A0),en=P(A1),vv=P(av);
+  var la=(215-av)>180?1:0;
+  var np=P(av,56);
+  var arc=function(x0,y0,x1,y1,lrg){return "M"+x0.toFixed(1)+" "+y0.toFixed(1)+"A"+r+" "+r+" 0 "+lrg+" 1 "+x1.toFixed(1)+" "+y1.toFixed(1);};
+  return '<svg viewBox="0 0 200 156" width="100%" role="img" aria-label="Fear and Greed '+sc+' av 100">'
+    +'<defs><linearGradient id="fgg2" x1="0" y1="1" x2="1" y2="0">'
+    +'<stop offset="0%" stop-color="#E8A020"/><stop offset="55%" stop-color="#F5C542"/><stop offset="100%" stop-color="#FFE9A8"/></linearGradient></defs>'
+    +'<g fill="none" stroke="#F5C542" stroke-opacity=".1" stroke-width="1"><circle cx="100" cy="95" r="24"/><circle cx="100" cy="95" r="38"/><circle cx="100" cy="95" r="52"/></g>'
+    +'<path d="'+arc(st[0],st[1],en[0],en[1],1)+'" stroke="#20242e" stroke-width="7" stroke-linecap="round" fill="none"/>'
+    +(sc>0?'<path d="'+arc(st[0],st[1],vv[0],vv[1],la)+'" stroke="url(#fgg2)" stroke-width="7" stroke-linecap="round" fill="none" style="filter:drop-shadow(0 0 6px rgba(245,197,66,.65))"/>':'')
+    +'<line x1="100" y1="95" x2="'+np[0].toFixed(1)+'" y2="'+np[1].toFixed(1)+'" stroke="#F5C542" stroke-width="4" stroke-linecap="round" style="filter:drop-shadow(0 0 4px rgba(245,197,66,.6))"/>'
+    +'<circle cx="100" cy="95" r="7.5" fill="#171205" stroke="#F5C542" stroke-width="2"/>'
+    +'<circle cx="100" cy="95" r="3" fill="#FFE9A8"/>'
+    +'<text x="100" y="12" text-anchor="middle" fill="#c9d2dd" font-size="13" font-weight="700" font-family="inherit">50</text>'
+    +'<text x="27" y="151" text-anchor="middle" fill="#FF4B4B" font-size="12" font-weight="700" font-family="inherit">0</text>'
+    +'<text x="173" y="151" text-anchor="middle" fill="#2BD576" font-size="12" font-weight="700" font-family="inherit">100</text>'
+    +'</svg>';}
+function fg2Icon(dir){
+  var d1=dir>0?'M6 13l6-6 6 6':dir<0?'M6 11l6 6 6-6':'M6 9h12',
+      d2=dir>0?'M6 19l6-6 6 6':dir<0?'M6 5l6 6 6-6':'M6 15h12';
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px"><path d="'+d1+'"/><path d="'+d2+'"/></svg>';}
+function fg2Spark(dir,col){
+  var ys=dir<0?[5,8,6,10,8,12,10,14,13,16]:dir>0?[16,13,14,10,12,8,10,6,7,4]:[10,8,11,9,10,11,9,10,11,10];
+  var p="";for(var i=0;i<ys.length;i++)p+=(i?"L":"M")+(i*4.4+1).toFixed(1)+" "+ys[i];
+  return '<svg class="fg2-spark" viewBox="0 0 42 20"><path d="'+p+'" fill="none" stroke="'+col+'" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/></svg>';}
+
 function gaugeSVG(score,color){const cx=130,cy=120,r=92,a=Math.PI*(1-score/100);
   const nx=cx+r*Math.cos(a),ny=cy-r*Math.sin(a);
   return `<svg viewBox="0 0 260 150" width="100%" style="max-width:190px" role="img" aria-label="Sentiment ${score} av 100">
@@ -1489,7 +1519,7 @@ function render(d){
       <div class="tg2-score num" style="color:${d.gauge.color}">${d.gauge.score}<small>/100</small></div>
       ${gdiff!=null&&gdiff!==0?`<div class="tg2-diff num" style="color:${gdiff>0?"var(--pos)":"var(--neg)"}">${gdiff>0?"\u2191":"\u2193"} ${gdiff>0?"+":""}${gdiff} sedan sist</div>`:""}
       <div class="tg2-btn" onclick="openAI()">AI-analys \u203A</div></div>`;}
-  if($("#feargreed")){const fg=fgInfo(d.gauge.score);const sc=d.gauge.score;$("#feargreed").innerHTML=`<div class="fgmini-l">FEAR &amp; GREED<i class="live"></i></div><div class="fgmini-radar">${radarGauge(sc,fg.col)}</div><div class="fgmini-n" style="color:${fg.col}">${sc}<small>/100</small></div><div class="fgmini-st" style="color:${fg.col}">${fg.label.toUpperCase()}</div>`;}
+  if($("#feargreed")){const fg=fgInfo(d.gauge.score);const sc=d.gauge.score;$("#feargreed").innerHTML=`<div class="fgmini-l">FEAR &amp; GREED<i class="live"></i></div><div class="fg2-div"><span></span><svg viewBox="0 0 24 24" fill="none" stroke="#F5C542" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;flex:none"><path d="M6 14l6-6 6 6"/><path d="M6 20l6-6 6 6"/></svg><span></span></div><div class="fgmini-radar">${fgGauge(sc)}</div><div class="fgmini-n" style="color:var(--gold2)">${sc}<small>/100</small></div><div class="fg2-pill">${fg.label.toUpperCase()}</div><div class="fg2-foot" style="color:${fg.col}"><span class="fg2-ic">${fg2Icon(fg.dir)}</span><span class="fg2-tx">${fg.txt}</span>${fg2Spark(fg.dir,fg.col)}</div>`;}
   // picks + fråga grabit
   if($("#picks"))$("#picks").innerHTML=d.picks.filter(function(p){return p.kicker!=="DAGENS BULL";}).map(pickCard).join("");
   // events (bildkort med riktiga foton ur mockupen)
@@ -2377,11 +2407,11 @@ async function paywallCheck(){
 paywallCheck();proPromoInit();
 load();loadMonthly();loadDaily();loadMacro();loadFda();loadTopOp();loadWatchrow();loadFacit();
 function fgInfo(s){s=+s||0;
-  if(s>=75)return{label:"Extrem girighet",col:"#22d3ee"};
-  if(s>=55)return{label:"Girighet",col:"#22d3ee"};
-  if(s>=45)return{label:"Neutral",col:"#F5C542"};
-  if(s>=25)return{label:"Rädsla",col:"#FF9F0A"};
-  return{label:"Extrem rädsla",col:"#FF3B30"};}
+  if(s>=75)return{label:"Extrem girighet",col:"#22d3ee",dir:1,txt:"Extrem girighet på marknaden — se upp för överhettning."};
+  if(s>=55)return{label:"Girighet",col:"#22d3ee",dir:1,txt:"Marknaden är girig. Investerare tar mer risk."};
+  if(s>=45)return{label:"Neutral",col:"#F5C542",dir:0,txt:"Marknaden är avvaktande — varken rädsla eller girighet."};
+  if(s>=25)return{label:"Rädsla",col:"#FF9F0A",dir:-1,txt:"Marknaden är rädd. Investerare är försiktiga."};
+  return{label:"Extrem rädsla",col:"#FF3B30",dir:-1,txt:"Extrem rädsla — investerare flyr risk."};}
 var SIGFILTER="allt";
 function setSig(k){SIGFILTER=k;
   var cs=document.querySelectorAll("#sigfilter .sigchip");
@@ -2686,10 +2716,18 @@ body{background:radial-gradient(130% 55% at 50% -12%,rgba(245,197,66,.075),trans
 .fgmini-card{background:#0E0F11!important;border:1px solid rgba(255,255,255,.07)!important;border-radius:18px!important;padding:14px 12px!important;display:flex!important;flex-direction:column;align-items:center;justify-content:center;text-align:center;margin:0!important}
 .fgmini-l{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--mut,#8b97a3);display:flex;align-items:center;gap:6px}
 .fgmini-l i.live{width:6px;height:6px;border-radius:50%;background:var(--pos,#22d3ee);display:inline-block}
-.fgmini-radar{margin:4px 0 2px;width:104px;max-width:104px}
+.fgmini-radar{margin:2px 0 0;width:100%;max-width:172px}
 .fgmini-n{font-family:var(--disp);font-weight:900;font-size:29px;line-height:1;letter-spacing:-.02em;margin-top:3px;font-feature-settings:"tnum"}
 .fgmini-n small{font-size:13px;font-weight:700;color:var(--mut,#8b97a3)}
 .fgmini-st{font-family:var(--disp);font-weight:900;font-size:14px;letter-spacing:.02em;margin-top:3px}
+.fg2-div{display:flex;align-items:center;gap:7px;width:100%;margin:7px 0 2px}
+.fg2-div span{flex:1;height:1px;background:linear-gradient(90deg,transparent,rgba(245,197,66,.55))}
+.fg2-div span:last-child{background:linear-gradient(90deg,rgba(245,197,66,.55),transparent)}
+.fg2-pill{margin-top:6px;border:1.5px solid rgba(245,197,66,.65);border-radius:999px;padding:4px 16px;font-family:var(--disp);font-weight:900;letter-spacing:.08em;font-size:12.5px;color:var(--gold2);text-transform:uppercase;box-shadow:0 0 16px rgba(245,197,66,.14)}
+.fg2-foot{display:flex;align-items:center;gap:7px;margin-top:10px;padding-top:9px;border-top:1px solid rgba(255,255,255,.07);width:100%;text-align:left}
+.fg2-ic{flex:none;width:25px;height:25px;border-radius:50%;border:1.2px solid currentColor;display:flex;align-items:center;justify-content:center;box-shadow:0 0 9px -2px currentColor}
+.fg2-tx{flex:1;min-width:0;font-size:9.5px;line-height:1.4;color:#8b97a3}
+.fg2-spark{flex:none;width:38px;height:19px}
 </style>
 <style>
 /* === Smart Money / Polymarket === */
