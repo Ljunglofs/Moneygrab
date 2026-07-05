@@ -1468,7 +1468,7 @@ function render(d){
   // AI-sammanfattning
   if($("#aibrief"))$("#aibrief").innerHTML=`<div class="aichip-bg" style="background-image:url('${IMGS.aichip}')"></div>`+(window._aiBriefHTML||`<div class="ai-h"><span class="dot2"></span>AI · Marknadsläge</div><p>${d.aiSummary}</p>`);
   // tempmätare
-  if($("#tempg")){const PULSE={BEARISH:"pulse_bear",BULLISH:"pulse_bull",NEUTRAL:"pulse_neutral","SUPER BULLISH":"pulse_super"};const pim=IMGS[PULSE[d.gauge.state]||"pulse_bear"];
+  if($("#tempg")){const pim=IMGS.globe;
     let gdiff=null;
     try{
       const today=new Date().toDateString();
@@ -2593,7 +2593,9 @@ html,body{overflow-x:clip}
 .ai2-disc{margin-top:12px;font-size:10px;color:#5b6675}
 /* ===== Dashboard-mockupen ===== */
 .tempg{position:relative;overflow:hidden;text-align:left;padding:15px 14px}
-.tg2-bg{position:absolute;right:-34%;top:-12%;width:115%;height:135%;background-size:cover;background-position:center;opacity:.42;pointer-events:none}
+.tg2-bg{position:absolute;right:-30%;top:-14%;width:118%;height:138%;background-size:cover;background-position:center;opacity:.5;pointer-events:none;filter:saturate(1.05)}
+.tempg::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(7,9,13,.82) 0%,rgba(7,9,13,.35) 55%,rgba(7,9,13,0) 100%);pointer-events:none}
+.tg2-in{position:relative;z-index:2}
 .tg2-in{position:relative;z-index:1}
 .tg2-state{font-family:var(--disp);font-size:19px;font-weight:900;letter-spacing:.02em;margin-top:8px;text-shadow:0 0 16px currentColor}
 .tg2-score{font-size:29px;font-weight:900;margin-top:2px}
