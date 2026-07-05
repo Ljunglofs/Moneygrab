@@ -2363,11 +2363,12 @@ async function proActive(){
   }catch(e){return null;}
 }
 function showPaywall(msg,dismissable){
+  if(dismissable===undefined)dismissable=true;   // X i hörnet som standard
   var el=document.getElementById("paywall");if(!el)return;
   var bi=document.getElementById("pw-brand");
   if(bi&&!bi.src){var hb=document.querySelector(".brand");if(hb&&hb.src)bi.src=hb.src;}
   if(msg){var su=document.getElementById("pw-sub");if(su)su.textContent=msg;}
-  var x=document.getElementById("pw-close");if(x)x.style.display=dismissable?"":"none";
+  var x=document.getElementById("pw-close");if(x)x.style.display=dismissable?"block":"none";
   el.style.display="flex";
 }
 function hidePaywall(){var el=document.getElementById("paywall");if(el)el.style.display="none";
@@ -2427,7 +2428,7 @@ async function paywallCheck(){
     if(tb){tb.textContent=(kvar===1?"Sista dagen":kvar+" dagar kvar")+" av gratisveckan · Skaffa PRO";tb.style.display="";}
     return;
   }
-  showPaywall("Din gratisvecka är slut — fortsätt för");
+  showPaywall("Din gratisvecka är slut — fortsätt för",false);
 }
 paywallCheck();proPromoInit();
 load();loadMonthly();loadDaily();loadMacro();loadFda();loadTopOp();loadWatchrow();loadFacit();
@@ -3008,6 +3009,7 @@ async function pfReview(){
   var pwHist=false;
   var _sp=window.showPaywall;
   if(typeof _sp==="function")window.showPaywall=function(msg,dis){
+    if(dis===undefined)dis=true;
     var r=_sp.apply(this,arguments);
     if(dis&&!pwHist&&isOpen("__pw")){pwHist=true;ovStack.push("__pw");try{history.pushState({g:"pw"},"");}catch(e){}}
     return r;
