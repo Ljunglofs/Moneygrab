@@ -776,6 +776,11 @@ body{background:
 </main>
 
 <div id="trialbar" style="display:none" onclick="showPaywall()"></div>
+<div id="iosbar" style="display:none">
+  <button class="ib-x" onclick="iosBarClose()" aria-label="St&auml;ng">&#10005;</button>
+  <b>K&ouml;r GRABIT som app p&aring; iPhone</b>
+  <span>Tryck p&aring; <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;vertical-align:-2px"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><rect x="5" y="11" width="14" height="10" rx="2"/></svg> <i>Dela</i> i Safari och v&auml;lj <i>&quot;L&auml;gg till p&aring; hemsk&auml;rmen&quot;</i></span>
+</div>
 <div id="propromo" style="display:none">
   <div class="pp-in" onclick="proPromoClick()">
     <button class="pp-x" onclick="proPromoClose(event)" aria-label="St&auml;ng">&#10005;</button>
@@ -2400,6 +2405,20 @@ async function restorePro(){
   if(act){localStorage.setItem("grabit_pro","1");hidePaywall();say("PRO återställt!");}
   else say("Ingen aktiv prenumeration hittades på det här Google-kontot");
 }
+function iosBarInit(){
+  try{
+    var ua=navigator.userAgent||"";
+    var isIOS=/iPhone|iPad|iPod/.test(ua)||(/(Macintosh)/.test(ua)&&navigator.maxTouchPoints>1);
+    var standalone=(window.navigator.standalone===true)||window.matchMedia("(display-mode: standalone)").matches;
+    if(!isIOS||standalone)return;
+    if(Date.now()<(+localStorage.getItem("grabit_iosbar_hide")||0))return;
+    setTimeout(function(){var el=document.getElementById("iosbar");if(el)el.style.display="block";},4000);
+  }catch(e){}
+}
+function iosBarClose(){
+  try{localStorage.setItem("grabit_iosbar_hide",String(Date.now()+7*86400000));}catch(e){}
+  var el=document.getElementById("iosbar");if(el)el.style.display="none";
+}
 function proPromoInit(){
   try{
     if(localStorage.getItem("grabit_pro")==="1")return;
@@ -2433,7 +2452,12 @@ async function paywallCheck(){
   }
   showPaywall("Din gratisvecka är slut — fortsätt för",false);
 }
-paywallCheck();proPromoInit();
+paywallCheck();
+(function(){
+  var ua=navigator.userAgent||"";
+  var isIOS=/iPhone|iPad|iPod/.test(ua)||(/(Macintosh)/.test(ua)&&navigator.maxTouchPoints>1);
+  if(isIOS){iosBarInit();}else{proPromoInit();}
+})();
 load();loadMonthly();loadDaily();loadMacro();loadFda();loadTopOp();loadWatchrow();loadFacit();
 function fgInfo(s){s=+s||0;
   if(s>=75)return{label:"Extrem girighet",col:"#22d3ee",dir:1,txt:"Extrem girighet på marknaden — se upp för överhettning."};
@@ -2724,6 +2748,11 @@ body{background:radial-gradient(130% 55% at 50% -12%,rgba(245,197,66,.075),trans
 .pp-in img{display:block;width:100%;height:auto}
 .pp-x{position:absolute;top:8px;right:8px;z-index:2;width:32px;height:32px;border-radius:50%;border:1px solid rgba(255,255,255,.3);background:rgba(4,4,5,.82);color:#e6ebf2;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center}
 @keyframes ppIn{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}
+#iosbar{position:fixed;left:50%;transform:translateX(-50%);bottom:76px;z-index:58;width:min(94vw,420px);background:linear-gradient(170deg,#141414,#0a0a0b);border:1px solid rgba(245,197,66,.5);border-radius:16px;padding:13px 40px 13px 15px;box-shadow:0 14px 40px rgba(0,0,0,.65),0 0 26px rgba(245,197,66,.12)}
+#iosbar b{display:block;font-family:var(--disp);font-size:14px;letter-spacing:.02em;color:var(--gold2)}
+#iosbar span{display:block;margin-top:3px;font-size:12.5px;line-height:1.5;color:#c7d0dc}
+#iosbar i{font-style:normal;font-weight:700;color:#fff}
+.ib-x{position:absolute;top:7px;right:7px;width:28px;height:28px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:rgba(5,5,6,.8);color:#cfd6e0;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center}
 #trialbar{position:fixed;left:50%;transform:translateX(-50%);bottom:74px;white-space:nowrap;z-index:60;background:rgba(20,20,22,.96);border:1px solid rgba(245,197,66,.4);color:var(--gold2);border-radius:99px;padding:8px 15px;font-size:12px;font-weight:800;letter-spacing:.03em;cursor:pointer;box-shadow:0 8px 26px rgba(0,0,0,.5)}
 .pulsecard{background:#0C0C0D!important;border:1px solid rgba(245,197,66,.16)!important;border-radius:20px!important;padding:16px 18px!important;margin:6px 0 12px!important;box-shadow:0 8px 30px rgba(0,0,0,.5),0 0 26px rgba(245,197,66,.05)!important;overflow:hidden}
 .pulse-wrap{display:grid;grid-template-columns:33% 1fr;gap:14px;align-items:center}
