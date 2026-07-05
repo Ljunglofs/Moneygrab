@@ -871,6 +871,18 @@ def robber_status():
 
 
 _PM_CACHE = {"t": 0.0, "data": None}
+_PM_LAST_GOOD = {"markets": {"t": 0.0, "data": []}, "trades": {"t": 0.0, "data": []}}
+
+def _pm_fallback(kind, fresh, err=None):
+    """Icke-tomt svar sparas; tomt/fel ersätts med senast lyckade (max 6 h)."""
+    import time as _t
+    lg = _PM_LAST_GOOD[kind]
+    if fresh:
+        lg["data"], lg["t"] = fresh, _t.time()
+        return fresh, False
+    if lg["data"] and _t.time() - lg["t"] < 6 * 3600:
+        return lg["data"], True
+    return fresh, False
 
 @app.get("/api/polymarket")
 def polymarket(limit: int = 24, show_all: bool = False):
@@ -896,7 +908,8 @@ def polymarket(limit: int = 24, show_all: bool = False):
         r.raise_for_status()
         raw = r.json()
     except Exception as e:
-        return {"markets": [], "error": str(e)}
+        data, stale = _pm_fallback("markets", [], err=e)
+        return {"markets": data, "stale": stale, "error": str(e)}
 
     out = []
     for m in (raw or []):
@@ -934,8 +947,10 @@ def polymarket(limit: int = 24, show_all: bool = False):
         except Exception:
             continue
     if not show_all:
+        out, stale = _pm_fallback("markets", out)
         _PM_CACHE["t"] = now
         _PM_CACHE["data"] = out
+        return {"markets": out, "cached": False, "stale": stale}
     return {"markets": out, "cached": False}
 
 
@@ -964,7 +979,8 @@ def polymarket_insiders(min_usd: float = 5000, limit: int = 40, show_all: bool =
         r.raise_for_status()
         raw = r.json()
     except Exception as e:
-        return {"trades": [], "error": str(e)}
+        data, stale = _pm_fallback("trades", [], err=e)
+        return {"trades": data, "stale": stale, "error": str(e)}
 
     out = []
     for t in (raw or []):
@@ -993,6 +1009,9 @@ def polymarket_insiders(min_usd: float = 5000, limit: int = 40, show_all: bool =
         except Exception:
             continue
     out.sort(key=lambda x: x["usd"], reverse=True)
+    if not show_all:
+        out, stale = _pm_fallback("trades", out)
+        return {"trades": out, "min_usd": min_usd, "count": len(out), "stale": stale}
     return {"trades": out, "min_usd": min_usd, "count": len(out)}
 
 
