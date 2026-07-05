@@ -1793,11 +1793,53 @@ class AiPayload(BaseModel):
     history: list = []
 
 
+# =====================================================================
+#  FRÅGEKVOT · skyddar AI-budgeten
+#  Per besökare (IP) och dag. Cachade/delade AI-svar (dagens läge,
+#  aktieanalyser) berörs INTE — bara det som kostar per anrop.
+#  Justeras via env: AI_QUOTA_CHAT (std 20), AI_QUOTA_PF (std 5).
+# =====================================================================
+import threading as _qthreading
+
+_AI_QUOTA_LIMITS = {"chat": int(os.getenv("AI_QUOTA_CHAT", "20")),
+                    "pf": int(os.getenv("AI_QUOTA_PF", "5"))}
+_AI_QUOTA_STATE = {}
+_AI_QUOTA_LOCK = _qthreading.Lock()
+
+def _quota_ok(kind: str, request) -> bool:
+    import datetime as _dt
+    try:
+        ip = ((request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
+              or (request.client.host if request.client else "okand"))
+    except Exception:
+        ip = "okand"
+    today = _dt.date.today().isoformat()
+    lim = _AI_QUOTA_LIMITS.get(kind, 20)
+    with _AI_QUOTA_LOCK:
+        if len(_AI_QUOTA_STATE) > 20000:      # svältskydd, nollstäl vid extremt många IP:n
+            _AI_QUOTA_STATE.clear()
+        st = _AI_QUOTA_STATE.get((kind, ip))
+        if not st or st["d"] != today:
+            st = {"d": today, "n": 0}
+        if st["n"] >= lim:
+            _AI_QUOTA_STATE[(kind, ip)] = st
+            return False
+        st["n"] += 1
+        _AI_QUOTA_STATE[(kind, ip)] = st
+    return True
+
+_QUOTA_MSG = ("Du har nått dagens gräns för AI-frågor. "
+              "Kvoten nollställs vid midnatt — signaler, analyser och resten av appen "
+              "fungerar som vanligt under tiden.")
+
+
 @app.post("/api/ai")
-def ai(payload: AiPayload):
+def ai(payload: AiPayload, request: Request):
     q = (payload.question or "").strip()
     if not q:
         raise HTTPException(400, "Tom fråga")
+    if not _quota_ok("chat", request):
+        return {"answer": _QUOTA_MSG, "kvot": True}
 
     ctx = _ai_context(q)
 
@@ -2349,9 +2391,11 @@ class PfPayload(BaseModel):
 
 
 @app.post("/api/ai_portfolio")
-def ai_portfolio(payload: PfPayload):
+def ai_portfolio(payload: PfPayload, request: Request):
     """Grabit AI granskar användarens portfölj. Body:
     {"holdings":[{"tkr":"NVDA","qty":10,"avg":95.5}, ...]}"""
+    if not _quota_ok("pf", request):
+        return {"text": _QUOTA_MSG, "positions": [], "kvot": True}
     import hashlib
     import datetime as _dt
     holds = []
