@@ -1321,15 +1321,19 @@ def run_loop():
     print(f"Tickers: {Config.TICKERS}  |  {Config.MTF_TIMEFRAME} setup / {Config.HTF_TIMEFRAME} bias  |  data=yfinance (futures)")
     _persist = "PERSISTENT" if Config.DATA_DIR not in (".", "") else "FLYKTIG (nollställs vid omstart — sätt DATA_DIR=/var/data + Render Disk)"
     print(f"State/journal: {Config.DATA_DIR}  [{_persist}]")
-    names = ", ".join(Config.NAMES.get(t, t) for t in Config.TICKERS)
-    ok = send_telegram(
-        "\u2705 <b>NASDAQ ROBBER startad</b>\n"
-        f"Bevakar: {names}\n"
-        f"Setup {Config.MTF_TIMEFRAME} / bias {Config.HTF_TIMEFRAME} \u00b7 larm vid \u2265{Config.MIN_SCORE}/7\n"
-        "Skannar 24/7 \u00b7 trade-larm 06:00\u201322:00 m\u00e5n\u2013fre \u00b7 \U0001F305 morgonbrief 06:00\n"
-        f"+ Polymarket-monitor: larm vid trades \u2265 ${int(POLY_MIN_USD):,}"
-    )
-    print(f"Startup-ping till Telegram: {'OK' if ok else 'MISSLYCKADES (kolla TOKEN/CHAT_ID)'}")
+    # Startup-ping i Telegram ar avstangd som standard — varje deploy startar
+    # om servern och spammade kanalen med "startad". Satt ROBBER_STARTUP_PING=1
+    # i Render om du vill ha tillbaka den.
+    if os.environ.get("ROBBER_STARTUP_PING") == "1":
+        names = ", ".join(Config.NAMES.get(t, t) for t in Config.TICKERS)
+        ok = send_telegram(
+            "\u2705 <b>NASDAQ ROBBER startad</b>\n"
+            f"Bevakar: {names}\n"
+            f"Setup {Config.MTF_TIMEFRAME} / bias {Config.HTF_TIMEFRAME} \u00b7 larm vid \u2265{Config.MIN_SCORE}/7\n"
+            "Skannar 24/7 \u00b7 trade-larm 06:00\u201322:00 m\u00e5n\u2013fre \u00b7 \U0001F305 morgonbrief 06:00\n"
+            f"+ Polymarket-monitor: larm vid trades \u2265 ${int(POLY_MIN_USD):,}"
+        )
+        print(f"Startup-ping till Telegram: {'OK' if ok else 'MISSLYCKADES (kolla TOKEN/CHAT_ID)'}")
     import threading as _th
     _th.Thread(target=command_listener, daemon=True, name="cmd-listener").start()
     from zoneinfo import ZoneInfo
