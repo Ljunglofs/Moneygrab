@@ -1043,7 +1043,22 @@ function openAI(){document.getElementById("aichat").classList.add("on");renderAI
   document.getElementById("ai-note").style.display=CONFIG.API_BASE?"none":"block";}
 function closeAI(){document.getElementById("aichat").classList.remove("on");}
 function renderAI(){const box=document.getElementById("ai-msgs");
-  if(!aiHist.length){box.innerHTML=`<div class="ai-empty"><div class="bigmark gbig"><img src="${IMGS.grabit}" alt="Grabit"></div><b style="color:#fff;font-size:15px">Hej! Jag är Grabit AI.</b><br><br>Fråga mig om dagens setups, jämför två aktier, eller be om lägen med bäst R/R. Jag känner hela ditt universum.</div>`;return;}
+  if(!aiHist.length){
+    const bs=(document.querySelector(".brand")||{}).src||"";
+    const ic=(CONFIG.API_BASE?CONFIG.API_BASE.replace(/\/$/,""):"")+"/icon-192.png";
+    const F=[
+      ['<svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.4" fill="#22d3ee" stroke="none"/><line x1="12" y1="2.5" x2="12" y2="5.5"/><line x1="12" y1="18.5" x2="12" y2="21.5"/><line x1="2.5" y1="12" x2="5.5" y2="12"/><line x1="18.5" y1="12" x2="21.5" y2="12"/></svg>',"Smart insights","AI-analys på sekundnivå"],
+      ['<svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16"/><rect x="5" y="12" width="3" height="5" rx="1"/><rect x="10.5" y="9" width="3" height="8" rx="1"/><rect x="16" y="6" width="3" height="11" rx="1"/><path d="M14 4h6v6"/><path d="M20 4l-7 7"/></svg>',"Bättre beslut","Datadrivna fördelar"],
+      ['<svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="16.2" y1="16.2" x2="21" y2="21"/></svg>',"Djup research","Nyheter &amp; mönster i realtid"],
+      ['<svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.8" stroke-linejoin="round"><path d="M13 2L4.5 13.5H11L10 22l8.5-11.5H12z"/></svg>',"Snabba svar","Fråga. Få svar direkt."]
+    ].map(f=>`<div class="aif"><span class="aif-ic">${f[0]}</span><b>${f[1]}</b><i>${f[2]}</i></div>`).join("");
+    box.innerHTML=`<div class="ai-empty">
+      ${bs?`<img class="ai2-brand" src="${bs}" alt="GRABIT">`:""}
+      <div class="ai2-globe" style="background-image:url('${IMGS.globe}')"><img class="ai2-icon" src="${ic}" alt="" onerror="this.style.display='none'"></div>
+      <div class="ai2-txt">Fråga mig om dagens setups, jämför två aktier, eller be om lägen med bäst R/R.<br>Jag känner <span>hela ditt universum</span>.</div>
+      <div class="ai2-feats">${F}</div>
+      <div class="ai2-disc">Grabit AI kan göra misstag. Verifiera alltid viktig information.</div>
+    </div>`;return;}
   box.innerHTML=aiHist.map(m=>`<div class="ai-msg ${m.r}">${m.t.replace(/</g,"&lt;").replace(/\n/g,"<br>")}</div>`).join("");
   box.scrollTop=box.scrollHeight;}
 async function aiSend(q){q=q||document.getElementById("ai-q").value;if(!q||!q.trim())return;
@@ -2564,6 +2579,18 @@ html,body{overflow-x:clip}
 .pw-restore{margin-top:12px;color:var(--gold2);font-size:11.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
 .pw-fine{margin-top:13px;display:flex;gap:10px;align-items:flex-start;text-align:left;color:#5b6675;font-size:10.5px;line-height:1.55;padding:0 4px}
 .pro{cursor:pointer}
+/* ===== Fråga Grabit AI · startvy ===== */
+.ai2-brand{height:38px;width:auto;display:block;margin:2px auto 10px}
+.ai2-globe{position:relative;width:100%;max-width:330px;height:150px;margin:0 auto 14px;background-size:cover;background-position:center 28%;border-radius:16px;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 46px rgba(0,0,0,.6),0 0 30px rgba(245,197,66,.08)}
+.ai2-icon{width:76px;height:76px;border-radius:18px;box-shadow:0 0 24px rgba(245,197,66,.5),0 0 60px rgba(34,211,238,.22)}
+.ai2-txt{font-size:13.5px;color:#c7d0dc;line-height:1.65}
+.ai2-txt span{color:#22d3ee;font-weight:700}
+.ai2-feats{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin:16px 0 4px;border:1px solid rgba(245,197,66,.22);border-radius:15px;padding:13px 6px}
+.aif{min-width:0;text-align:center}
+.aif-ic{display:block;width:26px;height:26px;margin:0 auto 6px;filter:drop-shadow(0 0 6px rgba(34,211,238,.5))}
+.aif b{display:block;font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:#f2f5f9}
+.aif i{font-style:normal;display:block;font-size:8.5px;color:#7c8a9a;margin-top:2px;line-height:1.35}
+.ai2-disc{margin-top:12px;font-size:10px;color:#5b6675}
 /* ===== Dashboard-mockupen ===== */
 .tempg{position:relative;overflow:hidden;text-align:left;padding:15px 14px}
 .tg2-bg{position:absolute;right:-34%;top:-12%;width:115%;height:135%;background-size:cover;background-position:center;opacity:.42;pointer-events:none}
