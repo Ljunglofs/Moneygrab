@@ -1474,8 +1474,15 @@ def indices():
     out = []
     for name, tk in INDICES:
         price, pct = _index_quote(tk)
+        hist = []
+        try:
+            df, _ = fetch(tk)
+            if df is not None:
+                hist = [round(float(x), 4) for x in df["Close"].dropna().iloc[-15:]]
+        except Exception:
+            pass
         out.append({"name": name, "tk": tk, "price": price,
-                    "priceStr": _fmt_idx_price(price), "pct": pct})
+                    "priceStr": _fmt_idx_price(price), "pct": pct, "hist": hist})
     return {"indices": out}
 
 
