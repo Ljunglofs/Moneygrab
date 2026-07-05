@@ -2477,7 +2477,7 @@ async function loadPoly(force){
       var bar=(yes!=null)?'<div class="poly-bar"><span style="width:'+yes+'%"></span></div>':'';
       var odds=(yes!=null)?'<span class="poly-yes">'+yes+'% JA</span>':'';
       var slug=polyEsc(m.slug||m.eventSlug||"");
-      return '<div class="poly-card" onclick="window.open(\'https://polymarket.com/event/'+slug+'\',\'_blank\')"><div class="poly-q">'+polyEsc(m.question)+'</div>'+bar+'<div class="poly-meta">'+odds+'<span>'+polyUsd(m.volume24h||m.volume)+' vol</span></div></div>';
+      return '<div class="poly-card"><div class="poly-q">'+polyEsc(m.question)+'</div>'+bar+'<div class="poly-meta">'+odds+'<span>'+polyUsd(m.volume24h||m.volume)+' vol</span></div></div>';
     }).join("");
   }catch(e){box.innerHTML='<div class="scl-empty">Kunde inte ladda Polymarket.</div>';}
 }
@@ -2761,7 +2761,7 @@ body{background:radial-gradient(130% 55% at 50% -12%,rgba(245,197,66,.075),trans
 #s-smart .sm-sub{color:var(--mut);font-size:12.5px;line-height:1.4;margin:-2px 16px 12px}
 #s-smart .sect2{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--gold);margin:14px 16px 8px}
 .poly-wrap{display:flex;flex-direction:column;gap:10px;padding:0 16px}
-.poly-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 15px;cursor:pointer;transition:border-color .15s}
+.poly-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 15px;transition:border-color .15s}
 .poly-card:active{border-color:rgba(245,197,66,.45)}
 .poly-card .poly-q,.poly-trade .poly-q{font-weight:700;font-size:13.5px;color:var(--txt);line-height:1.35;margin-bottom:9px}
 .poly-bar{height:7px;border-radius:6px;background:rgba(255,59,48,.25);overflow:hidden;margin:7px 0 9px}
