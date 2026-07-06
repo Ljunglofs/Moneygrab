@@ -2236,17 +2236,39 @@ def ai_daily():
                             e.get("title",""), e.get("impact","")) for e in ev)
     except Exception:
         ev_line = ""
+    # Samma breddpoäng som appens Marknadsläge/Fear&Greed-mätare — rubriken
+    # MÅSTE matcha mätarna, annars ser appen självmotsägande ut.
+    forced, breadth_line = "", ""
+    try:
+        rows = scan_universe(None) or []
+        bull = sum(1 for r in rows if r.get("label") in ("BULL", "MOMENTUM", "Rocketcase"))
+        bear = sum(1 for r in rows if r.get("label") in ("BEAR", "AVSVALNING"))
+        tot = bull + bear
+        gs = round(bull / tot * 100) if tot else 50
+        forced = "BULLISH" if gs >= 55 else ("NEUTRAL" if gs >= 40 else "BEARISH")
+        breadth_line = "%d/100 (bull %d mot bear %d i skannern)" % (gs, bull, bear)
+    except Exception:
+        pass
+    if forced:
+        rubrik = ("Inled med exakt ordet %s i versaler, följt av ' — '. Det är appens "
+                  "marknadspoäng (%s) och rubriken MÅSTE matcha mätarna i appen. "
+                  "Pekar indexrörelserna åt annat håll: förklara skillnaden kort i första "
+                  "meningen (t.ex. att index stiger men marknadsbredden är svag)."
+                  % (forced, breadth_line))
+    else:
+        rubrik = ("Börja med ETT av orden BULLISH, BEARISH eller NEUTRAL i versaler, "
+                  "följt av ' — ' och en mening som motiverar riktningen utifrån indexrörelserna.")
     sysp = ("Du är Grabit, svensk marknadsanalytiker. Skriv 'Dagens läge' i exakt detta format: "
-            "Börja med ETT av orden BULLISH, BEARISH eller NEUTRAL i versaler, följt av ' — ' "
-            "och en mening som motiverar riktningen utifrån indexrörelserna. "
+            + rubrik + " "
             "Sedan en mening om vad som sticker ut bland de hetaste aktierna (nämn 1-2 tickers). "
             "Avsluta med en mening om vad som kan röra marknaden framöver, baserat på "
             "makrohändelserna om sådana finns, annars på det allmänna läget (helgdag, tunn volym osv). "
             "Max 4 meningar totalt. Vardaglig men skarp svenska. Ingen rådgivning, "
             "hitta aldrig på siffror utöver de givna.")
-    txt = _ai_text(key, sysp,
-                   "INDEX: %s\nHETAST: %s\nMAKRO KOMMANDE: %s\nIdag är det %s.\nSkriv 'Dagens läge'."
-                   % (idx_line, hot_line, ev_line or "(inga större händelser)",
+    txt = _ai_text(key + ":" + (forced or "fri"), sysp,
+                   "INDEX: %s\nMARKNADSBREDD: %s\nHETAST: %s\nMAKRO KOMMANDE: %s\nIdag är det %s.\nSkriv 'Dagens läge'."
+                   % (idx_line, breadth_line or "okänd", hot_line,
+                      ev_line or "(inga större händelser)",
                       _dt.date.today().strftime("%A %d %B")), 300)
     if not txt:
         # AI:n nere/nyckel saknas -> visa senaste lyckade "Dagens läge" i stället för tomt
