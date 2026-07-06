@@ -1331,7 +1331,48 @@ def command_listener():
 #  Filter som höjer confidence: volym över snitt, EMA20/50 i riktningen.
 #  Av/på + trösklar via env: ORB_ENABLED (std 1), ORB_MIN_CONF (std 60).
 # =====================================================================
-_ORB_STATE = {"day": "", "fired": False}
+_ORB_STATE = {"day": "", "fired": False, "news_day": "", "news": None}
+
+def _orb_news_near_open(now_se):
+    """High-impact USD-makrohändelse inom ±45 min från US-öppning?
+    Returnerar (True, titel) eller (False, ""). Fel -> (False, "") tyst."""
+    today = now_se.strftime("%Y-%m-%d")
+    if _ORB_STATE["news_day"] == today and _ORB_STATE["news"] is not None:
+        return _ORB_STATE["news"]
+    result = (False, "")
+    try:
+        import requests
+        from api import _MACRO_URLS, _MACRO_HEADERS
+        raw = None
+        for url in _MACRO_URLS:
+            try:
+                r = requests.get(url, headers=_MACRO_HEADERS, timeout=8)
+                if r.status_code == 200:
+                    raw = r.json()
+                    break
+            except Exception:
+                continue
+        if raw:
+            open_se = now_se.replace(hour=15, minute=30, second=0, microsecond=0)
+            for e in raw:
+                if str(e.get("impact")) != "High":
+                    continue
+                if str(e.get("country")) not in ("USD", "ALL"):
+                    continue
+                try:
+                    t = datetime.fromisoformat(str(e.get("date")).replace("Z", "+00:00"))
+                except Exception:
+                    continue
+                if t.tzinfo is None:
+                    continue
+                if abs((t - open_se).total_seconds()) <= 45 * 60:
+                    result = (True, str(e.get("title") or "makrohändelse"))
+                    break
+    except Exception:
+        pass
+    _ORB_STATE["news_day"] = today
+    _ORB_STATE["news"] = result
+    return result
 
 def _orb_check():
     if os.environ.get("ORB_ENABLED", "1") != "1":
@@ -1420,6 +1461,9 @@ def _orb_check():
                 conf += 15
         except Exception:
             pass
+        news_risk, news_title = _orb_news_near_open(now_se)
+        if news_risk:
+            conf -= 20     # stor nyhet vid öppning -> breakouts blir opålitliga
         conf = min(conf, 93)
         if conf < int(os.environ.get("ORB_MIN_CONF", "60")):
             _ORB_STATE["fired"] = True
@@ -1436,7 +1480,8 @@ def _orb_check():
             f"\U0001F3AF Entry: <b>{f(c)}</b>\n"
             f"\U0001F6D1 Stop: {f(sl)}\n"
             f"\U0001F4B0 TP1: {f(tp1)}  \u00b7  TP2: {f(tp2)}\n"
-            f"\U0001F916 Confidence: <b>{conf}/100</b>")
+            f"\U0001F916 Confidence: <b>{conf}/100</b>"
+            + (f"\n\u26A0\uFE0F Makronyhet nära öppning: {news_title}" if news_risk else ""))
         try:
             import push_notify as PN
             pil = "\U0001F4C8" if side == "LONG" else "\U0001F4C9"
