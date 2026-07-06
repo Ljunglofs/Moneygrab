@@ -30,7 +30,8 @@ class Config:
     # Killzone-viktning (confidence-justering efter svensk tid) — Nasdaq lever på US-sessionen
     KZ_OPEN = int(os.environ.get("KZ_OPEN", "12"))    # bonus: US-öppning 15:30-17:30
     KZ_US   = int(os.environ.get("KZ_US",   "6"))     # bonus: övrig US-session 17:30-22:00
-    KZ_OFF  = int(os.environ.get("KZ_OFF",  "-15"))   # straff: natt/Asien/EU-morgon (lågvolym-chop)
+    KZ_OFF  = int(os.environ.get("KZ_OFF",  "-15"))   # straff: natt/Asien (lågvolym-chop)
+    KZ_LDN  = int(os.environ.get("KZ_LONDON", "6"))    # bonus: London-öppningen 08-11 (bra NQ-rörelser)
 
     # --- Timeframes (Alpaca-format) ---
     HTF_TIMEFRAME     = "1Hour"   # high-timeframe bias
@@ -951,6 +952,10 @@ def killzone_adjust(now_local):
         return Config.KZ_US, "US-session"
     if 13.0 <= h < 15.5:
         return 0, "EU/US-överlapp"
+    if 8.0 <= h < 11.0:
+        return Config.KZ_LDN, "London killzone"
+    if 11.0 <= h < 13.0:
+        return 0, "EU-session"
     return Config.KZ_OFF, "lågvolym/chop"
 
 
