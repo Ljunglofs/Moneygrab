@@ -29,6 +29,50 @@ except Exception as e:
 #    på begäran. Ligger på tvåsegments-väg så api.py:s catch-all /{fname}
 #    inte slukar den. Öppna i mobilen:
 #        https://grabit-api-80dh.onrender.com/robber/testsignal
+import os as _os
+from fastapi import HTTPException as _HTTPExc
+
+def _robber_key_ok(key: str) -> bool:
+    k = _os.environ.get("ROBBER_ADMIN_KEY", "")
+    return bool(k) and key == k
+
+
+@app.get("/robber/send")
+def _robber_send(key: str = "", side: str = "LONG", ticker: str = "US100",
+                 entry: str = "", sl: str = "", tp1: str = "", tp2: str = "",
+                 conf: int = 75, note: str = ""):
+    """Manuellt larm till ALLA prenumeranter + Telegram. Kräver ?key=<ROBBER_ADMIN_KEY>.
+    Exempel: /robber/send?key=XXX&side=LONG&entry=29700&sl=29650&tp1=29800&conf=80"""
+    if not _robber_key_ok(key):
+        raise _HTTPExc(403, "fel eller saknad nyckel (sätt ROBBER_ADMIN_KEY i Render)")
+    side = (side or "").upper()
+    if side not in ("LONG", "SHORT"):
+        raise _HTTPExc(400, "side måste vara LONG eller SHORT")
+    if not (entry and sl):
+        raise _HTTPExc(400, "entry och sl krävs")
+    tg_err = push_err = None
+    rikt_pil = "\U0001F4C8" if side == "LONG" else "\U0001F4C9"
+    tps = " | TP: " + tp1 + ((" / " + tp2) if tp2 else "") if tp1 else ""
+    try:
+        from nasdaq_robber import send_telegram
+        send_telegram(f"\U0001F6A8 <b>{side} \u2013 {ticker}</b> (manuell)\n"
+                      f"\U0001F525 Confidence: <b>{conf}/100</b>\n"
+                      f"Entry: <b>{entry}</b>\nSL: {sl}{tps}"
+                      + (f"\n{note}" if note else ""))
+    except Exception as e:
+        tg_err = str(e)
+    try:
+        import push_notify as PN
+        r = PN.send_all(f"\u26A1 NASDAQ ROBBER\u2122 \u00b7 {conf}/100",
+                        (f"NEW ENTRY SIGNAL {rikt_pil}\n{side} \u00b7 {ticker}\n"
+                         f"Entry: {entry} | SL: {sl}{tps}"),
+                        url="/", tag="robber-manual")
+    except Exception as e:
+        push_err = str(e); r = None
+    return {"ok": not (tg_err and push_err), "telegram_fel": tg_err,
+            "push_fel": push_err, "push_resultat": r}
+
+
 @app.get("/robber/status")
 def _robber_status():
     """Robotens hälsokontroll: kör den, vad har den sett, varför larmar den inte?"""
@@ -72,7 +116,9 @@ def _robber_status():
 
 
 @app.get("/robber/testsignal")
-def _robber_testsignal():
+def _robber_testsignal(key: str = ""):
+    if not _robber_key_ok(key):
+        raise _HTTPExc(403, "fel eller saknad nyckel — lägg till ?key=<ROBBER_ADMIN_KEY>")
     from datetime import datetime, timezone
     import math
     try:
