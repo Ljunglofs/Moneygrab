@@ -1319,6 +1319,139 @@ def command_listener():
             time.sleep(5)
 
 
+
+# =====================================================================
+#  GRABIT ORB 15/5  ·  Opening Range Breakout på NQ
+#  1) Första 15-min-candeln efter US-öppning (15:30-15:45 svensk tid)
+#     sätter range (high/low).
+#  2) Nästa 5-min-candle (15:45-15:50): STÄNGER den över high -> LONG,
+#     under low -> SHORT. Bara stängning räknas, inte en spik igenom.
+#  3) SL under/över breakout-candeln (eller range-kanten om den är
+#     orimligt tajt). TP1 = 2R, TP2 = 3R.
+#  Filter som höjer confidence: volym över snitt, EMA20/50 i riktningen.
+#  Av/på + trösklar via env: ORB_ENABLED (std 1), ORB_MIN_CONF (std 60).
+# =====================================================================
+_ORB_STATE = {"day": "", "fired": False}
+
+def _orb_check():
+    if os.environ.get("ORB_ENABLED", "1") != "1":
+        return
+    from zoneinfo import ZoneInfo
+    tz_se = ZoneInfo("Europe/Stockholm")
+    now_se = datetime.now(tz_se)
+    if now_se.weekday() > 4:
+        return
+    # Fönstret: breakout-candeln stänger 15:50 -> kolla 15:50-16:20
+    minutes = now_se.hour * 60 + now_se.minute
+    if not (15 * 60 + 50 <= minutes <= 16 * 60 + 20):
+        return
+    today = now_se.strftime("%Y-%m-%d")
+    if _ORB_STATE["day"] == today and _ORB_STATE["fired"]:
+        return
+    _ORB_STATE["day"] = today
+
+    try:
+        import yfinance as yf
+        df = yf.download("NQ=F", period="1d", interval="5m", progress=False, auto_adjust=False)
+        if df is None or len(df) < 4:
+            return
+        try:
+            import pandas as _pd
+            if isinstance(df.columns, _pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
+        except Exception:
+            pass
+        tz_ny = ZoneInfo("America/New_York")
+        idx = df.index.tz_convert(tz_ny)
+        d0 = now_se.astimezone(tz_ny).date()
+
+        def bar_at(h, m):
+            for i, t in enumerate(idx):
+                if t.date() == d0 and t.hour == h and t.minute == m:
+                    return df.iloc[i]
+            return None
+
+        b1 = bar_at(9, 30); b2 = bar_at(9, 35); b3 = bar_at(9, 40)
+        bo = bar_at(9, 45)
+        if b1 is None or b2 is None or b3 is None or bo is None:
+            return  # baren inte klar än — provas igen nästa cykel
+        or_high = max(float(b1["High"]), float(b2["High"]), float(b3["High"]))
+        or_low = min(float(b1["Low"]), float(b2["Low"]), float(b3["Low"]))
+        c = float(bo["Close"])
+
+        if c > or_high:
+            side = "LONG"
+        elif c < or_low:
+            side = "SHORT"
+        else:
+            _ORB_STATE["fired"] = True   # ingen breakout idag — klart för idag
+            STATUS["orb_last"] = f"{today}: ingen breakout (range {or_low:.1f}-{or_high:.1f}, stängning {c:.1f})"
+            print("[orb] ingen breakout idag")
+            return
+
+        # SL: breakout-candelns extrem; range-kanten om den är orimligt tajt (<0.05%)
+        if side == "LONG":
+            sl = float(bo["Low"])
+            if c - sl < c * 0.0005:
+                sl = or_low
+            risk = c - sl
+            tp1, tp2 = c + 2 * risk, c + 3 * risk
+        else:
+            sl = float(bo["High"])
+            if sl - c < c * 0.0005:
+                sl = or_high
+            risk = sl - c
+            tp1, tp2 = c - 2 * risk, c - 3 * risk
+        if risk <= 0:
+            return
+
+        # Filter -> confidence
+        conf = 60
+        try:
+            vol_avg = float(df["Volume"].tail(30).mean())
+            if float(bo["Volume"]) > vol_avg:
+                conf += 15
+        except Exception:
+            pass
+        try:
+            ema20 = float(df["Close"].ewm(span=20).mean().iloc[-1])
+            ema50 = float(df["Close"].ewm(span=50).mean().iloc[-1])
+            if (side == "LONG" and ema20 > ema50) or (side == "SHORT" and ema20 < ema50):
+                conf += 15
+        except Exception:
+            pass
+        conf = min(conf, 93)
+        if conf < int(os.environ.get("ORB_MIN_CONF", "60")):
+            _ORB_STATE["fired"] = True
+            STATUS["orb_last"] = f"{today}: {side} men conf {conf} under tröskeln"
+            return
+
+        _ORB_STATE["fired"] = True
+        STATUS["orb_last"] = f"{today}: {side} conf {conf} entry {c:.1f}"
+        f = lambda v: f"{v:,.1f}".replace(",", " ")
+        send_telegram(
+            "\U0001F680 <b>OPENING RANGE BREAKOUT</b> \u00b7 GRABIT ORB 15/5\n"
+            f"\U0001F552 Range: 15:30\u201315:45 ({f(or_low)}\u2013{f(or_high)})\n"
+            f"\U0001F4C8 Breakout: <b>{side}</b> \u2013 US100\n"
+            f"\U0001F3AF Entry: <b>{f(c)}</b>\n"
+            f"\U0001F6D1 Stop: {f(sl)}\n"
+            f"\U0001F4B0 TP1: {f(tp1)}  \u00b7  TP2: {f(tp2)}\n"
+            f"\U0001F916 Confidence: <b>{conf}/100</b>")
+        try:
+            import push_notify as PN
+            pil = "\U0001F4C8" if side == "LONG" else "\U0001F4C9"
+            PN.send_all(
+                f"\U0001F680 ORB 15/5 \u00b7 {side} US100 \u00b7 {conf}/100",
+                (f"OPENING RANGE BREAKOUT {pil}\n"
+                 f"Entry: {f(c)} | SL: {f(sl)} | TP1: {f(tp1)}"),
+                url="/", tag="grabit-orb")
+        except Exception as e:
+            print("[orb] push-fel:", e)
+        print(f"[orb] {side} skickad: entry {c:.1f} sl {sl:.1f} tp1 {tp1:.1f} conf {conf}")
+    except Exception as e:
+        print("[orb] fel:", e)
+
+
 def run_loop():
     print("=== NASDAQ ROBBER startad ===")
     print(f"Tickers: {Config.TICKERS}  |  {Config.MTF_TIMEFRAME} setup / {Config.HTF_TIMEFRAME} bias  |  data=yfinance (futures)")
@@ -1357,6 +1490,7 @@ def run_loop():
                     print("stats-fel:", e)
             last_win = win
             scan_once()                         # skannar 24/7 (håller koll på natten/Asien)
+            _orb_check()                        # GRABIT ORB 15/5 vid US-öppningen
             poly_scan()                         # Polymarket 24/7
         except Exception as e:
             # En miss i en cykel får ALDRIG döda tråden / värd-appen.
