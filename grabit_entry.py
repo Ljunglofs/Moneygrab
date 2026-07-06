@@ -29,6 +29,48 @@ except Exception as e:
 #    på begäran. Ligger på tvåsegments-väg så api.py:s catch-all /{fname}
 #    inte slukar den. Öppna i mobilen:
 #        https://grabit-api-80dh.onrender.com/robber/testsignal
+@app.get("/robber/status")
+def _robber_status():
+    """Robotens hälsokontroll: kör den, vad har den sett, varför larmar den inte?"""
+    from datetime import datetime, timezone, timedelta
+    try:
+        from nasdaq_robber import STATUS, Config
+    except Exception as e:
+        return {"ok": False, "error": f"kan inte importera roboten: {e}"}
+    out = {"ok": True}
+    out["status"] = {k: STATUS.get(k) for k in (
+        "started", "last_scan", "scans_total", "fired_total", "fired_last",
+        "hogsta_conf_idag", "data_fel_total", "senaste_data_fel", "tickers")}
+    out["regler"] = {"tickers": Config.TICKERS,
+                     "min_score_av_7": Config.MIN_SCORE,
+                     "conf_min_for_larm": Config.CONF_MIN_SEND,
+                     "larmfonster": "06:00-22:00 mån-fre (svensk tid)"}
+    # Skuggloggen: ALLA kandidatsetups senaste 7 dygnen, även de som inte larmats
+    import json as _j
+    rows = []
+    try:
+        with open(Config.SHADOW_LOG) as f:
+            for line in f:
+                try:
+                    rows.append(_j.loads(line))
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    grans = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat(timespec="seconds")
+    last7 = [r for r in rows if (r.get("ts") or "") >= grans]
+    from collections import Counter
+    out["skugglogg_7d"] = {
+        "kandidater_totalt": len(last7),
+        "larm_skickade": sum(1 for r in last7 if r.get("sent")),
+        "hogsta_confidence": max((r.get("confidence") or 0) for r in last7) if last7 else None,
+        "per_dag": dict(sorted(Counter((r.get("ts") or "")[:10] for r in last7).items())),
+        "obs": ("Skuggloggen låg på flyktig disk fram till idag — historik före "
+                "diskbytet är borta. Från och med nu sparas allt beständigt."),
+    }
+    return out
+
+
 @app.get("/robber/testsignal")
 def _robber_testsignal():
     from datetime import datetime, timezone
