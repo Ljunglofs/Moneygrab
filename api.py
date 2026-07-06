@@ -427,7 +427,7 @@ def _manifest():
                    headers={"Cache-Control": "no-cache"})
 
 _SW_JS = """
-const V = 'grabit-v1';
+const V = 'grabit-v2';
 const SHELL = ['/', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png', '/icon-180.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(V).then(c => c.addAll(SHELL).catch(()=>{})).then(()=>self.skipWaiting()));
@@ -440,11 +440,21 @@ self.addEventListener('fetch', e => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.pathname.startsWith('/api/')) return;              // API: alltid nätverk
-  if (req.mode === 'navigate') {                              // appskal: visa cache direkt, uppdatera i bakgrunden
-    e.respondWith(caches.open(V).then(c => c.match('/').then(hit => {
-      const net = fetch(req).then(res => { if (res && res.status === 200) c.put('/', res.clone()); return res; }).catch(()=>hit);
-      return hit || net;
-    })));
+  if (req.mode === 'navigate') {                              // appskal: NÄTVERK FÖRST — uppdateringar når alla direkt
+    e.respondWith((async () => {
+      const c = await caches.open(V);
+      try {
+        const net = await Promise.race([
+          fetch(req),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('sw-timeout')), 4000))
+        ]);
+        if (net && net.status === 200) c.put('/', net.clone());
+        return net;
+      } catch (_) {
+        const hit = await c.match('/');                        // offline/segt: cachen som reserv
+        return hit || fetch(req);
+      }
+    })());
     return;
   }
   e.respondWith(caches.open(V).then(c => c.match(req).then(hit => {  // statiska resurser: cache-first + bakgrundsuppdatering
