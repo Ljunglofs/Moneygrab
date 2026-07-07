@@ -299,6 +299,64 @@ def _snap_targets(targets, price, stop, side, levels):
     return out, labs
 
 
+# =====================================================================
+#  ENTRY-SKYDD  ·  lärdomar från live-handel (3xSL 2026-07-07)
+#  1. Jaga inte: har rörelsen redan gått > CHASE_ATR x ATR i signalens
+#     riktning (12 barer) är läget sent — hoppa över, vänta på rekyl.
+#  2. Gå inte emot stark motcandle: shorta inte när senaste baren är en
+#     kraftig grön candle (V-vändning) och omvänt.
+#  3. SL-cooldown: efter en stopp på en sida — 90 min paus; efter två
+#     stoppar samma sida samma dag — sidan stängd till imorgon.
+#  Justeras via env: CHASE_ATR (std 3.5), SL_COOLDOWN_MIN (std 90),
+#  SL_MAX_PER_SIDE (std 2).
+# =====================================================================
+def _entry_guards(ticker, side, df, price, atr):
+    """Returnerar blockeringsskäl (str) eller None om entryn är OK."""
+    try:
+        chase = float(os.environ.get("CHASE_ATR", "3.5"))
+        look = df.iloc[-min(13, len(df)):-1]
+        if side == "SHORT":
+            ext = float(look.High.max()) - price
+        else:
+            ext = price - float(look.Low.min())
+        if atr > 0 and ext > chase * atr:
+            return "rörelsen redan %.1f ATR i riktningen — jagat läge" % (ext / atr)
+    except Exception:
+        pass
+    try:
+        cur = df.iloc[-1]
+        body = float(cur.Close) - float(cur.Open)
+        if side == "SHORT" and body > 0.5 * atr:
+            return "senaste baren stark grön (+%.0f) — shortar inte in i rekyl" % body
+        if side == "LONG" and -body > 0.5 * atr:
+            return "senaste baren stark röd (%.0f) — köper inte in i ras" % body
+    except Exception:
+        pass
+    try:
+        cool = int(os.environ.get("SL_COOLDOWN_MIN", "90"))
+        maxsl = int(os.environ.get("SL_MAX_PER_SIDE", "2"))
+        now = datetime.now(timezone.utc)
+        today = now.date().isoformat()
+        with open(Config.OUTCOMES_LOG) as f:
+            rows = [json.loads(x) for x in f.readlines()[-200:] if x.strip()]
+        sls = [r for r in rows
+               if r.get("ticker") == ticker and r.get("side") == side
+               and r.get("outcome") == "SL"
+               and str(r.get("closed_ts", "")).startswith(today)]
+        if len(sls) >= maxsl:
+            return "%d SL på %s idag — sidan pausad till imorgon" % (len(sls), side)
+        if sls:
+            last = datetime.fromisoformat(str(sls[-1]["closed_ts"]).replace("Z", "+00:00"))
+            mins = (now - last).total_seconds() / 60
+            if mins < cool:
+                return "SL för %d min sedan — cooldown %d min" % (int(mins), cool)
+    except FileNotFoundError:
+        pass
+    except Exception:
+        pass
+    return None
+
+
 def build_signal(ticker, df, bias):
     cur, prev = df.iloc[-1], df.iloc[-2]
     price = round(float(cur.Close), 2)
@@ -317,6 +375,13 @@ def build_signal(ticker, df, bias):
     elif short_s >= Config.MIN_SCORE and short_s > long_s:
         side, score, reasons = "SHORT", short_s, short_r
     else:
+        return None
+
+    block = _entry_guards(ticker, side, df, price, atr)
+    if block:
+        STATUS["blocked_last"] = "%s %s %s: %s" % (
+            datetime.now(timezone.utc).strftime("%H:%M"), side, ticker, block)
+        print("[guard] %s %s: %s" % (side, ticker, block))
         return None
 
     # Risk: stop = swing-extrem (senaste 5 barer) buffrad med 0.25*ATR,
