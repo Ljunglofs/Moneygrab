@@ -1400,6 +1400,7 @@ def _orb_check():
         import yfinance as yf
         df = yf.download("NQ=F", period="1d", interval="5m", progress=False, auto_adjust=False)
         if df is None or len(df) < 4:
+            STATUS["orb_last"] = f"{today}: ingen/för lite 5m-data ({0 if df is None else len(df)} barer)"
             return
         try:
             import pandas as _pd
@@ -1408,7 +1409,10 @@ def _orb_check():
         except Exception:
             pass
         tz_ny = ZoneInfo("America/New_York")
-        idx = df.index.tz_convert(tz_ny)
+        try:
+            idx = df.index.tz_convert(tz_ny)
+        except TypeError:
+            idx = df.index.tz_localize("UTC").tz_convert(tz_ny)
         d0 = now_se.astimezone(tz_ny).date()
 
         def bar_at(h, m):
@@ -1420,6 +1424,9 @@ def _orb_check():
         b1 = bar_at(9, 30); b2 = bar_at(9, 35); b3 = bar_at(9, 40)
         bo = bar_at(9, 45)
         if b1 is None or b2 is None or b3 is None or bo is None:
+            STATUS["orb_last"] = (f"{today}: väntar på barer "
+                                  f"(9:30 {'ok' if b1 is not None else '-'}, 9:35 {'ok' if b2 is not None else '-'}, "
+                                  f"9:40 {'ok' if b3 is not None else '-'}, 9:45 {'ok' if bo is not None else '-'})")
             return  # baren inte klar än — provas igen nästa cykel
         or_high = max(float(b1["High"]), float(b2["High"]), float(b3["High"]))
         or_low = min(float(b1["Low"]), float(b2["Low"]), float(b3["Low"]))
@@ -1499,6 +1506,7 @@ def _orb_check():
             print("[orb] push-fel:", e)
         print(f"[orb] {side} skickad: entry {c:.1f} sl {sl:.1f} tp1 {tp1:.1f} conf {conf}")
     except Exception as e:
+        STATUS["orb_last"] = f"{_ORB_STATE.get('day','?')}: FEL {type(e).__name__}: {str(e)[:140]}"
         print("[orb] fel:", e)
 
 
