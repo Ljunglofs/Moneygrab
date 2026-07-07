@@ -3046,6 +3046,31 @@ async function pfReview(){
   setTimeout(away,3500); // säkerhetsnät
 })();
 
+/* ===== Auto-uppdatering: håll siffrorna färska medan sidan är öppen =====
+   - Var 5:e minut om fliken är synlig (serverns cache gör anropen billiga)
+   - Direkt när man återvänder till appen efter 3+ min borta
+   - Aldrig i bakgrunden (sparar batteri och data) */
+(function(){
+  var last=Date.now();
+  function refresh(){
+    last=Date.now();
+    try{load();}catch(e){}
+    try{loadDaily();}catch(e){}
+    try{loadTopOp();}catch(e){}
+    try{loadWatchrow();}catch(e){}
+    try{loadMacro();}catch(e){}
+    try{loadFda();}catch(e){}
+    try{loadFacit();}catch(e){}
+    try{if(typeof _dtLoaded!=="undefined"&&_dtLoaded)loadDaytrade(true);}catch(e){}
+  }
+  setInterval(function(){
+    if(document.visibilityState==="visible"&&Date.now()-last>4.5*60*1000)refresh();
+  },60*1000);
+  document.addEventListener("visibilitychange",function(){
+    if(document.visibilityState==="visible"&&Date.now()-last>3*60*1000)refresh();
+  });
+})();
+
 /* ===== Telefonens backknapp: stäng översta vyn / gå till föregående flik ===== */
 (function(){
   var OV=[
