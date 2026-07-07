@@ -351,11 +351,81 @@ app.add_middleware(
 app.add_middleware(GZipMiddleware, minimum_size=600)
 
 
+# =====================================================================
+#  BESÖKSRÄKNARE  ·  unika besökare per dag, integritetsvänligt
+#  Ingen cookie, ingen sparad IP — besökaren identifieras med en hash av
+#  IP + dagens datum + en serverhemlighet, så samma person räknas en
+#  gång per dag och inget kan spåras tillbaka. Sparas på disken.
+#  Läs av: /admin/besok?key=<ROBBER_ADMIN_KEY>
+# =====================================================================
+import hashlib as _hashlib
+import json as _vj
+import threading as _vthreading
+
+_VISITS_FILE = os.path.join(os.environ.get("DATA_DIR", "."), "besok.json")
+_VISITS_LOCK = _vthreading.Lock()
+_VISITS = None
+
+def _visits_load():
+    global _VISITS
+    if _VISITS is None:
+        try:
+            with open(_VISITS_FILE) as f:
+                _VISITS = _vj.load(f)
+        except Exception:
+            _VISITS = {}
+    return _VISITS
+
+def _visit_note(request):
+    try:
+        import datetime as _dt
+        ip = ((request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
+              or (request.client.host if request.client else "?"))
+        if ip.startswith("10.") or ip in ("127.0.0.1", "?"):
+            return                       # interna hälsokollar räknas inte
+        day = _dt.date.today().isoformat()
+        salt = os.environ.get("ROBBER_ADMIN_KEY", "grabit")
+        h = _hashlib.sha256((ip + day + salt).encode()).hexdigest()[:16]
+        with _VISITS_LOCK:
+            v = _visits_load()
+            d = v.setdefault(day, {"visningar": 0, "unika": []})
+            d["visningar"] += 1
+            if h not in d["unika"]:
+                d["unika"].append(h)
+            if len(v) > 60:              # behåll ~2 månader
+                for k in sorted(v)[:-60]:
+                    v.pop(k, None)
+            try:
+                tmp = _VISITS_FILE + ".tmp"
+                with open(tmp, "w") as f:
+                    _vj.dump(v, f)
+                os.replace(tmp, _VISITS_FILE)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+
+@app.get("/admin/besok")
+def admin_besok(key: str = ""):
+    if not key or key != os.environ.get("ROBBER_ADMIN_KEY", ""):
+        raise HTTPException(403, "fel eller saknad nyckel")
+    with _VISITS_LOCK:
+        v = _visits_load()
+        out = {day: {"unika_besokare": len(d.get("unika", [])),
+                     "sidvisningar": d.get("visningar", 0)}
+               for day, d in sorted(v.items(), reverse=True)}
+    tot_unika = sum(x["unika_besokare"] for x in out.values())
+    return {"per_dag": out, "summa_unika_60_dagar": tot_unika,
+            "obs": "Unika = per dag. Samma person i går och i dag räknas två gånger."}
+
+
 # index.html: tillåt cache MEN revalidera varje gång (no-cache + ETag).
 # -> aterbesok = 304 (laddar direkt), efter deploy = ny ETag = farsk fil.
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
     import os
+    _visit_note(request)
     p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "index.html")
     if not os.path.exists(p):
         return HTMLResponse("<h1>GRABIT API</h1><p>index.html saknas i repot.</p>",
