@@ -1893,6 +1893,7 @@ def _ai_fallback(question: str, ctx: str) -> str:
 class AiPayload(BaseModel):
     question: str
     history: list = []
+    lang: str = "sv"
 
 
 # =====================================================================
@@ -1976,7 +1977,7 @@ def ai(payload: AiPayload, request: Request):
                 f"\n\nDagens datum är {_today}. Du har tillgång till webbsökning. "
                 "Använd den för aktuella fakta (kurser, IPO:er, bolagsnyheter, vem som äger vad) "
                 "istället för att svara från minnet, eftersom din träningsdata kan vara inaktuell. "
-                "Svara alltid på svenska.")
+                + ("Respond ONLY in natural English." if str(getattr(payload,"lang","sv")).lower().startswith("en") else "Svara alltid på svenska."))
 
     try:
         try:
@@ -2243,8 +2244,21 @@ def robber_exec_status():
     return out
 
 
-def _ai_text(cache_key: str, system: str, user: str, max_tokens: int = 220) -> str:
+def _lang_instr(lang: str) -> str:
+    """Slutinstruktion som tvingar svarsspråket. Överskriver 'på svenska' i prompten."""
+    if (lang or "sv").lower().startswith("en"):
+        return (" OUTPUT LANGUAGE: English only. Ignore any earlier instruction to "
+                "write in Swedish and produce all output in natural English. If the "
+                "output is JSON, keep the keys and structure but translate the values.")
+    return ""
+
+
+def _ai_text(cache_key: str, system: str, user: str, max_tokens: int = 220, lang: str = "sv") -> str:
     """Generisk cachad Claude-text. Tom sträng om nyckel saknas/fel."""
+    li = _lang_instr(lang)
+    if li:
+        cache_key = cache_key + ":en"
+        system = (system or "") + li
     if cache_key in _AI_TEXT_CACHE:
         return _AI_TEXT_CACHE[cache_key]
     client = _anthropic_client()
@@ -2271,7 +2285,7 @@ def _ai_text(cache_key: str, system: str, user: str, max_tokens: int = 220) -> s
 
 
 @app.get("/api/ai_setup/{ticker}")
-def ai_setup(ticker: str):
+def ai_setup(ticker: str, lang: str = "sv"):
     """En till två meningar på svenska som förklarar bolagets tekniska setup."""
     tk = ticker.upper().strip()
     a = scan(tk)
@@ -2282,12 +2296,12 @@ def ai_setup(ticker: str):
             "det viktigaste (trend, brott, volym, momentum) och en risk om den finns "
             "(överköpt, parabol, tunn likviditet). Inga köp/säljråd. Hitta inte på siffror.")
     txt = _ai_text("setup:%s:%s:%s" % (tk, a.get("score10"), a.get("last")),
-                   sysp, "Förklara setupen:\n" + _fmt_stock_ctx(a), 170)
+                   sysp, "Förklara setupen:\n" + _fmt_stock_ctx(a), 170, lang=lang)
     return {"ticker": tk, "text": txt}
 
 
 @app.get("/api/ai_daily")
-def ai_daily():
+def ai_daily(lang: str = "sv"):
     """Kort 'Dagens läge'-text för Översikt, byggd på index + hetast."""
     import datetime as _dt
     key = "daily:" + _dt.datetime.utcnow().strftime("%Y%m%d%H")  # ny var timme
@@ -2342,7 +2356,7 @@ def ai_daily():
                    "INDEX: %s\nMARKNADSBREDD: %s\nHETAST: %s\nMAKRO KOMMANDE: %s\nIdag är det %s.\nSkriv 'Dagens läge'."
                    % (idx_line, breadth_line or "okänd", hot_line,
                       ev_line or "(inga större händelser)",
-                      _dt.date.today().strftime("%A %d %B")), 300)
+                      _dt.date.today().strftime("%A %d %B")), 300, lang=lang)
     if not txt:
         # AI:n nere/nyckel saknas -> visa senaste lyckade "Dagens läge" i stället för tomt
         stale = [v for k2, v in _AI_TEXT_CACHE.items() if k2.startswith("daily:")]
@@ -2352,7 +2366,7 @@ def ai_daily():
 
 
 @app.get("/api/ai_news/{ticker}")
-def ai_news(ticker: str):
+def ai_news(ticker: str, lang: str = "sv"):
     """Svensk sammanfattning + stämpel av bolagets nyheter (kräver Alpaca-nycklar)."""
     tk = ticker.upper().strip()
     heads = []
@@ -2380,7 +2394,7 @@ def ai_news(ticker: str):
             "Rapport, Analytiker, Personal, Marknad, Övrigt — välj den som bäst matchar "
             "huvudnyheten. Tolka bara rubrikerna, hitta inte på.")
     txt = _ai_text("news:%s:%x" % (tk, hash(tuple(heads[:6])) & 0xffffff),
-                   sysp, "Aktie %s. Rubriker:\n- %s" % (tk, "\n- ".join(heads[:6])), 240)
+                   sysp, "Aktie %s. Rubriker:\n- %s" % (tk, "\n- ".join(heads[:6])), 240, lang=lang)
     low = txt.lower()
     senti = "pos" if "positivt" in low else "neg" if "negativt" in low else "neu" if "neutralt" in low else ""
     _CAT_TAXONOMY = ["FDA", "Kontrakt", "Förvärv", "Produktlansering", "Rapport",
@@ -2396,7 +2410,7 @@ _SV_MONTHS = ["januari", "februari", "mars", "april", "maj", "juni", "juli",
 
 
 @app.get("/api/ai_monthly")
-def ai_monthly(ticker: str = ""):
+def ai_monthly(ticker: str = "", lang: str = "sv"):
     """Auto-skrivet 'Månadens case'. Väljer starkaste bolaget om ingen ticker anges."""
     import datetime as _dt
     import json as _j
@@ -2444,7 +2458,7 @@ def ai_monthly(ticker: str = ""):
             '{"h":"Risker","t":"<2-3 meningar>"}]}\n'
             "Sakligt, ingen köp/säljrådgivning, hitta inte på siffror utöver de givna.")
     user = "Bolag: %s (%s)\nManad: %s\n%s" % (tk, name, manad, _fmt_stock_ctx(a))
-    raw = _ai_text("monthly:%s:%s" % (tk, now.strftime("%Y%m")), sysp, user, 900)
+    raw = _ai_text("monthly:%s:%s" % (tk, now.strftime("%Y%m")), sysp, user, 900, lang=lang)
     tagline = summary = verdict = ""
     sektioner = []
     if raw:
@@ -2512,6 +2526,7 @@ def quotes(tickers: str = ""):
 
 class PfPayload(BaseModel):
     holdings: list = []
+    lang: str = "sv"
 
 
 @app.post("/api/ai_portfolio")
@@ -2572,7 +2587,7 @@ def ai_portfolio(payload: PfPayload, request: Request):
         ("|".join(f"{h['tkr']}:{h['qty']}:{h['avg']}" for h in holds)
          + _dt.datetime.utcnow().strftime("%Y%m%d%H")).encode()).hexdigest()
     user = ("PORTFÖLJ (vikter: %s)\n\n%s\n\nGranska portföljen." % (wline or "—", "\n".join(lines)))
-    txt = _ai_text(key, sysp, user, 700)
+    txt = _ai_text(key, sysp, user, 700, lang=str(getattr(payload,"lang","sv")))
     out = {"text": txt, "positions": positions, "total": round(total, 2)}
     if not txt:
         out["error"] = _AI_LAST_ERR.get("err") or "AI-svaret blev tomt"

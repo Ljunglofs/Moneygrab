@@ -1324,7 +1324,7 @@ function renderAI(){const box=document.getElementById("ai-msgs");
 async function aiSend(q){q=q||document.getElementById("ai-q").value;if(!q||!q.trim())return;
   document.getElementById("ai-q").value="";aiHist.push({r:"u",t:q});aiHist.push({r:"a",t:"…"});renderAI();const i=aiHist.length-1;
   if(!CONFIG.API_BASE){aiHist[i].t=demoAnswer(q);renderAI();return;}
-  try{const res=await fetch(CONFIG.API_BASE.replace(/\/$/,"")+"/api/ai",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:q,history:aiHist.slice(0,-1)})});
+  try{const res=await fetch(CONFIG.API_BASE.replace(/\/$/,"")+"/api/ai",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:q,history:aiHist.slice(0,-1),lang:window.GRABIT_LANG||"sv"})});
     const j=await res.json();aiHist[i].t=j.answer||j.text||JSON.stringify(j);}
   catch(e){aiHist[i].t="Kunde inte nå Grabit just nu. Försök igen.";}
   renderAI();}
@@ -1606,7 +1606,7 @@ async function askGrabit(tkr,q){if(!q||!q.trim())return;const ans=$("#ask-ans");
   const B=CONFIG.API_BASE?CONFIG.API_BASE.replace(/\/$/,""):"";
   if(!B){ans.innerHTML=`<b>Demo:</b> koppla API:t så svarar Grabit live om ${tkr}.`;return;}
   const qq=(q.toUpperCase().indexOf(tkr.toUpperCase())>=0)?q:(q+" ("+tkr+")");
-  try{const r=await fetch(B+"/api/ai",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:qq,history:[]})});
+  try{const r=await fetch(B+"/api/ai",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:qq,history:[],lang:window.GRABIT_LANG||"sv"})});
     const j=await r.json();const txt=(j.answer||j.text||"");ans.innerHTML=txt?txt.replace(/</g,"&lt;").replace(/\n/g,"<br>"):"Inget svar just nu — försök igen.";}
   catch(e){ans.innerHTML="Kunde inte nå Grabit just nu. Försök igen.";}}
 
@@ -2187,7 +2187,7 @@ async function loadMonthly(){
       else if(j&&j.ticker)wantTk=j.ticker;}}catch(e){}
   // 2) Auto-skrivet av Claude (om inget färdigt case ovan)
   if(!m&&B){try{
-    const r=await fetch(B+"/api/ai_monthly"+(wantTk?("?ticker="+encodeURIComponent(wantTk)):""),{cache:"no-store"});
+    const r=await fetch(B+"/api/ai_monthly"+(wantTk?("?ticker="+encodeURIComponent(wantTk)):"")+((window.GRABIT_LANG==="en")?((wantTk?"&":"?")+"lang=en"):""),{cache:"no-store"});
     if(r.ok){const j=await r.json();if(j&&j.ticker&&(j.summary||j.tagline))m=j;}
   }catch(e){}}
   if(!m)return; _MCASE=m;
@@ -2319,7 +2319,7 @@ async function loadDaily(){
   // show(html,true) sparar texten globalt så render() aldrig skriver över den med "Laddar…"
   const show=function(html,remember){if(remember)window._aiBriefHTML=html;el.innerHTML=chip+html;};
   try{
-    const r=await fetch(B+"/api/ai_daily",{cache:"no-store"});const j=await r.json();
+    const r=await fetch(B+"/api/ai_daily"+((window.GRABIT_LANG==="en")?"?lang=en":""),{cache:"no-store"});const j=await r.json();
     if(j&&j.text){
       var txt=j.text.replace(/\*\*/g,"").replace(/^\s*dagens läge:?\s*/i,"").replace(/\n+/g," ").trim();
       var dir=null,dm=txt.match(/^(BULLISH|BEARISH|NEUTRAL)\b[\s—–-]*/i);
@@ -2373,9 +2373,9 @@ async function loadStockAI(tkr){
   card.innerHTML='<div class="st-ai-h"><span class="dot2"></span>GRABIT AI</div><div class="st-ai-b">Analyserar…</div>';
   slot.innerHTML="";slot.appendChild(card);
   let html="";
-  try{const sR=await fetch(B+"/api/ai_setup/"+encodeURIComponent(tkr),{cache:"no-store"});const sJ=await sR.json();
+  try{const sR=await fetch(B+"/api/ai_setup/"+encodeURIComponent(tkr)+((window.GRABIT_LANG==="en")?"?lang=en":""),{cache:"no-store"});const sJ=await sR.json();
     if(sJ&&sJ.text)html+='<div class="st-ai-row"><b>Setup</b><span>'+sJ.text.replace(/</g,"&lt;")+'</span></div>';}catch(e){}
-  try{const nR=await fetch(B+"/api/ai_news/"+encodeURIComponent(tkr),{cache:"no-store"});const nJ=await nR.json();
+  try{const nR=await fetch(B+"/api/ai_news/"+encodeURIComponent(tkr)+((window.GRABIT_LANG==="en")?"?lang=en":""),{cache:"no-store"});const nJ=await nR.json();
     if(nJ&&nJ.text){const sc=nJ.sentiment,lbl=sc==="pos"?"Positivt":sc==="neg"?"Negativt":sc==="neu"?"Neutralt":"";
       const col=sc==="pos"?"var(--pos)":sc==="neg"?"var(--neg)":"var(--mut)";
       const clean=nJ.text.replace(/Stämpel:.*/i,"").replace(/Kategori:.*/i,"").replace(/</g,"&lt;").trim();_sent=sc;
@@ -3272,7 +3272,7 @@ async function pfReview(){
   if(btn){btn.disabled=true;btn.textContent="Grabit AI analyserar…";}
   try{
     var r=await fetch(B+"/api/ai_portfolio",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({holdings:H})});
+      body:JSON.stringify({holdings:H,lang:window.GRABIT_LANG||"sv"})});
     var j=await r.json();
     if(j&&j.text){box.innerHTML='<div class="pf2-ai"><div class="ai-h"><span class="dot2" style="width:6px;height:6px;border-radius:50%;background:var(--gold);display:inline-block"></span>Grabit AI · portföljgranskning</div><div class="ai-tx"></div></div>';
       box.querySelector(".ai-tx").textContent=j.text;}
