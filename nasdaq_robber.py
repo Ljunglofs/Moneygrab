@@ -321,14 +321,20 @@ def _snap_targets(targets, price, stop, side, levels):
 def _entry_guards(ticker, side, df, price, atr):
     """Returnerar blockeringsskäl (str) eller None om entryn är OK."""
     try:
+        # Sträckning mäts som avstånd från EMA20 (medelvärdet) — INTE från senaste
+        # botten. I en frisk trend med rekyler ligger priset nära EMA20 och släpps
+        # igenom; bara en parabolisk blowoff långt från snittet räknas som jagande.
+        # (Gamla måttet blockerade i praktiken varje entry i en stark trend.)
         chase = float(os.environ.get("CHASE_ATR", "3.5"))
-        look = df.iloc[-min(13, len(df)):-1]
-        if side == "SHORT":
-            ext = float(look.High.max()) - price
-        else:
-            ext = price - float(look.Low.min())
-        if atr > 0 and ext > chase * atr:
-            return "rörelsen redan %.1f ATR i riktningen — jagat läge" % (ext / atr)
+        e20 = None
+        if "ema20" in df.columns:
+            v = df["ema20"].to_numpy()
+            if len(v) and not np.isnan(v[-1]):
+                e20 = float(v[-1])
+        if e20 is not None and atr > 0:
+            ext = (price - e20) if side == "LONG" else (e20 - price)
+            if ext > chase * atr:
+                return "priset %.1f ATR från EMA20 — paraboliskt/jagat läge" % (ext / atr)
     except Exception:
         pass
     try:
