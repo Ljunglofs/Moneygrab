@@ -1069,6 +1069,26 @@ def _tier(conf):
     return "\U0001F534", "SVAG"
 
 
+def _primary_setup(comps):
+    """Valjer det mest definierande uppl\u00E4gget som fyrade (prioritetsordning)."""
+    comps = comps or {}
+    order = [
+        ("retest",          "Breakout + Retest"),
+        ("sweep",           "Liquidity Sweep"),
+        ("failed_breakout", "Failed Breakout"),
+        ("vwap_bounce",     "VWAP-studs"),
+        ("pullback",        "Trend Pullback"),
+        ("fvg",             "Fair Value Gap"),
+        ("ob",              "Order Block"),
+        ("bos",             "Breakout (BOS)"),
+        ("choch",           "Trendv\u00E4ndning (CHoCH)"),
+    ]
+    for key, label in order:
+        if comps.get(key):
+            return label
+    return "Trendf\u00F6ljning"
+
+
 def format_alert(sig):
     check, cross, wait = "\u2705", "\u274C", "\u23F3"
     side_txt = "LONG" if sig["side"] == "LONG" else "SHORT"
@@ -1089,8 +1109,10 @@ def format_alert(sig):
         f"TP{i+1}: {t}" + (f" ({_labs[i]})" if i < len(_labs) and _labs[i] else "")
         for i, t in enumerate(tgs))
     rrtxt = " / ".join(f"1:{r:g}" for r in rr)
+    setup = sig.get("setup") or _primary_setup(sig.get("components"))
     lines = [
         f"{dot} <b>{side_txt} \u2013 {name}</b>  ({sig['ticker']})",
+        f"\U0001F3AF Setup: <b>{setup}</b>",
         f"\U0001F525 Confidence: <b>{conf}/100</b>  \u00b7  {tier}",
         f"HTF Bias: {bias_txt}",
     ]
@@ -1215,6 +1237,7 @@ def scan_once():
                 kz_delta, kz_label = killzone_adjust(datetime.now(ZoneInfo(Config.LOCAL_TZ)))
                 conf = max(0, min(100, conf + kz_delta))
                 sig["confidence"] = conf; sig["groups"] = groups; sig["components"] = comps
+                sig["setup"] = _primary_setup(comps)
                 sig["killzone"] = kz_label; sig["kz_delta"] = kz_delta
 
             if sig:
@@ -1244,9 +1267,10 @@ def scan_once():
                         _tps = sig.get("targets") or []
                         _tp = (" | TP: " + str(_tps[0])) if _tps else ""
                         _pil = "\U0001F4C8" if sig["side"] == "LONG" else "\U0001F4C9"
+                        _setup = sig.get("setup") or _primary_setup(sig.get("components"))
                         PN.send_all(
                             f"\u26A1 NASDAQ ROBBER\u2122 \u00b7 {sig['confidence']}/100",
-                            (f"NEW ENTRY SIGNAL {_pil}\n"
+                            (f"{_setup} {_pil}\n"
                              f"{sig['side']} \u00b7 {Config.NAMES.get(sig['ticker'], sig['ticker'])}\n"
                              f"Entry: {sig['price']} | SL: {sig['stop']}{_tp}"),
                             url="/", tag="robber-signal")
