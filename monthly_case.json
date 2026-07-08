@@ -1,21 +1,37 @@
 {
   "manad": "Juli 2026",
+  "manad_en": "July 2026",
   "ticker": "AMPG",
   "name": "AmpliTech Group",
   "tagline": "Amerikansk 5G- & O-RAN-infrastruktur – bygger näten USA vill äga själv",
+  "tagline_en": "American 5G & O-RAN infrastructure – building the networks the US wants to own",
   "score": 8.6,
   "verdict": "KÖP",
+  "verdict_en": "BUY",
   "summary": "Bygger och kontrollerar kritisk kommunikationsinfrastruktur på amerikansk mark – 5G, O-RAN och privata nät. Aktien är upp över 225 % på tre månader och bolaget har just avslutat sitt utspädande ATM-program och startat ett återköpsprogram på 10 miljoner dollar – en signal om att ledningen tror på egen aktie.",
+  "summary_en": "Builds and controls critical communications infrastructure on American soil – 5G, O-RAN and private networks. The stock is up over 225% in three months and the company just wrapped up its dilutive ATM program and started a $10 million buyback – a signal that management believes in its own stock.",
   "sektioner": [
     { "h": "Vad de gör", "t": "Designar och tillverkar RF-komponenter, förstärkare och 5G/O-RAN-system – amerikansktillverkad hårdvara för nät som staten och försvaret vill hålla inom landet." },
     { "h": "Katalysatorer", "t": "18 juli: Series A-teckningsrätter förfaller ($5) – utlöses de tillförs bolaget kapital. Mitten av augusti: Q2-rapport som guidats klart högre än Q1." },
     { "h": "Rakt från VD:n", "t": "Grundare & VD Fawad Maqbool: 'Oberoende idag betyder att bygga och kontrollera vår nations kritiska kommunikationsinfrastruktur. Vi är stolta över att bygga i USA.'" },
     { "h": "Tesen", "t": "Momentum-case med riktig story: inhemsk 5G-infrastruktur i en tid av handelskonflikt och trygga leverantörskedjor. Buyback plus avslutad ATM minskar utspädningsrisken. Hög volatilitet – för den som tål svängningar." }
   ],
+  "sektioner_en": [
+    { "h": "What they do", "t": "Designs and manufactures RF components, amplifiers and 5G/O-RAN systems – American-made hardware for networks the government and defense want to keep inside the country." },
+    { "h": "Catalysts", "t": "July 18: Series A warrants expire ($5) – if triggered they bring capital into the company. Mid-August: Q2 report guided clearly higher than Q1." },
+    { "h": "Straight from the CEO", "t": "Founder & CEO Fawad Maqbool: 'Independence today means building and controlling our nation's critical communications infrastructure. We are proud to build in the USA.'" },
+    { "h": "The thesis", "t": "A momentum case with a real story: domestic 5G infrastructure in a time of trade conflict and secure supply chains. The buyback plus the finished ATM reduces dilution risk. High volatility – for those who can stomach the swings." }
+  ],
   "nyckeltal": [
     { "k": "Sektor", "v": "5G / O-RAN" },
     { "k": "Kurs", "v": "$6.22" },
     { "k": "3 mån", "v": "+226 %" },
     { "k": "Risk", "v": "Hög" }
+  ],
+  "nyckeltal_en": [
+    { "k": "Sector", "v": "5G / O-RAN" },
+    { "k": "Price", "v": "$6.22" },
+    { "k": "3 mo", "v": "+226 %" },
+    { "k": "Risk", "v": "High" }
   ]
 }

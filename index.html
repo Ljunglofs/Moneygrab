@@ -967,7 +967,57 @@ var _I18N_EXACT = {
   "Analyserar…":"Analyzing…",
   "TradingView · candlesticks, indikatorer & ritverktyg":"TradingView · candlesticks, indicators & drawing tools",
   "Fullständig bolagsbeskrivning hämtas…":"Full company description loading…",
-  "Verkar inom":"Operates within"
+  "Verkar inom":"Operates within",
+  "Institutionellt ägande":"Institutional ownership",
+  "Insiderägande":"Insider ownership",
+  "Blankat (short int.)":"Shorted (short int.)",
+  "Struktur":"Structure",
+  "Trendstyrka":"Trend strength",
+  "Stöd (1 ATR)":"Support (1 ATR)",
+  "Motstånd (1 ATR)":"Resistance (1 ATR)",
+  "Fake-breakout-risk":"Fake-breakout risk",
+  "Exit-risk":"Exit risk",
+  "Rel. volym":"Rel. volume",
+  "🔥 Hetta just nu":"🔥 Hot right now",
+  "Extrem girighet på marknaden — se upp för överhettning.":"Extreme greed in the market — watch for overheating.",
+  "Marknaden är girig. Investerare tar mer risk.":"The market is greedy. Investors are taking more risk.",
+  "Marknaden är rädd. Investerare är försiktiga.":"The market is fearful. Investors are cautious.",
+  "Extrem rädsla — investerare flyr risk.":"Extreme fear — investors are fleeing risk.",
+  "Mer":"More",
+  "Vändningar":"Reversals",
+  "Veckans hetaste":"Hottest of the week",
+  "Varningar":"Warnings",
+  "Jämför":"Compare",
+  "Kurs <$15":"Price <$15",
+  "Hög relvol":"High rel.vol",
+  "Låg mcap":"Low mcap",
+  "Halvledare":"Semiconductors",
+  "Nuclear/Energi":"Nuclear/Energy",
+  "Försvar/Drönare":"Defense/Drones",
+  "Mjukvara/AI":"Software/AI",
+  "Bio/Hälsa":"Bio/Health",
+  "Stark tillväxt":"Strong growth",
+  "Starkast nu":"Strongest now",
+  "Framtidens kraft":"Power of the future",
+  "Strategisk resurs":"Strategic resource",
+  "Stabil tillväxt":"Stable growth",
+  "Ökat fokus":"Increased focus",
+  "AI möter verkligheten":"AI meets reality",
+  "Nya gränser":"New frontiers",
+  "Hälsa & innovation":"Health & innovation",
+  "Hetaste teman just nu":"Hottest themes right now",
+  "HETASTA TEMAN JUST NU":"HOTTEST THEMES RIGHT NOW",
+  "Stark momentum · Flera breakout-setups":"Strong momentum · Several breakout setups",
+  "3 TOPPSETUPS":"3 TOP SETUPS",
+  "SEKTORSCANNER":"SECTOR SCANNER",
+  "Bekräftade setups":"Confirmed setups",
+  "Högsta volym":"Highest volume",
+  "Totalt värde":"Total value",
+  "Inga innehav ännu. Lägg till din första aktie ovan — ticker, antal och GAV.":"No holdings yet. Add your first stock above — ticker, quantity and avg. price.",
+  "Watchlist, nyheter, inställningar.":"Watchlist, news, settings.",
+  "Demo-läge · koppla API:t så svarar Grabit live med din scanner-data":"Demo mode · connect the API and Grabit answers live with your scanner data",
+  "Kunde inte hämtas just nu — servern kan vara i kallstart. Försöker igen…":"Couldn't be fetched right now — the server may be cold-starting. Retrying…",
+  "+ Fråga Grabit":"+ Ask Grabit"
 };
 var _I18N_RULES = [
   [/^(\d+) dagar kvar av gratisveckan · Skaffa PRO$/, "$1 days left of your free week · Get PRO"],
@@ -1005,7 +1055,12 @@ var _I18N_RULES = [
   [/^Grabit Riktkurs$/, "Grabit Target"],
   [/^Riktkurs \(snitt\)$/, "Target (avg)"],
   [/^(.+?) är noterat i ([^.]+)\.(?: Verkar inom ([^.]+)\.)? Fullständig bolagsbeskrivning hämtas…$/, function(_m,nm,ld,se){var L={USA:"the USA",Sverige:"Sweden",Europa:"Europe",Tyskland:"Germany",Kanada:"Canada",Storbritannien:"the UK",Finland:"Finland",Norge:"Norway",Danmark:"Denmark",Japan:"Japan",Kina:"China",Taiwan:"Taiwan",Australien:"Australia",Schweiz:"Switzerland"};return nm+" is listed in "+(L[ld]||ld)+"."+(se?" Operates within "+se+".":"")+" Full company description loading…";}],
-  [/^Bolag noterat i ([^.]+)\.(?: Verkar inom ([^.]+)\.)? Fullständig bolagsbeskrivning hämtas…$/, function(_m,ld,se){var L={USA:"the USA",Sverige:"Sweden",Europa:"Europe",Tyskland:"Germany",Kanada:"Canada",Storbritannien:"the UK",Finland:"Finland",Norge:"Norway",Danmark:"Denmark",Japan:"Japan",Kina:"China",Taiwan:"Taiwan",Australien:"Australia",Schweiz:"Switzerland"};return "Company listed in "+(L[ld]||ld)+"."+(se?" Operates within "+se+".":"")+" Full company description loading…";}]
+  [/^Bolag noterat i ([^.]+)\.(?: Verkar inom ([^.]+)\.)? Fullständig bolagsbeskrivning hämtas…$/, function(_m,ld,se){var L={USA:"the USA",Sverige:"Sweden",Europa:"Europe",Tyskland:"Germany",Kanada:"Canada",Storbritannien:"the UK",Finland:"Finland",Norge:"Norway",Danmark:"Denmark",Japan:"Japan",Kina:"China",Taiwan:"Taiwan",Australien:"Australia",Schweiz:"Switzerland"};return "Company listed in "+(L[ld]||ld)+"."+(se?" Operates within "+se+".":"")+" Full company description loading…";}],
+  [/^(.+) sedan sist$/, "$1 since last"],
+  [/^Månadens case · (.+)$/, "Monthly case · $1"],
+  [/^Perfekt entry-zon – volym ökar, trend upp\. Bevaka (.+)\.$/, "Perfect entry zone – volume rising, trend up. Watch $1."],
+  [/^Avvakta bättre läge – ej bekräftad\. Stöd (.+)\.$/, "Wait for a better setup – not confirmed. Support $1."],
+  [/^(⚠️\s*)?Servern svarar inte — detta är EXEMPELDATA, inte live\. Försöker igen… \((\d+)\)$/, "$1The server isn't responding — this is SAMPLE DATA, not live. Retrying… ($2)"]
 ];
 function _i18nTx(str){
   if(GRABIT_LANG!=="en"||!str)return str;
@@ -2296,6 +2351,7 @@ if("serviceWorker" in navigator){window.addEventListener("load",function(){
 
 // ---- Månadens case ----
 let _MCASE=null;
+function _mcL(m,k){return (window.GRABIT_LANG==="en"&&m&&m[k+"_en"]!=null)?m[k+"_en"]:(m?m[k]:undefined);}
 async function loadMonthly(){
   const B=CONFIG.API_BASE?CONFIG.API_BASE.replace(/\/$/,""):"";
   let m=null,wantTk="";
@@ -2312,20 +2368,21 @@ async function loadMonthly(){
   if(!m)return; _MCASE=m;
   const el=document.getElementById("mcase"); if(!el)return;
   const col=scoreColor(+m.score||7);
-  el.innerHTML=`<div class="mc-tag">Månadens case${m.manad?" · "+m.manad:""}</div>
-      <div class="mc-row">${lic(m.ticker,46,col)}<div class="mc-tx"><div class="mc-tk">${m.ticker}<span class="mc-nm">${m.name||""}</span></div><div class="mc-tl">${m.tagline||""}</div></div>${m.score!=null?`<div class="mc-sc" style="color:${col}">${(+m.score).toFixed(1)}</div>`:""}</div>
+  el.innerHTML=`<div class="mc-tag">Månadens case${_mcL(m,'manad')?" · "+_mcL(m,'manad'):""}</div>
+      <div class="mc-row">${lic(m.ticker,46,col)}<div class="mc-tx"><div class="mc-tk">${m.ticker}<span class="mc-nm">${m.name||""}</span></div><div class="mc-tl">${_mcL(m,'tagline')||""}</div></div>${m.score!=null?`<div class="mc-sc" style="color:${col}">${(+m.score).toFixed(1)}</div>`:""}</div>
       <div class="mc-go">Läs hela caset →</div>`;
   el.style.display="block";
 }
 function openMonthly(){const m=_MCASE; if(!m)return;
   const col=scoreColor(+m.score||7);
-  const secs=(m.sektioner||[]).map(x=>`<div class="mc-sec"><div class="mc-sh">${x.h||""}</div><p>${(x.t||"").replace(/</g,"&lt;")}</p></div>`).join("");
-  const nyck=(m.nyckeltal||[]).map(n=>`<div class="stt"><div class="sk">${n.k||""}</div><div class="sv">${n.v||""}</div></div>`).join("");
+  const secs=(_mcL(m,'sektioner')||[]).map(x=>`<div class="mc-sec"><div class="mc-sh">${x.h||""}</div><p>${(x.t||"").replace(/</g,"&lt;")}</p></div>`).join("");
+  const nyck=(_mcL(m,'nyckeltal')||[]).map(n=>`<div class="stt"><div class="sk">${n.k||""}</div><div class="sv">${n.v||""}</div></div>`).join("");
+  const mSummary=_mcL(m,'summary');
   document.getElementById("mc-body").innerHTML=`
-    <div class="st-hero sthero-fill"><div class="sthero-in">${lic(m.ticker,60,col)}<div class="sthero-tx"><div class="sthero-tk">${m.ticker}</div><div class="sthero-nm">${m.name||""}</div><div class="sthero-sub">${m.tagline||""}</div></div></div></div>
-    <div class="st-grid2"><div class="st-box st-score2"><div class="k2">GRABIT Score</div><div class="sc num" style="color:${col}">${m.score!=null?(+m.score).toFixed(1):"—"}</div><div class="sctag" style="color:${col}">${m.verdict||""}</div></div>
-      <div class="st-box st-score2"><div class="k2">Månad</div><div class="sc num" style="font-size:18px">${m.manad||"—"}</div></div></div>
-    ${m.summary?`<div class="st-box about" style="margin-top:12px"><p class="blurb">${m.summary.replace(/</g,"&lt;")}</p></div>`:""}
+    <div class="st-hero sthero-fill"><div class="sthero-in">${lic(m.ticker,60,col)}<div class="sthero-tx"><div class="sthero-tk">${m.ticker}</div><div class="sthero-nm">${m.name||""}</div><div class="sthero-sub">${_mcL(m,'tagline')||""}</div></div></div></div>
+    <div class="st-grid2"><div class="st-box st-score2"><div class="k2">GRABIT Score</div><div class="sc num" style="color:${col}">${m.score!=null?(+m.score).toFixed(1):"—"}</div><div class="sctag" style="color:${col}">${_mcL(m,'verdict')||""}</div></div>
+      <div class="st-box st-score2"><div class="k2">Månad</div><div class="sc num" style="font-size:18px">${_mcL(m,'manad')||"—"}</div></div></div>
+    ${mSummary?`<div class="st-box about" style="margin-top:12px"><p class="blurb">${mSummary.replace(/</g,"&lt;")}</p></div>`:""}
     ${secs}
     ${nyck?`<div class="nyck" style="margin-top:11px">${nyck}</div>`:""}
     <div class="mc-cardlink" onclick="closeMonthly();openStock('${m.ticker}')">
