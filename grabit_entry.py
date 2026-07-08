@@ -84,7 +84,8 @@ def _robber_status():
     out = {"ok": True}
     out["status"] = {k: STATUS.get(k) for k in (
         "started", "last_scan", "scans_total", "fired_total", "fired_last",
-        "hogsta_conf_idag", "data_fel_total", "senaste_data_fel", "tickers")}
+        "hogsta_conf_idag", "data_fel_total", "senaste_data_fel", "tickers",
+        "orb_last", "blocked_last")}
     out["regler"] = {"tickers": Config.TICKERS,
                      "min_score_av_7": Config.MIN_SCORE,
                      "conf_min_for_larm": Config.CONF_MIN_SEND,
