@@ -752,7 +752,82 @@ var _I18N_EXACT = {
   // Diagram
   "Diagram & nivåer":"Chart & levels","Öppna livegraf":"Open live chart","Stäng graf ✕":"Close chart ✕",
   "Laddar…":"Loading…","Laddar diagram…":"Loading chart…","Laddar setups…":"Loading setups…",
-  "Laddar nyheter…":"Loading news…"
+  "Laddar nyheter…":"Loading news…",
+  "Analytiker":"Analysts",
+  "Diagram & nivåer":"Chart & levels",
+  "Fråga Grabit":"Ask Grabit",
+  "Insiderköp":"Insider buys",
+  "Katalysatorer & nyheter":"Catalysts & news",
+  "Nyckeltal":"Key figures",
+  "Om bolaget":"About the company",
+  "Potentiella risker":"Potential risks",
+  "Risk & scenario":"Risk & scenario",
+  "Senaste nyheter":"Latest news",
+  "Smart Money":"Smart Money",
+  "Struktur & trend":"Structure & trend",
+  "Varför vi är bullish":"Why we're bullish",
+  "Ägande":"Ownership",
+  "Prislarm":"Price alert",
+  "PRISLARM":"PRICE ALERT",
+  "Diagrammet kunde inte hämtas just nu.":"The chart couldn't be loaded right now.",
+  "Inga marknader just nu.":"No markets right now.",
+  "Inga stora trades just nu.":"No large trades right now.",
+  "Inga träffar just nu.":"No matches right now.",
+  "Inga setups just nu.":"No setups right now.",
+  "Inga signaler i den här kategorin just nu.":"No signals in this category right now.",
+  "Inga setups just nu — försöker igen strax…":"No setups right now — trying again shortly…",
+  "Kunde inte hämta daytrade just nu — försöker igen strax…":"Couldn't load daytrade right now — trying again shortly…",
+  "Koppla API:t för Polymarket-data.":"Connect the API for Polymarket data.",
+  "Koppla API:t för live daytrade-setups.":"Connect the API for live daytrade setups.",
+  "Koppla API:t.":"Connect the API.",
+  "Kunde inte ladda Polymarket.":"Couldn't load Polymarket.",
+  "Kunde inte ladda trades.":"Couldn't load trades.",
+  "Laddar analytikerdata…":"Loading analyst data…",
+  "Laddar diagram…":"Loading chart…",
+  "Laddar insider…":"Loading insider…",
+  "Laddar marknader…":"Loading markets…",
+  "Laddar nyheter…":"Loading news…",
+  "Laddar setups…":"Loading setups…",
+  "Laddar trades…":"Loading trades…",
+  "Laddar…":"Loading…",
+  "Söker globalt…":"Searching globally…",
+  "Kunde inte hämtas just nu — försöker igen automatiskt.":"Couldn't be fetched right now — retrying automatically.",
+  "Allt":"All",
+  "Insiders":"Insiders",
+  "Setups":"Setups",
+  "Kurs":"Price",
+  "Entry":"Entry",
+  "Stop":"Stop",
+  "Mål 1":"Target 1",
+  "Mål 2":"Target 2",
+  "KORT":"SHORT",
+  "LÅNG":"LONG",
+  "AVVAKTA":"WAIT",
+  "7 dagar gratis":"7 days free",
+  "Avsluta när som helst.":"Cancel anytime.",
+  "/månad":"/month",
+  "per månad":"per month",
+  "Dagens Top Opportunity":"Today's Top Opportunity",
+  "Med entry, stopp & targets":"With entry, stop & targets",
+  "AI-analys på alla aktier":"AI analysis on all stocks",
+  "Push-larm för din watchlist":"Push alerts for your watchlist",
+  "Pris-larm, nyheter & rapporter":"Price alerts, news & earnings",
+  "Screeners, facit":"Screeners, track record",
+  "och hela scannern":"and the full scanner",
+  "Fortsätt med PRO":"Continue with PRO",
+  "Har du redan PRO? Återställ köp":"Already have PRO? Restore purchase","Har du redan PRO? Återställ köp ›":"Already have PRO? Restore purchase ›",
+  "Din gratisvecka är slut — fortsätt för":"Your free week is over — continue for",
+  "Exit plan":"Exit plan",
+  "Dagens kurs":"Today's price",
+  "Månad":"Month",
+  "Prestandagraf kopplas in när du länkar kontot via API:t.":"A performance chart is added when you link your account via the API.",
+  "Lägg till aktier i Portföljen så bevakas de här — och du får push-larm när de rör sig.":"Add stocks to your Portfolio and they're watched here — and you get push alerts when they move.",
+  "Granska portföljen med Grabit AI":"Review the portfolio with Grabit AI",
+  "Visa alla":"View all",
+  "Visa setup →":"Show setup →",
+  "Livegraf ›":"Live chart ›",
+  "Livegraf":"Live chart",
+  "Kör GRABIT som app på iPhone":"Run GRABIT as an app on iPhone"
 };
 var _I18N_RULES = [
   [/^(\d+) dagar kvar av gratisveckan · Skaffa PRO$/, "$1 days left of your free week · Get PRO"],
@@ -760,7 +835,9 @@ var _I18N_RULES = [
   [/^(\d+) månader/, "$1 months"],
   [/^Inga (.+) just nu\.?$/, "No $1 right now."],
   [/^(.+) senaste 5 dagarna$/, "$1 past 5 days"],
-  [/(\d+)% i dag$/, "$1% today"]
+  [/(\d+)% i dag$/, "$1% today"],
+  [/^Träffsäkerhet (\d+)%$/, "Hit rate $1%"],
+  [/^Inga lokala träffar på (.+)$/, "No local matches for $1"]
 ];
 function _i18nTx(str){
   if(GRABIT_LANG!=="en"||!str)return str;
@@ -797,16 +874,19 @@ function _i18nStart(){
   try{document.documentElement.setAttribute("lang","en");}catch(e){}
   _i18nWalk(document.body);
   try{
+    /* Ingen disconnect: översättningen är idempotent (byter bara om värdet
+       skiljer sig) så ingen loop uppstår, och observern kan aldrig dö av ett
+       fel mitt i. Varje nod skyddas dessutom av egen try. */
     var obs=new MutationObserver(function(muts){
-      obs.disconnect();
       muts.forEach(function(m){
-        if(m.type==="childList")Array.prototype.forEach.call(m.addedNodes,function(nd){
-          if(nd.nodeType===3){var tr=_i18nTx(nd.nodeValue); if(tr!==nd.nodeValue)nd.nodeValue=tr;}
-          else if(nd.nodeType===1)_i18nWalk(nd);
-        });
-        else if(m.type==="characterData"&&m.target){var tr=_i18nTx(m.target.nodeValue); if(tr!==m.target.nodeValue)m.target.nodeValue=tr;}
+        try{
+          if(m.type==="childList")Array.prototype.forEach.call(m.addedNodes,function(nd){
+            if(nd.nodeType===3){var tr=_i18nTx(nd.nodeValue); if(tr!==nd.nodeValue)nd.nodeValue=tr;}
+            else if(nd.nodeType===1)_i18nWalk(nd);
+          });
+          else if(m.type==="characterData"&&m.target){var tr=_i18nTx(m.target.nodeValue); if(tr!==m.target.nodeValue)m.target.nodeValue=tr;}
+        }catch(e){}
       });
-      obs.observe(document.body,{childList:true,subtree:true,characterData:true});
     });
     obs.observe(document.body,{childList:true,subtree:true,characterData:true});
   }catch(e){}
