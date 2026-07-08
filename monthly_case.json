@@ -1,20 +1,21 @@
 {
-  "manad": "Juni 2026",
-  "ticker": "ASTS",
-  "name": "AST SpaceMobile",
-  "tagline": "Satelliter direkt till vanliga mobiler",
-  "score": 8.4,
+  "manad": "Juli 2026",
+  "ticker": "AMPG",
+  "name": "AmpliTech Group",
+  "tagline": "Amerikansk 5G- & O-RAN-infrastruktur – bygger näten USA vill äga själv",
+  "score": 8.6,
   "verdict": "KÖP",
-  "summary": "Bygger ett rymdbaserat mobilnät som kopplar vanliga smartphones direkt till satellit \u2013 utan specialhårdvara. Partneravtal med stora teleoperatörer ger en tydlig intäktsväg när konstellationen skalas upp.",
+  "summary": "Bygger och kontrollerar kritisk kommunikationsinfrastruktur på amerikansk mark – 5G, O-RAN och privata nät. Aktien är upp över 225 % på tre månader och bolaget har just avslutat sitt utspädande ATM-program och startat ett återköpsprogram på 10 miljoner dollar – en signal om att ledningen tror på egen aktie.",
   "sektioner": [
-    { "h": "Vad de gör", "t": "Driver BlueBird-satelliter som fungerar som basstationer i omloppsbana, så att täckning når dit marknätet inte räcker." },
-    { "h": "Kunder", "t": "Avtal och avsiktsförklaringar med ledande operatörer i USA, Europa och Japan \u2013 sammanlagt hundratals miljoner abonnenter i räckhåll." },
-    { "h": "Varför det spelar roll", "t": "Direct-to-cell är en helt ny kategori. Lyckas utrullningen blir bolaget en infrastrukturspelare snarare än en nischaktör." },
-    { "h": "Tesen", "t": "Hög risk, hög potential. Kursen drivs av uppskjutningar och avtal snarare än vinst \u2013 en case för den som tål svängningar och tror på exekveringen." }
+    { "h": "Vad de gör", "t": "Designar och tillverkar RF-komponenter, förstärkare och 5G/O-RAN-system – amerikansktillverkad hårdvara för nät som staten och försvaret vill hålla inom landet." },
+    { "h": "Katalysatorer", "t": "18 juli: Series A-teckningsrätter förfaller ($5) – utlöses de tillförs bolaget kapital. Mitten av augusti: Q2-rapport som guidats klart högre än Q1." },
+    { "h": "Rakt från VD:n", "t": "Grundare & VD Fawad Maqbool: 'Oberoende idag betyder att bygga och kontrollera vår nations kritiska kommunikationsinfrastruktur. Vi är stolta över att bygga i USA.'" },
+    { "h": "Tesen", "t": "Momentum-case med riktig story: inhemsk 5G-infrastruktur i en tid av handelskonflikt och trygga leverantörskedjor. Buyback plus avslutad ATM minskar utspädningsrisken. Hög volatilitet – för den som tål svängningar." }
   ],
   "nyckeltal": [
-    { "k": "Sektor", "v": "Space" },
-    { "k": "Risk", "v": "Hög" },
-    { "k": "Horisont", "v": "12\u201336 mån" }
+    { "k": "Sektor", "v": "5G / O-RAN" },
+    { "k": "Kurs", "v": "$6.22" },
+    { "k": "3 mån", "v": "+226 %" },
+    { "k": "Risk", "v": "Hög" }
   ]
 }
