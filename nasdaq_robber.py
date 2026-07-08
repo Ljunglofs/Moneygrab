@@ -1790,8 +1790,13 @@ def run_loop():
                 except Exception as e:
                     print("stats-fel:", e)
             last_win = win
+            # ORB vid Nasdaq-öppning är PRIO — körs FÖRST och i eget skyddsnät
+            # så en krasch i huvudskanningen aldrig kan tränga undan den.
+            try:
+                _orb_check()                    # GRABIT ORB 15/5 vid US-öppningen
+            except Exception as e:
+                print(f"[orb] loop-fel: {e}")
             scan_once()                         # skannar 24/7 (håller koll på natten/Asien)
-            _orb_check()                        # GRABIT ORB 15/5 vid US-öppningen
             poly_scan()                         # Polymarket 24/7
         except Exception as e:
             # En miss i en cykel får ALDRIG döda tråden / värd-appen.

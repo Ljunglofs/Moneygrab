@@ -596,6 +596,12 @@ body{background:
 .mc-go{font-size:12px;font-weight:700;color:var(--gold2);margin-top:11px}
 .mc-sec{margin-top:15px}
 .mc-sec .mc-sh{font-family:var(--disp);font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:5px}
+.mc-cardlink{margin-top:18px;display:flex;align-items:center;gap:12px;cursor:pointer;border:1.5px solid rgba(245,197,66,.55);border-radius:15px;padding:15px 16px;background:linear-gradient(135deg,rgba(245,197,66,.14),rgba(245,197,66,.04));box-shadow:0 0 24px rgba(245,197,66,.12)}
+.mc-cardlink:active{transform:scale(.99)}
+.mc-cl-tx{flex:1;min-width:0}
+.mc-cl-tx b{display:block;font-family:var(--disp);font-size:15px;font-weight:800;letter-spacing:.02em;color:var(--gold2)}
+.mc-cl-tx i{font-style:normal;display:block;margin-top:3px;font-size:12px;color:#c7d0dc}
+.mc-cl-arr{flex:none;font-size:22px;font-weight:800;color:var(--gold2)}
 .mc-sec p{font-size:13.5px;line-height:1.5;color:#cdd5e1}
 /* Daytrade */
 #s-daytrade{padding-bottom:90px}
@@ -1950,6 +1956,9 @@ function openMonthly(){const m=_MCASE; if(!m)return;
     ${m.summary?`<div class="st-box about" style="margin-top:12px"><p class="blurb">${m.summary.replace(/</g,"&lt;")}</p></div>`:""}
     ${secs}
     ${nyck?`<div class="nyck" style="margin-top:11px">${nyck}</div>`:""}
+    <div class="mc-cardlink" onclick="closeMonthly();openStock('${m.ticker}')">
+      <div class="mc-cl-tx"><b>Öppna ${m.ticker}-aktiekortet</b><i>Score, kurs, diagram &amp; nivåer, AI-analys, livegraf</i></div>
+      <span class="mc-cl-arr">→</span></div>
     <div style="height:34px"></div>`;
   document.getElementById("mcdetail").classList.add("on");
   document.getElementById("mcdetail").scrollTop=0;
