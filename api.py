@@ -2015,7 +2015,7 @@ def ai(payload: AiPayload, request: Request):
 _company_blurb_cache: dict = {}
 
 
-def _ai_company(tk: str, name: str = "") -> dict:
+def _ai_company(tk: str, name: str = "", lang: str = "sv") -> dict:
     client = _anthropic_client()
     if client is None:
         return {"name": "", "sector": "", "summary": ""}
@@ -2023,14 +2023,24 @@ def _ai_company(tk: str, name: str = "") -> dict:
         import json as _j
         import re as _re2
         who = tk + (f' ("{name}")' if name and name != tk else "")
-        prompt = (
-            f"Aktien med tickern {who}. Svara ENBART med giltig JSON (inga kodblock), på svenska:\n"
-            '{"name": "<bolagets fullständiga namn>", '
-            '"sector": "<sektor på ett ord, t.ex. Teknik, Energi, Finans, Konsument, '
-            'Hälsa, Industri, Råvaror, Fastighet, Kommunikation>", '
-            '"summary": "<2 korta meningar om vad bolaget gör och varför det är intressant, på svenska>"}\n'
-            "Känner du inte till EXAKT vilket bolag tickern avser – sätt ALLA fält till tom sträng. Gissa aldrig ett annat bolag."
-        )
+        if (lang or "sv").lower().startswith("en"):
+            prompt = (
+                f"The stock with ticker {who}. Respond ONLY with valid JSON (no code blocks), in English:\n"
+                '{"name": "<the company\'s full name>", '
+                '"sector": "<sector in one word, e.g. Technology, Energy, Finance, Consumer, '
+                'Health, Industrial, Materials, Real estate, Communication>", '
+                '"summary": "<2 short sentences on what the company does and why it is interesting, in English>"}\n'
+                "If you do not know EXACTLY which company the ticker refers to — set ALL fields to an empty string. Never guess another company."
+            )
+        else:
+            prompt = (
+                f"Aktien med tickern {who}. Svara ENBART med giltig JSON (inga kodblock), på svenska:\n"
+                '{"name": "<bolagets fullständiga namn>", '
+                '"sector": "<sektor på ett ord, t.ex. Teknik, Energi, Finans, Konsument, '
+                'Hälsa, Industri, Råvaror, Fastighet, Kommunikation>", '
+                '"summary": "<2 korta meningar om vad bolaget gör och varför det är intressant, på svenska>"}\n'
+                "Känner du inte till EXAKT vilket bolag tickern avser – sätt ALLA fält till tom sträng. Gissa aldrig ett annat bolag."
+            )
         resp = client.messages.create(
             model=AI_MODEL, max_tokens=400,
             messages=[{"role": "user", "content": prompt}],
@@ -2049,37 +2059,54 @@ def _ai_company(tk: str, name: str = "") -> dict:
 
 
 @app.get("/api/company/{ticker}")
-def company_blurb(ticker: str):
+def company_blurb(ticker: str, lang: str = "sv"):
     tk = ticker.upper().strip()
-    if tk in _company_blurb_cache:
-        return _company_blurb_cache[tk]
+    en = (lang or "sv").lower().startswith("en")
+    ckey = tk + (":en" if en else "")
+    if ckey in _company_blurb_cache:
+        return _company_blurb_cache[ckey]
     # Identiteten förankras i Finnhub profile2 (exakt per ticker) -> AI gissar aldrig fel bolag.
     prof = _fh_profile(tk)
-    ai = _ai_company(tk, prof.get("name", ""))
+    ai = _ai_company(tk, prof.get("name", ""), lang=lang)
     name = prof.get("name") or ai.get("name") or tk
     sector = prof.get("industry") or ai.get("sector") or ""
     summary = ai.get("summary") or ""
     # Fallback: AI:n svarade inte (nyckel saknas/timeout) -> bygg en saklig
-    # svensk beskrivning av verifierad Finnhub-data i stället för tom sträng.
+    # beskrivning av verifierad Finnhub-data i stället för tom sträng.
     # Då slipper frontenden falla tillbaka på sin generiska malltext.
     if not summary and (prof.get("name") or prof.get("industry")):
-        land_map = {"US": "USA", "SE": "Sverige", "DE": "Tyskland", "FR": "Frankrike",
-                    "CA": "Kanada", "GB": "Storbritannien", "NL": "Nederländerna",
-                    "FI": "Finland", "NO": "Norge", "DK": "Danmark", "JP": "Japan",
-                    "CN": "Kina", "TW": "Taiwan", "AU": "Australien", "CH": "Schweiz"}
-        land = land_map.get(prof.get("country", ""), prof.get("country", ""))
-        parts = [name]
-        if prof.get("industry"):
-            parts.append("är verksamt inom " + prof["industry"])
-        if land:
-            parts.append("med säte i " + land)
-        summary = " ".join(parts) + "."
-        if prof.get("weburl"):
-            summary += " Webb: " + prof["weburl"].replace("https://", "").replace("http://", "").rstrip("/") + "."
+        if en:
+            land_map = {"US": "the USA", "SE": "Sweden", "DE": "Germany", "FR": "France",
+                        "CA": "Canada", "GB": "the UK", "NL": "the Netherlands",
+                        "FI": "Finland", "NO": "Norway", "DK": "Denmark", "JP": "Japan",
+                        "CN": "China", "TW": "Taiwan", "AU": "Australia", "CH": "Switzerland"}
+            land = land_map.get(prof.get("country", ""), prof.get("country", ""))
+            parts = [name]
+            if prof.get("industry"):
+                parts.append("operates within " + prof["industry"])
+            if land:
+                parts.append("and is headquartered in " + land)
+            summary = " ".join(parts) + "."
+            if prof.get("weburl"):
+                summary += " Web: " + prof["weburl"].replace("https://", "").replace("http://", "").rstrip("/") + "."
+        else:
+            land_map = {"US": "USA", "SE": "Sverige", "DE": "Tyskland", "FR": "Frankrike",
+                        "CA": "Kanada", "GB": "Storbritannien", "NL": "Nederländerna",
+                        "FI": "Finland", "NO": "Norge", "DK": "Danmark", "JP": "Japan",
+                        "CN": "Kina", "TW": "Taiwan", "AU": "Australien", "CH": "Schweiz"}
+            land = land_map.get(prof.get("country", ""), prof.get("country", ""))
+            parts = [name]
+            if prof.get("industry"):
+                parts.append("är verksamt inom " + prof["industry"])
+            if land:
+                parts.append("med säte i " + land)
+            summary = " ".join(parts) + "."
+            if prof.get("weburl"):
+                summary += " Webb: " + prof["weburl"].replace("https://", "").replace("http://", "").rstrip("/") + "."
     out = {"ticker": tk, "name": name, "sector": sector,
            "summary": summary, "country": prof.get("country", "")}
     if sector or summary:
-        _company_blurb_cache[tk] = out
+        _company_blurb_cache[ckey] = out
     return out
 
 
