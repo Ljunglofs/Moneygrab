@@ -36,7 +36,9 @@ class Config:
     # --- Timeframes (Alpaca-format) ---
     HTF_TIMEFRAME     = "1Hour"   # high-timeframe bias
     HTF_LOOKBACK_DAYS = 60
-    MTF_TIMEFRAME     = "15Min"   # setup/entry timeframe
+    # Setup/entry-timeframe: 5Min som standard (NQ-daytrading) — reagerar 3x
+    # snabbare än gamla 15Min. Byt via env MTF_TF=15Min om det blir för brusigt.
+    MTF_TIMEFRAME     = os.environ.get("MTF_TF", "5Min")
     MTF_LOOKBACK_DAYS = 12
 
     # --- Data ---
@@ -108,7 +110,9 @@ class Config:
     TRADE_DAYS        = {0, 1, 2, 3, 4}   # mån–fre
 
     # --- Loop ---
-    BAR_MINUTES   = 15
+    # Skanna i takt med setup-timeframen (5Min -> var 5:e min). Härleds ur
+    # MTF_TIMEFRAME så de aldrig glider isär.
+    BAR_MINUTES   = int("".join(c for c in MTF_TIMEFRAME if c.isdigit()) or "5")
     BUFFER_SEC    = 20            # vänta efter bar-stängning innan hämtning
     TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
     CHAT_ID        = os.environ.get("CHAT_ID", "")
