@@ -77,6 +77,7 @@ class Config:
         "ob":        10,   # Order Block (retestad)
         "volym":      4,   # Relativ volym
         "orderflow":  8,   # Volymproxy köp/säljtryck (CLV x volym, ackumulerat)
+        "retest":    15,   # Breakout + Retest -- entry VID nivån, inte jaga rörelsen
     }
     CONF_GREEN    = int(os.environ.get("CONF_GREEN",  "75"))   # gron A+ (stark konfluens)
     CONF_YELLOW   = int(os.environ.get("CONF_YELLOW", "55"))   # gul / bevaka
@@ -518,6 +519,44 @@ def detect_ob(df, side, lookback=20, impulse_atr=0.8):
     return False, None
 
 
+def detect_retest(df, side, lookback=24):
+    """Breakout + Retest (⭐ setup): en swingnivå bryts, priset kommer TILLBAKA
+    och testar den brutna nivån som nu håller (rejection). Ger entry VID nivån
+    i stället för att jaga den redan gångna rörelsen.
+    LONG: swing-high bryts uppåt -> pris rekylerar ner till nivån -> stänger över.
+    SHORT: swing-low bryts nedåt -> pris rekylerar upp till nivån -> stänger under.
+    Returnerar (bool, brott-nivå)."""
+    H = df["High"].to_numpy(); L = df["Low"].to_numpy(); C = df["Close"].to_numpy()
+    n = len(C)
+    if n < 8:
+        return False, None
+    atr = float(df["atr"].iloc[-1]) if "atr" in df.columns else 0.0
+    if atr <= 0:
+        atr = float(np.nanmean(H[-20:] - L[-20:])) or 1.0
+    band = 0.45 * atr                       # hur nära nivån räknas som retest
+    sh, sl = _swings(H, L, k=2)
+    lo = max(0, n - lookback)
+    if side == "LONG":
+        for si in reversed([i for i in sh if lo <= i <= n - 4]):
+            lvl = H[si]
+            broke = any(C[j] > lvl + 0.1 * atr for j in range(si + 1, n - 1))   # bekräftat brott
+            if not broke:
+                continue
+            retest = (L[-1] <= lvl + band) and (C[-1] > lvl) and (C[-1] >= C[-2] * 0.999)
+            if retest:
+                return True, round(float(lvl), 2)
+    else:
+        for si in reversed([i for i in sl if lo <= i <= n - 4]):
+            lvl = L[si]
+            broke = any(C[j] < lvl - 0.1 * atr for j in range(si + 1, n - 1))
+            if not broke:
+                continue
+            retest = (H[-1] >= lvl - band) and (C[-1] < lvl) and (C[-1] <= C[-2] * 1.001)
+            if retest:
+                return True, round(float(lvl), 2)
+    return False, None
+
+
 def detect_orderflow(df, side, lookback=10):
     """Volymproxy for orderflow (ingen tick-data tillganglig via yfinance for NQ).
     Close-Location-Value (Chaikin-stil) x volym, ackumulerat over `lookback` barer:
@@ -563,6 +602,7 @@ def compute_confidence(df, bias, side):
     fvg,   fvg_zone  = detect_fvg(df, side)
     ob,    ob_zone   = detect_ob(df, side)
     flow_ok, flow_delta = detect_orderflow(df, side)
+    retest, retest_lvl = detect_retest(df, side)
     W = Config.CONF_WEIGHTS
     conf = (W["trend"] * trend_frac
             + (W["sweep"]     if sweep   else 0)
@@ -571,17 +611,20 @@ def compute_confidence(df, bias, side):
             + (W["fvg"]       if fvg     else 0)
             + (W["ob"]        if ob      else 0)
             + (W["volym"]     if vol     else 0)
-            + (W["orderflow"] if flow_ok else 0))
+            + (W["orderflow"] if flow_ok else 0)
+            + (W.get("retest", 0) if retest else 0))
     conf = max(0, min(100, int(round(conf))))
     groups = {
         "Trend": trend_frac >= 0.5, "Liquidity Sweep": bool(sweep), "BOS": bos, "CHoCH": choch,
-        "FVG": bool(fvg), "Order Block": bool(ob), "Volym": vol, "Orderflow": flow_ok,
+        "FVG": bool(fvg), "Order Block": bool(ob), "Retest": bool(retest),
+        "Volym": vol, "Orderflow": flow_ok,
     }
     comps = {
         "trend_frac": round(trend_frac, 2), "htf": htf, "ema": ema, "mom": mom,
         "sweep": bool(sweep), "sweep_lvl": sweep_lvl, "bos": bos, "choch": choch, "mss_lvl": mss_lvl,
         "fvg": bool(fvg), "fvg_zone": fvg_zone, "ob": bool(ob), "ob_zone": ob_zone, "volym": vol,
         "orderflow": flow_ok, "orderflow_delta": flow_delta,
+        "retest": bool(retest), "retest_lvl": retest_lvl,
     }
     return conf, comps, groups
 
