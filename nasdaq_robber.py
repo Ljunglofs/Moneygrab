@@ -78,6 +78,9 @@ class Config:
         "volym":      4,   # Relativ volym
         "orderflow":  8,   # Volymproxy köp/säljtryck (CLV x volym, ackumulerat)
         "retest":    15,   # Breakout + Retest -- entry VID nivån, inte jaga rörelsen
+        "vwap":      10,   # VWAP Bounce -- institutionellt snitt försvarat
+        "pullback":  12,   # Trend Pullback -- rekyl till EMA20 i stark trend
+        "failbreak": 10,   # Failed Breakout -- fakeout som handlas åt motsatt håll
     }
     CONF_GREEN    = int(os.environ.get("CONF_GREEN",  "75"))   # gron A+ (stark konfluens)
     CONF_YELLOW   = int(os.environ.get("CONF_YELLOW", "55"))   # gul / bevaka
@@ -557,6 +560,100 @@ def detect_retest(df, side, lookback=24):
     return False, None
 
 
+def _vwap_now(df, bars=78):
+    """Dagsankrad VWAP (faller tillbaka på rullande RTH-längd om dagen är tunn)."""
+    idx = df.index
+    try:
+        last_day = idx[-1].date()
+        sel = [i for i in range(len(idx)) if idx[i].date() == last_day]
+        if len(sel) < 3:
+            sel = list(range(max(0, len(idx) - bars), len(idx)))
+    except Exception:
+        sel = list(range(max(0, len(idx) - bars), len(idx)))
+    H = df["High"].to_numpy(); L = df["Low"].to_numpy()
+    C = df["Close"].to_numpy(); V = df["Volume"].to_numpy()
+    tp = (H[sel] + L[sel] + C[sel]) / 3.0
+    vv = V[sel].astype(float); vv[vv <= 0] = 1.0
+    tot = vv.sum()
+    return float((tp * vv).sum() / tot) if tot else float("nan")
+
+
+def detect_vwap_bounce(df, side, lookback=6):
+    """VWAP Bounce: pris i trend på rätt sida om VWAP, rekylerar TILL VWAP och
+    studsar (institutioner försvarar snittet). LONG över, SHORT under."""
+    v = _vwap_now(df)
+    if not np.isfinite(v):
+        return False, None
+    atr = float(df["atr"].iloc[-1]) if "atr" in df.columns else 0.0
+    if atr <= 0:
+        atr = 1.0
+    band = 0.4 * atr
+    H = df["High"].to_numpy(); L = df["Low"].to_numpy(); C = df["Close"].to_numpy()
+    m = min(5, len(C) - 1)
+    prev_mean = float(np.nanmean(C[-m-1:-1])) if m > 0 else C[-1]
+    if side == "LONG":
+        if prev_mean > v and (L[-1] <= v + band) and (C[-1] > v):
+            return True, round(v, 2)
+    else:
+        if prev_mean < v and (H[-1] >= v - band) and (C[-1] < v):
+            return True, round(v, 2)
+    return False, None
+
+
+def detect_pullback(df, side, lookback=6):
+    """Trend Pullback: stark trend (EMA20>EMA50 för long), rekyl till EMA20,
+    fortsättning. En av de stabilaste setupsen."""
+    if "ema20" not in df.columns or "ema50" not in df.columns:
+        return False, None
+    e20 = df["ema20"].to_numpy(); e50 = df["ema50"].to_numpy()
+    H = df["High"].to_numpy(); L = df["Low"].to_numpy(); C = df["Close"].to_numpy()
+    atr = float(df["atr"].iloc[-1]) if "atr" in df.columns else 1.0
+    if atr <= 0:
+        atr = 1.0
+    band = 0.5 * atr
+    if np.isnan(e20[-1]) or np.isnan(e50[-1]):
+        return False, None
+    if side == "LONG" and e20[-1] > e50[-1]:
+        tag = any((not np.isnan(e20[-k])) and L[-k] <= e20[-k] + band
+                  for k in range(1, min(lookback, len(C)) + 1))
+        if tag and C[-1] > e20[-1]:
+            return True, round(float(e20[-1]), 2)
+    if side == "SHORT" and e20[-1] < e50[-1]:
+        tag = any((not np.isnan(e20[-k])) and H[-k] >= e20[-k] - band
+                  for k in range(1, min(lookback, len(C)) + 1))
+        if tag and C[-1] < e20[-1]:
+            return True, round(float(e20[-1]), 2)
+    return False, None
+
+
+def detect_failed_breakout(df, side, lookback=24):
+    """Failed Breakout: nivå bryts men håller inte -> pris tillbaka i rangen,
+    handla åt motsatt håll (stop hunt / fakeout). LONG = misslyckad breakdown
+    som återtas, SHORT = misslyckad breakout som faller tillbaka."""
+    H = df["High"].to_numpy(); L = df["Low"].to_numpy(); C = df["Close"].to_numpy()
+    n = len(C)
+    if n < 8:
+        return False, None
+    atr = float(df["atr"].iloc[-1]) if "atr" in df.columns else 1.0
+    if atr <= 0:
+        atr = 1.0
+    sh, sl = _swings(H, L, k=2)
+    lo = max(0, n - lookback)
+    if side == "LONG":
+        for si in reversed([i for i in sl if lo <= i <= n - 3]):
+            lvl = L[si]
+            broke = any(L[j] < lvl - 0.05 * atr and C[j] < lvl for j in range(si + 1, n - 1))
+            if broke and C[-1] > lvl + 0.05 * atr:
+                return True, round(float(lvl), 2)
+    else:
+        for si in reversed([i for i in sh if lo <= i <= n - 3]):
+            lvl = H[si]
+            broke = any(H[j] > lvl + 0.05 * atr and C[j] > lvl for j in range(si + 1, n - 1))
+            if broke and C[-1] < lvl - 0.05 * atr:
+                return True, round(float(lvl), 2)
+    return False, None
+
+
 def detect_orderflow(df, side, lookback=10):
     """Volymproxy for orderflow (ingen tick-data tillganglig via yfinance for NQ).
     Close-Location-Value (Chaikin-stil) x volym, ackumulerat over `lookback` barer:
@@ -603,6 +700,9 @@ def compute_confidence(df, bias, side):
     ob,    ob_zone   = detect_ob(df, side)
     flow_ok, flow_delta = detect_orderflow(df, side)
     retest, retest_lvl = detect_retest(df, side)
+    vwapb, vwap_lvl = detect_vwap_bounce(df, side)
+    pull,  pull_lvl = detect_pullback(df, side)
+    failb, failb_lvl = detect_failed_breakout(df, side)
     W = Config.CONF_WEIGHTS
     conf = (W["trend"] * trend_frac
             + (W["sweep"]     if sweep   else 0)
@@ -612,11 +712,15 @@ def compute_confidence(df, bias, side):
             + (W["ob"]        if ob      else 0)
             + (W["volym"]     if vol     else 0)
             + (W["orderflow"] if flow_ok else 0)
-            + (W.get("retest", 0) if retest else 0))
+            + (W.get("retest", 0)    if retest else 0)
+            + (W.get("vwap", 0)      if vwapb  else 0)
+            + (W.get("pullback", 0)  if pull   else 0)
+            + (W.get("failbreak", 0) if failb  else 0))
     conf = max(0, min(100, int(round(conf))))
     groups = {
         "Trend": trend_frac >= 0.5, "Liquidity Sweep": bool(sweep), "BOS": bos, "CHoCH": choch,
         "FVG": bool(fvg), "Order Block": bool(ob), "Retest": bool(retest),
+        "VWAP-studs": bool(vwapb), "Trend-pullback": bool(pull), "Failed breakout": bool(failb),
         "Volym": vol, "Orderflow": flow_ok,
     }
     comps = {
@@ -625,6 +729,9 @@ def compute_confidence(df, bias, side):
         "fvg": bool(fvg), "fvg_zone": fvg_zone, "ob": bool(ob), "ob_zone": ob_zone, "volym": vol,
         "orderflow": flow_ok, "orderflow_delta": flow_delta,
         "retest": bool(retest), "retest_lvl": retest_lvl,
+        "vwap_bounce": bool(vwapb), "vwap_lvl": vwap_lvl,
+        "pullback": bool(pull), "pullback_lvl": pull_lvl,
+        "failed_breakout": bool(failb), "failbreak_lvl": failb_lvl,
     }
     return conf, comps, groups
 
