@@ -2269,10 +2269,33 @@ function robberQuickScan(){var EN=(window.GRABIT_LANG==="en");
     .then(function(r){return r.json();})
     .then(function(j){
       if(j&&j.cooldown){_rbToast((EN?"Wait ":"Vänta ")+j.cooldown+(EN?"s before next check.":"s innan nästa koll."),false);return;}
-      if(j&&j.found){_rbToast(EN?"✅ Setup found — signal sent!":"✅ Setup hittad — signal skickad!",true);}
-      else{_rbToast(EN?"No setup right now.":"Ingen setup just nu.",false);}
+      if(j&&j.tickers){_rbResult(j);return;}
+      _rbToast(EN?"Couldn't reach the robot.":"Kunde inte nå roboten.",false);
     })
     .catch(function(){_rbToast(EN?"Couldn't reach the robot.":"Kunde inte nå roboten.",false);});}
+function _rbResult(j){var EN=(window.GRABIT_LANG==="en");
+  var m=document.getElementById("rbmodal");
+  if(!m){m=document.createElement("div");m.id="rbmodal";document.body.appendChild(m);}
+  var rows=(j.tickers||[]).map(function(t){
+    var bias=t.bias||"—";var bcol=bias==="LONG"?"#3ddc84":bias==="SHORT"?"#ff5b52":"#cdd5e1";
+    var sc=(t.long_score!=null)?("<span class='rbm-sc'>L "+t.long_score+"/7</span><span class='rbm-sc'>S "+t.short_score+"/7</span>"):"";
+    var line;
+    if(t.setup){var ok=t.over_troskel&&t.fardata;
+      line="<div class='rbm-setup "+(ok?"hit":"")+"'>"+(ok?"✅ ":"")+t.side+" · "+t.setup+" · "+t.confidence+"/100"+
+        (t.over_troskel?(t.fardata?"":(EN?" · stale":" · stale data")):(EN?" (below threshold)":" (under tröskel)"))+"</div>";}
+    else{var need=(t.krav_score!=null)?t.krav_score:5;var blocked=(Math.max(t.long_score||0,t.short_score||0)>=need);
+      line="<div class='rbm-note'>"+(blocked?(EN?"Setup present but blocked (too extended / pullback / cooldown)":"Setup finns men blockad (för utsträckt / rekyl / cooldown)"):(EN?"No setup over threshold yet":"Ingen setup över tröskeln än"))+"</div>";}
+    return "<div class='rbm-tk'><div class='rbm-h'><b>"+(t.namn||t.ticker)+"</b>"+(t.pris!=null?"<i>"+t.pris+"</i>":"")+"</div>"+
+      "<div class='rbm-bias'>Bias: <b style='color:"+bcol+"'>"+bias+"</b>"+sc+"</div>"+line+"</div>";
+  }).join("")||("<div class='rbm-note'>"+(EN?"No data.":"Ingen data.")+"</div>");
+  var sent=(j.tickers||[]).some(function(t){return t.skickat;});
+  var head=sent?(EN?"✅ Signal sent!":"✅ Signal skickad!"):(EN?"Market read":"Robotens läge just nu");
+  var lage=(j.lage||"normal");
+  m.innerHTML="<div class='rbm-card'><div class='rbm-top'><span class='rbm-ttl'>"+head+"</span>"+
+    "<button class='rbm-x' aria-label='Close' onclick=\"var e=document.getElementById('rbmodal');if(e)e.classList.remove('on')\">&#10005;</button></div>"+
+    "<div class='rbm-sub'>"+(EN?"Mode":"Läge")+": <b>"+lage+"</b> · "+(EN?"Session":"Fönster")+": "+(j.handelsfonster?(EN?"open":"öppet"):(EN?"closed":"stängt"))+"</div>"+
+    rows+"<div class='rbm-foot'>"+(sent?(EN?"Sent to Telegram + push.":"Skickat till Telegram + notis."):(EN?"No setup over threshold — nothing broadcast.":"Ingen setup över tröskeln — inget larm skickat."))+"</div></div>";
+  m.classList.add("on");}
 I.grabit='<img class="gimg" src="'+IMGS.grabit+'" alt="">';
 document.querySelector(".nav").innerHTML=document.querySelector(".nav").innerHTML.replace(/\$\{I\.(\w+)\}/g,(m,k)=>I[k]||"");
 var _fab=document.getElementById("fab");if(_fab){_fab.innerHTML=_fab.innerHTML.replace(/\$\{I\.(\w+)\}/g,(m,k)=>I[k]||"");}
@@ -3162,6 +3185,25 @@ async function loadPolyInsiders(force){
 .rbtoast.ok{background:#0e2a19;border:1px solid #2ecc71;color:#8ff0b5}
 .rbtoast.err{background:#2a1414;border:1px solid #ff5b52;color:#ffb4ae}
 .rbtoast.info{background:#12161c;border:1px solid rgba(255,255,255,.2);color:#dfe7ee}
+#rbmodal{position:fixed;inset:0;z-index:100000;display:none;align-items:center;justify-content:center;background:rgba(4,6,10,.72);backdrop-filter:blur(3px);padding:18px}
+#rbmodal.on{display:flex}
+.rbm-card{width:100%;max-width:400px;max-height:82vh;overflow-y:auto;background:#0b0d12;border:1px solid rgba(60,160,240,.35);border-radius:18px;padding:16px 16px 14px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.rbm-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px}
+.rbm-ttl{font-family:var(--disp);font-weight:800;font-size:18px;color:#fff}
+.rbm-x{background:none;border:none;color:#8b97a3;font-size:18px;cursor:pointer;padding:2px 6px}
+.rbm-sub{font-size:12px;color:#8b97a3;margin-bottom:12px}
+.rbm-sub b{color:#cfe8ff;text-transform:capitalize}
+.rbm-tk{background:#111419;border:1px solid rgba(255,255,255,.07);border-radius:13px;padding:12px 13px;margin-bottom:9px}
+.rbm-h{display:flex;align-items:baseline;justify-content:space-between}
+.rbm-h b{font-family:var(--disp);font-weight:800;font-size:16px;color:#fff}
+.rbm-h i{font-style:normal;font-weight:700;font-size:14px;color:#cdd5e1}
+.rbm-bias{font-size:13px;color:#aeb8c4;margin:5px 0 7px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.rbm-bias b{font-family:var(--disp);letter-spacing:.03em}
+.rbm-sc{font-size:11px;font-weight:700;color:#8b97a3;background:rgba(255,255,255,.05);padding:2px 7px;border-radius:6px}
+.rbm-setup{font-size:12.5px;font-weight:700;color:#cdd5e1;background:rgba(255,255,255,.04);border-radius:8px;padding:7px 10px}
+.rbm-setup.hit{color:#8ff0b5;background:rgba(46,204,113,.12);border:1px solid rgba(46,204,113,.35)}
+.rbm-note{font-size:12.5px;color:#8b97a3;background:rgba(255,255,255,.03);border-radius:8px;padding:7px 10px}
+.rbm-foot{font-size:11.5px;color:#8b97a3;text-align:center;margin-top:4px}
 
 /* === Signaler-filter + Fear&Greed (append, vinner via källordning) === */
 .sigfilter{display:flex;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:2px 0 2px!important;margin:6px 0 2px!important;scrollbar-width:none}
