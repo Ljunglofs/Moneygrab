@@ -33,7 +33,9 @@ try:
 except Exception:                       # pragma: no cover
     requests = None
 
-_TOKEN_DAYS = 7                          # token gäller 7 dygn, klienten förnyar
+_TOKEN_DAYS = 7                          # standard-token
+_CODE_DAYS = int(os.getenv("PRO_CODE_DAYS", "365"))   # give-away/egna koder: 1 år
+_PAID_DAYS = int(os.getenv("PRO_PAID_DAYS", "35"))    # köp: månadscykel + buffert
 
 
 # --------------------------------------------------------------------------
@@ -190,7 +192,8 @@ def register(app) -> None:
         code = str(body.get("key") or body.get("code") or "").strip()
         if _valid_code(code):
             kh = hashlib.sha256(code.encode("utf-8")).hexdigest()[:16]
-            return {"ok": True, "token": make_token(extra={"k": kh})}
+            # Give-away/egna koder: lång giltighet så de inte dör efter en vecka.
+            return {"ok": True, "token": make_token(days=_CODE_DAYS, extra={"k": kh})}
         return {"ok": False}
 
     @app.get("/api/pro/verify")
@@ -206,7 +209,7 @@ def register(app) -> None:
         if _has_claim(cid):
             _drop_claim(cid)
             kh = hashlib.sha256((cid or "").encode("utf-8")).hexdigest()[:16]
-            return {"ok": True, "token": make_token(extra={"k": kh})}
+            return {"ok": True, "token": make_token(days=_PAID_DAYS, extra={"k": kh})}
         return {"ok": False}
 
     @app.post("/api/webhook/stripe")
