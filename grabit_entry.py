@@ -99,6 +99,24 @@ def _robber_mode(key: str = "", set: str = ""):
                     "defensiv": "choppigt/osäkert — bara A+-lägen"}}
 
 
+@app.get("/robber/scan")
+def _robber_scan(key: str = "", send: int = 0):
+    """On-demand-koll NU: 'ser du en setup just nu?'. Kräver ?key=<ROBBER_ADMIN_KEY>.
+      /robber/scan?key=XXX          -> kollar och rapporterar (skickar inget)
+      /robber/scan?key=XXX&send=1   -> skickar larm om ett läge är över tröskeln"""
+    if not _robber_key_ok(key):
+        raise _HTTPExc(403, "fel eller saknad nyckel (sätt ROBBER_ADMIN_KEY i Render)")
+    try:
+        import nasdaq_robber as R
+    except Exception as e:
+        raise _HTTPExc(500, f"kan inte importera roboten: {e}")
+    try:
+        res = R.scan_now(send=bool(send))
+    except Exception as e:
+        raise _HTTPExc(500, f"scan-fel: {type(e).__name__}: {e}")
+    return {"ok": True, **res}
+
+
 @app.get("/robber/status")
 def _robber_status():
     """Robotens hälsokontroll: kör den, vad har den sett, varför larmar den inte?"""

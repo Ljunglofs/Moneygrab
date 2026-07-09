@@ -1374,6 +1374,82 @@ def scan_once():
     return fired
 
 
+def scan_now(send: bool = False) -> dict:
+    """On-demand-koll: 'ser du en setup just nu?'. Kör hela pipelinen direkt och
+    rapporterar per ticker — även kandidater under tröskeln. Skickar INTE larm
+    om inte send=True (och det finns ett läge över tröskeln)."""
+    from zoneinfo import ZoneInfo
+    tradable = in_session()
+    out = []
+    for ticker in Config.TICKERS:
+        row = {"ticker": ticker, "namn": Config.NAMES.get(ticker, ticker)}
+        try:
+            htf = fetch_ohlcv(ticker, Config.HTF_TIMEFRAME, Config.HTF_LOOKBACK_DAYS)
+            mtf = fetch_ohlcv(ticker, Config.MTF_TIMEFRAME, Config.MTF_LOOKBACK_DAYS)
+            if len(htf) < 200 or len(mtf) < 50:
+                row["status"] = f"för lite data (htf={len(htf)}, mtf={len(mtf)})"
+                out.append(row); continue
+            last = mtf.index[-1]
+            age = (pd.Timestamp.now(tz=last.tz) - last).total_seconds() / 60
+            row["bar_alder_min"] = round(age, 1)
+            mtf = add_indicators(mtf)
+            bias = htf_bias(htf)
+            cur, prev = mtf.iloc[-1], mtf.iloc[-2]
+            row["bias"] = bias
+            row["pris"] = round(float(cur.Close), 2)
+            long_s, _lr = score_long(cur, prev, bias)
+            short_s, _sr = score_short(cur, prev, bias)
+            row["long_score"] = long_s
+            row["short_score"] = short_s
+            row["krav_score"] = cur_min_score()
+            sig = build_signal(ticker, mtf, bias)
+            if sig:
+                conf, comps, groups = compute_confidence(mtf, bias, sig["side"])
+                kz_delta, kz_label = killzone_adjust(datetime.now(ZoneInfo(Config.LOCAL_TZ)))
+                conf = max(0, min(100, conf + kz_delta))
+                sig["confidence"] = conf; sig["groups"] = groups; sig["components"] = comps
+                sig["setup"] = _primary_setup(comps)
+                sig["killzone"] = kz_label; sig["kz_delta"] = kz_delta
+                would = conf >= cur_conf_min_send()
+                row.update({"setup": sig["setup"], "side": sig["side"], "confidence": conf,
+                            "entry": sig["price"], "sl": sig["stop"], "targets": sig.get("targets"),
+                            "over_troskel": would, "conf_troskel": cur_conf_min_send(),
+                            "i_handelsfonster": tradable})
+                row["status"] = ("SETUP: %s %s %d/100%s" % (
+                    sig["side"], sig["setup"], conf, "" if would else " (under larmtröskel)"))
+                if send and would:
+                    try:
+                        msg = "\U0001F50E <b>På begäran</b>\n" + format_alert(sig)
+                        if sig.get("killzone"):
+                            _d = sig.get("kz_delta", 0)
+                            msg += f"\n\U0001F551 {sig['killzone']}" + (f" ({_d:+d})" if _d else "")
+                        send_telegram(msg)
+                        import push_notify as PN
+                        _tps = sig.get("targets") or []
+                        _tp = (" | TP: " + str(_tps[0])) if _tps else ""
+                        _pil = "\U0001F4C8" if sig["side"] == "LONG" else "\U0001F4C9"
+                        PN.send_all(f"⚡ NASDAQ ROBBER™ · {conf}/100",
+                                    (f"{sig['setup']} {_pil}\n{sig['side']} · {row['namn']}\n"
+                                     f"Entry: {sig['price']} | SL: {sig['stop']}{_tp}"),
+                                    url="/", tag="robber-ondemand")
+                        row["skickat"] = True
+                    except Exception as _e:
+                        row["skickat"] = False; row["skick_fel"] = str(_e)[:140]
+            else:
+                best = max(long_s, short_s)
+                if best >= cur_min_score():
+                    row["status"] = ("setup men blockad av risk-/guard-filter "
+                                     "(för utsträckt, rekyl eller SL-cooldown)")
+                else:
+                    row["status"] = (f"ingen setup (long {long_s}, short {short_s}, "
+                                     f"krav {cur_min_score()}/7)")
+        except Exception as e:
+            row["status"] = f"fel: {type(e).__name__}: {str(e)[:120]}"
+        out.append(row)
+    return {"lage": RUNTIME.get("mode", "normal"), "handelsfonster": tradable,
+            "orb_last": STATUS.get("orb_last"), "tickers": out}
+
+
 # ==================================================================
 # LOOP — exakt på bar-stängning
 # ==================================================================
