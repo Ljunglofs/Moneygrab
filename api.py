@@ -796,6 +796,190 @@ def _fh_insider_buys(ticker):
     return buys
 
 
+# ============================================================
+#  INSIDER FLOW — politiker (senat, gratis) + VD/insider (Finnhub)
+#  Källa politiker: senate-stock-watcher (rå JSON på GitHub, nyckelfri).
+#  House-flödet är nedlagt (S3 403) -> valfritt via FMP_API_KEY senare.
+# ============================================================
+import time as _time
+_IFLOW_CACHE = {"congress": (0.0, []), "corp": (0.0, [])}
+# Politiker-data: FMP:s gratisnivå (nyckel = env FMP_API_KEY, gratis signup).
+# Täcker BÅDE senaten och representanthuset (Pelosi m.fl.) med FÄRSK data.
+# De nyckelfria community-flödena (S3/GitHub) är nedlagda/inaktuella.
+# Kuraterad lista populära tickers för VD/insider-flödet (håller Finnhub-anropen nere).
+_IFLOW_TICKERS = ["NVDA", "TSLA", "AAPL", "PLTR", "AMD", "META", "MSFT", "AMZN",
+                  "GOOGL", "COIN", "HOOD", "MSTR", "SMCI", "AVGO", "MU", "MRVL",
+                  "ARM", "SOFI", "RIVN", "AMPG", "MP", "USAR", "RKLB", "OKLO"]
+
+
+def _amount_pretty(a: str) -> str:
+    """'$1,001 - $15,000' -> '$1K – $15K'; '$1,000,001 - $5,000,000' -> '$1M – $5M'."""
+    import re as _re
+    nums = _re.findall(r"[\d,]+", a or "")
+    def comp(n):
+        v = int(n.replace(",", ""))
+        if v >= 1_000_000:
+            return ("$%.1fM" % (v / 1_000_000)).replace(".0M", "M")
+        if v >= 1_000:
+            return "$%dK" % round(v / 1000)
+        return "$%d" % v
+    if len(nums) >= 2:
+        return comp(nums[0]) + " – " + comp(nums[1])
+    if len(nums) == 1:
+        return comp(nums[0])
+    return a or ""
+
+
+def _days_ago(mmddyyyy: str):
+    import datetime as _d
+    for fmt in ("%m/%d/%Y", "%Y-%m-%d"):
+        try:
+            dt = _d.datetime.strptime(mmddyyyy, fmt).date()
+            return (_d.date.today() - dt).days
+        except Exception:
+            continue
+    return None
+
+
+def _fmp(path, params=None):
+    import requests
+    key = os.getenv("FMP_API_KEY", "")
+    if not key:
+        return None
+    try:
+        p = dict(params or {}); p["apikey"] = key
+        r = requests.get("https://financialmodelingprep.com" + path, params=p, timeout=12)
+        if r.status_code == 200:
+            return r.json()
+    except Exception:
+        pass
+    return None
+
+
+def _congress_flow():
+    """Politiker-affärer (senat + hus) via FMP:s gratisnivå. Cachas 6h.
+    Tom lista om FMP_API_KEY saknas -> frontend visar 'koppla nyckel'."""
+    now = _time.time()
+    ts, data = _IFLOW_CACHE["congress"]
+    if data and now - ts < 21600:
+        return data
+    if not os.getenv("FMP_API_KEY", ""):
+        return []
+    out = []
+
+    def _norm(t, chamber):
+        tk = (t.get("symbol") or t.get("ticker") or "").strip().upper()
+        if not tk or tk in ("--", "N/A", "--."):
+            return None
+        typ = (t.get("type") or "").lower()
+        if typ.startswith("purchase"):
+            action = "KÖP"
+        elif typ.startswith("sale") or "sold" in typ:
+            action = "SÄLJ"
+        else:
+            return None
+        person = (t.get("representative")
+                  or ((t.get("firstName", "") + " " + t.get("lastName", "")).strip())
+                  or "").strip()
+        da = _days_ago(t.get("transactionDate", "") or t.get("date", ""))
+        if da is None or da < 0 or da > 120:
+            return None
+        return {"kind": "politiker", "person": person,
+                "role": ("SENATOR" if chamber == "SENATE" else "HOUSE"),
+                "chamber": chamber, "party": (t.get("party") or "").strip(),
+                "ticker": tk, "name": (t.get("assetDescription") or tk).strip(),
+                "action": action, "amount": _amount_pretty(t.get("amount", "")),
+                "days_ago": da, "url": t.get("link") or ""}
+
+    for path, chamber in (("/api/v4/senate-trading-rss-feed", "SENATE"),
+                          ("/api/v4/senate-disclosure-rss-feed", "HOUSE")):
+        for page in (0, 1):
+            j = _fmp(path, {"page": page})
+            if not isinstance(j, list) or not j:
+                break
+            for t in j:
+                it = _norm(t, chamber)
+                if it:
+                    out.append(it)
+    out.sort(key=lambda x: x["days_ago"])
+    out = out[:80]
+    if out:
+        _IFLOW_CACHE["congress"] = (now, out)
+    return out
+
+
+def _fh_insider_flow(ticker):
+    """Rika insider-transaktioner för en ticker (namn, köp/sälj, storlek, datum)."""
+    k = ("insflow", ticker)
+    if k in _FH_CACHE:
+        return _FH_CACHE[k]
+    j = _finnhub("/stock/insider-transactions", {"symbol": ticker})
+    items = []
+    for t in (j or {}).get("data", []):
+        code = (t.get("transactionCode") or "").upper()
+        chg = t.get("change") or 0
+        if code == "P" and chg > 0:
+            action = "KÖP"
+        elif code == "S" and chg < 0:
+            action = "SÄLJ"
+        else:
+            continue
+        da = _days_ago(t.get("transactionDate", ""))
+        if da is None or da < 0 or da > 120:
+            continue
+        price = t.get("transactionPrice") or 0
+        usd = abs(chg) * price if price else 0
+        amt = ("$%.1fM" % (usd / 1e6)).replace(".0M", "M") if usd >= 1e6 else \
+              ("$%dK" % round(usd / 1000) if usd >= 1000 else (("$%d" % usd) if usd else ""))
+        items.append({
+            "kind": "insider", "person": (t.get("name") or "").strip(),
+            "role": "INSIDER", "chamber": "", "party": "",
+            "ticker": ticker, "name": ticker, "action": action,
+            "amount": amt, "days_ago": da, "url": "",
+        })
+    _FH_CACHE[k] = items
+    return items
+
+
+def _corp_flow():
+    """VD/insider-flödet för kuraterade tickers. Cachas 12h."""
+    now = _time.time()
+    ts, data = _IFLOW_CACHE["corp"]
+    if data and now - ts < 43200:
+        return data
+    out = []
+    for tk in _IFLOW_TICKERS:
+        try:
+            out.extend(_fh_insider_flow(tk))
+        except Exception:
+            continue
+    out.sort(key=lambda x: x["days_ago"])
+    out = out[:60]
+    if out:
+        _IFLOW_CACHE["corp"] = (now, out)
+    return out
+
+
+@app.get("/api/insider_flow")
+def insider_flow(limit: int = 50):
+    """Enat 'smart money'-flöde: senatorer (gratis) + VD/insider (Finnhub).
+    Confluence = samma ticker köps av BÅDE politiker och bolagsinsider (senaste 120 d)."""
+    pol = _congress_flow()
+    corp = _corp_flow()
+    # Confluence: tickers med KÖP i båda flödena (politiker + bolagsinsider)
+    pol_buy = {x["ticker"] for x in pol if x["action"] == "KÖP"}
+    corp_buy = {x["ticker"] for x in corp if x["action"] == "KÖP"}
+    conf_tk = pol_buy & corp_buy
+    items = pol + corp
+    for it in items:
+        it["confluence"] = it["ticker"] in conf_tk and it["action"] == "KÖP"
+    items.sort(key=lambda x: (not x["confluence"], x["days_ago"]))
+    return {"items": items[:limit], "confluence_tickers": sorted(conf_tk),
+            "has_congress": bool(os.getenv("FMP_API_KEY", "")),
+            "has_insider": bool(os.getenv("FINNHUB_API_KEY", "")),
+            "updated": int(_time.time())}
+
+
 @app.get("/api/research")
 def research(max_price: float = 15.0, min_relvol: float = 1.3,
              min_momentum: float = 0.0, themes: str = "",
