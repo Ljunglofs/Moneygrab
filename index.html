@@ -2291,6 +2291,31 @@ async function unlockWithCode(){
     else{if(window.say)say(EN?"Invalid code.":"Ogiltig kod.");}
   }catch(e){if(window.say)say(EN?"Couldn't verify the code.":"Kunde inte verifiera koden.");}
 }
+async function proAutoClaim(){
+  try{
+    if(isPro())return;
+    var cid="",t0=0;
+    try{cid=localStorage.getItem("grabit_cid")||"";t0=+localStorage.getItem("grabit_cid_t")||0;}catch(e){}
+    if(!cid||!CONFIG.API_BASE)return;
+    if(t0&&(Date.now()-t0)>2*3600*1000){try{localStorage.removeItem("grabit_cid");localStorage.removeItem("grabit_cid_t");}catch(e){}return;}
+    var base=CONFIG.API_BASE.replace(/\/$/,"");
+    for(var i=0;i<12;i++){
+      try{
+        var r=await fetch(base+"/api/pro/claim?cid="+encodeURIComponent(cid),{cache:"no-store"});
+        var j=await r.json();
+        if(j&&j.ok&&j.token){
+          localStorage.setItem("grabit_pro","1");localStorage.setItem("grabit_token",j.token);
+          try{localStorage.removeItem("grabit_cid");localStorage.removeItem("grabit_cid_t");}catch(e){}
+          if(window.refreshProState)refreshProState();
+          try{if(window.loadInsiderFlow)loadInsiderFlow(true);}catch(e){}
+          if(window.pToast)pToast(window.GRABIT_LANG==="en"?"✅ PRO unlocked!":"✅ PRO upplåst!");
+          return;
+        }
+      }catch(e){}
+      await new Promise(function(res){setTimeout(res,2500);});
+    }
+  }catch(e){}
+}
 function _rbToast(msg,ok){var t=document.getElementById("rbtoast");
   if(!t){t=document.createElement("div");t.id="rbtoast";document.body.appendChild(t);}
   t.textContent=msg;t.className="rbtoast "+(ok===true?"ok":ok===false?"err":"info");
@@ -2966,7 +2991,13 @@ async function buyPro(){
     try{
       var cr=await fetch(CONFIG.API_BASE.replace(/\/$/,"")+"/api/pro/checkout",{cache:"no-store"});
       var cj=await cr.json();
-      if(cj&&cj.ok&&cj.url){window.location.href=cj.url;return;}
+      if(cj&&cj.ok&&cj.url){
+        var cid;try{cid=localStorage.getItem("grabit_cid")||"";}catch(e){cid="";}
+        if(!cid){cid=(Date.now().toString(36)+Math.random().toString(36).slice(2,10));}
+        try{localStorage.setItem("grabit_cid",cid);localStorage.setItem("grabit_cid_t",String(Date.now()));}catch(e){}
+        var u=cj.url+(cj.url.indexOf("?")>=0?"&":"?")+"checkout[custom][cid]="+encodeURIComponent(cid);
+        window.location.href=u;return;
+      }
     }catch(e){}
     say(EN?"Checkout isn't set up yet.":"Betalningen är inte konfigurerad än.");return;
   }
@@ -3046,6 +3077,7 @@ paywallCheck();
   if(isIOS){iosBarInit();}else{proPromoInit();}
 })();
 if(window.refreshProState)refreshProState();
+if(window.proAutoClaim)proAutoClaim();
 load();loadMonthly();loadDaily();loadMacro();loadFda();loadTopOp();loadWatchrow();loadFacit();
 function fgInfo(s){s=+s||0;
   if(s>=75)return{label:"Extrem girighet",col:"#22d3ee",dir:1,txt:"Extrem girighet på marknaden — se upp för överhettning."};

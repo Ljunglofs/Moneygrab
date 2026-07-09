@@ -121,6 +121,83 @@ def _validate_license(key: str) -> bool:
 
 
 # --------------------------------------------------------------------------
+#  Auto-upplåsning: koppla ett köp till en anonym "cid" så appen kan hämta
+#  licensnyckeln automatiskt när kunden kommer tillbaka (ingen manuell
+#  inklistring). Webhooken lagrar {cid -> nyckel}; /api/pro/claim hämtar.
+# --------------------------------------------------------------------------
+_CLAIMS_FILE = os.path.join(os.environ.get("DATA_DIR", "."), "pro_claims.json")
+
+
+def _load_claims() -> dict:
+    try:
+        with open(_CLAIMS_FILE) as f:
+            return json.load(f) or {}
+    except Exception:
+        return {}
+
+
+def _save_claims(d: dict) -> None:
+    try:
+        os.makedirs(os.path.dirname(_CLAIMS_FILE) or ".", exist_ok=True)
+        # Rensa poster äldre än 3 dygn så filen inte växer i onändan.
+        cutoff = int(time.time()) - 3 * 86400
+        d = {k: v for k, v in d.items() if int((v or {}).get("t", 0)) >= cutoff}
+        tmp = _CLAIMS_FILE + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(d, f)
+        os.replace(tmp, _CLAIMS_FILE)
+    except Exception:
+        pass
+
+
+def _store_claim(cid: str, key: str) -> None:
+    cid = (cid or "").strip()
+    key = (key or "").strip()
+    if not (cid and key):
+        return
+    d = _load_claims()
+    d[cid] = {"key": key, "t": int(time.time())}
+    _save_claims(d)
+
+
+def _peek_claim(cid: str) -> str:
+    cid = (cid or "").strip()
+    if not cid:
+        return ""
+    return str((_load_claims().get(cid) or {}).get("key") or "")
+
+
+def _drop_claim(cid: str) -> None:
+    d = _load_claims()
+    if cid in d:
+        d.pop(cid, None)
+        _save_claims(d)
+
+
+def _ls_fetch_key_for_order(order_id) -> str:
+    """Hämtar licensnyckeln för en order via Lemon Squeezy-API:t."""
+    if not order_id or requests is None:
+        return ""
+    api = os.environ.get("LEMONSQUEEZY_API_KEY", "").strip()
+    if not api:
+        return ""
+    try:
+        r = requests.get(
+            "https://api.lemonsqueezy.com/v1/license-keys",
+            params={"filter[order_id]": str(order_id)},
+            headers={"Authorization": "Bearer " + api,
+                     "Accept": "application/vnd.api+json"},
+            timeout=12,
+        )
+        data = (r.json() or {}).get("data") or []
+        if data:
+            return str((data[0].get("attributes") or {}).get("key") or "")
+    except Exception:
+        pass
+    return ""
+
+
+# --------------------------------------------------------------------------
 #  Rutter
 # --------------------------------------------------------------------------
 def register(app) -> None:
@@ -151,9 +228,21 @@ def register(app) -> None:
         p = verify_token(token)
         return {"ok": p is not None, "exp": (p or {}).get("exp")}
 
+    @app.get("/api/pro/claim")
+    def pro_claim(cid: str = ""):
+        """Auto-upplåsning: hämtar licensnyckeln som webhooken lagrat för denna
+        cid och utfärdar en token. Frontenden pollar denna efter checkout."""
+        key = _peek_claim(cid)
+        if key and _validate_license(key):
+            _drop_claim(cid)
+            kh = hashlib.sha256(key.encode("utf-8")).hexdigest()[:16]
+            return {"ok": True, "token": make_token(extra={"k": kh})}
+        return {"ok": False}
+
     @app.post("/api/webhook/lemon")
     async def lemon_webhook(request: Request):
-        """Lemon Squeezy-webhook (signaturverifierad). Kvitterar events."""
+        """Lemon Squeezy-webhook (signaturverifierad). Kopplar köp -> cid så
+        appen kan auto-låsa upp när kunden kommer tillbaka."""
         secret = os.environ.get("LEMONSQUEEZY_WEBHOOK_SECRET", "").encode("utf-8")
         body = await request.body()
         sig = request.headers.get("X-Signature", "")
@@ -165,5 +254,17 @@ def register(app) -> None:
             evt = json.loads(body or b"{}")
         except Exception:
             evt = {}
-        name = (((evt.get("meta") or {}).get("event_name")) or "")
-        return {"ok": True, "event": name}
+        meta = evt.get("meta") or {}
+        name = str(meta.get("event_name") or "")
+        cid = str((meta.get("custom_data") or {}).get("cid") or "").strip()
+        data = evt.get("data") or {}
+        attrs = data.get("attributes") or {}
+        key = ""
+        if name == "license_key_created":
+            key = str(attrs.get("key") or "")
+        elif name in ("order_created", "subscription_created", "subscription_payment_success"):
+            order_id = data.get("id") if name == "order_created" else attrs.get("order_id")
+            key = _ls_fetch_key_for_order(order_id)
+        if cid and key:
+            _store_claim(cid, key)
+        return {"ok": True, "event": name, "linked": bool(cid and key)}
