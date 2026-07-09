@@ -117,6 +117,35 @@ def _robber_scan(key: str = "", send: int = 0):
     return {"ok": True, **res}
 
 
+_QUICK_LAST = {"t": 0.0}
+
+@app.get("/robber/quickscan")
+def _robber_quickscan(code: str = ""):
+    """Publik direktkoll bakom en enkel kod (env ROBBER_QUICK_CODE, default 'daq').
+    Kör en koll NU och skickar signal (Telegram + push) om ett läge är över tröskeln.
+    45s cooldown mot spam. Används av bannern i appen."""
+    import time as _t
+    want = _os.environ.get("ROBBER_QUICK_CODE", "daq")
+    if (code or "").strip().lower() != want.strip().lower():
+        raise _HTTPExc(403, "fel kod")
+    now = _t.time()
+    gone = now - _QUICK_LAST["t"]
+    if gone < 45:
+        return {"ok": True, "cooldown": int(45 - gone)}
+    _QUICK_LAST["t"] = now
+    try:
+        import nasdaq_robber as R
+        res = R.scan_now(send=True)
+    except Exception as e:
+        _QUICK_LAST["t"] = 0.0
+        raise _HTTPExc(500, f"scan-fel: {type(e).__name__}: {e}")
+    tickers = res.get("tickers", [])
+    found = any(t.get("over_troskel") and t.get("fardata") for t in tickers)
+    sent = sum(1 for t in tickers if t.get("skickat"))
+    return {"ok": True, "found": found, "sent": sent, "lage": res.get("lage"),
+            "handelsfonster": res.get("handelsfonster"), "tickers": tickers}
+
+
 @app.get("/robber/status")
 def _robber_status():
     """Robotens hälsokontroll: kör den, vad har den sett, varför larmar den inte?"""

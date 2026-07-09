@@ -1411,13 +1411,15 @@ def scan_now(send: bool = False) -> dict:
                 sig["setup"] = _primary_setup(comps)
                 sig["killzone"] = kz_label; sig["kz_delta"] = kz_delta
                 would = conf >= cur_conf_min_send()
+                fresh = age <= Config.BAR_MINUTES * 3
                 row.update({"setup": sig["setup"], "side": sig["side"], "confidence": conf,
                             "entry": sig["price"], "sl": sig["stop"], "targets": sig.get("targets"),
-                            "over_troskel": would, "conf_troskel": cur_conf_min_send(),
+                            "over_troskel": would, "fardata": fresh, "conf_troskel": cur_conf_min_send(),
                             "i_handelsfonster": tradable})
-                row["status"] = ("SETUP: %s %s %d/100%s" % (
-                    sig["side"], sig["setup"], conf, "" if would else " (under larmtröskel)"))
-                if send and would:
+                row["status"] = ("SETUP: %s %s %d/100%s%s" % (
+                    sig["side"], sig["setup"], conf, "" if would else " (under larmtröskel)",
+                    "" if fresh else " · stale data (marknad stängd?)"))
+                if send and would and fresh:
                     try:
                         msg = "\U0001F50E <b>På begäran</b>\n" + format_alert(sig)
                         if sig.get("killzone"):
