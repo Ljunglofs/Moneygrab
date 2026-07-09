@@ -3035,12 +3035,11 @@ function renderInsiderFlow(){
     return true;});
   var chips=[["allt","Allt"],["kop","Köp"],["politiker","Politiker"],["insider","VD / Insider"],["conf","Confluence"]]
     .map(function(c){return '<button class="if-chip'+(f===c[0]?' on':'')+'" onclick="setIflow(\''+c[0]+'\')">'+c[1]+'</button>';}).join("");
-  var note=(J.has_congress===false)?'<div class="if-note">Politiker-flödet tänds när en gratis FMP-nyckel kopplas. Visar VD/insider så länge.</div>':'';
   var cards=list.length?list.map(_iflowCard).join(""):'<div class="sig-empty">Inga träffar i den här kategorin just nu.</div>';
   box.innerHTML='<div class="iflow">'
-    +'<div class="if-hd"><div class="if-hdtop"><span class="if-brand">GRA<b>BIT</b></span><span class="if-livef"><i></i>LIVE FEED</span></div>'
+    +'<div class="if-hd"><div class="if-hdtop"><span class="if-livef"><i></i>LIVE FEED</span></div>'
     +'<h1 class="if-h1">INSIDER <b>FLOW</b></h1><p class="if-p">Smart money moves. Follow the filings.</p></div>'
-    +'<div class="if-chips">'+chips+'</div>'+note
+    +'<div class="if-chips">'+chips+'</div>'
     +'<div class="if-list">'+cards+'</div></div>';
 }
 function polyEsc(x){return String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
@@ -3088,12 +3087,12 @@ async function loadPolyInsiders(force){
 /* === INSIDER FLOW === */
 .iflow{margin-top:2px}
 .if-hd{background:linear-gradient(150deg,rgba(245,197,66,.10),rgba(10,10,11,.2));border:1px solid rgba(245,197,66,.16);border-radius:18px;padding:16px 16px 15px;margin-bottom:12px}
-.if-hdtop{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px}
+.if-hdtop{display:flex;justify-content:flex-end;align-items:center;margin-bottom:9px}
 .if-brand{font-family:var(--disp);font-weight:800;letter-spacing:.14em;font-size:13px;color:#eef2f6}
 .if-brand b{color:var(--gold2)}
 .if-livef{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;font-weight:800;letter-spacing:.12em;color:#9fe6b4}
 .if-livef i{width:7px;height:7px;border-radius:50%;background:#22c55e;box-shadow:0 0 7px #22c55e}
-.if-h1{font-family:var(--disp);font-weight:800;font-size:34px;line-height:1;letter-spacing:.01em;color:#fff;margin:2px 0 6px}
+.if-h1{font-family:var(--disp);font-weight:700;font-size:30px;line-height:1;letter-spacing:.01em;color:#fff;margin:2px 0 6px}
 .if-h1 b{color:var(--gold2)}
 .if-p{color:var(--mut,#8b97a3);font-size:13px;margin:0}
 .if-chips{display:flex;gap:8px;overflow-x:auto;padding:2px 0;margin-bottom:11px;scrollbar-width:none}
