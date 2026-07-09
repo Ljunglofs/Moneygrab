@@ -73,6 +73,32 @@ def _robber_send(key: str = "", side: str = "LONG", ticker: str = "US100",
             "push_fel": push_err, "push_resultat": r}
 
 
+@app.get("/robber/mode")
+def _robber_mode(key: str = "", set: str = ""):
+    """Ställ robotens läge efter marknaden — utan omdeploy. Kräver ?key=<ROBBER_ADMIN_KEY>.
+      /robber/mode?key=XXX                 -> visar nuvarande läge
+      /robber/mode?key=XXX&set=aggressiv   -> starkt trend/bull, fler larm
+      /robber/mode?key=XXX&set=normal      -> balanserat (default)
+      /robber/mode?key=XXX&set=defensiv    -> choppigt, bara A+-lägen"""
+    if not _robber_key_ok(key):
+        raise _HTTPExc(403, "fel eller saknad nyckel (sätt ROBBER_ADMIN_KEY i Render)")
+    try:
+        import nasdaq_robber as R
+    except Exception as e:
+        raise _HTTPExc(500, f"kan inte importera roboten: {e}")
+    if set:
+        R.set_mode(set)
+    m = R.RUNTIME.get("mode", "normal")
+    p = R._MODE_PRESETS.get(m, {})
+    return {"ok": True, "lage": m,
+            "trosklar": {"min_score_av_7": p.get("min_score"),
+                         "confidence_min_for_larm": p.get("conf_min_send"),
+                         "min_rel_volym": p.get("min_rel_volume")},
+            "val": {"aggressiv": "starkt trend/bull — fler fortsättningslarm",
+                    "normal": "balanserat (default)",
+                    "defensiv": "choppigt/osäkert — bara A+-lägen"}}
+
+
 @app.get("/robber/status")
 def _robber_status():
     """Robotens hälsokontroll: kör den, vad har den sett, varför larmar den inte?"""
@@ -86,9 +112,16 @@ def _robber_status():
         "started", "last_scan", "scans_total", "fired_total", "fired_last",
         "hogsta_conf_idag", "data_fel_total", "senaste_data_fel", "tickers",
         "orb_last", "blocked_last")}
+    try:
+        import nasdaq_robber as _R
+        _lage = _R.RUNTIME.get("mode", "normal")
+        _minscore = _R.cur_min_score(); _confmin = _R.cur_conf_min_send()
+    except Exception:
+        _lage = "normal"; _minscore = Config.MIN_SCORE; _confmin = Config.CONF_MIN_SEND
     out["regler"] = {"tickers": Config.TICKERS,
-                     "min_score_av_7": Config.MIN_SCORE,
-                     "conf_min_for_larm": Config.CONF_MIN_SEND,
+                     "lage": _lage,
+                     "min_score_av_7": _minscore,
+                     "conf_min_for_larm": _confmin,
                      "larmfonster": "06:00-22:00 mån-fre (svensk tid)"}
     # Skuggloggen: ALLA kandidatsetups senaste 7 dygnen, även de som inte larmats
     import json as _j

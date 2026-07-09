@@ -136,6 +136,68 @@ except Exception as _e:
     print(f"Robber: kunde inte skapa DATA_DIR ({Config.DATA_DIR}): {_e}")
 
 
+# --- LÄGE / MODE: ställ roboten efter marknadsläget utan omdeploy ----------
+# Tre lägen buntar ihop trigger-trösklarna. Normal = exakt dagens beteende.
+#   aggressiv  -> starkt trend/bull: fler fortsättningslarm (lägre trösklar)
+#   normal     -> balanserat (default)
+#   defensiv   -> choppigt/osäkert: bara A+-lägen (högre trösklar)
+_MODE_PRESETS = {
+    "aggressiv": {"min_score": 4, "conf_min_send": 50, "min_rel_volume": 1.10},
+    "normal":    {"min_score": 5, "conf_min_send": 55, "min_rel_volume": 1.20},
+    "defensiv":  {"min_score": 6, "conf_min_send": 66, "min_rel_volume": 1.40},
+}
+_MODE_ALIASES = {"aggressive": "aggressiv", "agg": "aggressiv", "bull": "aggressiv",
+                 "def": "defensiv", "defensive": "defensiv", "chop": "defensiv",
+                 "norm": "normal", "default": "normal"}
+_MODE_FILE = os.path.join(Config.DATA_DIR, "robber_mode.txt")
+
+
+def _norm_mode(m: str) -> str:
+    m = (m or "").strip().lower()
+    m = _MODE_ALIASES.get(m, m)
+    return m if m in _MODE_PRESETS else "normal"
+
+
+def _load_mode() -> str:
+    # Prioritet: sparad fil (live-satt) > env ROBBER_MODE > normal
+    try:
+        if os.path.exists(_MODE_FILE):
+            return _norm_mode(open(_MODE_FILE, encoding="utf-8").read())
+    except Exception:
+        pass
+    return _norm_mode(os.environ.get("ROBBER_MODE", "normal"))
+
+
+RUNTIME = {"mode": _load_mode()}
+
+
+def set_mode(m: str) -> str:
+    """Sätt läget live och spara till disk (överlever omstart om DATA_DIR = disk)."""
+    RUNTIME["mode"] = _norm_mode(m)
+    try:
+        with open(_MODE_FILE, "w", encoding="utf-8") as f:
+            f.write(RUNTIME["mode"])
+    except Exception:
+        pass
+    return RUNTIME["mode"]
+
+
+def _preset() -> dict:
+    return _MODE_PRESETS.get(RUNTIME["mode"], _MODE_PRESETS["normal"])
+
+
+def cur_min_score() -> int:
+    return _preset()["min_score"]
+
+
+def cur_conf_min_send() -> int:
+    return _preset()["conf_min_send"]
+
+
+def cur_min_rel_volume() -> float:
+    return _preset()["min_rel_volume"]
+
+
 def fetch_ohlcv(ticker: str, timeframe: str, lookback_days: int) -> pd.DataFrame:
     """
     Hamtar OHLCV-barer via yfinance. Futures (NQ=F, GC=F) handlas nastan
@@ -230,7 +292,7 @@ def score_long(cur, prev, bias) -> tuple[int, list]:
         s += 1; reasons.append(f"RSI momentum ({cur.rsi:.0f})")
     if cur.macd_hist > 0 and cur.macd_hist > prev.macd_hist:
         s += 1; reasons.append("MACD-hist stigande > 0")
-    if cur.rel_vol >= Config.MIN_REL_VOLUME:
+    if cur.rel_vol >= cur_min_rel_volume():
         s += 1; reasons.append(f"Relativ volym {cur.rel_vol:.1f}x")
     # pullback-reclaim: förra baren nära/under ema20, nu tillbaka över
     if (prev.Low <= prev.ema20 and cur.Close > cur.ema20) or (cur.Close > prev.High):
@@ -251,7 +313,7 @@ def score_short(cur, prev, bias) -> tuple[int, list]:
         s += 1; reasons.append(f"RSI momentum ({cur.rsi:.0f})")
     if cur.macd_hist < 0 and cur.macd_hist < prev.macd_hist:
         s += 1; reasons.append("MACD-hist fallande < 0")
-    if cur.rel_vol >= Config.MIN_REL_VOLUME:
+    if cur.rel_vol >= cur_min_rel_volume():
         s += 1; reasons.append(f"Relativ volym {cur.rel_vol:.1f}x")
     if (prev.High >= prev.ema20 and cur.Close < cur.ema20) or (cur.Close < prev.Low):
         s += 1; reasons.append("Studs-reject / breakdown")
@@ -384,9 +446,9 @@ def build_signal(ticker, df, bias):
     short_s, short_r = score_short(cur, prev, bias)
 
     side = None
-    if long_s >= Config.MIN_SCORE and long_s >= short_s:
+    if long_s >= cur_min_score() and long_s >= short_s:
         side, score, reasons = "LONG", long_s, long_r
-    elif short_s >= Config.MIN_SCORE and short_s > long_s:
+    elif short_s >= cur_min_score() and short_s > long_s:
         side, score, reasons = "SHORT", short_s, short_r
     else:
         return None
@@ -695,7 +757,7 @@ def compute_confidence(df, bias, side):
         mom = bool((cur.macd_hist < 0 and cur.macd_hist < prev.macd_hist)
                    or (Config.RSI_SHORT_LOW < cur.rsi < Config.RSI_SHORT_HIGH))
     trend_frac = (int(htf) + int(ema) + int(mom)) / 3.0
-    vol = bool(cur.rel_vol >= Config.MIN_REL_VOLUME)
+    vol = bool(cur.rel_vol >= cur_min_rel_volume())
     sweep, sweep_lvl = detect_sweep(df, side)
     mss,   mss_lvl   = detect_mss(df, side)
     # BOS = strukturbrytning MED htf-bias (fortsättning) -> stark signal
@@ -1258,7 +1320,7 @@ def scan_once():
                 except Exception:
                     pass
             if sig and is_fresh(sig, state):
-                strong  = sig["confidence"] >= Config.CONF_MIN_SEND
+                strong  = sig["confidence"] >= cur_conf_min_send()
                 send_ok = strong and tradable          # larm bara i handelsfönstret
                 _shadow_log(sig, sent=send_ok)
                 open_trade(sig, send_ok)
@@ -1777,7 +1839,7 @@ def run_loop():
         ok = send_telegram(
             "\u2705 <b>NASDAQ ROBBER startad</b>\n"
             f"Bevakar: {names}\n"
-            f"Setup {Config.MTF_TIMEFRAME} / bias {Config.HTF_TIMEFRAME} \u00b7 larm vid \u2265{Config.MIN_SCORE}/7\n"
+            f"Setup {Config.MTF_TIMEFRAME} / bias {Config.HTF_TIMEFRAME} \u00b7 larm vid \u2265{cur_min_score()}/7\n"
             "Skannar 24/7 \u00b7 trade-larm 06:00\u201322:00 m\u00e5n\u2013fre \u00b7 \U0001F305 morgonbrief 06:00\n"
             f"+ Polymarket-monitor: larm vid trades \u2265 ${int(POLY_MIN_USD):,}"
         )
