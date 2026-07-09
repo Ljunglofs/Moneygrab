@@ -1131,6 +1131,11 @@ def format_alert(sig):
         f"Risk/Reward: {rrtxt}",
         f"Plan: risk {Config.RISK_PER_TRADE_KR} kr  \u00b7  TP-mål "
         + " / ".join(f"~{int(round(Config.RISK_PER_TRADE_KR*r))} kr" for r in Config.TARGETS_R),
+        # Aktiv förvaltning (Zennbot-stil): säkra + flytta till break-even vid TP1,
+        # låt vinnaren löpa mot TP2 med trailing. Ingen revenge, ingen chansning.
+        ("⚙️ Förvaltning: vid <b>TP1</b> → säkra halva & flytta SL till "
+         f"break-even ({sig['price']}); låt resten löpa mot <b>TP2</b> med trailing "
+         + ("under senaste swing." if sig["side"] == "LONG" else "över senaste swing.")),
     ]
     return "\n".join(lines)
 
