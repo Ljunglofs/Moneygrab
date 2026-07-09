@@ -1243,8 +1243,8 @@ else _i18nBoot();
       <div class="pw-restore" onclick="restorePro()">Har du redan PRO? Återställ köp &#8250;</div>
       <div class="pw-code"><input id="pw-code-in" placeholder="Har du en medlemskod?" autocomplete="off" autocapitalize="off" spellcheck="false" onkeydown="if(event.key==='Enter')unlockWithCode()"><button onclick="unlockWithCode()">Lås upp</button></div>
     </div>
-    <div class="pw-fine"><svg viewBox="0 0 24 24" fill="none" stroke="#5b6675" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;flex:none"><path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg><span>Prenumerationen hanteras och debiteras av Google Play.
-    Avsluta när som helst i Play Butik. Ingen finansiell rådgivning.</span></div>
+    <div class="pw-fine"><svg viewBox="0 0 24 24" fill="none" stroke="#5b6675" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;flex:none"><path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg><span>Betalningen sker säkert via Google Play (appen) eller vår betalpartner (webben).
+    Avsluta när som helst. Ingen finansiell rådgivning.</span></div>
   </div>
 </div>
 
@@ -2285,9 +2285,9 @@ async function unlockWithCode(){
   if(!code)return;
   if(!CONFIG.API_BASE){if(window.say)say(EN?"Demo mode — connect the API.":"Demo-läge — koppla API:t.");return;}
   try{
-    var r=await fetch(CONFIG.API_BASE.replace(/\/$/,"")+"/api/unlock?code="+encodeURIComponent(code),{cache:"no-store"});
+    var r=await fetch(CONFIG.API_BASE.replace(/\/$/,"")+"/api/pro/activate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key:code}),cache:"no-store"});
     var j=await r.json();
-    if(j&&j.ok){localStorage.setItem("grabit_pro","1");refreshProState();if(window.hidePaywall)hidePaywall();if(window.say)say(EN?"✅ PRO unlocked!":"✅ PRO upplåst!");}
+    if(j&&j.ok){localStorage.setItem("grabit_pro","1");if(j.token)localStorage.setItem("grabit_token",j.token);refreshProState();try{if(window.loadInsiderFlow)loadInsiderFlow(true);}catch(e){}if(window.hidePaywall)hidePaywall();if(window.say)say(EN?"✅ PRO unlocked!":"✅ PRO upplåst!");}
     else{if(window.say)say(EN?"Invalid code.":"Ogiltig kod.");}
   }catch(e){if(window.say)say(EN?"Couldn't verify the code.":"Kunde inte verifiera koden.");}
 }
@@ -2959,9 +2959,18 @@ function showPaywall(msg,dismissable){
 function hidePaywall(){var el=document.getElementById("paywall");if(el)el.style.display="none";
   var tb=document.getElementById("trialbar");if(tb)tb.style.display="none";}
 async function buyPro(){
+  var EN=(window.GRABIT_LANG==="en");
   var say=window.pToast||function(m){alert(m);};
+  if(!(await billingInit())){
+    // Webben: Lemon Squeezy (Merchant of Record — sköter momsen). Öppna checkout.
+    try{
+      var cr=await fetch(CONFIG.API_BASE.replace(/\/$/,"")+"/api/pro/checkout",{cache:"no-store"});
+      var cj=await cr.json();
+      if(cj&&cj.ok&&cj.url){window.location.href=cj.url;return;}
+    }catch(e){}
+    say(EN?"Checkout isn't set up yet.":"Betalningen är inte konfigurerad än.");return;
+  }
   try{
-    if(!(await billingInit())){say("Köp görs i GRABIT-appen från Play Butik");return;}
     try{await BILLING.svc.getDetails([BILLING.SKU]);}catch(e){}
     var req=new PaymentRequest(
       [{supportedMethods:"https://play.google.com/billing",data:{sku:BILLING.SKU}}],
@@ -3083,7 +3092,8 @@ async function loadInsiderFlow(force){
   if(!CONFIG.API_BASE){window.__IFLOW=_IFLOW_DEMO;renderInsiderFlow();return;}
   box.innerHTML='<div class="scl-empty">Laddar insider flow…</div>';
   try{
-    var r=await fetch(CONFIG.API_BASE.replace(/\/$/,"")+"/api/insider_flow?limit=60",{cache:"no-store"});
+    var _tok=(function(){try{return localStorage.getItem("grabit_token")||"";}catch(e){return "";}})();
+    var r=await fetch(CONFIG.API_BASE.replace(/\/$/,"")+"/api/insider_flow?limit=60"+(_tok?("&token="+encodeURIComponent(_tok)):""),{cache:"no-store"});
     var j=await r.json();
     if(!j||!j.items||!j.items.length){if(!j.has_congress&&!j.has_insider){window.__IFLOW=_IFLOW_DEMO;}else{window.__IFLOW=j;}}
     else window.__IFLOW=j;
@@ -3106,6 +3116,14 @@ function _iflowCard(it){
     +'<div class="if-rt"><span class="if-act '+(buy?"buy":"sell")+'">'+it.action+'</span>'
     +(it.amount?'<span class="if-amt">'+polyEsc(it.amount)+'</span>':'')+'</div></div></div>';
 }
+function _iflowLockedCard(i){
+  var nm=["•••••• ••••","••••• ••••••","•••• •••••"];
+  return '<div class="if-card"><div class="if-row"><div class="if-av">••</div>'
+    +'<div class="if-main"><div class="if-nm">'+nm[i%3]+' <span class="if-ago">••</span></div>'
+    +'<div class="if-bd"><span class="if-tag ins">VD / INSIDER</span><span class="if-sub">Bolagsinsider</span></div>'
+    +'<div class="if-tk">•••• <span class="if-co">•••••••</span></div></div>'
+    +'<div class="if-rt"><span class="if-act buy">KÖP</span></div></div></div>';
+}
 function renderInsiderFlow(){
   var box=document.getElementById("feed2");if(!box)return;
   var J=window.__IFLOW||{items:[]};var items=J.items||[];
@@ -3119,11 +3137,13 @@ function renderInsiderFlow(){
   var chips=[["allt","Allt"],["kop","Köp"],["politiker","Politiker"],["insider","VD / Insider"],["conf","Confluence"]]
     .map(function(c){return '<button class="if-chip'+(f===c[0]?' on':'')+'" onclick="setIflow(\''+c[0]+'\')">'+c[1]+'</button>';}).join("");
   var cards;
-  if(!list.length){cards='<div class="sig-empty">Inga träffar i den här kategorin just nu.</div>';}
-  else if(!isPro()&&list.length>2){var EN=(window.GRABIT_LANG==="en");
+  var _locked=(J.locked===true)||(!isPro()&&J.locked!==false);
+  if(!list.length&&!_locked){cards='<div class="sig-empty">Inga träffar i den här kategorin just nu.</div>';}
+  else if(_locked){var EN=(window.GRABIT_LANG==="en");
+    var _more=(J.total?(J.total-2):5);if(_more<1)_more=(list.length>2?list.length-2:5);
     cards=list.slice(0,2).map(_iflowCard).join("")
-      +'<div class="pro-gated" data-lock="'+(list.length-2)+(EN?" more trades":" fler affärer")+'">'
-      +list.slice(2,7).map(_iflowCard).join("")+'</div>';}
+      +'<div class="pro-gated" data-lock="'+_more+(EN?" more trades":" fler affärer")+'">'
+      +[0,1,2,3,4].map(_iflowLockedCard).join("")+'</div>';}
   else{cards=list.map(_iflowCard).join("");}
   box.innerHTML='<div class="iflow">'
     +'<div class="if-hd"><div class="if-hdtop"><span class="if-livef"><i></i>LIVE FEED</span></div>'

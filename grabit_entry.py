@@ -25,6 +25,14 @@ except Exception as e:
     # Roboten får ALDRIG hindra grabit från att starta.
     print(f"Robber kunde inte starta (grabit kör vidare): {e}")
 
+# 2b) Äkta serversidig PRO-låsning för webben (Lemon Squeezy / MoR).
+try:
+    import billing_web
+    billing_web.register(app)
+except Exception as e:
+    # Får aldrig hindra grabit från att boota.
+    print(f"billing_web kunde inte registreras (grabit kör vidare): {e}")
+
 # 3) TESTENDPOINT — avfyra ett skarpt formaterat (men fejkat) Telegram-larm
 #    på begäran. Ligger på tvåsegments-väg så api.py:s catch-all /{fname}
 #    inte slukar den. Öppna i mobilen:

@@ -971,7 +971,7 @@ def unlock(code: str = ""):
 
 
 @app.get("/api/insider_flow")
-def insider_flow(limit: int = 50):
+def insider_flow(limit: int = 50, token: str = ""):
     """Enat 'smart money'-flöde: senatorer (gratis) + VD/insider (Finnhub).
     Confluence = samma ticker köps av BÅDE politiker och bolagsinsider (senaste 120 d)."""
     pol = _congress_flow()
@@ -984,7 +984,17 @@ def insider_flow(limit: int = 50):
     for it in items:
         it["confluence"] = it["ticker"] in conf_tk and it["action"] == "KÖP"
     items.sort(key=lambda x: (not x["confluence"], x["days_ago"]))
-    return {"items": items[:limit], "confluence_tickers": sorted(conf_tk),
+    # PRO-lås (server-sidan): utan giltig token släpps bara 2 kort. Går inte
+    # att kringgå från webbläsarkonsolen — resten av datan lämnar aldrig servern.
+    try:
+        from billing_web import verify_token
+        is_pro = verify_token(token) is not None
+    except Exception:
+        is_pro = False
+    total = len(items)
+    shown = items[:limit] if is_pro else items[:2]
+    return {"items": shown, "locked": (not is_pro), "total": total,
+            "confluence_tickers": (sorted(conf_tk) if is_pro else []),
             "has_congress": bool(os.getenv("FMP_API_KEY", "")),
             "has_insider": bool(os.getenv("FINNHUB_API_KEY", "")),
             "updated": int(_time.time())}
