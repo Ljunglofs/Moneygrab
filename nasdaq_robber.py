@@ -1131,6 +1131,33 @@ def send_telegram(text, chat_id=None):
         return False
 
 
+def send_discord(text):
+    """Postar samma larm till en Discord-kanal via webhook (env DISCORD_WEBHOOK_URL).
+    Tyst no-op om ingen webhook satt. HTML <b> -> Discord **bold**."""
+    url = os.environ.get("DISCORD_WEBHOOK_URL", "")
+    if not url:
+        return False
+    try:
+        import requests, re as _re
+        body = _re.sub(r"</?b>", "**", text or "")
+        body = _re.sub(r"<[^>]+>", "", body)          # strip ev. andra taggar
+        r = requests.post(url, json={"content": body[:1900]}, timeout=8)
+        return r.status_code in (200, 204)
+    except Exception as e:
+        print("Discord-fel:", e)
+        return False
+
+
+def notify(text):
+    """Skickar ett larm till alla kanaler (Telegram + Discord)."""
+    ok = send_telegram(text)
+    try:
+        send_discord(text)
+    except Exception:
+        pass
+    return ok
+
+
 def _tier(conf):
     if conf >= Config.CONF_GREEN:  return "\U0001F7E2", "A+ GODKÄND"
     if conf >= Config.CONF_YELLOW: return "\U0001F7E1", "BEVAKA"
@@ -1334,7 +1361,7 @@ def scan_once():
                     if ctx:
                         msg = msg + "\n\n" + ctx
                     print(msg, "\n")
-                    send_telegram(msg)
+                    notify(msg)
                     try:
                         import push_notify as PN
                         _tps = sig.get("targets") or []
@@ -1425,7 +1452,7 @@ def scan_now(send: bool = False) -> dict:
                         if sig.get("killzone"):
                             _d = sig.get("kz_delta", 0)
                             msg += f"\n\U0001F551 {sig['killzone']}" + (f" ({_d:+d})" if _d else "")
-                        send_telegram(msg)
+                        notify(msg)
                         import push_notify as PN
                         _tps = sig.get("targets") or []
                         _tp = (" | TP: " + str(_tps[0])) if _tps else ""
@@ -1545,7 +1572,7 @@ def poly_scan():
                f"{side} {t.get('outcome','')} \u00b7 ${usd:,.0f}\n"
                f"{title}\n"
                f"Trader: {who}")
-        if send_telegram(msg):
+        if notify(msg):
             fired += 1
 
     _POLY_PRIMED = True
@@ -1879,7 +1906,7 @@ def _orb_check():
         _ORB_STATE["fired"] = True
         STATUS["orb_last"] = f"{today}: {side} conf {conf} entry {c:.1f}"
         f = lambda v: f"{v:,.1f}".replace(",", " ")
-        send_telegram(
+        notify(
             "\U0001F680 <b>OPENING RANGE BREAKOUT</b> \u00b7 GRABIT ORB 15/5\n"
             f"\U0001F552 Range: 15:30\u201315:45 ({f(or_low)}\u2013{f(or_high)})\n"
             f"\U0001F4C8 Breakout: <b>{side}</b> \u2013 US100\n"

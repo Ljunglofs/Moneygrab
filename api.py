@@ -960,6 +960,16 @@ def _corp_flow():
     return out
 
 
+@app.get("/api/unlock")
+def unlock(code: str = ""):
+    """Löser upp PRO via medlemskod (Whop/Patreon/Discord m.m.) — ingen inloggning.
+    Giltiga koder i env PRO_UNLOCK_CODES (kommaseparerat). Skiftlägesokänsligt.
+    Frontenden sätter localStorage grabit_pro=1 vid ok."""
+    codes = [c.strip().lower() for c in os.getenv("PRO_UNLOCK_CODES", "").split(",") if c.strip()]
+    c = (code or "").strip().lower()
+    return {"ok": bool(c) and c in codes}
+
+
 @app.get("/api/insider_flow")
 def insider_flow(limit: int = 50):
     """Enat 'smart money'-flöde: senatorer (gratis) + VD/insider (Finnhub).

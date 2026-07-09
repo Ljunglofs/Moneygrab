@@ -1027,6 +1027,7 @@ var _I18N_EXACT = {
   "Insider-köp + breakout på levels":"Insider buy + breakout on levels",
   "Bolagsinsider":"Company insider",
   "Kolla läget nu":"Check the market now",
+  "Har du en medlemskod?":"Have a membership code?","Lås upp":"Unlock",
   "Igår":"Yesterday"
 };
 var _I18N_RULES = [
@@ -1240,6 +1241,7 @@ else _i18nBoot();
       <div class="pw-price2 num">149 kr<span>/månad</span></div>
       <button class="pw-btn" onclick="buyPro()">Fortsätt med PRO <span class="pw-arrow">&#8594;</span></button>
       <div class="pw-restore" onclick="restorePro()">Har du redan PRO? Återställ köp &#8250;</div>
+      <div class="pw-code"><input id="pw-code-in" placeholder="Har du en medlemskod?" autocomplete="off" autocapitalize="off" spellcheck="false" onkeydown="if(event.key==='Enter')unlockWithCode()"><button onclick="unlockWithCode()">Lås upp</button></div>
     </div>
     <div class="pw-fine"><svg viewBox="0 0 24 24" fill="none" stroke="#5b6675" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;flex:none"><path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg><span>Prenumerationen hanteras och debiteras av Google Play.
     Avsluta när som helst i Play Butik. Ingen finansiell rådgivning.</span></div>
@@ -1573,7 +1575,7 @@ function openStock(tkr){_curStock=tkr;const d=stockData(tkr,_liveStock[tkr]);
     <div id="st-insider" class="ins-list"><div class="anl-load">Laddar insider…</div></div>
     <div class="st-sec">Om bolaget</div>
     <div class="st-box about secgfx-wrap"><div class="secgfx" style="background-image:url('${IMGS.goldwave}')"></div><div class="ab-facts"><div><span>Sektor</span><b>${d.sector}</b></div><div><span>Marknad</span><b>${d.bors}</b></div><div><span>Land</span><b>${d.land} ${d.flag}</b></div></div><p class="blurb">${d.desc}</p></div>
-    <div class="verdict secgfx-wrap" style="border-color:${d.vcolor}66;background:linear-gradient(160deg,${d.vcolor}1f,#070708)"><div class="secgfx gverdict" style="background-image:url('${IMGS.verdict_chart}')"></div><div class="vd-top"><span class="vd-badge" style="background:${d.liveOk?d.vcolor:'#7c8a9a'}">${d.liveOk?d.verdict:'LADDAR'}</span><span class="vd-hit">${d.liveOk?'Träffsäkerhet <b style="color:'+d.vcolor+'">'+d.hitrate+'%</b>':''}</span></div><div class="vd-line">${!d.liveOk?'Hämtar live-kurs… nivåer visas när riktig data laddats.':(d.verdict==='UNDVIK'?'Avvakta – ingen entry rekommenderas just nu.':'Köp '+d.cur+d.entryLo+'–'+d.cur+d.entryHi+'  ·  Stop '+d.cur+d.stop+'  ·  Mål '+d.cur+d.t2)}</div><div class="vd-sub">${!d.liveOk?'Grabit räknar entry, stop och mål på live-priset – aldrig på uppskattningar.':(d.score>=7.5?'AI-slutsats: stark setup med bekräftad trend och stigande relativ styrka. R/R 1:2.3.':d.score>=6?'AI-slutsats: blandad bild – vänta på bekräftelse (volym + utbrott) innan entry.':'AI-slutsats: svag setup – hög risk. Undvik tills trend och volym förbättras.')}</div></div>
+    <div class="verdict secgfx-wrap pro-gated" data-lock="${window.GRABIT_LANG==='en'?'Entry · Stop · Target':'Entry · Stop · Mål'}" style="border-color:${d.vcolor}66;background:linear-gradient(160deg,${d.vcolor}1f,#070708)"><div class="secgfx gverdict" style="background-image:url('${IMGS.verdict_chart}')"></div><div class="vd-top"><span class="vd-badge" style="background:${d.liveOk?d.vcolor:'#7c8a9a'}">${d.liveOk?d.verdict:'LADDAR'}</span><span class="vd-hit">${d.liveOk?'Träffsäkerhet <b style="color:'+d.vcolor+'">'+d.hitrate+'%</b>':''}</span></div><div class="vd-line">${!d.liveOk?'Hämtar live-kurs… nivåer visas när riktig data laddats.':(d.verdict==='UNDVIK'?'Avvakta – ingen entry rekommenderas just nu.':'Köp '+d.cur+d.entryLo+'–'+d.cur+d.entryHi+'  ·  Stop '+d.cur+d.stop+'  ·  Mål '+d.cur+d.t2)}</div><div class="vd-sub">${!d.liveOk?'Grabit räknar entry, stop och mål på live-priset – aldrig på uppskattningar.':(d.score>=7.5?'AI-slutsats: stark setup med bekräftad trend och stigande relativ styrka. R/R 1:2.3.':d.score>=6?'AI-slutsats: blandad bild – vänta på bekräftelse (volym + utbrott) innan entry.':'AI-slutsats: svag setup – hög risk. Undvik tills trend och volym förbättras.')}</div></div>
     <div class="st-sec">GRABIT Score</div>
     <div class="rings">${ring(d.mom,"#22d3ee","Momentum",d.mom>=8?"Starkt":"Bra")}
       ${ring(d.sent,"#F5C542","Sentiment",d.sent>=8?"Positivt":"Neutralt")}
@@ -1600,7 +1602,7 @@ function openStock(tkr){_curStock=tkr;const d=stockData(tkr,_liveStock[tkr]);
       <div class="er"><span class="k">Stöd (1 ATR)</span><span class="v">${d.cur}${d.s1}</span></div>
       <div class="er"><span class="k">Motstånd (1 ATR)</span><span class="v">${d.cur}${d.r2}</span></div></div>
     <div class="st-grid2">
-      <div class="st-box exit2"><div class="k2" style="margin-bottom:6px">Exit plan</div>
+      <div class="st-box exit2 pro-gated" data-lock="${window.GRABIT_LANG==='en'?'Exit plan':'Exit plan'}"><div class="k2" style="margin-bottom:6px">Exit plan</div>
         <div class="er2"><span class="k">Mål 1</span><span class="v pos">${d.cur}${d.t1}</span></div>
         <div class="er2"><span class="k">Mål 2</span><span class="v pos">${d.cur}${d.t2}</span></div>
         <div class="er2"><span class="k">Stop</span><span class="v neg">${d.cur}${d.stop}</span></div>
@@ -1626,6 +1628,7 @@ function openStock(tkr){_curStock=tkr;const d=stockData(tkr,_liveStock[tkr]);
     <div class="st-sec">Senaste nyheter</div>
     <div id="st-news" class="news-list"><div class="anl-load">Laddar nyheter…</div></div>`;
   loadStockExtras(tkr, d.price);
+  if(window.applyProLocks)applyProLocks(document.getElementById("st-body"));
   document.getElementById("stock").classList.add("on");
   document.getElementById("stock").scrollTop=0;
   if(CONFIG.API_BASE&&_liveStock[tkr]===undefined)fetchLiveStock(tkr);
@@ -2254,6 +2257,40 @@ function go(s){document.querySelectorAll(".screen").forEach(x=>x.classList.remov
   document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("on",b.dataset.s===s));
   window.scrollTo({top:0,behavior:"instant"});}
 function openInsiderFlow(){go('signal');if(window.setSig)setSig('insider');}
+/* ===== FREEMIUM: sneak-peek-lås + kod-upplåsning ===== */
+function isPro(){try{return localStorage.getItem("grabit_pro")==="1";}catch(e){return false;}}
+function applyProLocks(root){
+  if(isPro())return;
+  var EN=(window.GRABIT_LANG==="en");
+  var els=(root||document).querySelectorAll(".pro-gated:not(.locked)");
+  Array.prototype.forEach.call(els,function(el){
+    el.classList.add("locked");
+    var lbl=el.getAttribute("data-lock")||"PRO";
+    var ov=document.createElement("div");ov.className="pro-ov";
+    ov.innerHTML='<div class="pro-ov-in"><span class="pro-ov-ic">🔒</span><b>'+lbl+'</b><i>'+(EN?"Unlock with PRO":"Lås upp med PRO")+'</i></div>';
+    ov.onclick=function(e){e.stopPropagation();showPaywall(null,true);};
+    el.appendChild(ov);
+  });
+}
+function refreshProState(){
+  document.body.classList.toggle("not-pro",!isPro());
+  if(isPro()){
+    Array.prototype.forEach.call(document.querySelectorAll(".pro-ov"),function(o){o.remove();});
+    Array.prototype.forEach.call(document.querySelectorAll(".pro-gated.locked"),function(e){e.classList.remove("locked");});
+  }else{applyProLocks(document);}
+}
+async function unlockWithCode(){
+  var EN=(window.GRABIT_LANG==="en");
+  var inp=document.getElementById("pw-code-in");var code=inp?inp.value.trim():"";
+  if(!code)return;
+  if(!CONFIG.API_BASE){if(window.say)say(EN?"Demo mode — connect the API.":"Demo-läge — koppla API:t.");return;}
+  try{
+    var r=await fetch(CONFIG.API_BASE.replace(/\/$/,"")+"/api/unlock?code="+encodeURIComponent(code),{cache:"no-store"});
+    var j=await r.json();
+    if(j&&j.ok){localStorage.setItem("grabit_pro","1");refreshProState();if(window.hidePaywall)hidePaywall();if(window.say)say(EN?"✅ PRO unlocked!":"✅ PRO upplåst!");}
+    else{if(window.say)say(EN?"Invalid code.":"Ogiltig kod.");}
+  }catch(e){if(window.say)say(EN?"Couldn't verify the code.":"Kunde inte verifiera koden.");}
+}
 function _rbToast(msg,ok){var t=document.getElementById("rbtoast");
   if(!t){t=document.createElement("div");t.id="rbtoast";document.body.appendChild(t);}
   t.textContent=msg;t.className="rbtoast "+(ok===true?"ok":ok===false?"err":"info");
@@ -2935,6 +2972,7 @@ async function buyPro(){
     try{fetch(CONFIG.API_BASE+"/api/billing/log",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({token:token||"",sku:BILLING.SKU})});}catch(e){}
     localStorage.setItem("grabit_pro","1");
+    if(window.refreshProState)refreshProState();
     hidePaywall();say("Välkommen till GRABIT PRO!");
   }catch(e){/* användaren avbröt köpet */}
 }
@@ -2942,7 +2980,7 @@ async function restorePro(){
   var say=window.pToast||function(m){alert(m);};
   if(!(await billingInit())){say("Öppna GRABIT-appen från Play Butik för att återställa");return;}
   var act=await proActive();
-  if(act){localStorage.setItem("grabit_pro","1");hidePaywall();say("PRO återställt!");}
+  if(act){localStorage.setItem("grabit_pro","1");if(window.refreshProState)refreshProState();hidePaywall();say("PRO återställt!");}
   else say("Ingen aktiv prenumeration hittades på det här Google-kontot");
 }
 function iosBarInit(){
@@ -2998,6 +3036,7 @@ paywallCheck();
   var isIOS=/iPhone|iPad|iPod/.test(ua)||(/(Macintosh)/.test(ua)&&navigator.maxTouchPoints>1);
   if(isIOS){iosBarInit();}else{proPromoInit();}
 })();
+if(window.refreshProState)refreshProState();
 load();loadMonthly();loadDaily();loadMacro();loadFda();loadTopOp();loadWatchrow();loadFacit();
 function fgInfo(s){s=+s||0;
   if(s>=75)return{label:"Extrem girighet",col:"#22d3ee",dir:1,txt:"Extrem girighet på marknaden — se upp för överhettning."};
@@ -3079,12 +3118,19 @@ function renderInsiderFlow(){
     return true;});
   var chips=[["allt","Allt"],["kop","Köp"],["politiker","Politiker"],["insider","VD / Insider"],["conf","Confluence"]]
     .map(function(c){return '<button class="if-chip'+(f===c[0]?' on':'')+'" onclick="setIflow(\''+c[0]+'\')">'+c[1]+'</button>';}).join("");
-  var cards=list.length?list.map(_iflowCard).join(""):'<div class="sig-empty">Inga träffar i den här kategorin just nu.</div>';
+  var cards;
+  if(!list.length){cards='<div class="sig-empty">Inga träffar i den här kategorin just nu.</div>';}
+  else if(!isPro()&&list.length>2){var EN=(window.GRABIT_LANG==="en");
+    cards=list.slice(0,2).map(_iflowCard).join("")
+      +'<div class="pro-gated" data-lock="'+(list.length-2)+(EN?" more trades":" fler affärer")+'">'
+      +list.slice(2,7).map(_iflowCard).join("")+'</div>';}
+  else{cards=list.map(_iflowCard).join("");}
   box.innerHTML='<div class="iflow">'
     +'<div class="if-hd"><div class="if-hdtop"><span class="if-livef"><i></i>LIVE FEED</span></div>'
     +'<h1 class="if-h1">INSIDER <b>FLOW</b></h1><p class="if-p">Smart money moves. Follow the filings.</p></div>'
     +'<div class="if-chips">'+chips+'</div>'
     +'<div class="if-list">'+cards+'</div></div>';
+  if(window.applyProLocks)applyProLocks(box);
 }
 function polyEsc(x){return String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 function polyUsd(n){n=+n||0;if(n>=1e6)return "$"+(n/1e6).toFixed(1)+"M";if(n>=1e3)return "$"+(n/1e3).toFixed(0)+"k";return "$"+Math.round(n);}
@@ -3204,6 +3250,19 @@ async function loadPolyInsiders(force){
 .rbm-setup.hit{color:#8ff0b5;background:rgba(46,204,113,.12);border:1px solid rgba(46,204,113,.35)}
 .rbm-note{font-size:12.5px;color:#8b97a3;background:rgba(255,255,255,.03);border-radius:8px;padding:7px 10px}
 .rbm-foot{font-size:11.5px;color:#8b97a3;text-align:center;margin-top:4px}
+/* Sneak-peek-lås */
+.pro-gated.locked{position:relative;overflow:hidden}
+.pro-gated.locked>*:not(.pro-ov){filter:blur(7px);opacity:.5;pointer-events:none;user-select:none}
+.pro-ov{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,rgba(8,10,14,.28),rgba(8,10,14,.5));border-radius:inherit;cursor:pointer;z-index:6}
+.pro-ov-in{display:flex;flex-direction:column;align-items:center;gap:3px;text-align:center;padding:8px 14px}
+.pro-ov-ic{font-size:20px;margin-bottom:1px}
+.pro-ov-in b{font-family:var(--disp);font-weight:800;font-size:14px;color:#fff}
+.pro-ov-in i{font-style:normal;font-size:11px;font-weight:700;letter-spacing:.05em;color:var(--gold2);background:rgba(245,197,66,.14);border:1px solid rgba(245,197,66,.4);padding:3px 10px;border-radius:999px;margin-top:3px}
+/* Paywall: kod-upplåsning */
+.pw-code{display:flex;gap:8px;margin-top:12px}
+.pw-code input{flex:1;min-width:0;background:#111318;border:1px solid rgba(255,255,255,.12);border-radius:10px;color:#eef2f6;font-size:13px;padding:10px 12px;outline:none}
+.pw-code input:focus{border-color:rgba(245,197,66,.5)}
+.pw-code button{flex:none;background:rgba(245,197,66,.14);border:1px solid rgba(245,197,66,.45);color:var(--gold2);font-weight:800;font-size:13px;border-radius:10px;padding:10px 14px;cursor:pointer}
 
 /* === Signaler-filter + Fear&Greed (append, vinner via källordning) === */
 .sigfilter{display:flex;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:2px 0 2px!important;margin:6px 0 2px!important;scrollbar-width:none}

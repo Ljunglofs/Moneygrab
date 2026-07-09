@@ -54,11 +54,11 @@ def _robber_send(key: str = "", side: str = "LONG", ticker: str = "US100",
     rikt_pil = "\U0001F4C8" if side == "LONG" else "\U0001F4C9"
     tps = " | TP: " + tp1 + ((" / " + tp2) if tp2 else "") if tp1 else ""
     try:
-        from nasdaq_robber import send_telegram
-        send_telegram(f"\U0001F6A8 <b>{side} \u2013 {ticker}</b> (manuell)\n"
-                      f"\U0001F525 Confidence: <b>{conf}/100</b>\n"
-                      f"Entry: <b>{entry}</b>\nSL: {sl}{tps}"
-                      + (f"\n{note}" if note else ""))
+        from nasdaq_robber import notify
+        notify(f"\U0001F6A8 <b>{side} \u2013 {ticker}</b> (manuell)\n"
+               f"\U0001F525 Confidence: <b>{conf}/100</b>\n"
+               f"Entry: <b>{entry}</b>\nSL: {sl}{tps}"
+               + (f"\n{note}" if note else ""))
     except Exception as e:
         tg_err = str(e)
     try:
