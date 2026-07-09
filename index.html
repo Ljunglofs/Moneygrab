@@ -2987,7 +2987,7 @@ async function buyPro(){
   var EN=(window.GRABIT_LANG==="en");
   var say=window.pToast||function(m){alert(m);};
   if(!(await billingInit())){
-    // Webben: Lemon Squeezy (Merchant of Record — sköter momsen). Öppna checkout.
+    // Webben: Stripe Payment Link (Managed Payments — Stripe sköter momsen). Öppna checkout.
     try{
       var cr=await fetch(CONFIG.API_BASE.replace(/\/$/,"")+"/api/pro/checkout",{cache:"no-store"});
       var cj=await cr.json();
@@ -2995,7 +2995,7 @@ async function buyPro(){
         var cid;try{cid=localStorage.getItem("grabit_cid")||"";}catch(e){cid="";}
         if(!cid){cid=(Date.now().toString(36)+Math.random().toString(36).slice(2,10));}
         try{localStorage.setItem("grabit_cid",cid);localStorage.setItem("grabit_cid_t",String(Date.now()));}catch(e){}
-        var u=cj.url+(cj.url.indexOf("?")>=0?"&":"?")+"checkout[custom][cid]="+encodeURIComponent(cid);
+        var u=cj.url+(cj.url.indexOf("?")>=0?"&":"?")+"client_reference_id="+encodeURIComponent(cid);
         window.location.href=u;return;
       }
     }catch(e){}
