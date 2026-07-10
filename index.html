@@ -1240,7 +1240,7 @@ else _i18nBoot();
     <div class="pw-buybox">
       <div class="pw-plans">
         <button type="button" class="pw-plan on" data-plan="monthly" onclick="setProPlan('monthly',this)"><span class="pp-t">Månad</span><span class="pp-p">139 kr<i>/mån</i></span></button>
-        <button type="button" class="pw-plan" data-plan="annual" onclick="setProPlan('annual',this)"><span class="pp-badge">3 MÅN GRATIS</span><span class="pp-t">År</span><span class="pp-p">1251 kr<i>/år</i></span></button>
+        <button type="button" class="pw-plan" data-plan="annual" onclick="setProPlan('annual',this)"><span class="pp-badge">3 MÅN GRATIS</span><span class="pp-t">År</span><span class="pp-p">1251 kr<i>/år</i></span><span class="pp-save">Spara 25%</span></button>
       </div>
       <button class="pw-btn" onclick="buyPro()">Fortsätt med PRO <span class="pw-arrow">&#8594;</span></button>
       <div class="pw-restore" onclick="restorePro()">Har du redan PRO? Återställ köp &#8250;</div>
@@ -3519,6 +3519,7 @@ html,body{overflow-x:clip}
 .pw-plan .pp-p{font-family:var(--disp);font-weight:900;font-size:17px;color:#fff}
 .pw-plan .pp-p i{font-style:normal;font-size:11px;font-weight:700;color:#8a93a3;margin-left:1px}
 .pw-plan .pp-badge{position:absolute;top:-8px;left:50%;transform:translateX(-50%);white-space:nowrap;background:var(--gold);color:#0a0a0a;font-size:8.5px;font-weight:900;letter-spacing:.04em;padding:2px 7px;border-radius:99px}
+.pw-plan .pp-save{font-size:9.5px;font-weight:800;color:#22d3ee;letter-spacing:.03em;margin-top:1px}
 .pw-btn{width:100%;margin-top:10px;background:linear-gradient(135deg,#F5C542,#E8A020);color:#14100a;font-weight:900;letter-spacing:.09em;text-transform:uppercase;border:none;border-radius:13px;padding:15px;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;box-shadow:0 8px 26px rgba(245,197,66,.22)}
 .pw-btn:active{transform:scale(.985)}
 .pw-arrow{font-size:17px;line-height:1}
