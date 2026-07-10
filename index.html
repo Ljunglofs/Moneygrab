@@ -1996,7 +1996,7 @@ function render(d){
   if($("#catgrid"))$("#catgrid").innerHTML=THEMES.map((t,i)=>`<div class="cat" style="background-image:linear-gradient(to top,rgba(0,0,0,.97) 6%,rgba(0,0,0,.5) 42%,rgba(0,0,0,.12)),url('${THEME_IMG[t.key]||""}')" onclick="openCat(${i})"><div class="ci" style="color:${t.c}">${ICONS[t.key]||t.ic}</div><div class="cbottom"><div class="cn">${t.key}</div><div class="cc">${t.n} bolag</div><div class="cstatus" style="color:${t.c}">${THEME_STATUS[t.key]||""}</div></div></div>`).join("");
   if($("#winners"))$("#winners").innerHTML=qlist(d.winners);
   if($("#losers"))$("#losers").innerHTML=qlist(d.losers);
-  if($("#scanner")&&d.scanner)$("#scanner").innerHTML=renderScanner(d.scanner);
+  if($("#scanner")&&d.scanner){$("#scanner").innerHTML=renderScanner(d.scanner);if(window.applyProLocks)applyProLocks($("#scanner"));}
   /* Portföljen renderas nu av initPortfolio() (lokala innehav + live-kurser) */
 }
 function qlist(arr){return arr.map(x=>{const c=x.chg>=0?"var(--pos)":"var(--neg)";
@@ -2035,10 +2035,11 @@ function renderScanner(s){
     return `<svg class="sm-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><path d="${a.line}" fill="none" stroke="${col}" stroke-width="2.2" stroke-linecap="round"/></svg>`;};
   const row=(tkr,right,rc,sc,up)=>`<div class="sm-row" onclick="openStock('${tkr}')">${lic(tkr,30,rc)}<div class="sm-nm"><span class="sm-t">${tkr}</span><span class="sm-co">${NAMES[tkr]||''}</span></div>${spark(tkr,sc||rc,up!==false)}<span class="sm-r" style="color:${rc}">${right}</span></div>`;
   const mini=(title,col,rows)=>`<div class="scan-mini card" style="--ac:${col}"><div class="sm-h" style="color:${col}">${title}</div>${rows}</div>`;
-  const g=s.gainers.map(x=>row(x.tkr,(x.chg>=0?'+':'')+x.chg.toFixed(1)+'%','var(--pos)',null,x.chg>=0)).join("");
-  const v=s.volume.map(x=>row(x.tkr,x.x.toFixed(1)+'x','var(--gold2)','var(--gold2)',true)).join("");
+  const _gate=(arr,freeN,mapFn)=>{if(isPro()||arr.length<=freeN)return arr.map(mapFn).join("");var EN=(window.GRABIT_LANG==="en");return arr.slice(0,freeN).map(mapFn).join("")+'<div class="pro-gated" data-lock="'+(arr.length-freeN)+(EN?" more":" fler")+'">'+arr.slice(freeN).map(mapFn).join("")+'</div>';};
+  const g=_gate(s.gainers,3,x=>row(x.tkr,(x.chg>=0?'+':'')+x.chg.toFixed(1)+'%','var(--pos)',null,x.chg>=0));
+  const v=_gate(s.volume,1,x=>row(x.tkr,x.x.toFixed(1)+'x','var(--gold2)','var(--gold2)',true));
   window._screeners=s.screeners;
-  const scr=s.screeners.map((c,i)=>`<div class="scr-card card" style="--c:${c.c}" onclick="openScreener(${i})"><div class="scr-ic" style="color:${c.c};background:${c.c}1a;border-color:${c.c}55">${I[c.ic]||I.dot}</div><div class="scr-t">${c.n}</div><div class="scr-d">${c.d}</div><div class="scr-pill" style="color:${c.c};border-color:${c.c}66">${c.pill}</div></div>`).join("")+`<div class="scr-card card" style="--c:#F5C542" onclick="openResearch()"><div class="scr-ic" style="color:#F5C542;background:#F5C5421a;border-color:#F5C54255">${I.compass||I.dot}</div><div class="scr-t">Grabit Screen</div><div class="scr-d">Filtrera bolag — kurs, volym, tema</div><div class="scr-pill" style="color:#F5C542;border-color:#F5C54266">40 bolag</div></div>`;
+  const scr=s.screeners.map((c,i)=>{var _lk=(!isPro()&&(c.filt==="early"||c.filt==="risk"));return `<div class="scr-card card${_lk?" pro-gated":""}"${_lk?" data-lock=\"PRO\"":""} style="--c:${c.c}" onclick="openScreener(${i})"><div class="scr-ic" style="color:${c.c};background:${c.c}1a;border-color:${c.c}55">${I[c.ic]||I.dot}</div><div class="scr-t">${c.n}</div><div class="scr-d">${c.d}</div><div class="scr-pill" style="color:${c.c};border-color:${c.c}66">${c.pill}</div></div>`;}).join("")+`<div class="scr-card card" style="--c:#F5C542" onclick="openResearch()"><div class="scr-ic" style="color:#F5C542;background:#F5C5421a;border-color:#F5C54255">${I.compass||I.dot}</div><div class="scr-t">Grabit Screen</div><div class="scr-d">Filtrera bolag — kurs, volym, tema</div><div class="scr-pill" style="color:#F5C542;border-color:#F5C54266">40 bolag</div></div>`;
   const hero=`<div class="theme-hero" onclick="go('marknad')" style="background-image:linear-gradient(100deg,#0A0A0B 34%,rgba(10,10,11,.55) 58%,rgba(10,10,11,.1) 100%),url('${IMGS.rocket}')"><div class="th-k">HETASTA TEMAN JUST NU</div><div class="th-h">Space &amp; Defense</div><div class="th-s">Stark momentum · Flera breakout-setups</div><div class="th-pill">3 TOPPSETUPS</div></div>`;
   return `<div class="sect"><h2>Populära screeners</h2></div>
     <div class="scr-grid">${scr}</div>
