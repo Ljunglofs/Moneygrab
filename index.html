@@ -722,6 +722,7 @@ body{background:
 var GRABIT_LANG = (function(){try{return localStorage.getItem("grabit_lang")||"sv";}catch(e){return "sv";}})();
 window.GRABIT_LANG = GRABIT_LANG;
 var _I18N_EXACT = {
+"Ny extrem möjlighet":"New extreme opportunity","Rädsla":"Fear","RÄDSLA":"FEAR","Extrem rädsla":"Extreme fear","EXTREM RÄDSLA":"EXTREME FEAR","Girighet":"Greed","GIRIGHET":"GREED","Extrem girighet":"Extreme greed","EXTREM GIRIGHET":"EXTREME GREED","GULD":"GOLD","Guld":"Gold","AI · MARKNADSLÄGE":"AI · MARKET OUTLOOK","MARKNADSLÄGE":"MARKET OUTLOOK","Laddar dagens läge…":"Loading today's outlook…","Laddar dagens läge...":"Loading today's outlook…",
 "Månad":"Month","År":"Year","/mån":"/mo","/år":"/yr","/månad":"/month","3 MÅN GRATIS":"3 MONTHS FREE","Spara 25%":"Save 25%","Fortsätt med PRO":"Continue with PRO","Har du en licensnyckel?":"Have a license key?","Betalningen är inte konfigurerad än.":"Checkout isn't set up yet.",
   // Nav
   "Översikt":"Overview","Daytrade":"Daytrade","Signaler":"Signals","Research":"Research",
@@ -1032,6 +1033,8 @@ var _I18N_EXACT = {
   "Igår":"Yesterday"
 };
 var _I18N_RULES = [
+  [/rel\.volym/, "rel.vol"],
+  [/Telekom/, "Telecom"],
   [/^(\d+) dagar kvar av gratisveckan · Skaffa PRO$/, "$1 days left of your free week · Get PRO"],
   [/^Sista dagen av gratisveckan · Skaffa PRO$/, "Last day of your free week · Get PRO"],
   [/^(\d+) månader/, "$1 months"],
