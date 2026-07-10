@@ -128,21 +128,21 @@ _CODE_HTML = ("<div style='font-family:-apple-system,Segoe UI,Roboto,sans-serif;
               "<h2 style='color:#F5C542;margin:0 0 8px'>Din GRABIT-kod</h2>"
               "<p style='font-size:34px;font-weight:800;letter-spacing:8px;color:#fff;margin:12px 0'>%s</p>"
               "<p style='color:#c7d0dc;font-size:14px'>Gäller i 10 minuter. Skriv in den i GRABIT för att "
-              "låsa upp PRO och synka din portfölj.</p></div>")
+              "låsa upp PRO och synka din portfölj.</p>" "<p style='color:#5b6675;font-size:12px;margin-top:16px;border-top:1px solid rgba(255,255,255,.08);padding-top:12px'>Frågor? Kontakta oss på <a href='mailto:support@grabitlabs.com' style='color:#F5C542;text-decoration:none'>support@grabitlabs.com</a></p></div>")
 
 _WELCOME_HTML = ("<div style='font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:460px;"
                  "margin:0 auto;padding:24px;background:#0A0E12;color:#e8edf5;border-radius:14px'>"
-                 "<h2 style='color:#F5C542;margin:0 0 8px'>Välkommen till GRABIT 👋</h2>"
+                 "<h2 style='color:#F5C542;margin:0 0 8px'>Välkommen till GRABIT</h2>"
                  "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'>Ditt konto är nu kopplat till "
                  "den här mejladressen. Din PRO, portfölj och bevakningar följer med dig på alla enheter — "
                  "logga bara in med mejlen.</p>"
-                 "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'>\U0001F916 <b>NASDAQ ROBBER</b> "
+                 "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'><b>NASDAQ ROBBER</b> "
                  "— skriv koden <b style='color:#F5C542'>daq</b> i appen för en direktkoll. Han larmar bara "
                  "när det finns ett riktigt entry-läge på NASDAQ 100 (US100).</p>"
-                 "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'>\U0001F514 <b>Slå på notiser</b> "
+                 "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'><b>Slå på notiser</b> "
                  "för robotens larm och signaler — samt pris-, nyhets- och rapportlarm på aktierna i din "
                  "portfölj.</p>"
-                 "<p style='color:#F5C542;font-weight:700;margin-top:16px'>Spot the setup. Ignore the noise.</p></div>")
+                 "<p style='color:#F5C542;font-weight:700;margin-top:16px'>Spot the setup. Ignore the noise.</p>" "<p style='color:#5b6675;font-size:12px;margin-top:16px;border-top:1px solid rgba(255,255,255,.08);padding-top:12px'>Frågor? Kontakta oss på <a href='mailto:support@grabitlabs.com' style='color:#F5C542;text-decoration:none'>support@grabitlabs.com</a></p></div>")
 
 
 # --------------------------------------------------------------------------
@@ -207,7 +207,7 @@ def register(app) -> None:
         users[email] = u
         _save(_ACC_FILE, users)
         if is_new:
-            _send_email(email, "Välkommen till GRABIT 👋", _WELCOME_HTML)
+            _send_email(email, "Välkommen till GRABIT", _WELCOME_HTML)
         out = {"ok": True, "token": acc_token(email),
                "portfolio": u.get("portfolio", []), "watchlist": u.get("watchlist", [])}
         out.update(_pro_bundle(email))
