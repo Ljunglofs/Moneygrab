@@ -2287,7 +2287,7 @@ async function unlockWithCode(){
   try{
     var r=await fetch(CONFIG.API_BASE.replace(/\/$/,"")+"/api/pro/activate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key:code}),cache:"no-store"});
     var j=await r.json();
-    if(j&&j.ok){localStorage.setItem("grabit_pro","1");if(j.token)localStorage.setItem("grabit_token",j.token);refreshProState();try{if(window.loadInsiderFlow)loadInsiderFlow(true);}catch(e){}if(window.hidePaywall)hidePaywall();if(window.say)say(EN?"✅ PRO unlocked!":"✅ PRO upplåst!");}
+    if(j&&j.ok){localStorage.setItem("grabit_pro","1");localStorage.setItem("grabit_pro_src","code");if(j.token)localStorage.setItem("grabit_token",j.token);refreshProState();try{if(window.loadInsiderFlow)loadInsiderFlow(true);}catch(e){}if(window.hidePaywall)hidePaywall();if(window.say)say(EN?"✅ PRO unlocked!":"✅ PRO upplåst!");}
     else{if(window.say)say(EN?"Invalid code.":"Ogiltig kod.");}
   }catch(e){if(window.say)say(EN?"Couldn't verify the code.":"Kunde inte verifiera koden.");}
 }
@@ -2305,7 +2305,7 @@ async function proAutoClaim(){
         var j=await r.json();
         if(j&&j.ok&&j.token){
           localStorage.setItem("grabit_pro","1");localStorage.setItem("grabit_token",j.token);
-          try{localStorage.removeItem("grabit_cid");localStorage.removeItem("grabit_cid_t");}catch(e){}
+          try{localStorage.setItem("grabit_pcid",cid);localStorage.setItem("grabit_pro_src","sub");localStorage.removeItem("grabit_cid");localStorage.removeItem("grabit_cid_t");}catch(e){}
           if(window.refreshProState)refreshProState();
           try{if(window.loadInsiderFlow)loadInsiderFlow(true);}catch(e){}
           if(window.pToast)pToast(window.GRABIT_LANG==="en"?"✅ PRO unlocked!":"✅ PRO upplåst!");
@@ -2313,6 +2313,25 @@ async function proAutoClaim(){
         }
       }catch(e){}
       await new Promise(function(res){setTimeout(res,2500);});
+    }
+  }catch(e){}
+}
+async function proCheckStatus(){
+  try{
+    var src="";try{src=localStorage.getItem("grabit_pro_src")||"";}catch(e){}
+    if(src==="code")return;                 // kod-upplåsning styrs av koden
+    var pcid="";try{pcid=localStorage.getItem("grabit_pcid")||"";}catch(e){}
+    if(!pcid||!CONFIG.API_BASE)return;
+    var r=await fetch(CONFIG.API_BASE.replace(/\/$/,"")+"/api/pro/status?cid="+encodeURIComponent(pcid),{cache:"no-store"});
+    var j=await r.json();
+    if(j&&j.pro&&j.token){
+      localStorage.setItem("grabit_pro","1");localStorage.setItem("grabit_token",j.token);localStorage.setItem("grabit_pro_src","sub");
+      if(window.refreshProState)refreshProState();
+    }else if(j&&j.pro===false){
+      // prenumeration avslutad/utgången -> lås & blurra igen
+      try{localStorage.removeItem("grabit_pro");localStorage.removeItem("grabit_token");}catch(e){}
+      if(window.refreshProState)refreshProState();
+      try{if(window.loadInsiderFlow)loadInsiderFlow(true);}catch(e){}
     }
   }catch(e){}
 }
@@ -3078,6 +3097,7 @@ paywallCheck();
 })();
 if(window.refreshProState)refreshProState();
 if(window.proAutoClaim)proAutoClaim();
+if(window.proCheckStatus)proCheckStatus();
 load();loadMonthly();loadDaily();loadMacro();loadFda();loadTopOp();loadWatchrow();loadFacit();
 function fgInfo(s){s=+s||0;
   if(s>=75)return{label:"Extrem girighet",col:"#22d3ee",dir:1,txt:"Extrem girighet på marknaden — se upp för överhettning."};
