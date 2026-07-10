@@ -3192,9 +3192,9 @@ function renderInsiderFlow(){
   var _locked=(J.locked===true)||(!isPro()&&J.locked!==false);
   if(!list.length&&!_locked){cards='<div class="sig-empty">Inga träffar i den här kategorin just nu.</div>';}
   else if(_locked){var EN=(window.GRABIT_LANG==="en");
-    var _more=(J.total?(J.total-2):5);if(_more<1)_more=(list.length>2?list.length-2:5);
-    cards=list.slice(0,2).map(_iflowCard).join("")
-      +'<div class="pro-gated" data-lock="'+_more+(EN?" more trades":" fler affärer")+'">'
+    var _shown=items.length;var _more=(J.total?(J.total-_shown):5);if(_more<1)_more=5;
+    cards=list.map(_iflowCard).join("")
+      +'<div class="pro-gated" data-lock="'+_more+(EN?" more companies":" fler bolag")+'">'
       +[0,1,2,3,4].map(_iflowLockedCard).join("")+'</div>';}
   else{cards=list.map(_iflowCard).join("");}
   box.innerHTML='<div class="iflow">'

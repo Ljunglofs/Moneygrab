@@ -992,7 +992,8 @@ def insider_flow(limit: int = 50, token: str = ""):
     except Exception:
         is_pro = False
     total = len(items)
-    shown = items[:limit] if is_pro else items[:2]
+    free_n = int(os.getenv("PRO_FREE_ITEMS", "3"))
+    shown = items[:limit] if is_pro else items[:free_n]
     return {"items": shown, "locked": (not is_pro), "total": total,
             "confluence_tickers": (sorted(conf_tk) if is_pro else []),
             "has_congress": bool(os.getenv("FMP_API_KEY", "")),
