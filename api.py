@@ -2142,10 +2142,22 @@ _QUOTA_MSG = ("Du har nått dagens gräns för AI-frågor. "
 
 
 @app.post("/api/ai")
-def ai(payload: AiPayload, request: Request):
+def ai(payload: AiPayload, request: Request, token: str = ""):
     q = (payload.question or "").strip()
     if not q:
         raise HTTPException(400, "Tom fråga")
+    # Ask Grabit ar PRO-last - verifieras server-sidan (gar ej att kringga).
+    try:
+        from billing_web import verify_token as _vt
+        _pro = _vt(token) is not None
+    except Exception:
+        _pro = False
+    if not _pro:
+        _en = (getattr(payload, "lang", "") or "") == "en"
+        return {"answer": ("\U0001F512 Ask Grabit is a PRO feature - unlock PRO to chat with Grabit AI."
+                           if _en else
+                           "\U0001F512 Ask Grabit ar en PRO-funktion - las upp PRO for att chatta med Grabit AI."),
+                "locked": True}
     if not _quota_ok("chat", request):
         return {"answer": _QUOTA_MSG, "kvot": True}
 

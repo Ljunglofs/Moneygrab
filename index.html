@@ -1493,7 +1493,7 @@ function stat(k,v,col){return `<div class="stt"><div class="sk">${k}</div><div c
 
 let aiHist=[];
 const AI_CHIPS=["Vilken setup har högst sannolikhet?","Visa lägen med R/R över 3","Är HBM bättre än MRVL?","Vad rör sig mest idag?"];
-function openAI(){document.getElementById("aichat").classList.add("on");renderAI();
+function openAI(){if(!isPro()){if(window.showPaywall)showPaywall(null,true);return;}document.getElementById("aichat").classList.add("on");renderAI();
   document.getElementById("ai-chips").innerHTML=AI_CHIPS.map(q=>`<button onclick="aiSend('${q.replace(/'/g,"\\'")}')">${q}</button>`).join("");
   document.getElementById("ai-note").style.display=CONFIG.API_BASE?"none":"block";}
 function closeAI(){document.getElementById("aichat").classList.remove("on");}
@@ -1515,10 +1515,10 @@ function renderAI(){const box=document.getElementById("ai-msgs");
     </div>`;return;}
   box.innerHTML=aiHist.map(m=>`<div class="ai-msg ${m.r}">${m.t.replace(/</g,"&lt;").replace(/\n/g,"<br>")}</div>`).join("");
   box.scrollTop=box.scrollHeight;}
-async function aiSend(q){q=q||document.getElementById("ai-q").value;if(!q||!q.trim())return;
+async function aiSend(q){q=q||document.getElementById("ai-q").value;if(!q||!q.trim())return;if(!isPro()){if(window.showPaywall)showPaywall(null,true);return;}
   document.getElementById("ai-q").value="";aiHist.push({r:"u",t:q});aiHist.push({r:"a",t:"…"});renderAI();const i=aiHist.length-1;
   if(!CONFIG.API_BASE){aiHist[i].t=demoAnswer(q);renderAI();return;}
-  try{const res=await fetch(CONFIG.API_BASE.replace(/\/$/,"")+"/api/ai",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:q,history:aiHist.slice(0,-1),lang:window.GRABIT_LANG||"sv"})});
+  try{const res=await fetch(CONFIG.API_BASE.replace(/\/$/,"")+"/api/ai?token="+encodeURIComponent(localStorage.getItem("grabit_token")||""),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:q,history:aiHist.slice(0,-1),lang:window.GRABIT_LANG||"sv"})});
     const j=await res.json();aiHist[i].t=j.answer||j.text||JSON.stringify(j);}
   catch(e){aiHist[i].t="Kunde inte nå Grabit just nu. Försök igen.";}
   renderAI();}
@@ -1796,12 +1796,12 @@ function openScreener(i){
   const el=document.getElementById("screener");el.classList.add("on");el.scrollTop=0;
 }
 function closeScreener(){document.getElementById("screener").classList.remove("on");}
-async function askGrabit(tkr,q){if(!q||!q.trim())return;const ans=$("#ask-ans");ans.classList.add("on");
+async function askGrabit(tkr,q){if(!q||!q.trim())return;if(!isPro()){if(window.showPaywall)showPaywall(null,true);return;}const ans=$("#ask-ans");ans.classList.add("on");
   ans.innerHTML="Grabit tänker…";
   const B=CONFIG.API_BASE?CONFIG.API_BASE.replace(/\/$/,""):"";
   if(!B){ans.innerHTML=`<b>Demo:</b> koppla API:t så svarar Grabit live om ${tkr}.`;return;}
   const qq=(q.toUpperCase().indexOf(tkr.toUpperCase())>=0)?q:(q+" ("+tkr+")");
-  try{const r=await fetch(B+"/api/ai",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:qq,history:[],lang:window.GRABIT_LANG||"sv"})});
+  try{const r=await fetch(B+"/api/ai?token="+encodeURIComponent(localStorage.getItem("grabit_token")||""),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:qq,history:[],lang:window.GRABIT_LANG||"sv"})});
     const j=await r.json();const txt=(j.answer||j.text||"");ans.innerHTML=txt?txt.replace(/</g,"&lt;").replace(/\n/g,"<br>"):"Inget svar just nu — försök igen.";}
   catch(e){ans.innerHTML="Kunde inte nå Grabit just nu. Försök igen.";}}
 
