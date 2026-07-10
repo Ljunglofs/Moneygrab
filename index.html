@@ -3105,6 +3105,18 @@ paywallCheck();
   var isIOS=/iPhone|iPad|iPod/.test(ua)||(/(Macintosh)/.test(ua)&&navigator.maxTouchPoints>1);
   if(isIOS){iosBarInit();}else{proPromoInit();}
 })();
+function _devLogoTap(){
+  var now=Date.now();
+  if(now-(window._logoTapT||0)>2000)window._logoTaps=0;
+  window._logoTapT=now;window._logoTaps=(window._logoTaps||0)+1;
+  if(window._logoTaps>=5){
+    window._logoTaps=0;
+    ["grabit_pro","grabit_token","grabit_pcid","grabit_cid","grabit_cid_t","grabit_pro_src"].forEach(function(k){try{localStorage.removeItem(k);}catch(e){}});
+    try{if(window.pToast)pToast(window.GRABIT_LANG==="en"?"PRO reset (test) — reloading…":"PRO nollat (test) — laddar om…");}catch(e){}
+    setTimeout(function(){location.reload();},450);
+  }
+}
+(function(){var _lg=document.querySelector(".logo");if(_lg){_lg.style.cursor="pointer";_lg.addEventListener("click",_devLogoTap);}})();
 if(window.refreshProState)refreshProState();
 if(window.proAutoClaim)proAutoClaim();
 if(window.proCheckStatus)proCheckStatus();
