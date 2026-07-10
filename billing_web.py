@@ -41,6 +41,19 @@ except Exception:                       # pragma: no cover
 _CODE_DAYS = int(os.getenv("PRO_CODE_DAYS", "365"))   # give-away/egna koder: 1 år
 _PAID_DAYS = int(os.getenv("PRO_PAID_DAYS", "2"))     # köp: kort, förnyas via status
 
+_PRO_WELCOME_HTML = (
+    "<div style='font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:460px;margin:0 auto;"
+    "padding:24px;background:#0A0E12;color:#e8edf5;border-radius:14px'>"
+    "<h2 style='color:#F5C542;margin:0 0 10px'>Välkommen till GRABIT PRO \U0001F389</h2>"
+    "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'>Tack för att du prenumererar! Din PRO är "
+    "aktiv och allt är upplåst — Insider Flow, Daytrade-setups, Ask Grabit och alla screeners.</p>"
+    "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'>\U0001F4A1 <b>På en annan enhet?</b> "
+    "Öppna GRABIT, välj “Återställ köp” och logga in med den här "
+    "mejladressen — så följer din PRO med överallt.</p>"
+    "<p style='color:#8a93a3;font-size:12.5px;margin-top:16px'>Avsluta när som helst. Ingen finansiell "
+    "rådgivning.</p>"
+    "<p style='color:#F5C542;font-weight:700;margin-top:14px'>Spot the setup. Ignore the noise.</p></div>")
+
 
 # --------------------------------------------------------------------------
 #  Signerad token  (HMAC-SHA256 — kan inte förfalskas utan hemligheten)
@@ -292,6 +305,13 @@ def register(app) -> None:
                 _set_sub(sub_id, status="active", email=email)
                 if cid:
                     _map_cid(cid, sub_id)
+                if email:
+                    # Välkomstmejl vid köp (lazy import undviker cirkulär import).
+                    try:
+                        import accounts as _acc
+                        _acc._send_email(email, "Välkommen till GRABIT PRO \U0001F389", _PRO_WELCOME_HTML)
+                    except Exception:
+                        pass
                 handled = True
 
         elif etype in ("customer.subscription.created", "customer.subscription.updated"):
