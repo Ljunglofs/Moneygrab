@@ -1984,7 +1984,7 @@ function render(d){
     <div class="ebody"><div class="et">${e.t}</div><div class="ed">${I.calendar} ${e.d}</div><div class="enote" style="color:${e.bc}">${e.note||""}</div></div>
   </div>`).join("");
   // 10 hetaste
-  if($("#hetaste"))$("#hetaste").innerHTML=d.hetaste.map((h,i)=>hetRow(h,i)).join("");
+  if($("#hetaste")){var _hl=d.hetaste||[],_hh;if(isPro()||_hl.length<=4){_hh=_hl.map((h,i)=>hetRow(h,i)).join("");}else{var _EN=(window.GRABIT_LANG==="en");_hh=_hl.slice(0,4).map((h,i)=>hetRow(h,i)).join("")+'<div class="pro-gated" data-lock="'+(_hl.length-4)+(_EN?" more":" fler")+'">'+_hl.slice(4).map((h,i)=>hetRow(h,i+4)).join("")+'</div>';}$("#hetaste").innerHTML=_hh;if(window.applyProLocks)applyProLocks($("#hetaste"));}
   // snabbval-flikar
   if($("#menuchips"))$("#menuchips").innerHTML=MENU.map(m=>`<button onclick="go('marknad')">${m}</button>`).join("");
   // signal feed-skärmen
