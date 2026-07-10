@@ -2551,7 +2551,7 @@ async function loadDaytrade(force){
     if(!setups.length){wrap.innerHTML=`<div class="scl-empty">Inga setups just nu — försöker igen strax…</div>`;
       window._dtRetry=(window._dtRetry||0)+1;if(window._dtRetry<=5)setTimeout(function(){loadDaytrade(true);},10000);return;}
     window._dtRetry=0;
-    wrap.innerHTML=setups.map(s=>{
+    const _cards=setups.map(s=>{
       const bias=String(s.bias||"").toLowerCase();
       const bc=bias==="long"?"var(--pos)":bias==="short"?"var(--neg)":"var(--mut)";
       const blab=bias==="long"?"LÅNG":bias==="short"?"KORT":"AVVAKTA";
@@ -2573,6 +2573,7 @@ async function loadDaytrade(force){
         <div class="dt-tvlink" onclick="dtTv(this,'${s.ticker}')">Livegraf \u203A</div>
       </div>`;
     }).join("");
+    if(isPro()){wrap.innerHTML=_cards;}else{var _EN=(window.GRABIT_LANG==="en");wrap.innerHTML='<div class="pro-gated" data-lock="'+(_EN?"Daytrade setups":"Daytrade-setups")+'">'+_cards+'</div>';if(window.applyProLocks)applyProLocks(wrap);}
   }catch(e){wrap.innerHTML=`<div class="scl-empty">Kunde inte hämta daytrade just nu — försöker igen strax…</div>`;
     window._dtRetry=(window._dtRetry||0)+1;if(window._dtRetry<=5)setTimeout(function(){loadDaytrade(true);},10000);}
 }
