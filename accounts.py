@@ -136,6 +136,12 @@ _WELCOME_HTML = ("<div style='font-family:-apple-system,Segoe UI,Roboto,sans-ser
                  "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'>Ditt konto är nu kopplat till "
                  "den här mejladressen. Din PRO, portfölj och bevakningar följer med dig på alla enheter — "
                  "logga bara in med mejlen.</p>"
+                 "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'>\U0001F916 <b>NASDAQ ROBBER</b> "
+                 "— skriv koden <b style='color:#F5C542'>daq</b> i appen för en direktkoll. Han larmar bara "
+                 "när det finns ett riktigt entry-läge på NASDAQ 100 (US100).</p>"
+                 "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'>\U0001F514 <b>Slå på notiser</b> "
+                 "för robotens larm och signaler — samt pris-, nyhets- och rapportlarm på aktierna i din "
+                 "portfölj.</p>"
                  "<p style='color:#F5C542;font-weight:700;margin-top:16px'>Spot the setup. Ignore the noise.</p></div>")
 
 

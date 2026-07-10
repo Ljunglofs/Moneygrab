@@ -50,6 +50,11 @@ _PRO_WELCOME_HTML = (
     "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'>\U0001F4A1 <b>På en annan enhet?</b> "
     "Öppna GRABIT, välj “Återställ köp” och logga in med den här "
     "mejladressen — så följer din PRO med överallt.</p>"
+    "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'>\U0001F916 <b>NASDAQ ROBBER</b> — skriv "
+    "koden <b style='color:#F5C542'>daq</b> i appen för en direktkoll. Han larmar bara när det finns ett "
+    "riktigt entry-läge på NASDAQ 100 (US100) — inga låtsas-signaler.</p>"
+    "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'>\U0001F514 <b>Slå på notiser</b> för att få "
+    "robotens larm och signaler direkt — samt pris-, nyhets- och rapportlarm på aktierna i din portfölj.</p>"
     "<p style='color:#8a93a3;font-size:12.5px;margin-top:16px'>Avsluta när som helst. Ingen finansiell "
     "rådgivning.</p>"
     "<p style='color:#F5C542;font-weight:700;margin-top:14px'>Spot the setup. Ignore the noise.</p></div>")
