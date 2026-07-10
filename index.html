@@ -2870,19 +2870,27 @@ function renderTopMovers(){
   const el=document.getElementById("topmovers");if(!el)return;
   const T=window._tmv;if(!T||(!T.g.length&&!T.l.length)){el.style.display="none";return;}
   const tab=window._tmvTab||"g";
-  const rows=(tab==="g"?T.g:T.l).map(function(r,i){
+  const _src=(tab==="g"?T.g:T.l);
+  const _row=function(r,i){
     const up=r.chg>=0,col=up?"var(--pos)":"var(--neg)",sc=up?"#22d3ee":"#FF4B4B";
     const tr=up?[3,4,3.6,5,4.6,6,7]:[7,6,6.4,5,5.4,4,3];
     return `<div class="tmv-row" onclick="openStock('${r.tkr}')">${lic(r.tkr,26,col)}
       <div class="tmv-nm"><b>${r.tkr}</b><i>${NAMES[r.tkr]||""}</i></div>
       <div class="tmv-spark">${spark(tr,sc)}</div>
       <div class="tmv-r"><b class="num" style="color:${col}">${up?"+":""}${r.chg}%</b>${r.px!=null?`<i class="num">${fmtPx(r.px)}</i>`:""}</div></div>`;
-  }).join("");
+  };
+  let rows;
+  if(isPro()||_src.length<=3){rows=_src.map(_row).join("");}
+  else{const EN=(window.GRABIT_LANG==="en");
+    rows=_src.slice(0,3).map(_row).join("")
+      +'<div class="pro-gated" data-lock="'+(_src.length-3)+(EN?" more":" fler")+'">'
+      +_src.slice(3).map(_row).join("")+'</div>';}
   el.style.display="";
   el.innerHTML=`<div class="tmv-h"><span>Top movers</span>
     <span class="tmv-tabs"><button class="${tab==="g"?"on":""}" onclick="event.stopPropagation();window._tmvTab='g';renderTopMovers()">Vinnare</button>
     <button class="${tab==="l"?"on":""}" onclick="event.stopPropagation();window._tmvTab='l';renderTopMovers()">Förlorare</button></span></div>${rows}
     <div class="tmv-all" onclick="go('marknad')">Visa alla \u203A</div>`;
+  if(window.applyProLocks)applyProLocks(el);
 }
 async function loadFda(){
   const el=document.getElementById("fdacal");if(!el)return;
