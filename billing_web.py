@@ -208,10 +208,14 @@ def register(app) -> None:
     from fastapi import Request, Response
 
     @app.get("/api/pro/checkout")
-    def pro_checkout():
-        """Ger frontenden Stripe Payment Link-URL:en (env STRIPE_PAYMENT_LINK)."""
-        url = os.environ.get("STRIPE_PAYMENT_LINK", "").strip()
-        return {"ok": bool(url), "url": url}
+    def pro_checkout(plan: str = "monthly"):
+        """Ger frontenden rätt Stripe Payment Link (månad/år)."""
+        if plan == "annual":
+            url = (os.environ.get("STRIPE_PAYMENT_LINK_ANNUAL", "").strip()
+                   or os.environ.get("STRIPE_PAYMENT_LINK", "").strip())
+        else:
+            url = os.environ.get("STRIPE_PAYMENT_LINK", "").strip()
+        return {"ok": bool(url), "url": url, "plan": plan}
 
     @app.post("/api/pro/activate")
     async def pro_activate(request: Request):
