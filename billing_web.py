@@ -178,6 +178,18 @@ def _active_for_cid(cid: str) -> bool:
     return _sub_active(d["subs"].get(sub_id))
 
 
+def _active_for_email(email: str) -> bool:
+    """Har den här mejladressen en aktiv prenumeration? (för e-post-återställning)"""
+    email = str(email or "").strip().lower()
+    if not email:
+        return False
+    d = _load_ent()
+    for sub in d["subs"].values():
+        if str((sub or {}).get("email", "")).lower() == email and _sub_active(sub):
+            return True
+    return False
+
+
 # --------------------------------------------------------------------------
 #  Stripe webhook-signatur  (schema: "t=<ts>,v1=<hex>")
 # --------------------------------------------------------------------------

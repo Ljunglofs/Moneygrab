@@ -3052,11 +3052,44 @@ async function buyPro(){
 }
 async function restorePro(){
   var say=window.pToast||function(m){alert(m);};
-  if(!(await billingInit())){say("Öppna GRABIT-appen från Play Butik för att återställa");return;}
+  if(!(await billingInit())){return accountLogin();}
   var act=await proActive();
   if(act){localStorage.setItem("grabit_pro","1");if(window.refreshProState)refreshProState();hidePaywall();say("PRO återställt!");}
   else say("Ingen aktiv prenumeration hittades på det här Google-kontot");
 }
+async function accountLogin(){
+  var EN=(window.GRABIT_LANG==="en");
+  var say=window.pToast||function(m){alert(m);};
+  if(!CONFIG.API_BASE){say(EN?"Demo mode.":"Demo-läge.");return;}
+  var base=CONFIG.API_BASE.replace(/\/$/,"");
+  var email=prompt(EN?"Enter your email to restore PRO / sync your portfolio:":"Ange din mejl för att återställa PRO / synka portföljen:");
+  if(!email)return;email=(""+email).trim();
+  try{
+    var r=await fetch(base+"/api/account/request",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email})});
+    var j=await r.json();
+    if(!j.ok){say(j.error||(EN?"Couldn't send code.":"Kunde inte skicka kod."));return;}
+  }catch(e){say(EN?"Network error.":"Nätverksfel.");return;}
+  say(EN?"Code sent — check your email.":"Kod skickad — kolla mejlen.");
+  var code=prompt(EN?"Enter the 6-digit code:":"Ange 6-siffriga koden:");
+  if(!code)return;
+  try{
+    var vr=await fetch(base+"/api/account/verify",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email,code:(""+code).trim()})});
+    var vj=await vr.json();
+    if(!vj.ok){say(vj.error||(EN?"Wrong code.":"Fel kod."));return;}
+    try{localStorage.setItem("grabit_acc",vj.token);}catch(e){}
+    if(vj.pro&&vj.pro_token){localStorage.setItem("grabit_pro","1");localStorage.setItem("grabit_token",vj.pro_token);localStorage.setItem("grabit_pro_src","email");}
+    if(vj.portfolio&&vj.portfolio.length){try{localStorage.setItem("grabit_pf",JSON.stringify(vj.portfolio));}catch(e){}}
+    if(window.refreshProState)refreshProState();
+    try{if(window.initPortfolio)initPortfolio();}catch(e){}
+    if(window.hidePaywall)hidePaywall();
+    say(vj.pro?(EN?"✅ PRO restored!":"✅ PRO återställt!"):(EN?"✅ Signed in — synced.":"✅ Inloggad — synkat."));
+  }catch(e){say(EN?"Network error.":"Nätverksfel.");}
+}
+window.accSync=async function(){
+  var tok="";try{tok=localStorage.getItem("grabit_acc")||"";}catch(e){}
+  if(!tok||!CONFIG.API_BASE)return;
+  try{await fetch(CONFIG.API_BASE.replace(/\/$/,"")+"/api/account/sync",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token:tok,portfolio:(typeof pfLoad==="function"?pfLoad():[])})});}catch(e){}
+};
 function iosBarInit(){
   try{
     var ua=navigator.userAgent||"";
@@ -3125,6 +3158,7 @@ function _devLogoTap(){
 if(window.refreshProState)refreshProState();
 if(window.proAutoClaim)proAutoClaim();
 if(window.proCheckStatus)proCheckStatus();
+(function(){var _at="";try{_at=localStorage.getItem("grabit_acc")||"";}catch(e){}if(!_at||!CONFIG.API_BASE)return;fetch(CONFIG.API_BASE.replace(/\/$/,"")+"/api/account/data?token="+encodeURIComponent(_at),{cache:"no-store"}).then(function(r){return r.json();}).then(function(j){if(!j||!j.ok)return;if(j.pro&&j.pro_token){localStorage.setItem("grabit_pro","1");localStorage.setItem("grabit_token",j.pro_token);localStorage.setItem("grabit_pro_src","email");if(window.refreshProState)refreshProState();}if(j.portfolio&&j.portfolio.length){try{localStorage.setItem("grabit_pf",JSON.stringify(j.portfolio));if(window.initPortfolio)initPortfolio();}catch(e){}}}).catch(function(){});})();
 load();loadMonthly();loadDaily();loadMacro();loadFda();loadTopOp();loadWatchrow();loadFacit();
 function fgInfo(s){s=+s||0;
   if(s>=75)return{label:"Extrem girighet",col:"#22d3ee",dir:1,txt:"Extrem girighet på marknaden — se upp för överhettning."};
@@ -3734,7 +3768,7 @@ body{background:radial-gradient(130% 55% at 50% -12%,rgba(245,197,66,.075),trans
 /* ===== Portfölj 2.0 · lokala innehav + live-kurser + Grabit AI-granskning ===== */
 var PF_KEY="grabit_pf";
 function pfLoad(){try{return JSON.parse(localStorage.getItem(PF_KEY)||"[]");}catch(e){return[];}}
-function pfSave(a){try{localStorage.setItem(PF_KEY,JSON.stringify(a));}catch(e){}try{window.pushSyncWatchlist&&window.pushSyncWatchlist();}catch(e){}try{typeof loadWatchrow==="function"&&loadWatchrow();}catch(e){}}
+function pfSave(a){try{localStorage.setItem(PF_KEY,JSON.stringify(a));}catch(e){}try{window.pushSyncWatchlist&&window.pushSyncWatchlist();}catch(e){}try{typeof loadWatchrow==="function"&&loadWatchrow();}catch(e){}try{window.accSync&&window.accSync();}catch(e){}}
 function pfCcy(tk){if(/\.ST$/.test(tk))return"kr";if(/\.(PA|DE|AS)$/.test(tk))return"€";if(/\.(TO|V)$/.test(tk))return"C$";return"$";}
 function pfFmt(n){return (+n||0).toLocaleString("sv-SE",{maximumFractionDigits:0});}
 var _PF_Q={};
