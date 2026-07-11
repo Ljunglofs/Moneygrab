@@ -3067,6 +3067,10 @@ window.setPriceAlert=async function(tkr,px){
    Körs bara inne i Play-appen (TWA) där Digital Goods API finns.
    I vanlig webbläsare är appen öppen — där finns inget köp att göra. */
 var BILLING={SKU:"grabit_pro",svc:null,twa:false};
+/* Körs appen som Android-app (TWA från Google Play)? Då får inget köp ske i appen
+   (Googles regler) — PRO köps på webben och låses upp via mejl-inloggning här. */
+var _ANDROID_APP=(function(){try{return (document.referrer||"").lastIndexOf("android-app://",0)===0;}catch(e){return false;}})();
+try{window.isAndroidApp=function(){return _ANDROID_APP;};}catch(e){}
 async function billingInit(){
   if(BILLING.svc)return true;
   if(!("getDigitalGoodsService" in window))return false;
@@ -3086,6 +3090,18 @@ function showPaywall(msg,dismissable){
   if(bi&&!bi.src){var hb=document.querySelector(".brand");if(hb&&hb.src)bi.src=hb.src;}
   if(msg){var su=document.getElementById("pw-sub");if(su)su.textContent=msg;}
   var x=document.getElementById("pw-close");if(x)x.style.display=dismissable?"block":"none";
+  if(_ANDROID_APP){
+    var _EN=(window.GRABIT_LANG==="en");
+    [".pw-plans",".pw-btn",".pw-big",".pw-trial",".pw-cancel"].forEach(function(sel){
+      var n=el.querySelector(sel);if(n)n.style.display="none";});
+    var sub=document.getElementById("pw-sub");
+    if(sub&&!msg)sub.innerHTML=_EN?"<b>Have PRO?</b> Log in to unlock":"<b>Har du PRO?</b> Logga in för att låsa upp";
+    var rest=el.querySelector(".pw-restore");
+    if(rest)rest.textContent=_EN?"Log in with email ›":"Logga in med mejl ›";
+    var fine=el.querySelector(".pw-fine span");
+    if(fine)fine.textContent=_EN?"Log in with the email you used when subscribing to unlock PRO. No financial advice."
+                                :"Logga in med mejlen du använde när du prenumererade för att låsa upp PRO. Ingen finansiell rådgivning.";
+  }
   el.style.display="flex";
 }
 function hidePaywall(){var el=document.getElementById("paywall");if(el)el.style.display="none";
@@ -3095,6 +3111,8 @@ function setProPlan(p,btn){window._proPlan=p;var ps=document.querySelectorAll(".
 async function buyPro(){
   var EN=(window.GRABIT_LANG==="en");
   var say=window.pToast||function(m){alert(m);};
+  // Android-appen (TWA): inget köp i appen — skicka till mejl-inloggning istället.
+  if(_ANDROID_APP){return accountLogin();}
   if(!(await billingInit())){
     // Webben: Stripe Payment Link (Managed Payments — Stripe sköter momsen). Öppna checkout.
     try{
@@ -3126,11 +3144,8 @@ async function buyPro(){
   }catch(e){/* användaren avbröt köpet */}
 }
 async function restorePro(){
-  var say=window.pToast||function(m){alert(m);};
-  if(!(await billingInit())){return accountLogin();}
-  var act=await proActive();
-  if(act){localStorage.setItem("grabit_pro","1");if(window.refreshProState)refreshProState();hidePaywall();say("PRO återställt!");}
-  else say("Ingen aktiv prenumeration hittades på det här Google-kontot");
+  // PRO köps på webben (Stripe) och låses upp via mejl-inloggning på alla enheter.
+  return accountLogin();
 }
 async function accountLogin(){
   var EN=(window.GRABIT_LANG==="en");
@@ -3181,6 +3196,7 @@ function iosBarClose(){
 }
 function proPromoInit(){
   try{
+    if(_ANDROID_APP)return;   // ingen köp-nudge i Android-appen
     if(localStorage.getItem("grabit_pro")==="1")return;
     var el=document.getElementById("propromo");if(!el)return;
     var im=el.querySelector("img");if(im&&!im.src)im.src=IMGS.promo;
@@ -3196,6 +3212,7 @@ function proPromoClick(){
   showPaywall(null,true);
 }
 async function paywallCheck(){
+  if(_ANDROID_APP)return;   // Android-appen: ingen köp-paywall i appen (PRO via webben)
   var twa=await billingInit();
   if(!twa)return;   // vanlig webbläsare: ingen paywall
   var act=await proActive();
