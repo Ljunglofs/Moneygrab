@@ -1700,10 +1700,25 @@ function insiderHTML(list){
     return '<div class="ins-item">'+badge+'<div class="ins-tx"><div class="ins-n">'+(t.name||'\u2014')+'</div><div class="ins-m">'+meta+'</div></div></div>';
   }).join('');
 }
+function smartMoneyTease(){
+  var hs=[64,42,86,52,38,70,58,48,78,44,62,50];
+  var bars=hs.map(function(h,i){return '<div class="sm-bar '+(i%4===3?'neg':'pos')+'" style="height:'+h+'%"></div>';}).join('');
+  return '<div class="sm-head"><div><div class="sm-k">Smart Money</div><div class="sm-sub">Insider-intensitet</div></div>'
+    +'<div class="sm-sum pos">•• köp · • sälj</div></div><div class="sm-bars">'+bars+'</div>';
+}
+function insiderTease(){
+  var rows=[['pos','KÖP','24 000'],['pos','KÖP','8 500'],['neg','SÄLJ','3 200']];
+  return rows.map(function(r){
+    return '<div class="ins-item"><span class="ins-b '+r[0]+'">'+r[1]+'</span><div class="ins-tx">'
+      +'<div class="ins-n">•••••••••</div>'
+      +'<div class="ins-m">'+r[2]+' @ $•• · 2026</div></div></div>';
+  }).join('');
+}
 function renderExtras(tkr,j,price){
   var nv=document.getElementById("st-news");if(nv)nv.innerHTML=newsHTML(j&&j.news);
-  var iv=document.getElementById("st-insider");if(iv){iv.innerHTML=insiderHTML(j&&j.insider);if(!isPro()){iv.innerHTML='<div class="pro-gated" data-lock="PRO">'+iv.innerHTML+'</div>';if(window.applyProLocks)applyProLocks(iv);}}
-  var sm=document.getElementById("st-smart");if(sm){sm.innerHTML=smartMoneyHTML(j&&j.insider);if(!isPro()){sm.innerHTML='<div class="pro-gated" data-lock="PRO">'+sm.innerHTML+'</div>';if(window.applyProLocks)applyProLocks(sm);}}
+  var _hasIns=!!(j&&j.insider&&j.insider.length);
+  var iv=document.getElementById("st-insider");if(iv){if(isPro()){iv.innerHTML=insiderHTML(j&&j.insider);}else{iv.innerHTML='<div class="pro-gated" data-lock="PRO">'+(_hasIns?insiderHTML(j.insider):insiderTease())+'</div>';if(window.applyProLocks)applyProLocks(iv);}}
+  var sm=document.getElementById("st-smart");if(sm){if(isPro()){sm.innerHTML=smartMoneyHTML(j&&j.insider);}else{sm.innerHTML='<div class="pro-gated" data-lock="PRO">'+(_hasIns?smartMoneyHTML(j.insider):smartMoneyTease())+'</div>';if(window.applyProLocks)applyProLocks(sm);}}
   var a=document.getElementById("st-analyst");if(!a)return;
   var an=j&&j.analyst;
   a.innerHTML=analystHTML(an,price);
@@ -3390,8 +3405,8 @@ async function loadPolyInsiders(force){
 .rbm-foot{font-size:11.5px;color:#8b97a3;text-align:center;margin-top:4px}
 /* Sneak-peek-lås */
 .pro-gated.locked{position:relative;overflow:hidden}
-.pro-gated.locked>*:not(.pro-ov){filter:blur(7px);opacity:.5;pointer-events:none;user-select:none}
-.pro-ov{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,rgba(8,10,14,.28),rgba(8,10,14,.5));border-radius:inherit;cursor:pointer;z-index:6}
+.pro-gated.locked>*:not(.pro-ov){filter:blur(5px);opacity:.82;pointer-events:none;user-select:none}
+.pro-ov{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,rgba(8,10,14,.12),rgba(8,10,14,.32));border-radius:inherit;cursor:pointer;z-index:6}
 .pro-ov-in{display:flex;flex-direction:column;align-items:center;gap:3px;text-align:center;padding:8px 14px}
 .pro-ov-ic{font-size:20px;margin-bottom:1px}
 .pro-ov-in b{font-family:var(--disp);font-weight:800;font-size:14px;color:#fff}
