@@ -585,50 +585,183 @@ def assetlinks():
     return Response(content=_j.dumps(data), media_type="application/json")
 
 
-_PRIVACY_HTML = """<!doctype html><html lang="sv"><head><meta charset="utf-8">
+_LEGAL_HEAD = ("""<!doctype html><html lang="sv"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>GRABIT — Integritetspolicy</title>
+<title>GRABIT — %s</title>
 <style>body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#0A0E12;color:#e8edf5;
-max-width:680px;margin:0 auto;padding:28px 20px;line-height:1.6}
-h1{font-size:22px;color:#F5C542}h2{font-size:16px;margin-top:26px;color:#F5C542}
-p,li{font-size:14.5px;color:#c7d0dc}a{color:#F5C542}</style></head><body>
+max-width:720px;margin:0 auto;padding:30px 20px 60px;line-height:1.62}
+h1{font-size:23px;color:#F5C542;margin:0 0 4px}
+.upd{color:#8891a0;font-size:12.5px;margin:0 0 22px}
+h2{font-size:16px;margin-top:28px;color:#F5C542}
+p,li{font-size:14.5px;color:#c7d0dc}b{color:#e8edf5}a{color:#F5C542}
+.nav{margin-top:34px;padding-top:16px;border-top:1px solid rgba(255,255,255,.08);font-size:13px}
+.note{background:rgba(245,197,66,.08);border:1px solid rgba(245,197,66,.3);border-radius:10px;padding:12px 14px;font-size:13px;color:#d9e0ea}
+</style></head><body>""")
+
+# OBS: Fyll i operatörens juridiska namn / firma nedan (ORG_LEGAL_NAME) innan lansering.
+_LEGAL_OP = os.environ.get("GRABIT_LEGAL_NAME", "GRABIT (drivs som enskild näringsidkare i Sverige)").strip()
+
+_PRIVACY_HTML = _LEGAL_HEAD % "Integritetspolicy" + ("""
 <h1>Integritetspolicy för GRABIT</h1>
-<p>Senast uppdaterad: juli 2026. GRABIT är en app för teknisk aktieanalys.
-Vi samlar in så lite data som möjligt och säljer aldrig data vidare.</p>
+<p class="upd">Senast uppdaterad: juli 2026</p>
+<p>GRABIT är en app för teknisk aktieanalys och information. Vi behandlar så få
+personuppgifter som möjligt och säljer aldrig dina uppgifter vidare. Denna policy
+förklarar vad vi behandlar och varför.</p>
+
+<h2>Personuppgiftsansvarig</h2>
+<p>""" + _LEGAL_OP + """. Kontakt:
+<a href="mailto:support@grabitlabs.com">support@grabitlabs.com</a>.</p>
+
 <h2>Vilka uppgifter behandlas?</h2>
 <ul>
-<li><b>Push-prenumeration</b> — om du slår på notiser sparas din webbläsares
-push-adress (en teknisk identifierare, ingen personlig information) på vår
-server så att vi kan skicka notiserna du bett om.</li>
-<li><b>Bevakade aktier</b> — tickersymbolerna i din portfölj/watchlist sparas
-tillsammans med push-prenumerationen så att larmen kan riktas rätt, samt dina
-egna prislarm (ticker och nivå).</li>
-<li><b>Lokalt i din enhet</b> — portföljens innehav sparas i din webbläsares
-lokala lagring och lämnar inte enheten i annat syfte än ovan.</li>
+<li><b>E-postadress</b> — om du skapar konto, köper PRO eller loggar in. Används
+för inloggning (engångskod), för att återställa din PRO på andra enheter, för
+kvitton/orderbekräftelser och för viktig information om tjänsten.</li>
+<li><b>Inloggningskoder</b> — tillfälliga engångskoder som skickas till din
+e-post och raderas efter kort tid.</li>
+<li><b>Portfölj och bevakningar</b> — om du är inloggad synkas dina bevakade
+aktier (tickersymboler) till servern så att de följer med mellan enheter. Är du
+inte inloggad sparas de endast lokalt i din enhet.</li>
+<li><b>Push-notiser</b> — om du slår på notiser sparas din enhets push-adress
+(en teknisk identifierare), dina bevakade tickers och eventuella prislarm, så att
+larmen kan riktas rätt.</li>
+<li><b>Betalning</b> — köp hanteras av Stripe. Vi tar aldrig emot eller lagrar
+kortnummer. Vi lagrar ett prenumerations-ID och dess status (aktiv/avslutad) samt
+kopplingen till din e-post, för att kunna ge dig rätt åtkomst.</li>
 </ul>
-<p>Vi använder inga annonsnätverk, ingen spårning över andra webbplatser och
-inga tredjeparts-analysverktyg. Inga konton, inga personuppgifter som namn,
-e-post eller telefonnummer samlas in.</p>
-<h2>Delas något med tredje part?</h2>
-<p>Nej. Kursdata och nyheter hämtas från externa källor (t.ex. Yahoo Finance)
-av vår server — dina uppgifter skickas inte dit. Push-notiser levereras via din
-webbläsares pushtjänst (t.ex. Google FCM), vilket är tekniskt nödvändigt för
-funktionen.</p>
+
+<h2>Rättslig grund</h2>
+<p>Konto, PRO och betalning behandlas för att <b>fullgöra vårt avtal</b> med dig.
+Notiser bygger på ditt <b>samtycke</b> (du slår på dem själv). Viss behandling
+sker utifrån vårt <b>berättigade intresse</b> av säker och fungerande drift.</p>
+
+<h2>Vilka delar vi uppgifter med?</h2>
+<p>Vi använder följande leverantörer (personuppgiftsbiträden) enbart för att
+driva tjänsten:</p>
+<ul>
+<li><b>Stripe</b> — betalning och prenumerationer (agerar Merchant of Record).</li>
+<li><b>Resend</b> — utskick av e-post (koder, kvitton, viktig info).</li>
+<li><b>Render</b> — hosting av servern.</li>
+<li><b>Push-tjänst</b> — Google (FCM) respektive Apple levererar notiserna till
+din enhet, vilket är tekniskt nödvändigt.</li>
+</ul>
+<p>Kurser, nyheter och insiderdata hämtas från externa källor av vår server —
+<b>dina</b> uppgifter skickas aldrig dit. Vi använder inga annonsnätverk och
+ingen spårning över andra webbplatser.</p>
+
+<h2>Lagringstid</h2>
+<p>Kontouppgifter sparas så länge du har ett konto. Push- och larmdata sparas tills
+du stänger av notiserna. Betalningsdata sparas så länge lag kräver (t.ex.
+bokföring). Du kan när som helst begära radering.</p>
+
+<h2>Dina rättigheter</h2>
+<p>Du har rätt att få tillgång till, rätta eller radera dina uppgifter, att
+invända mot eller begränsa behandling, att flytta dina uppgifter samt att
+återkalla samtycke. Kontakta <a href="mailto:support@grabitlabs.com">support@grabitlabs.com</a>.
+Du kan också klaga till Integritetsskyddsmyndigheten (IMY).</p>
+
 <h2>Radering</h2>
-<p>Stäng av notiserna i appen (klockan) så raderas din push-prenumeration,
-bevakade tickers och prislarm från servern. Rensa webbläsardata för att ta bort
-den lokala portföljen.</p>
+<p>Stäng av notiserna (klockan i appen) så raderas din push-prenumeration,
+bevakade tickers och prislarm. Vill du radera hela ditt konto, mejla support så
+tar vi bort dina uppgifter. Rensa webbläsardata för att ta bort lokalt sparad
+portfölj.</p>
+
 <h2>Viktigt om innehållet</h2>
-<p>GRABIT tillhandahåller teknisk analys och information — ingen finansiell
+<p>GRABIT tillhandahåller teknisk analys och information — <b>inte</b> finansiell
 rådgivning. Handel med värdepapper innebär risk och kan leda till förluster.</p>
-<h2>Kontakt</h2>
-<p>Frågor om integritet: <a href="mailto:info@hekab.nu">info@hekab.nu</a></p>
-</body></html>"""
+
+<div class="nav"><a href="/terms">Läs våra Villkor →</a></div>
+</body></html>""")
+
+_TERMS_HTML = _LEGAL_HEAD % "Villkor" + ("""
+<h1>Användarvillkor för GRABIT</h1>
+<p class="upd">Senast uppdaterad: juli 2026</p>
+<p>Dessa villkor gäller mellan dig och """ + _LEGAL_OP + """ ("vi", "oss") när du
+använder GRABIT. Genom att använda appen eller köpa PRO godkänner du villkoren.</p>
+
+<h2>1. Vad tjänsten är</h2>
+<p>GRABIT är en app för <b>teknisk aktieanalys och information</b>. Innehållet är
+generellt och riktar sig inte till någon enskild person. GRABIT ger <b>inte
+finansiell rådgivning</b> och är inte en investeringsrekommendation enligt lag.
+Alla investeringsbeslut fattar du själv och på egen risk. Handel med värdepapper
+kan leda till förluster. Historisk träffsäkerhet är ingen garanti för framtida
+resultat.</p>
+
+<h2>2. Konto</h2>
+<p>Vissa funktioner kräver att du loggar in med din e-postadress och en
+engångskod. Du ansvarar för att den e-postadress du anger är din och för
+aktiviteten på ditt konto.</p>
+
+<h2>3. PRO-prenumeration och pris</h2>
+<p>GRABIT PRO är en prenumeration. Aktuella priser visas i appen (för närvarande
+174 kr/månad respektive 1&nbsp;566 kr/år, inklusive moms). Prenumerationen
+<b>förnyas automatiskt</b> vid varje periods slut tills du säger upp den.</p>
+
+<h2>4. Betalning</h2>
+<p>Betalning hanteras av <b>Stripe</b>, som agerar Merchant of Record och ansvarar
+för att ta ut och redovisa moms. Vi hanterar aldrig dina kortuppgifter.</p>
+
+<h2>5. Avsluta</h2>
+<p>Du kan avsluta din prenumeration när som helst. Du behåller PRO till slutet av
+den betalda perioden, därefter upphör åtkomsten. Redan betalda perioder återbetalas
+inte, med undantag för ångerrätten nedan.</p>
+
+<h2>6. Ångerrätt</h2>
+<p>Som konsument har du normalt 14 dagars ångerrätt enligt distansavtalslagen.
+Eftersom PRO är en digital tjänst som du får tillgång till direkt, godkänner du vid
+köpet att tjänsten börjar levereras omedelbart och att <b>ångerrätten därmed
+upphör</b> när leveransen påbörjats. Kontakta support om du har frågor om ett köp.</p>
+
+<h2>7. Tillåten användning</h2>
+<p>Innehåll och data i GRABIT är endast för din personliga användning. Du får inte
+vidareförsälja, kopiera i stor skala, automatiskt hämta (scrapa) eller på annat
+sätt utnyttja tjänstens data kommersiellt utan vårt skriftliga medgivande.</p>
+
+<h2>8. Immateriella rättigheter</h2>
+<p>Appen, dess design, texter och analyser tillhör oss eller våra licensgivare och
+skyddas av upphovsrätt.</p>
+
+<h2>9. Ansvarsbegränsning</h2>
+<p>Tjänsten tillhandahålls "i befintligt skick". Vi lämnar inga garantier om att
+data alltid är korrekt, fullständig eller tillgänglig utan avbrott, och ansvarar
+inte för förluster som uppstår genom investeringsbeslut du fattar utifrån
+innehållet. Detta begränsar inte ansvar som enligt tvingande lag inte kan
+begränsas.</p>
+
+<h2>10. Ändringar</h2>
+<p>Vi kan uppdatera dessa villkor och priser. Prisändringar gäller från nästa
+period, och vi informerar i förväg när så krävs. Fortsatt användning innebär att du
+godkänner de uppdaterade villkoren.</p>
+
+<h2>11. Tillämplig lag och tvist</h2>
+<p>Svensk lag gäller. Är du konsument och vi inte kommer överens kan du vända dig
+till Allmänna reklamationsnämnden (ARN) eller allmän domstol.</p>
+
+<h2>12. Kontakt</h2>
+<p><a href="mailto:support@grabitlabs.com">support@grabitlabs.com</a></p>
+
+<div class="nav"><a href="/privacy">Läs vår Integritetspolicy →</a></div>
+</body></html>""")
 
 
 @app.get("/privacy", response_class=HTMLResponse)
 def privacy():
     return HTMLResponse(content=_PRIVACY_HTML)
+
+
+@app.get("/integritetspolicy", response_class=HTMLResponse)
+def integritetspolicy():
+    return HTMLResponse(content=_PRIVACY_HTML)
+
+
+@app.get("/terms", response_class=HTMLResponse)
+def terms():
+    return HTMLResponse(content=_TERMS_HTML)
+
+
+@app.get("/villkor", response_class=HTMLResponse)
+def villkor():
+    return HTMLResponse(content=_TERMS_HTML)
 
 
 # ---- Push-notiser (Web Push / VAPID) --------------------------------
