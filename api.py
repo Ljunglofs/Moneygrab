@@ -3515,14 +3515,33 @@ def _facit_log_today():
     print("Facit: loggade %d picks för %s" % (len(seen), tid))
 
 
+_FACIT_EVAL_TRADING = 5   # utvärdera efter 5 handelsdagar (hoppar över helger)
+
+
+def _trading_days_since(datum_str):
+    """Antal handelsdagar (mån–fre) mellan loggdatum och idag."""
+    import datetime as _dt2
+    try:
+        d = _dt2.date.fromisoformat((datum_str or "")[:10])
+    except Exception:
+        return 0
+    today = _dt2.date.today()
+    n, cur = 0, d
+    while cur < today:
+        cur += _dt2.timedelta(days=1)
+        if cur.weekday() < 5:
+            n += 1
+    return n
+
+
 def _facit_evaluate():
-    """Mäter utfall för ~en handelsvecka gamla picks. Max 3 per pass (yfinance-snällt)."""
+    """Mäter utfall för picks som är 5 handelsdagar gamla. Max 3 per pass (yfinance-snällt)."""
     import datetime as _dt2
     if yf is None:
         return
     rows = _facit_load()
-    cutoff = (_dt2.date.today() - _dt2.timedelta(days=_FACIT_EVAL_DAGAR)).isoformat()
-    todo = [e for e in rows if "utfall_pct" not in e and e.get("datum", "9999") <= cutoff][:3]
+    todo = [e for e in rows if "utfall_pct" not in e
+            and _trading_days_since(e.get("datum", "")) >= _FACIT_EVAL_TRADING][:3]
     if not todo:
         return
     for e in todo:
@@ -3558,15 +3577,12 @@ def facit():
     else:
         stats = {"antal": 0}
     # Loggade men ännu ej utvärderade picks — visas så kortet aldrig står tomt.
-    import datetime as _dt3
-    today = _dt3.date.today()
     pending = []
     for e in rows:
         if "utfall_pct" in e:
             continue
         try:
-            d = _dt3.date.fromisoformat(e.get("datum", ""))
-            kvar = max(0, _FACIT_EVAL_DAGAR - (today - d).days)
+            kvar = max(0, _FACIT_EVAL_TRADING - _trading_days_since(e.get("datum", "")))
         except Exception:
             kvar = None
         pending.append({"datum": e.get("datum", ""), "roll": e.get("roll", ""),
