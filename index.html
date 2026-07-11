@@ -44,6 +44,19 @@ button,input{font-family:inherit}button{cursor:pointer;border:none;background:no
 .bell{position:relative;width:34px;height:34px;border-radius:50%;background:var(--card);display:grid;
   place-items:center;font-size:16px;border:1px solid var(--line)}
 .bell .dot{position:absolute;top:5px;right:6px;width:8px;height:8px;border-radius:50%;background:var(--gold);border:2px solid var(--bg)}
+.notif-cta{position:fixed;left:12px;right:12px;bottom:80px;z-index:9998;display:flex;align-items:center;gap:11px;
+  background:linear-gradient(160deg,#12161d,#0a0d12);border:1px solid rgba(245,197,66,.4);border-radius:15px;
+  padding:12px 13px;box-shadow:0 10px 34px -8px rgba(0,0,0,.7);max-width:520px;margin:0 auto;
+  opacity:0;transform:translateY(14px);transition:opacity .3s,transform .3s}
+.notif-cta.show{opacity:1;transform:translateY(0)}
+.notif-cta .nc-ic{font-size:22px;line-height:1;flex:none}
+.notif-cta .nc-tx{flex:1;min-width:0}
+.notif-cta .nc-h{font-family:var(--disp,inherit);font-weight:800;font-size:14px;color:#fff}
+.notif-cta .nc-s{font-size:11.5px;line-height:1.35;color:#aeb8c4;margin-top:1px}
+.notif-cta .nc-go{flex:none;background:var(--gold);color:#0A0E12;font-weight:800;font-size:13px;border:none;
+  border-radius:10px;padding:9px 14px;cursor:pointer}
+.notif-cta .nc-x{flex:none;background:transparent;border:none;color:#7d8794;font-size:20px;line-height:1;
+  cursor:pointer;padding:2px 4px;align-self:flex-start}
 
 main{padding:16px 16px 110px}
 .screen{display:none;animation:fade .35s ease}.screen.on{display:block}
@@ -2475,12 +2488,43 @@ if("serviceWorker" in navigator){window.addEventListener("load",function(){
         body: JSON.stringify({endpoint: r.sub.endpoint, tickers: tks})});
     }catch(e){}
   };
+  // Slår PÅ notiser (prenumeration). Returnerar true vid lyckad aktivering.
+  async function pushEnable(){
+    if(!("PushManager" in window)){ pToast("Din webbläsare stödjer inte push"); return false; }
+    const r = await getSub();
+    if(!r){ pToast("Notiser kräver att appen laddats klart"); return false; }
+    if(r.sub){ setOn(true); return true; }
+    const perm = await Notification.requestPermission();
+    if(perm !== "granted"){ pToast("Notiser blockerade — tillåt i webbläsarens inställningar"); return false; }
+    const kr = await fetch(CONFIG.API_BASE + "/api/push/pubkey").then(x=>x.json());
+    let key = (kr.key||"").trim().replace(/^["']|["']$/g,"").replace(/\s+/g,"");
+    const m = key.match(/[A-Za-z0-9_-]{80,90}/); if(m) key = m[0];
+    if(!key){ pToast("Servern saknar VAPID-nycklar — kolla Render env"); return false; }
+    const ku = b64ToU8(key);
+    if(ku.length !== 65 || ku[0] !== 4){ pToast("VAPID-nyckeln på servern är felformaterad ("+ku.length+" bytes, ska vara 65) — klistra in värdet utan citattecken"); return false; }
+    let sub;
+    try{
+      sub = await r.reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: ku });
+    }catch(se){
+      if(String(se).indexOf("applicationServerKey")>-1){
+        const old = await r.reg.pushManager.getSubscription();
+        if(old) await old.unsubscribe();
+        sub = await r.reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: ku });
+      }else{ throw se; }
+    }
+    const body = sub.toJSON();
+    try{ body.tickers = (typeof pfLoad==="function"?pfLoad():[]).map(function(h){return h.tkr;}).filter(Boolean); }catch(e){ body.tickers = []; }
+    await fetch(CONFIG.API_BASE + "/api/push/subscribe", {method:"POST",
+      headers:{"Content-Type":"application/json"}, body: JSON.stringify(body)}).then(x=>x.json());
+    setOn(true); pToast("Notiser PÅ — du får larm för aktierna i din portfölj + ROBBER-signaler");
+    return true;
+  }
+  window.pushEnable = pushEnable;
   bell.addEventListener("click", async ()=>{
     try{
       if(!("PushManager" in window)){ pToast("Din webbläsare stödjer inte push"); return; }
       const r = await getSub();
-      if(!r){ pToast("Notiser kräver att appen laddats klart"); return; }
-      if(r.sub){
+      if(r && r.sub){
         const ep = r.sub.endpoint;
         await r.sub.unsubscribe();
         fetch(CONFIG.API_BASE + "/api/push/unsubscribe", {method:"POST",
@@ -2488,31 +2532,40 @@ if("serviceWorker" in navigator){window.addEventListener("load",function(){
         setOn(false); pToast("Notiser AV");
         return;
       }
-      const perm = await Notification.requestPermission();
-      if(perm !== "granted"){ pToast("Notiser blockerade — tillåt i webbläsarens inställningar"); return; }
-      const kr = await fetch(CONFIG.API_BASE + "/api/push/pubkey").then(x=>x.json());
-      let key = (kr.key||"").trim().replace(/^["']|["']$/g,"").replace(/\s+/g,"");
-      const m = key.match(/[A-Za-z0-9_-]{80,90}/); if(m) key = m[0];
-      if(!key){ pToast("Servern saknar VAPID-nycklar — kolla Render env"); return; }
-      const ku = b64ToU8(key);
-      if(ku.length !== 65 || ku[0] !== 4){ pToast("VAPID-nyckeln på servern är felformaterad ("+ku.length+" bytes, ska vara 65) — klistra in värdet utan citattecken"); return; }
-      let sub;
-      try{
-        sub = await r.reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: ku });
-      }catch(se){
-        if(String(se).indexOf("applicationServerKey")>-1){
-          const old = await r.reg.pushManager.getSubscription();
-          if(old) await old.unsubscribe();
-          sub = await r.reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: ku });
-        }else{ throw se; }
-      }
-      const body = sub.toJSON();
-      try{ body.tickers = (typeof pfLoad==="function"?pfLoad():[]).map(function(h){return h.tkr;}).filter(Boolean); }catch(e){ body.tickers = []; }
-      const res = await fetch(CONFIG.API_BASE + "/api/push/subscribe", {method:"POST",
-        headers:{"Content-Type":"application/json"}, body: JSON.stringify(body)}).then(x=>x.json());
-      setOn(true); pToast("Notiser PÅ — du får larm för aktierna i din portfölj + ROBBER-signaler");
+      await pushEnable();
     }catch(e){ pToast("Kunde inte aktivera: " + (e && e.message ? e.message.slice(0,60) : "okänt fel")); }
   });
+
+  /* ---- Synlig CTA: "Slå på notiser" ---- */
+  (function(){
+    if(!("PushManager" in window) || !("serviceWorker" in navigator)) return;
+    if(localStorage.getItem("notifCtaDismissed")==="1") return;
+    async function maybeShow(){
+      try{ const r = await getSub(); if(r && r.sub) return; }catch(e){ return; }
+      if(document.getElementById("notif-cta")) return;
+      const EN = (window.GRABIT_LANG==="en");
+      const bar = document.createElement("div");
+      bar.id = "notif-cta"; bar.className = "notif-cta";
+      bar.innerHTML =
+        '<div class="nc-ic">🔔</div>'
+        +'<div class="nc-tx"><div class="nc-h">'+(EN?"Turn on notifications":"Slå på notiser")+'</div>'
+        +'<div class="nc-s">'+(EN?"Get alerts on news & insider trades in your portfolio + ROBBER signals."
+                                  :"Få larm om nyheter & insiderhandel i din portfölj + ROBBER-signaler.")+'</div></div>'
+        +'<button class="nc-go">'+(EN?"Turn on":"Slå på")+'</button>'
+        +'<button class="nc-x" aria-label="close">×</button>';
+      document.body.appendChild(bar);
+      requestAnimationFrame(()=>bar.classList.add("show"));
+      function close(dismiss){ bar.classList.remove("show"); if(dismiss)localStorage.setItem("notifCtaDismissed","1");
+        setTimeout(()=>{ try{bar.remove();}catch(e){} }, 300); }
+      bar.querySelector(".nc-x").addEventListener("click", ()=>close(true));
+      bar.querySelector(".nc-go").addEventListener("click", async ()=>{
+        const ok = await pushEnable(); if(ok) close(false);
+      });
+    }
+    // Visa efter att appen laddat lite (mindre påträngande)
+    setTimeout(maybeShow, 3500);
+    window.showNotifCta = maybeShow;
+  })();
 })();
 
 // ---- Månadens case ----
