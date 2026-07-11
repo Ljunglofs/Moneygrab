@@ -2275,7 +2275,7 @@ function applyProLocks(root){
     el.classList.add("locked");
     var lbl=el.getAttribute("data-lock")||"PRO";
     var ov=document.createElement("div");ov.className="pro-ov";
-    ov.innerHTML='<div class="pro-ov-in"><span class="pro-ov-ic">🔒</span><b>'+lbl+'</b><i>'+(EN?"Unlock with PRO":"Lås upp med PRO")+'</i></div>';
+    ov.innerHTML='<div class="pro-ov-in"><span class="pro-ov-ic">🔒</span><i>'+(EN?"Unlock with PRO":"Lås upp med PRO")+'</i></div>';
     ov.onclick=function(e){e.stopPropagation();showPaywall(null,true);};
     el.appendChild(ov);
   });
