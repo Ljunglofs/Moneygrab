@@ -3130,7 +3130,27 @@ def _watchlist_scan_once():
         return
     st = _watch_state_load()
     today = _dt2.date.today().isoformat()
+    import time as _t2
+    _open_now = _us_market_open()
     for tk in tickers[:60]:
+        # Nyhetslarm — dygnet runt (nyheter bryter när som helst)
+        try:
+            _news = _company_news(tk)
+            if _news:
+                _lat = _news[0]; _nts = int(_lat.get("ts") or 0)
+                _nkey = tk + ":news"; _seen = int(st.get(_nkey) or 0)
+                if _nts > 0 and _seen == 0:
+                    st[_nkey] = _nts
+                elif _nts > _seen:
+                    st[_nkey] = _nts
+                    if _t2.time() - _nts < 21600:
+                        PN.send_watchlist(tk, tk + " \u00b7 Nyhet",
+                                          (_lat.get("headline") or "")[:120],
+                                          url=_lat.get("url") or "/")
+        except Exception:
+            pass
+        if not _open_now:
+            continue
         try:
             a = scan(tk)
         except Exception:
@@ -3153,7 +3173,7 @@ def _watchlist_scan_once():
                 PN.send_watchlist(tk, "%s \u2014 setup %d/10" % (tk, score),
                                   "%s har ett starkt tekniskt lage just nu%s." % (
                                       tk, (" (" + a.get("label") + ")") if a.get("label") else ""))
-    st = {k: v for k, v in st.items() if (":%s:" % today) in k}
+    st = {k: v for k, v in st.items() if (":%s:" % today) in k or k.endswith(":news")}
     _watch_state_save(st)
 
 
@@ -3161,8 +3181,7 @@ def _watchlist_loop():
     time.sleep(90)   # lat servern boota och cachen varmas forst
     while True:
         try:
-            if _us_market_open():
-                _watchlist_scan_once()
+            _watchlist_scan_once()
         except Exception as e:
             print("Watchlist-push fel:", e)
         time.sleep(600)   # var 10:e minut
