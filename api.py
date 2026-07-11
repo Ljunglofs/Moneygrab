@@ -3133,6 +3133,7 @@ def _watchlist_scan_once():
     import time as _t2
     _open_now = _us_market_open()
     for tk in tickers[:60]:
+        _t2.sleep(0.4)   # var snäll mot Finnhub rate limit
         # Nyhetslarm — dygnet runt (nyheter bryter när som helst)
         try:
             _news = _company_news(tk)
@@ -3147,6 +3148,31 @@ def _watchlist_scan_once():
                         PN.send_watchlist(tk, tk + " \u00b7 Nyhet",
                                           (_lat.get("headline") or "")[:120],
                                           url=_lat.get("url") or "/")
+        except Exception:
+            pass
+        # Insider-larm — ny köp/sälj hos en bevakad aktie (dygnet runt)
+        try:
+            _ins = _company_insider(tk)
+            if _ins:
+                _it = _ins[0]
+                _isig = "%s|%s|%s|%s" % (_it.get("date",""), _it.get("name",""), _it.get("shares",0), "P" if _it.get("buy") else "S")
+                _ikey = tk + ":ins"; _iseen = st.get(_ikey)
+                if not _iseen:
+                    st[_ikey] = _isig
+                elif _isig != _iseen:
+                    st[_ikey] = _isig
+                    import datetime as _d3
+                    try:
+                        _fresh = (_d3.date.today() - _d3.date.fromisoformat(_it.get("date","")[:10])).days <= 10
+                    except Exception:
+                        _fresh = True
+                    if _fresh:
+                        _who = _it.get("name") or "En insider"
+                        try: _shs = format(int(_it.get("shares") or 0), ",d").replace(",", " ")
+                        except Exception: _shs = str(_it.get("shares") or 0)
+                        PN.send_watchlist(tk, tk + " · Insider " + ("KÖP" if _it.get("buy") else "SÄLJ"),
+                                          "%s %s %s aktier." % (_who, "köpte" if _it.get("buy") else "sålde", _shs),
+                                          url="/")
         except Exception:
             pass
         if not _open_now:
@@ -3173,7 +3199,7 @@ def _watchlist_scan_once():
                 PN.send_watchlist(tk, "%s \u2014 setup %d/10" % (tk, score),
                                   "%s har ett starkt tekniskt lage just nu%s." % (
                                       tk, (" (" + a.get("label") + ")") if a.get("label") else ""))
-    st = {k: v for k, v in st.items() if (":%s:" % today) in k or k.endswith(":news")}
+    st = {k: v for k, v in st.items() if (":%s:" % today) in k or k.endswith(":news") or k.endswith(":ins")}
     _watch_state_save(st)
 
 
