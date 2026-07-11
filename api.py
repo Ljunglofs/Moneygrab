@@ -1994,6 +1994,12 @@ def screen(themes: Optional[str] = Query(None, description="Komma-separerade tem
 def stock(ticker: str):
     ticker = ticker.upper()
     a = scan(ticker)
+    if not a and "." not in ticker:
+        # Svenska bolag ligger på .ST hos Yahoo (OVZON -> OVZON.ST). Testa den varianten.
+        alt = ticker + ".ST"
+        a_alt = scan(alt)
+        if a_alt:
+            ticker, a = alt, a_alt
     if not a:
         raise HTTPException(404, f"Ingen data för {ticker}")
     payload = {
