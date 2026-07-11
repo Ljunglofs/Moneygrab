@@ -40,6 +40,13 @@ try:
 except Exception as e:
     print(f"accounts kunde inte registreras (grabit kör vidare): {e}")
 
+# 2d) Google Play Billing: verifiering av köp i Android-appen.
+try:
+    import play_billing
+    play_billing.register(app)
+except Exception as e:
+    print(f"play_billing kunde inte registreras (grabit kör vidare): {e}")
+
 # 3) TESTENDPOINT — avfyra ett skarpt formaterat (men fejkat) Telegram-larm
 #    på begäran. Ligger på tvåsegments-väg så api.py:s catch-all /{fname}
 #    inte slukar den. Öppna i mobilen:
