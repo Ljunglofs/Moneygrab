@@ -3557,8 +3557,24 @@ def facit():
                  "basta": {"ticker": basta["ticker"], "pct": basta["utfall_pct"]}}
     else:
         stats = {"antal": 0}
+    # Loggade men ännu ej utvärderade picks — visas så kortet aldrig står tomt.
+    import datetime as _dt3
+    today = _dt3.date.today()
+    pending = []
+    for e in rows:
+        if "utfall_pct" in e:
+            continue
+        try:
+            d = _dt3.date.fromisoformat(e.get("datum", ""))
+            kvar = max(0, _FACIT_EVAL_DAGAR - (today - d).days)
+        except Exception:
+            kvar = None
+        pending.append({"datum": e.get("datum", ""), "roll": e.get("roll", ""),
+                        "ticker": e.get("ticker", ""), "pris": e.get("pris"),
+                        "score": e.get("score"), "dgr_kvar": kvar})
+    pending = list(reversed(pending))[:8]
     return {"stats": stats, "rader": list(reversed(senaste[-8:])),
-            "loggade_totalt": len(rows)}
+            "pending": pending, "loggade_totalt": len(rows)}
 
 
 def _facit_loop():

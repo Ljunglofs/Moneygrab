@@ -3032,8 +3032,23 @@ async function loadFacit(){
   if(!j)return;
   const st=j.stats||{};
   if(!st.antal){
-    if(j.loggade_totalt>0){el.style.display="";
+    const EN=(window.GRABIT_LANG==="en");
+    const pend=j.pending||[];
+    if(pend.length){el.style.display="";
+      const prows=pend.map(function(e){
+        const nar=(e.dgr_kvar===0)?(EN?"outcome soon":"utfall snart")
+                 :(e.dgr_kvar!=null?(EN?("in "+e.dgr_kvar+"d"):(e.dgr_kvar+" dgr")):"");
+        return '<div class="fc-row"><span>'+(e.roll||"")+' · <b>'+(e.ticker||"")+'</b>'
+          +(e.pris!=null?' <span style="color:var(--mut)">@ $'+e.pris+'</span>':'')
+          +'</span><span style="font-size:11.5px;color:var(--gold2);font-weight:700;white-space:nowrap">'+nar+'</span></div>';
+      }).join("");
+      el.innerHTML='<div class="fc-h">'+(EN?"GRABIT track record · "+pend.length+" logged setups":"Grabits facit · "+pend.length+" loggade setups")+'</div>'
+        +'<div class="fc-rows">'+prows+'</div>'
+        +'<div class="to-disc">'+(EN?"Setups are logged openly the day they trigger. Outcome (%) is measured ~5 trading days later — first results appear soon."
+                                     :"Setups loggas öppet dagen de triggas. Utfallet (%) mäts ~5 handelsdagar senare — första resultaten kommer snart.")+'</div>';
+    }else if(j.loggade_totalt>0){el.style.display="";
       el.innerHTML='<div class="fc-h">Grabits facit</div><div class="wl-empty">Varje börsdags setups loggas öppet — första utfallen visas efter en handelsvecka ('+j.loggade_totalt+' loggade hittills).</div>';}
+    else{el.style.display="none";}
     return;
   }
   el.style.display="";
