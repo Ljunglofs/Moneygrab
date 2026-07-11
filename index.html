@@ -818,7 +818,7 @@ var _I18N_EXACT = {
   "KORT":"SHORT",
   "LÅNG":"LONG",
   "AVVAKTA":"WAIT",
-  "7 dagar gratis":"7 days free",
+  "Lås upp allt":"Unlock everything",
   "Avsluta när som helst.":"Cancel anytime.",
   "/månad":"/month",
   "per månad":"per month",
@@ -877,7 +877,6 @@ var _I18N_EXACT = {
   "Dela":"Share",
   "\"Lägg till på hemskärmen\"":"\"Add to Home Screen\"",
   "i Safari och välj":"in Safari and choose",
-  "Din gratisvecka är slut — fortsätt för":"Your free week is over — continue for",
   "Exit plan":"Exit plan",
   "Dagens kurs":"Today's price",
   "Månad":"Month",
@@ -1050,8 +1049,6 @@ var _I18N_EXACT = {
 var _I18N_RULES = [
   [/rel\.volym/, "rel.vol"],
   [/Telekom/, "Telecom"],
-  [/^(\d+) dagar kvar av gratisveckan · Skaffa PRO$/, "$1 days left of your free week · Get PRO"],
-  [/^Sista dagen av gratisveckan · Skaffa PRO$/, "Last day of your free week · Get PRO"],
   [/^(\d+) månader/, "$1 months"],
   [/^Inga (.+) just nu\.?$/, "No $1 right now."],
   [/^(.+) senaste 5 dagarna$/, "$1 past 5 days"],
@@ -1252,7 +1249,7 @@ else _i18nBoot();
   <div class="pw-card">
     <button class="pw-close" id="pw-close" onclick="hidePaywall()" aria-label="Stäng">&#10005;</button>
     <div class="pw-logo"><img id="pw-brand" alt="GRABIT"><span class="pw-badge">PRO</span></div>
-    <div class="pw-trial" id="pw-sub"><b>7 dagar gratis</b> — sedan</div>
+    <div class="pw-trial" id="pw-sub"><b>Lås upp allt</b></div>
     <div class="pw-big"><span class="pw-149">174 kr</span><span class="pw-per">/månad</span></div>
     <div class="pw-cancel">Avsluta när som helst.</div>
     <div class="pw-feats2"><div class="pwf"><span class="pwf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.6" fill="#22d3ee" stroke="none"/><line x1="12" y1="2.5" x2="12" y2="5.5"/><line x1="12" y1="18.5" x2="12" y2="21.5"/><line x1="2.5" y1="12" x2="5.5" y2="12"/><line x1="18.5" y1="12" x2="21.5" y2="12"/></svg></span><span class="pwf-tx"><b>Dagens Top Opportunity</b><i>Med entry, stopp &amp; targets</i></span></div><div class="pwf"><span class="pwf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4a3 3 0 0 0-3 3v10a3 3 0 0 0 6 0V7a3 3 0 0 0-3-3z"/><path d="M9 8H7a3 3 0 0 0 0 6h2"/><path d="M15 8h2a3 3 0 0 1 0 6h-2"/><circle cx="12" cy="12" r="1.3" fill="#22d3ee" stroke="none"/></svg></span><span class="pwf-tx"><b>AI-analys på alla aktier</b><i>+ Fråga Grabit</i></span></div><div class="pwf"><span class="pwf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></span><span class="pwf-tx"><b>Push-larm för din watchlist</b><i>Pris-larm, nyheter &amp; rapporter</i></span></div><div class="pwf"><span class="pwf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="16.2" y1="16.2" x2="21" y2="21"/></svg></span><span class="pwf-tx"><b>Screeners, facit</b><i>och hela scannern</i></span></div></div>
@@ -3084,7 +3081,7 @@ window.setPriceAlert=async function(tkr,px){
     say(res&&res.ok?("Larm satt: "+tkr+" "+m[1]+" "+m[2]):("Kunde inte sätta larmet"+(res&&res.fel?": "+res.fel:"")));
   }catch(e){say("Kunde inte sätta larmet");}
 };
-/* ===== GRABIT PRO · 7 dagar gratis, sen 174 kr/mån via Google Play =====
+/* ===== GRABIT PRO · 174 kr/mån (webben: Stripe · appen: Google Play) =====
    Körs bara inne i Play-appen (TWA) där Digital Goods API finns.
    I vanlig webbläsare är appen öppen — där finns inget köp att göra. */
 var BILLING={SKU:"grabit_pro",svc:null,twa:false};
@@ -3271,18 +3268,8 @@ async function paywallCheck(){
   var twa=await billingInit();
   if(!twa)return;   // vanlig webbläsare: ingen paywall
   var act=await proActive();
-  if(act===true){localStorage.setItem("grabit_pro","1");return;}
-  if(act===null&&localStorage.getItem("grabit_pro")==="1")return;   // offline: släpp in betalande
-  if(act===false)localStorage.removeItem("grabit_pro");
-  var first=parseInt(localStorage.getItem("grabit_first")||"0",10);
-  if(!first){first=Date.now();localStorage.setItem("grabit_first",String(first));}
-  var kvar=7-Math.floor((Date.now()-first)/86400000);
-  if(kvar>0){
-    var tb=document.getElementById("trialbar");
-    if(tb){tb.textContent=(kvar===1?"Sista dagen":kvar+" dagar kvar")+" av gratisveckan · Skaffa PRO";tb.style.display="";}
-    return;
-  }
-  showPaywall("Din gratisvecka är slut — fortsätt för",false);
+  if(act===true){localStorage.setItem("grabit_pro","1");}
+  // Ingen trial, ingen tvingande paywall — freemium med teasers (som webben).
 }
 paywallCheck();
 (function(){
