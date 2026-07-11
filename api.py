@@ -3553,6 +3553,7 @@ def _facit_evaluate():
                 closes = h["Close"].dropna()
                 ref = closes.iloc[:6]        # ~5 handelsdagar efter loggning
                 slut = float(ref.iloc[-1])
+                e["slutpris"] = round(slut, 2)
                 e["utfall_pct"] = round((slut - float(e["pris"])) / float(e["pris"]) * 100, 2)
             e["traff"] = bool(e["utfall_pct"] > 0)
         except Exception as ex:

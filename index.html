@@ -3052,7 +3052,13 @@ async function loadFacit(){
     return;
   }
   el.style.display="";
-  const rows=(j.rader||[]).map(function(e){return `<div class="fc-row"><span>${e.roll} · <b>${e.ticker}</b></span><span class="num" style="color:${e.utfall_pct>=0?"var(--pos)":"var(--neg)"};font-weight:800">${e.utfall_pct>=0?"+":""}${e.utfall_pct}%</span></div>`;}).join("");
+  const rows=(j.rader||[]).map(function(e){
+    const up=e.utfall_pct>=0;
+    const prisTxt=(e.pris!=null?("@ $"+e.pris):"")+(e.slutpris!=null?(" → $"+e.slutpris):"");
+    return '<div class="fc-row"><span>'+e.roll+' · <b>'+e.ticker+'</b>'
+      +(prisTxt?' <span style="color:var(--mut)">'+prisTxt+'</span>':'')
+      +'</span><span class="num" style="color:'+(up?"var(--pos)":"var(--neg)")+';font-weight:800">'+(up?"+":"")+e.utfall_pct+'%</span></div>';
+  }).join("");
   el.innerHTML=`<div class="fc-h">Grabits facit · senaste ${st.antal} setups</div>
    <div class="fc-stats">
      <div class="fc-big"><b class="num" style="color:var(--gold2)">${st.traffprocent}%</b><i>Träffar</i></div>
