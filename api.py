@@ -1635,6 +1635,40 @@ _FF_COUNTRY_FLAG = {
 
 _MACRO_LAST_GOOD = {"ts": 0.0, "events": [], "err": "", "src": ""}
 
+# Senaste lyckade hämtning sparas på disk (DATA_DIR) så den överlever deploys —
+# annars töms minnescachen vid varje omstart och kalendern "blinkar rött".
+_MACRO_CACHE_FILE = os.path.join(os.environ.get("DATA_DIR", "."), "macro_cache.json")
+_macro_cache_loaded = False
+
+
+def _macro_cache_load():
+    global _macro_cache_loaded
+    if _macro_cache_loaded:
+        return
+    _macro_cache_loaded = True
+    try:
+        import json as _j
+        with open(_MACRO_CACHE_FILE) as f:
+            d = _j.load(f) or {}
+        if d.get("events") and not _MACRO_LAST_GOOD["events"]:
+            _MACRO_LAST_GOOD["events"] = d["events"]
+            _MACRO_LAST_GOOD["ts"] = float(d.get("ts") or 0)
+            _MACRO_LAST_GOOD["src"] = (d.get("src", "") or "") + " (disk)"
+    except Exception:
+        pass
+
+
+def _macro_cache_save():
+    try:
+        import json as _j
+        tmp = _MACRO_CACHE_FILE + ".tmp"
+        with open(tmp, "w") as f:
+            _j.dump({"events": _MACRO_LAST_GOOD["events"], "ts": _MACRO_LAST_GOOD["ts"],
+                     "src": _MACRO_LAST_GOOD["src"]}, f, ensure_ascii=False)
+        os.replace(tmp, _MACRO_CACHE_FILE)
+    except Exception:
+        pass
+
 _MACRO_HEADERS = {
     "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                    "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"),
@@ -1649,6 +1683,7 @@ _MACRO_URLS = [
     # Renders datacenter-IP blockeras ibland av Cloudflare -> ta vägen via
     # en proxy som hämtar från annan IP och alltid svarar med ren JSON.
     "https://api.allorigins.win/raw?url=https%3A%2F%2Fnfs.faireconomy.media%2Fff_calendar_thisweek.json",
+    "https://corsproxy.io/?url=https%3A%2F%2Fnfs.faireconomy.media%2Fff_calendar_thisweek.json",
 ]
 
 def _macro_events():
@@ -1657,6 +1692,7 @@ def _macro_events():
     och provar två hosts. Senast lyckade svar behålls i minnet som fallback."""
     import requests
     import datetime as _dt
+    _macro_cache_load()                               # läs disk-cache (överlever deploys)
     now_ts = time.time()
     # Färskt nog? (2h) -> använd cache direkt, spara anrop
     if _MACRO_LAST_GOOD["events"] and now_ts - _MACRO_LAST_GOOD["ts"] < 7200:
@@ -1733,6 +1769,7 @@ def _macro_events():
     if out:
         _MACRO_LAST_GOOD["events"] = out
         _MACRO_LAST_GOOD["ts"] = now_ts
+        _macro_cache_save()                           # spara på disk för framtida deploys
     return out or _MACRO_LAST_GOOD["events"]
 
 
