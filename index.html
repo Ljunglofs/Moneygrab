@@ -1703,7 +1703,7 @@ function insiderHTML(list){
 function renderExtras(tkr,j,price){
   var nv=document.getElementById("st-news");if(nv)nv.innerHTML=newsHTML(j&&j.news);
   var iv=document.getElementById("st-insider");if(iv){iv.innerHTML=insiderHTML(j&&j.insider);if(!isPro()){iv.innerHTML='<div class="pro-gated" data-lock="PRO">'+iv.innerHTML+'</div>';if(window.applyProLocks)applyProLocks(iv);}}
-  var sm=document.getElementById("st-smart");if(sm)sm.innerHTML=smartMoneyHTML(j&&j.insider);
+  var sm=document.getElementById("st-smart");if(sm){sm.innerHTML=smartMoneyHTML(j&&j.insider);if(!isPro()){sm.innerHTML='<div class="pro-gated" data-lock="PRO">'+sm.innerHTML+'</div>';if(window.applyProLocks)applyProLocks(sm);}}
   var a=document.getElementById("st-analyst");if(!a)return;
   var an=j&&j.analyst;
   a.innerHTML=analystHTML(an,price);
