@@ -2001,11 +2001,12 @@ function render(d){
   window.__SIG={feed:(d.feed||[]),news:(d.news||[]),allHTML:feedHTML};if(window.applySigFilter)applySigFilter();
   // UPPTÄCK
   if($("#catgrid"))$("#catgrid").innerHTML=THEMES.map((t,i)=>`<div class="cat" style="background-image:linear-gradient(to top,rgba(0,0,0,.97) 6%,rgba(0,0,0,.5) 42%,rgba(0,0,0,.12)),url('${THEME_IMG[t.key]||""}')" onclick="openCat(${i})"><div class="ci" style="color:${t.c}">${ICONS[t.key]||t.ic}</div><div class="cbottom"><div class="cn">${t.key}</div><div class="cc">${t.n} bolag</div><div class="cstatus" style="color:${t.c}">${THEME_STATUS[t.key]||""}</div></div></div>`).join("");
-  if($("#winners"))$("#winners").innerHTML=qlist(d.winners);
-  if($("#losers"))$("#losers").innerHTML=qlist(d.losers);
+  if($("#winners")){$("#winners").innerHTML=_gate2(d.winners,qlist);if(window.applyProLocks)applyProLocks($("#winners"));}
+  if($("#losers")){$("#losers").innerHTML=_gate2(d.losers,qlist);if(window.applyProLocks)applyProLocks($("#losers"));}
   if($("#scanner")&&d.scanner){$("#scanner").innerHTML=renderScanner(d.scanner);if(window.applyProLocks)applyProLocks($("#scanner"));}
   /* Portföljen renderas nu av initPortfolio() (lokala innehav + live-kurser) */
 }
+function _gate2(arr,fn){if(isPro()||!arr||arr.length<=2)return fn(arr||[]);return fn(arr.slice(0,2))+'<div class="pro-gated" data-lock="PRO">'+fn(arr.slice(2))+'</div>';}
 function qlist(arr){return arr.map(x=>{const c=x.chg>=0?"var(--pos)":"var(--neg)";
   return `<div class="qrow" onclick="openStock('${x.tkr}')">${lic(x.tkr,36,scoreColor(7))}<div class="nm"><div class="t">${x.tkr}</div>
     <div class="s">${NAMES[x.tkr]||x.tkr}</div></div><div class="chg" style="color:${c}">${x.chg>=0?"+":""}${x.chg.toFixed(1)}%</div></div>`;}).join("");}
