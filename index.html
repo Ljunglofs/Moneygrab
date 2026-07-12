@@ -3047,15 +3047,22 @@ async function loadFacit(){
     if(pend.length){el.style.display="";
       const prows=pend.map(function(e){
         const nar=(e.dgr_kvar===0)?(EN?"outcome soon":"utfall snart")
-                 :(e.dgr_kvar!=null?(EN?("in "+e.dgr_kvar+"d"):(e.dgr_kvar+" dgr")):"");
+                 :(e.dgr_kvar!=null?(EN?(e.dgr_kvar+"d left"):(e.dgr_kvar+" dgr kvar")):"");
+        const hasNow=(e.nupris!=null);
+        const up=(e.nu_pct>=0);
+        const prisTxt=(e.pris!=null?("$"+e.pris):"")+(hasNow?(" → $"+e.nupris):"");
+        const right=hasNow&&e.nu_pct!=null
+          ? '<b class="num" style="color:'+(up?"var(--pos)":"var(--neg)")+'">'+(up?"+":"")+e.nu_pct+'%</b>'
+            +'<span style="font-size:10.5px;color:var(--mut);font-weight:600;margin-left:7px">'+nar+'</span>'
+          : '<span style="font-size:11.5px;color:var(--gold2);font-weight:700">'+nar+'</span>';
         return '<div class="fc-row"><span>'+(e.roll||"")+' · <b>'+(e.ticker||"")+'</b>'
-          +(e.pris!=null?' <span style="color:var(--mut)">@ $'+e.pris+'</span>':'')
-          +'</span><span style="font-size:11.5px;color:var(--gold2);font-weight:700;white-space:nowrap">'+nar+'</span></div>';
+          +(prisTxt?' <span style="color:var(--mut)">'+prisTxt+'</span>':'')
+          +'</span><span style="white-space:nowrap">'+right+'</span></div>';
       }).join("");
       el.innerHTML='<div class="fc-h">'+(EN?"GRABIT track record · "+pend.length+" logged setups":"Grabits facit · "+pend.length+" loggade setups")+'</div>'
         +'<div class="fc-rows">'+prows+'</div>'
-        +'<div class="to-disc">'+(EN?"Setups are logged openly the day they trigger. Outcome (%) is measured ~5 trading days later — first results appear soon."
-                                     :"Setups loggas öppet dagen de triggas. Utfallet (%) mäts ~5 handelsdagar senare — första resultaten kommer snart.")+'</div>';
+        +'<div class="to-disc">'+(EN?"Entry price is logged the day the setup triggers. % is live until the final outcome is measured ~5 trading days later."
+                                     :"Entry-priset loggas dagen setupen triggas. %-en är live tills utfallet mäts ~5 handelsdagar senare.")+'</div>';
     }else if(j.loggade_totalt>0){el.style.display="";
       el.innerHTML='<div class="fc-h">Grabits facit</div><div class="wl-empty">Varje börsdags setups loggas öppet — första utfallen visas efter en handelsvecka ('+j.loggade_totalt+' loggade hittills).</div>';}
     else{el.style.display="none";}

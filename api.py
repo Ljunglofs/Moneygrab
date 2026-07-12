@@ -3567,6 +3567,36 @@ def _facit_evaluate():
     _facit_save(rows)
 
 
+_FACIT_NOW = {"ts": 0.0, "px": {}}
+
+
+def _facit_now_prices(tickers):
+    """Aktuella priser för de loggade tickers (batch, cachat 5 min)."""
+    tickers = [t for t in dict.fromkeys(tickers) if t]
+    if not tickers or yf is None:
+        return {}
+    now = time.time()
+    if _FACIT_NOW["px"] and now - _FACIT_NOW["ts"] < 300:
+        return _FACIT_NOW["px"]
+    px = {}
+    try:
+        data = yf.download(" ".join(tickers), period="2d", progress=False,
+                           auto_adjust=True, threads=False)
+        closes = data["Close"]
+        for t in tickers:
+            try:
+                col = closes if len(tickers) == 1 else closes[t]
+                px[t] = round(float(col.dropna().iloc[-1]), 2)
+            except Exception:
+                continue
+    except Exception as ex:
+        print("Facit: kunde inte hämta live-priser:", ex)
+    if px:
+        _FACIT_NOW["px"] = px
+        _FACIT_NOW["ts"] = now
+    return px or _FACIT_NOW["px"]
+
+
 @app.get("/api/facit")
 def facit():
     rows = _facit_load()
@@ -3596,6 +3626,15 @@ def facit():
                         "ticker": e.get("ticker", ""), "pris": e.get("pris"),
                         "score": e.get("score"), "dgr_kvar": kvar})
     pending = list(reversed(pending))[:8]
+    # Live-pris + rörelse hittills, så man ser skillnaden redan innan utfallet mäts.
+    now_px = _facit_now_prices([p["ticker"] for p in pending])
+    for p in pending:
+        np = now_px.get(p["ticker"])
+        p["nupris"] = np
+        try:
+            p["nu_pct"] = round((np - float(p["pris"])) / float(p["pris"]) * 100, 2) if (np and p.get("pris")) else None
+        except Exception:
+            p["nu_pct"] = None
     return {"stats": stats, "rader": list(reversed(senaste[-8:])),
             "pending": pending, "loggade_totalt": len(rows)}
 
