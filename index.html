@@ -1278,6 +1278,25 @@ else _i18nBoot();
   </div>
 </div>
 
+<div id="login-modal" style="display:none">
+  <div class="lm-card">
+    <button class="lm-x" onclick="closeLogin()" aria-label="Stäng">&#10005;</button>
+    <div class="lm-h" id="lm-h">Logga in / Återställ PRO</div>
+    <div class="lm-step" id="lm-step-email">
+      <div class="lm-sub" id="lm-sub-email">Ange din mejl så skickar vi en engångskod.</div>
+      <input id="lm-email" type="email" inputmode="email" autocomplete="email" placeholder="din@mejl.se" autocapitalize="off" spellcheck="false" onkeydown="if(event.key==='Enter')loginSendCode()">
+      <button class="lm-btn" id="lm-send" onclick="loginSendCode()">Skicka kod</button>
+    </div>
+    <div class="lm-step" id="lm-step-code" style="display:none">
+      <div class="lm-sub" id="lm-sub-code">Kod skickad. Kolla mejlen (även skräppost) och skriv in koden.</div>
+      <input id="lm-code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="6" placeholder="6-siffrig kod" onkeydown="if(event.key==='Enter')loginVerify()">
+      <button class="lm-btn" id="lm-verify" onclick="loginVerify()">Logga in</button>
+      <a class="lm-resend" id="lm-resend" onclick="loginSendCode(true)">Skicka ny kod</a>
+    </div>
+    <div class="lm-msg" id="lm-msg"></div>
+  </div>
+</div>
+
 <nav class="nav">
   <button class="on" data-s="hem"><span class="gi">${I.home}</span>Översikt</button>
   <button data-s="daytrade"><span class="gi">${I.trend}</span>Daytrade</button>
@@ -3207,33 +3226,63 @@ async function restorePro(){
   // Webbköp / annan enhet: mejl-inloggning
   return accountLogin();
 }
-async function accountLogin(){
+function accountLogin(){
   var EN=(window.GRABIT_LANG==="en");
-  var say=window.pToast||function(m){alert(m);};
-  if(!CONFIG.API_BASE){say(EN?"Demo mode.":"Demo-läge.");return;}
+  if(!CONFIG.API_BASE){(window.pToast||alert)(EN?"Demo mode.":"Demo-läge.");return;}
+  // Fyll i texter (tvåspråkigt)
+  document.getElementById("lm-h").textContent=EN?"Log in / Restore PRO":"Logga in / Återställ PRO";
+  document.getElementById("lm-sub-email").textContent=EN?"Enter your email and we'll send a one-time code.":"Ange din mejl så skickar vi en engångskod.";
+  document.getElementById("lm-send").textContent=EN?"Send code":"Skicka kod";
+  document.getElementById("lm-verify").textContent=EN?"Log in":"Logga in";
+  document.getElementById("lm-resend").textContent=EN?"Send a new code":"Skicka ny kod";
+  document.getElementById("lm-step-email").style.display="";
+  document.getElementById("lm-step-code").style.display="none";
+  document.getElementById("lm-msg").textContent="";document.getElementById("lm-msg").className="lm-msg";
+  document.getElementById("lm-code").value="";
+  document.getElementById("login-modal").style.display="flex";
+  setTimeout(function(){try{document.getElementById("lm-email").focus();}catch(e){}},60);
+}
+function closeLogin(){var el=document.getElementById("login-modal");if(el)el.style.display="none";}
+function _lmMsg(t,ok){var m=document.getElementById("lm-msg");if(!m)return;m.textContent=t||"";m.className="lm-msg"+(t?(ok?" ok":" err"):"");}
+async function loginSendCode(resend){
+  var EN=(window.GRABIT_LANG==="en");
   var base=CONFIG.API_BASE.replace(/\/$/,"");
-  var email=prompt(EN?"Enter your email to restore PRO / sync your portfolio:":"Ange din mejl för att återställa PRO / synka portföljen:");
-  if(!email)return;email=(""+email).trim();
+  var email=(document.getElementById("lm-email").value||"").trim();
+  if(!email||email.indexOf("@")<0){_lmMsg(EN?"Enter a valid email.":"Ange en giltig mejladress.");return;}
+  var btn=document.getElementById(resend?"lm-resend":"lm-send");var old=btn.textContent;
+  if(!resend)btn.disabled=true;btn.textContent=EN?"Sending…":"Skickar…";
   try{
     var r=await fetch(base+"/api/account/request",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email})});
     var j=await r.json();
-    if(!j.ok){say(j.error||(EN?"Couldn't send code.":"Kunde inte skicka kod."));return;}
-  }catch(e){say(EN?"Network error.":"Nätverksfel.");return;}
-  say(EN?"Code sent — check your email.":"Kod skickad — kolla mejlen.");
-  var code=prompt(EN?"Enter the 6-digit code:":"Ange 6-siffriga koden:");
-  if(!code)return;
+    if(!j.ok){_lmMsg(j.error||(EN?"Couldn't send code.":"Kunde inte skicka kod."));btn.disabled=false;btn.textContent=old;return;}
+  }catch(e){_lmMsg(EN?"Network error.":"Nätverksfel.");btn.disabled=false;btn.textContent=old;return;}
+  window._lmEmail=email;
+  document.getElementById("lm-step-email").style.display="none";
+  document.getElementById("lm-step-code").style.display="";
+  document.getElementById("lm-sub-code").innerHTML=(EN?"Code sent to ":"Kod skickad till ")+"<b>"+email.replace(/</g,"&lt;")+"</b>. "+(EN?"Check your inbox (and spam), then enter it here.":"Kolla inkorgen (även skräppost) och skriv in den här.");
+  _lmMsg(EN?"Code sent — you can switch to your mail app and come back.":"Kod skickad — du kan gå till mejlen och komma tillbaka.",true);
+  btn.disabled=false;btn.textContent=old;
+  setTimeout(function(){try{document.getElementById("lm-code").focus();}catch(e){}},60);
+}
+async function loginVerify(){
+  var EN=(window.GRABIT_LANG==="en");
+  var base=CONFIG.API_BASE.replace(/\/$/,"");
+  var email=window._lmEmail||"";
+  var code=(document.getElementById("lm-code").value||"").trim();
+  if(!code){_lmMsg(EN?"Enter the code.":"Skriv in koden.");return;}
+  var btn=document.getElementById("lm-verify");var old=btn.textContent;btn.disabled=true;btn.textContent=EN?"Checking…":"Kollar…";
   try{
-    var vr=await fetch(base+"/api/account/verify",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email,code:(""+code).trim()})});
+    var vr=await fetch(base+"/api/account/verify",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email,code:code})});
     var vj=await vr.json();
-    if(!vj.ok){say(vj.error||(EN?"Wrong code.":"Fel kod."));return;}
+    if(!vj.ok){_lmMsg(vj.error||(EN?"Wrong or expired code.":"Fel eller utgången kod."));btn.disabled=false;btn.textContent=old;return;}
     try{localStorage.setItem("grabit_acc",vj.token);}catch(e){}
     if(vj.pro&&vj.pro_token){localStorage.setItem("grabit_pro","1");localStorage.setItem("grabit_token",vj.pro_token);localStorage.setItem("grabit_pro_src","email");}
     if(vj.portfolio&&vj.portfolio.length){try{localStorage.setItem("grabit_pf",JSON.stringify(vj.portfolio));}catch(e){}}
     if(window.refreshProState)refreshProState();
     try{if(window.initPortfolio)initPortfolio();}catch(e){}
-    if(window.hidePaywall)hidePaywall();
-    say(vj.pro?(EN?"✅ PRO restored!":"✅ PRO återställt!"):(EN?"✅ Signed in — synced.":"✅ Inloggad — synkat."));
-  }catch(e){say(EN?"Network error.":"Nätverksfel.");}
+    closeLogin();if(window.hidePaywall)hidePaywall();
+    (window.pToast||alert)(vj.pro?(EN?"PRO restored!":"PRO återställt!"):(EN?"Signed in — synced.":"Inloggad — synkat."));
+  }catch(e){_lmMsg(EN?"Network error.":"Nätverksfel.");btn.disabled=false;btn.textContent=old;}
 }
 window.accSync=async function(){
   var tok="";try{tok=localStorage.getItem("grabit_acc")||"";}catch(e){}
@@ -3553,6 +3602,21 @@ async function loadPolyInsiders(force){
 .pw-code input{flex:1;min-width:0;background:#111318;border:1px solid rgba(255,255,255,.12);border-radius:10px;color:#eef2f6;font-size:13px;padding:10px 12px;outline:none}
 .pw-code input:focus{border-color:rgba(245,197,66,.5)}
 .pw-code button{flex:none;background:rgba(245,197,66,.14);border:1px solid rgba(245,197,66,.45);color:var(--gold2);font-weight:800;font-size:13px;border-radius:10px;padding:10px 14px;cursor:pointer}
+/* Inloggnings-modal (mejl + kod, stannar kvar när man byter till mejlappen) */
+#login-modal{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(4,6,9,.72);backdrop-filter:blur(6px)}
+.lm-card{position:relative;width:100%;max-width:380px;background:linear-gradient(165deg,#12161d,#0a0d12);border:1px solid rgba(245,197,66,.32);border-radius:18px;padding:24px 20px 20px;box-shadow:0 24px 60px -12px rgba(0,0,0,.8)}
+.lm-x{position:absolute;top:12px;right:13px;background:transparent;border:none;color:#7d8794;font-size:19px;cursor:pointer;padding:4px}
+.lm-h{font-family:var(--disp);font-weight:800;font-size:18px;color:#fff;margin-bottom:6px;text-wrap:balance}
+.lm-sub{font-size:13px;color:#aeb8c4;line-height:1.45;margin-bottom:14px}
+.lm-sub b{color:#e8edf5}
+#login-modal input{width:100%;box-sizing:border-box;background:#0e1116;border:1px solid rgba(255,255,255,.14);border-radius:11px;color:#eef2f6;font-size:16px;padding:13px 14px;outline:none;margin-bottom:11px}
+#login-modal input:focus{border-color:rgba(245,197,66,.6)}
+#lm-code{letter-spacing:.28em;font-weight:700;text-align:center}
+.lm-btn{width:100%;background:linear-gradient(160deg,#FFD166,#F5C542);color:#08120a;font-weight:800;font-size:15px;border:none;border-radius:11px;padding:13px;cursor:pointer}
+.lm-btn:disabled{opacity:.6;cursor:default}
+.lm-resend{display:inline-block;margin-top:12px;font-size:12.5px;font-weight:700;color:var(--gold2);cursor:pointer}
+.lm-msg{margin-top:12px;font-size:12.5px;line-height:1.4;min-height:1px}
+.lm-msg.err{color:#ff6b6b}.lm-msg.ok{color:#28c07a}
 
 /* === Signaler-filter + Fear&Greed (append, vinner via källordning) === */
 .sigfilter{display:flex;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:2px 0 2px!important;margin:6px 0 2px!important;scrollbar-width:none}
