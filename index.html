@@ -3055,7 +3055,7 @@ async function loadFacit(){
           ? '<b class="num" style="color:'+(up?"var(--pos)":"var(--neg)")+'">'+(up?"+":"")+e.nu_pct+'%</b>'
             +'<span style="font-size:10.5px;color:var(--mut);font-weight:600;margin-left:7px">'+nar+'</span>'
           : '<span style="font-size:11.5px;color:var(--gold2);font-weight:700">'+nar+'</span>';
-        return '<div class="fc-row"><span>'+(e.roll||"")+' · <b>'+(e.ticker||"")+'</b>'
+        return '<div class="fc-row" onclick="openStock(\''+(e.ticker||"")+'\')" style="cursor:pointer"><span>'+(e.roll||"")+' · <b>'+(e.ticker||"")+'</b>'
           +(prisTxt?' <span style="color:var(--mut)">'+prisTxt+'</span>':'')
           +'</span><span style="white-space:nowrap">'+right+'</span></div>';
       }).join("");
@@ -3072,7 +3072,7 @@ async function loadFacit(){
   const rows=(j.rader||[]).map(function(e){
     const up=e.utfall_pct>=0;
     const prisTxt=(e.pris!=null?("@ $"+e.pris):"")+(e.slutpris!=null?(" → $"+e.slutpris):"");
-    return '<div class="fc-row"><span>'+e.roll+' · <b>'+e.ticker+'</b>'
+    return '<div class="fc-row" onclick="openStock(\''+e.ticker+'\')" style="cursor:pointer"><span>'+e.roll+' · <b>'+e.ticker+'</b>'
       +(prisTxt?' <span style="color:var(--mut)">'+prisTxt+'</span>':'')
       +'</span><span class="num" style="color:'+(up?"var(--pos)":"var(--neg)")+';font-weight:800">'+(up?"+":"")+e.utfall_pct+'%</span></div>';
   }).join("");
