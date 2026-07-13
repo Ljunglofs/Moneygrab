@@ -470,13 +470,24 @@ _BADGE_96 = "iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAYAAADimHc4AAACB0lEQVR42u2dQXLDMAw
 @app.get("/badge-96.png")
 def _badge96(): return _png(_BADGE_96)
 
-@app.get("/email-logo.jpg")
-def _email_logo():
-    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "email_logo.jpg")
+def _static_jpg(name):
+    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
     if not os.path.exists(p):
         return Response(status_code=404)
     return FileResponse(p, media_type="image/jpeg",
                         headers={"Cache-Control": "public, max-age=86400"})
+
+@app.get("/email-logo.jpg")
+def _email_logo(): return _static_jpg("email_logo.jpg")
+
+@app.get("/news-label.jpg")
+def _news_label(): return _static_jpg("news_label.jpg")
+
+@app.get("/trump-label.jpg")
+def _trump_label(): return _static_jpg("trump_label.jpg")
+
+@app.get("/trump-hero.jpg")
+def _trump_hero(): return _static_jpg("trump_hero.jpg")
 
 _MANIFEST = {
     "id": "/",
