@@ -3062,50 +3062,52 @@ async function loadFacit(){
   const B=CONFIG.API_BASE?CONFIG.API_BASE.replace(/\/$/,""):"";if(!B)return;
   let j=null;try{const r=await fetch(B+"/api/facit",{cache:"no-store"});j=await r.json();}catch(e){}
   if(!j)return;
+  const EN=(window.GRABIT_LANG==="en");
   const st=j.stats||{};
-  if(!st.antal){
-    const EN=(window.GRABIT_LANG==="en");
-    const pend=j.pending||[];
-    if(pend.length){el.style.display="";
-      const prows=pend.map(function(e){
-        const nar=(e.dgr_kvar===0)?(EN?"outcome soon":"utfall snart")
-                 :(e.dgr_kvar!=null?(EN?(e.dgr_kvar+"d left"):(e.dgr_kvar+" dgr kvar")):"");
-        const hasNow=(e.nupris!=null);
-        const up=(e.nu_pct>=0);
-        const prisTxt=(e.pris!=null?("$"+e.pris):"")+(hasNow?(" → $"+e.nupris):"");
-        const right=hasNow&&e.nu_pct!=null
-          ? '<b class="num" style="color:'+(up?"var(--pos)":"var(--neg)")+'">'+(up?"+":"")+e.nu_pct+'%</b>'
-            +'<span style="font-size:10.5px;color:var(--mut);font-weight:600;margin-left:7px">'+nar+'</span>'
-          : '<span style="font-size:11.5px;color:var(--gold2);font-weight:700">'+nar+'</span>';
-        return '<div class="fc-row" onclick="openStock(\''+(e.ticker||"")+'\')" style="cursor:pointer"><span>'+(e.roll||"")+' · <b>'+(e.ticker||"")+'</b>'
-          +(prisTxt?' <span style="color:var(--mut)">'+prisTxt+'</span>':'')
-          +'</span><span style="white-space:nowrap">'+right+'</span></div>';
-      }).join("");
-      el.innerHTML='<div class="fc-h">'+(EN?"GRABIT track record · "+pend.length+" logged setups":"Grabits facit · "+pend.length+" loggade setups")+'</div>'
-        +'<div class="fc-rows">'+prows+'</div>'
-        +'<div class="to-disc">'+(EN?"Entry price is logged the day the setup triggers. % is live until the final outcome is measured ~5 trading days later."
-                                     :"Entry-priset loggas dagen setupen triggas. %-en är live tills utfallet mäts ~5 handelsdagar senare.")+'</div>';
-    }else if(j.loggade_totalt>0){el.style.display="";
-      el.innerHTML='<div class="fc-h">Grabits facit</div><div class="wl-empty">Varje börsdags setups loggas öppet — första utfallen visas efter en handelsvecka ('+j.loggade_totalt+' loggade hittills).</div>';}
-    else{el.style.display="none";}
-    return;
-  }
-  el.style.display="";
-  const rows=(j.rader||[]).map(function(e){
+  const FACIT_MIN=20;                 // visa sammanställd statistik först vid tillräckligt underlag
+  const evald=j.rader||[], pend=j.pending||[];
+  const evRow=function(e){
     const up=e.utfall_pct>=0;
-    const prisTxt=(e.pris!=null?("@ $"+e.pris):"")+(e.slutpris!=null?(" → $"+e.slutpris):"");
+    const prisTxt=(e.pris!=null?("$"+e.pris):"")+(e.slutpris!=null?(" → $"+e.slutpris):"");
     return '<div class="fc-row" onclick="openStock(\''+e.ticker+'\')" style="cursor:pointer"><span>'+e.roll+' · <b>'+e.ticker+'</b>'
       +(prisTxt?' <span style="color:var(--mut)">'+prisTxt+'</span>':'')
       +'</span><span class="num" style="color:'+(up?"var(--pos)":"var(--neg)")+';font-weight:800">'+(up?"+":"")+e.utfall_pct+'%</span></div>';
-  }).join("");
-  el.innerHTML=`<div class="fc-h">Grabits facit · senaste ${st.antal} setups</div>
-   <div class="fc-stats">
-     <div class="fc-big"><b class="num" style="color:var(--gold2)">${st.traffprocent}%</b><i>Träffar</i></div>
-     <div class="fc-big"><b class="num" style="color:${st.snitt_pct>=0?"var(--pos)":"var(--neg)"}">${st.snitt_pct>=0?"+":""}${st.snitt_pct}%</b><i>Snitt 5 dgr</i></div>
-     <div class="fc-big"><b>${st.basta?st.basta.ticker:"–"}</b><i>Bästa ${st.basta?("+"+st.basta.pct+"%"):""}</i></div>
-   </div>
-   <div class="fc-rows">${rows}</div>
-   <div class="to-disc">Utfall mäts ~5 handelsdagar efter publicering.</div>`;
+  };
+  const pendRow=function(e){
+    const nar=(e.dgr_kvar===0)?(EN?"outcome soon":"utfall snart")
+             :(e.dgr_kvar!=null?(EN?(e.dgr_kvar+"d left"):(e.dgr_kvar+" dgr kvar")):"");
+    const hasNow=(e.nupris!=null),up=(e.nu_pct>=0);
+    const prisTxt=(e.pris!=null?("$"+e.pris):"")+(hasNow?(" → $"+e.nupris):"");
+    const right=hasNow&&e.nu_pct!=null
+      ? '<b class="num" style="color:'+(up?"var(--pos)":"var(--neg)")+'">'+(up?"+":"")+e.nu_pct+'%</b><span style="font-size:10.5px;color:var(--mut);font-weight:600;margin-left:7px">'+nar+'</span>'
+      : '<span style="font-size:11.5px;color:var(--gold2);font-weight:700">'+nar+'</span>';
+    return '<div class="fc-row" onclick="openStock(\''+(e.ticker||"")+'\')" style="cursor:pointer"><span>'+(e.roll||"")+' · <b>'+(e.ticker||"")+'</b>'
+      +(prisTxt?' <span style="color:var(--mut)">'+prisTxt+'</span>':'')
+      +'</span><span style="white-space:nowrap">'+right+'</span></div>';
+  };
+  // Full sammanställning (träffar/snitt/bästa) bara när det finns ett meningsfullt underlag
+  if(st.antal>=FACIT_MIN){
+    el.style.display="";
+    el.innerHTML='<div class="fc-h">'+(EN?"GRABIT track record · last "+st.antal+" setups":"Grabits facit · senaste "+st.antal+" setups")+'</div>'
+      +'<div class="fc-stats">'
+      +'<div class="fc-big"><b class="num" style="color:var(--gold2)">'+st.traffprocent+'%</b><i>'+(EN?"Hits":"Träffar")+'</i></div>'
+      +'<div class="fc-big"><b class="num" style="color:'+(st.snitt_pct>=0?"var(--pos)":"var(--neg)")+'">'+(st.snitt_pct>=0?"+":"")+st.snitt_pct+'%</b><i>'+(EN?"Avg 5d":"Snitt 5 dgr")+'</i></div>'
+      +'<div class="fc-big"><b>'+(st.basta?st.basta.ticker:"–")+'</b><i>'+(EN?"Best ":"Bästa ")+(st.basta?("+"+st.basta.pct+"%"):"")+'</i></div>'
+      +'</div><div class="fc-rows">'+evald.map(evRow).join("")+'</div>'
+      +'<div class="to-disc">'+(EN?"Outcome measured ~5 trading days after logging.":"Utfall mäts ~5 handelsdagar efter loggning.")+'</div>';
+    return;
+  }
+  // Annars: öppen logg utan sammanställd siffra (för litet underlag = ingen vilseledande statistik)
+  const allRows=pend.map(pendRow).join("")+evald.map(evRow).join("");
+  if(allRows){
+    el.style.display="";
+    el.innerHTML='<div class="fc-h">'+(EN?"GRABIT track record · open log":"Grabits facit · loggade setups")+'</div>'
+      +'<div class="fc-rows">'+allRows+'</div>'
+      +'<div class="to-disc">'+(EN?"Every setup is logged openly with its entry price. Aggregate stats appear once there's a meaningful sample."
+                                   :"Varje setup loggas öppet med sitt entry-pris. Sammanställd statistik visas när underlaget är tillräckligt stort.")+'</div>';
+  }else if(j.loggade_totalt>0){el.style.display="";
+    el.innerHTML='<div class="fc-h">Grabits facit</div><div class="wl-empty">Varje börsdags setups loggas öppet ('+j.loggade_totalt+' loggade hittills).</div>';}
+  else{el.style.display="none";}
 }
 window.setPriceAlert=async function(tkr,px){
   var say=window.pToast||function(m){alert(m);};
