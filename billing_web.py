@@ -44,20 +44,40 @@ _PAID_DAYS = int(os.getenv("PRO_PAID_DAYS", "2"))     # köp: kort, förnyas via
 _PRO_WELCOME_HTML = (
     "<div style='font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:460px;margin:0 auto;"
     "padding:24px;background:#0A0E12;color:#e8edf5;border-radius:14px'>"
+    "<img src='https://grabitlabs.com/email-logo.jpg' alt='GRABIT' width='220' "
+    "style='width:220px;max-width:80%;display:block;margin:0 auto 18px'>"
+    # --- Svenska ---
     "<h2 style='color:#F5C542;margin:0 0 10px'>Välkommen till GRABIT PRO</h2>"
     "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'>Tack för att du prenumererar! Din PRO är "
     "aktiv och allt är upplåst — Insider Flow, Daytrade-setups, Ask Grabit och alla screeners.</p>"
     "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'><b>På en annan enhet?</b> "
     "Öppna GRABIT, välj “Återställ köp” och logga in med den här "
     "mejladressen — så följer din PRO med överallt.</p>"
-    "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'><b>NASDAQ ROBBER</b> — skriv "
-    "koden <b style='color:#F5C542'>daq</b> i appen för en direktkoll. Han larmar bara när det finns ett "
-    "riktigt entry-läge på NASDAQ 100 (US100) — inga låtsas-signaler.</p>"
+    "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'><b>NASDAQ ROBBER</b> har en egen flik "
+    "i appen. Öppna den och skriv koden <b style='color:#F5C542'>daq</b> i hans ruta för en direktkoll "
+    "på NASDAQ 100 (US100). Han larmar bara när det finns ett riktigt entry-läge — inga låtsas-signaler.</p>"
     "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'><b>Slå på notiser</b> för att få "
     "robotens larm och signaler direkt — samt pris-, nyhets- och rapportlarm på aktierna i din portfölj.</p>"
     "<p style='color:#8a93a3;font-size:12.5px;margin-top:16px'>Avsluta när som helst. Ingen finansiell "
     "rådgivning.</p>"
-    "<p style='color:#F5C542;font-weight:700;margin-top:14px'>Spot the setup. Ignore the noise.</p>" "<p style='color:#5b6675;font-size:12px;margin-top:16px;border-top:1px solid rgba(255,255,255,.08);padding-top:12px'>Frågor? Kontakta oss på <a href='mailto:support@grabitlabs.com' style='color:#F5C542;text-decoration:none'>support@grabitlabs.com</a></p></div>")
+    # --- English ---
+    "<div style='border-top:1px solid rgba(255,255,255,.1);margin:20px 0'></div>"
+    "<h2 style='color:#F5C542;margin:0 0 10px'>Welcome to GRABIT PRO</h2>"
+    "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'>Thanks for subscribing! Your PRO is active "
+    "and everything is unlocked — Insider Flow, Daytrade setups, Ask Grabit and all screeners.</p>"
+    "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'><b>On another device?</b> "
+    "Open GRABIT, choose “Restore purchase” and log in with this email — your PRO follows you everywhere.</p>"
+    "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'><b>NASDAQ ROBBER</b> has its own tab in "
+    "the app. Open it and type the code <b style='color:#F5C542'>daq</b> in his box for an instant check on "
+    "the NASDAQ 100 (US100). It only alerts when there's a genuine entry setup — no fake signals.</p>"
+    "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'><b>Turn on notifications</b> to get the "
+    "robot's alerts and signals instantly — plus price, news and earnings alerts on the stocks in your "
+    "portfolio.</p>"
+    "<p style='color:#8a93a3;font-size:12.5px;margin-top:16px'>Cancel anytime. Not financial advice.</p>"
+    "<p style='color:#F5C542;font-weight:700;margin-top:14px'>Spot the setup. Ignore the noise.</p>"
+    "<p style='color:#5b6675;font-size:12px;margin-top:16px;border-top:1px solid rgba(255,255,255,.08);"
+    "padding-top:12px'>Frågor / Questions? <a href='mailto:support@grabitlabs.com' "
+    "style='color:#F5C542;text-decoration:none'>support@grabitlabs.com</a></p></div>")
 
 
 # --------------------------------------------------------------------------

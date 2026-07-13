@@ -125,24 +125,44 @@ def _gen_code() -> str:
 
 _CODE_HTML = ("<div style='font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:420px;"
               "margin:0 auto;padding:24px;background:#0A0E12;color:#e8edf5;border-radius:14px'>"
-              "<h2 style='color:#F5C542;margin:0 0 8px'>Din GRABIT-kod</h2>"
+              "<img src='https://grabitlabs.com/email-logo.jpg' alt='GRABIT' width='200' "
+              "style='width:200px;max-width:80%;display:block;margin:0 auto 16px'>"
+              "<h2 style='color:#F5C542;margin:0 0 8px'>Din GRABIT-kod / Your GRABIT code</h2>"
               "<p style='font-size:34px;font-weight:800;letter-spacing:8px;color:#fff;margin:12px 0'>%s</p>"
               "<p style='color:#c7d0dc;font-size:14px'>Gäller i 10 minuter. Skriv in den i GRABIT för att "
-              "låsa upp PRO och synka din portfölj.</p>" "<p style='color:#5b6675;font-size:12px;margin-top:16px;border-top:1px solid rgba(255,255,255,.08);padding-top:12px'>Frågor? Kontakta oss på <a href='mailto:support@grabitlabs.com' style='color:#F5C542;text-decoration:none'>support@grabitlabs.com</a></p></div>")
+              "låsa upp PRO och synka din portfölj.</p>"
+              "<p style='color:#c7d0dc;font-size:14px'>Valid for 10 minutes. Enter it in GRABIT to unlock "
+              "PRO and sync your portfolio.</p>"
+              "<p style='color:#5b6675;font-size:12px;margin-top:16px;border-top:1px solid rgba(255,255,255,.08);padding-top:12px'>Frågor / Questions? <a href='mailto:support@grabitlabs.com' style='color:#F5C542;text-decoration:none'>support@grabitlabs.com</a></p></div>")
 
 _WELCOME_HTML = ("<div style='font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:460px;"
                  "margin:0 auto;padding:24px;background:#0A0E12;color:#e8edf5;border-radius:14px'>"
+                 "<img src='https://grabitlabs.com/email-logo.jpg' alt='GRABIT' width='220' "
+                 "style='width:220px;max-width:80%;display:block;margin:0 auto 18px'>"
+                 # --- Svenska ---
                  "<h2 style='color:#F5C542;margin:0 0 8px'>Välkommen till GRABIT</h2>"
                  "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'>Ditt konto är nu kopplat till "
                  "den här mejladressen. Din PRO, portfölj och bevakningar följer med dig på alla enheter — "
                  "logga bara in med mejlen.</p>"
-                 "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'><b>NASDAQ ROBBER</b> "
-                 "— skriv koden <b style='color:#F5C542'>daq</b> i appen för en direktkoll. Han larmar bara "
-                 "när det finns ett riktigt entry-läge på NASDAQ 100 (US100).</p>"
+                 "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'><b>NASDAQ ROBBER</b> har en egen "
+                 "flik i appen. Öppna den och skriv koden <b style='color:#F5C542'>daq</b> i hans ruta för en "
+                 "direktkoll på NASDAQ 100 (US100).</p>"
                  "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'><b>Slå på notiser</b> "
                  "för robotens larm och signaler — samt pris-, nyhets- och rapportlarm på aktierna i din "
                  "portfölj.</p>"
-                 "<p style='color:#F5C542;font-weight:700;margin-top:16px'>Spot the setup. Ignore the noise.</p>" "<p style='color:#5b6675;font-size:12px;margin-top:16px;border-top:1px solid rgba(255,255,255,.08);padding-top:12px'>Frågor? Kontakta oss på <a href='mailto:support@grabitlabs.com' style='color:#F5C542;text-decoration:none'>support@grabitlabs.com</a></p></div>")
+                 # --- English ---
+                 "<div style='border-top:1px solid rgba(255,255,255,.1);margin:20px 0'></div>"
+                 "<h2 style='color:#F5C542;margin:0 0 8px'>Welcome to GRABIT</h2>"
+                 "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'>Your account is now linked to "
+                 "this email. Your PRO, portfolio and watchlists follow you on every device — just log in "
+                 "with your email.</p>"
+                 "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'><b>NASDAQ ROBBER</b> has its own "
+                 "tab in the app. Open it and type the code <b style='color:#F5C542'>daq</b> in his box for "
+                 "an instant check on the NASDAQ 100 (US100).</p>"
+                 "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'><b>Turn on notifications</b> for "
+                 "the robot's alerts and signals — plus price, news and earnings alerts on the stocks in your "
+                 "portfolio.</p>"
+                 "<p style='color:#F5C542;font-weight:700;margin-top:16px'>Spot the setup. Ignore the noise.</p>" "<p style='color:#5b6675;font-size:12px;margin-top:16px;border-top:1px solid rgba(255,255,255,.08);padding-top:12px'>Frågor / Questions? <a href='mailto:support@grabitlabs.com' style='color:#F5C542;text-decoration:none'>support@grabitlabs.com</a></p></div>")
 
 
 # --------------------------------------------------------------------------
