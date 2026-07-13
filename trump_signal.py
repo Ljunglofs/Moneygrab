@@ -48,20 +48,27 @@ _lock = threading.Lock()
 _TAG_RE = re.compile(r"<[^>]+>")
 
 
-def _source_url() -> str:
-    u = os.environ.get("TRUMP_SOURCE_URL", "").strip()
-    if u:
-        return u
-    # Default: publik spegel av Trumps Truth Social (Truth Socials eget API
-    # blockeras oftast från datacenter-IP:n). Kan bytas via TRUMP_SOURCE_URL.
-    return "https://trumpstruth.org/feed"
+def _source_urls() -> list:
+    """En eller flera källor (kommaseparerade i TRUMP_SOURCE_URL). Slås ihop."""
+    raw = os.environ.get("TRUMP_SOURCE_URL", "").strip()
+    if raw:
+        return [u.strip() for u in raw.split(",") if u.strip()]
+    # Default: hans Truth Social-inlägg (spegel) + Trump-nyheter (Google News).
+    # Google News-RSS är gratis och funkar pålitligt från servrar.
+    return [
+        "https://trumpstruth.org/feed",
+        "https://news.google.com/rss/search?q=%22Donald+Trump%22+when:2d&hl=en-US&gl=US&ceid=US:en",
+    ]
 
 
-def _source_type() -> str:
-    t = os.environ.get("TRUMP_SOURCE_TYPE", "").strip().lower()
-    if t:
-        return t
-    return "rss" if _source_url().lower().rstrip("/").endswith((".rss", ".xml", "/rss", "/feed")) else "mastodon"
+def _type_for(url: str) -> str:
+    forced = os.environ.get("TRUMP_SOURCE_TYPE", "").strip().lower()
+    if forced:
+        return forced
+    low = url.lower()
+    if "truthsocial.com/api" in low:
+        return "mastodon"
+    return "rss"
 
 
 def _clean(txt: str) -> str:
@@ -89,35 +96,19 @@ def _save_posts(posts) -> None:
         print("[trump] kunde inte spara:", e)
 
 
-def _fetch() -> list:
-    """Returnerar lista av {id, text, url, ts} — nyast först. Tyst [] vid fel."""
+def _fetch_one(url: str) -> list:
     if requests is None:
         return []
-    url = _source_url()
     try:
         r = requests.get(url, headers=_HEADERS, timeout=12)
         if r.status_code != 200:
-            print("[trump] källa HTTP %s" % r.status_code)
+            print("[trump] %s -> HTTP %s" % (url.split("//")[-1][:30], r.status_code))
             return []
     except Exception as e:
         print("[trump] hämtningsfel:", type(e).__name__)
         return []
-
     out = []
-    if _source_type() == "rss":
-        try:
-            import xml.etree.ElementTree as ET
-            root = ET.fromstring(r.content)
-            for it in root.iter("item"):
-                def _g(tag):
-                    el = it.find(tag)
-                    return (el.text or "") if el is not None else ""
-                text = _clean(_g("description")) or _clean(_g("title"))
-                out.append({"id": _g("guid") or _g("link") or text[:40],
-                            "text": text, "url": _g("link"), "ts": _g("pubDate")})
-        except Exception as e:
-            print("[trump] rss-parse fel:", e)
-    else:  # mastodon-JSON (Truth Social)
+    if _type_for(url) == "mastodon":
         try:
             for s in (r.json() or []):
                 out.append({"id": str(s.get("id") or ""),
@@ -126,7 +117,34 @@ def _fetch() -> list:
                             "ts": s.get("created_at") or ""})
         except Exception as e:
             print("[trump] json-parse fel:", e)
+    else:  # RSS/Atom
+        try:
+            import xml.etree.ElementTree as ET
+            root = ET.fromstring(r.content)
+            for it in root.iter("item"):
+                def _g(tag):
+                    el = it.find(tag)
+                    return (el.text or "") if el is not None else ""
+                tt, dd = _clean(_g("title")), _clean(_g("description"))
+                text = dd if len(dd) > len(tt) else tt          # ta den fylligare
+                out.append({"id": _g("guid") or _g("link") or text[:40],
+                            "text": text, "url": _g("link"), "ts": _g("pubDate")})
+        except Exception as e:
+            print("[trump] rss-parse fel:", e)
     return [p for p in out if p.get("id") and p.get("text")]
+
+
+def _fetch() -> list:
+    """Hämtar alla källor, slår ihop och dedupar. Tyst [] vid totalt fel."""
+    merged, seen = [], set()
+    for url in _source_urls():
+        for p in _fetch_one(url):
+            key = p.get("id") or p.get("text", "")[:40]
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(p)
+    return merged
 
 
 def _filter_words():
