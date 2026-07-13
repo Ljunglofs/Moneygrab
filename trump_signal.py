@@ -52,8 +52,9 @@ def _source_url() -> str:
     u = os.environ.get("TRUMP_SOURCE_URL", "").strip()
     if u:
         return u
-    return ("https://truthsocial.com/api/v1/accounts/%s/statuses"
-            "?exclude_replies=true&limit=20" % _ACCOUNT_ID)
+    # Default: publik spegel av Trumps Truth Social (Truth Socials eget API
+    # blockeras oftast från datacenter-IP:n). Kan bytas via TRUMP_SOURCE_URL.
+    return "https://trumpstruth.org/feed"
 
 
 def _source_type() -> str:
@@ -111,9 +112,9 @@ def _fetch() -> list:
                 def _g(tag):
                     el = it.find(tag)
                     return (el.text or "") if el is not None else ""
-                out.append({"id": _g("guid") or _g("link"),
-                            "text": _clean(_g("title") + " " + _g("description")),
-                            "url": _g("link"), "ts": _g("pubDate")})
+                text = _clean(_g("description")) or _clean(_g("title"))
+                out.append({"id": _g("guid") or _g("link") or text[:40],
+                            "text": text, "url": _g("link"), "ts": _g("pubDate")})
         except Exception as e:
             print("[trump] rss-parse fel:", e)
     else:  # mastodon-JSON (Truth Social)
