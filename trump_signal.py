@@ -25,6 +25,7 @@ import json
 import time
 import html
 import threading
+from urllib.parse import quote as _quote
 
 try:
     import requests
@@ -53,11 +54,13 @@ def _source_urls() -> list:
     raw = os.environ.get("TRUMP_SOURCE_URL", "").strip()
     if raw:
         return [u.strip() for u in raw.split(",") if u.strip()]
-    # Default: hans Truth Social-inlägg (spegel) + Trump-nyheter (Google News).
-    # Google News-RSS är gratis och funkar pålitligt från servrar.
+    # Default: hans Truth Social-inlägg (spegel) + MARKNADS-inriktade Trump-nyheter
+    # (Google News-frågan är redan filtrerad mot börs-relevanta ämnen).
+    news_q = ("Trump (stocks OR tariff OR tariffs OR Fed OR \"interest rate\" OR economy "
+              "OR trade OR market OR China OR oil OR tax OR inflation OR sanctions) when:2d")
     return [
         "https://trumpstruth.org/feed",
-        "https://news.google.com/rss/search?q=%22Donald+Trump%22+when:2d&hl=en-US&gl=US&ceid=US:en",
+        "https://news.google.com/rss/search?q=" + _quote(news_q) + "&hl=en-US&gl=US&ceid=US:en",
     ]
 
 
@@ -147,22 +150,39 @@ def _fetch() -> list:
     return merged
 
 
-def _filter_words():
-    raw = os.environ.get("TRUMP_NOTIFY_FILTER", "").strip()
-    return [w.strip().lower() for w in raw.split(",") if w.strip()]
+# Marknadspåverkande ord — bara inlägg som nämner något av dessa behålls/visas.
+_MARKET_WORDS = [
+    "stock", "stocks", "market", "wall street", "dow", "nasdaq", "s&p", "shares",
+    "tariff", "tariffs", "trade", "trade deal", "import", "export", "sanction",
+    "fed", "federal reserve", "interest rate", "rate cut", "powell", "inflation",
+    "economy", "economic", "gdp", "jobs", "unemployment", "recession",
+    "tax", "taxes", "tax cut", "deregulat", "regulation",
+    "oil", "energy", "gas", "opec", "crude", "drill",
+    "china", "chip", "chips", "semiconductor", "ai ", "crypto", "bitcoin",
+    "dollar", "bond", "yields", "deal", "boeing", "tesla", "apple",
+]
 
 
-def _relevant(text: str) -> bool:
-    words = _filter_words()
+def _market_words():
+    raw = os.environ.get("TRUMP_MARKET_FILTER", "").strip()
+    if raw.lower() in ("off", "none", "0"):
+        return []                         # avstängt = visa allt
+    if raw:
+        return [w.strip().lower() for w in raw.split(",") if w.strip()]
+    return _MARKET_WORDS
+
+
+def _is_market(text: str) -> bool:
+    words = _market_words()
     if not words:
         return True
-    low = (text or "").lower()
+    low = " " + (text or "").lower() + " "
     return any(w in low for w in words)
 
 
 def poll_once(push=None) -> int:
-    """Hämtar, sparar nya inlägg och pushar de relevanta. Returnerar antal nya."""
-    fresh = _fetch()
+    """Hämtar, marknadsfiltrerar, sparar nya inlägg och pushar. Returnerar antal nya."""
+    fresh = [p for p in _fetch() if _is_market(p.get("text", ""))]
     if not fresh:
         return 0
     with _lock:
@@ -178,8 +198,6 @@ def poll_once(push=None) -> int:
     # Notis går till ALLA som slagit på notiser (ingen separat opt-in).
     if old:
         for p in reversed(new):                 # äldsta först
-            if not _relevant(p["text"]):
-                continue
             body = p["text"][:140] + ("…" if len(p["text"]) > 140 else "")
             try:
                 if push:
@@ -187,7 +205,7 @@ def poll_once(push=None) -> int:
                                   url=p.get("url") or "/", tag="trump")
             except Exception as e:
                 print("[trump] push-fel:", e)
-    print("[trump] %d nya inlägg" % len(new))
+    print("[trump] %d nya marknads-inlägg" % len(new))
     return len(new)
 
 
