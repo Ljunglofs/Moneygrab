@@ -47,6 +47,13 @@ try:
 except Exception as e:
     print(f"play_billing kunde inte registreras (grabit kör vidare): {e}")
 
+# 2e) Trump Signal: bevakar Truth Social + push vid nya inlägg.
+try:
+    import trump_signal
+    trump_signal.register(app)
+except Exception as e:
+    print(f"trump_signal kunde inte registreras (grabit kör vidare): {e}")
+
 # 3) TESTENDPOINT — avfyra ett skarpt formaterat (men fejkat) Telegram-larm
 #    på begäran. Ligger på tvåsegments-väg så api.py:s catch-all /{fname}
 #    inte slukar den. Öppna i mobilen:

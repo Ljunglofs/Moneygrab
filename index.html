@@ -246,6 +246,13 @@ main{padding:16px 16px 110px}
 .macrocal .ai-h{display:flex;align-items:center;gap:7px;font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--gold2);margin-bottom:9px}
 .macrocal .ai-h .dot2{width:6px;height:6px;border-radius:50%;background:var(--gold);box-shadow:0 0 7px var(--gold)}
 .macro-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 0;border-top:1px solid rgba(255,255,255,.06)}
+.trumpbar{display:flex;align-items:stretch;overflow:hidden;border-radius:12px;margin-top:8px;
+  background:linear-gradient(90deg,rgba(245,197,66,.10),var(--card));border:1px solid rgba(245,197,66,.4)}
+.tb-lbl{flex:none;display:flex;align-items:center;font-family:var(--disp);font-weight:900;font-size:10px;
+  letter-spacing:.06em;color:#0A0E12;background:var(--gold);padding:0 11px;white-space:nowrap}
+.tb-scroll{flex:1;min-width:0;overflow:hidden;padding:9px 0}
+.tb-track{display:inline-block;white-space:nowrap;font-size:12.5px;font-weight:600;color:#e6c766;
+  animation:gnews 110s linear infinite;padding-left:14px}
 .macro-row:first-of-type{border-top:none}
 .macro-dt{font-size:10.5px;color:var(--mut);width:74px;flex-shrink:0}
 .macro-mid{display:flex;align-items:center;gap:6px;flex:1;min-width:0}
@@ -1173,6 +1180,7 @@ else _i18nBoot();
 <main>
   <section class="screen on" id="s-hem">
     <div class="newsbar" id="newsbar"></div>
+    <div class="trumpbar" id="trumpbar" style="display:none"></div>
     <div class="mkt-scroll" id="mkt-scroll"></div>
     <div class="modeduo">
       <div class="card tempg" id="tempg"></div>
@@ -3019,6 +3027,21 @@ async function loadFda(){
     return n.url?'<a href="'+n.url+'" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;display:block">'+t+'</a>':t;
   }).join("");
 }
+async function loadTrump(){
+  const el=document.getElementById("trumpbar");if(!el)return;
+  const B=CONFIG.API_BASE?CONFIG.API_BASE.replace(/\/$/,""):"";if(!B)return;
+  let posts=[];
+  try{const r=await fetch(B+"/api/trump",{cache:"no-store"});const j=await r.json();posts=(j&&j.posts)||[];}catch(e){}
+  const items=posts.slice(0,10).map(function(p){
+    var t=String(p.text||"").replace(/</g,"&lt;").trim();
+    return t.length>160?t.slice(0,160)+"…":t;
+  }).filter(Boolean);
+  if(!items.length){el.style.display="none";return;}
+  const nt=items.join("　•　");
+  el.style.display="flex";
+  el.innerHTML='<span class="tb-lbl">THE TRUMP SIGNAL</span>'
+    +'<div class="tb-scroll"><div class="tb-track">'+nt+'　•　'+nt+'</div></div>';
+}
 async function loadTopOp(){
   const el=document.getElementById("topop");if(!el)return;
   const B=CONFIG.API_BASE?CONFIG.API_BASE.replace(/\/$/,""):"";if(!B)return;
@@ -3367,7 +3390,7 @@ if(window.refreshProState)refreshProState();
 if(window.proAutoClaim)proAutoClaim();
 if(window.proCheckStatus)proCheckStatus();
 (function(){var _at="";try{_at=localStorage.getItem("grabit_acc")||"";}catch(e){}if(!_at||!CONFIG.API_BASE)return;fetch(CONFIG.API_BASE.replace(/\/$/,"")+"/api/account/data?token="+encodeURIComponent(_at),{cache:"no-store"}).then(function(r){return r.json();}).then(function(j){if(!j||!j.ok)return;if(j.pro&&j.pro_token){localStorage.setItem("grabit_pro","1");localStorage.setItem("grabit_token",j.pro_token);localStorage.setItem("grabit_pro_src","email");if(window.refreshProState)refreshProState();}if(j.portfolio&&j.portfolio.length){try{localStorage.setItem("grabit_pf",JSON.stringify(j.portfolio));if(window.initPortfolio)initPortfolio();}catch(e){}}}).catch(function(){});})();
-load();loadMonthly();loadDaily();loadMacro();loadFda();loadTopOp();loadWatchrow();loadFacit();
+load();loadMonthly();loadDaily();loadMacro();loadFda();loadTrump();loadTopOp();loadWatchrow();loadFacit();
 function fgInfo(s){s=+s||0;
   if(s>=75)return{label:"Extrem girighet",col:"#22d3ee",dir:1,txt:"Extrem girighet på marknaden — se upp för överhettning."};
   if(s>=55)return{label:"Girighet",col:"#22d3ee",dir:1,txt:"Marknaden är girig. Investerare tar mer risk."};
@@ -4126,6 +4149,7 @@ async function pfReview(){
     try{loadWatchrow();}catch(e){}
     try{loadMacro();}catch(e){}
     try{loadFda();}catch(e){}
+    try{loadTrump();}catch(e){}
     try{loadFacit();}catch(e){}
     try{if(typeof _dtLoaded!=="undefined"&&_dtLoaded)loadDaytrade(true);}catch(e){}
   }

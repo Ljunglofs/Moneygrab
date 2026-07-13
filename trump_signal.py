@@ -1,0 +1,203 @@
+"""
+GRABIT  ·  trump_signal.py
+--------------------------
+"Trump Signal" — bevakar Donald Trumps Truth Social-konto. Nya inlägg visas i
+appen och de som slagit på notiser för det får en push direkt.
+
+Trumps inlägg rör ofta marknaden (tullar, Fed, Kina, olja, enskilda bolag), så
+det är en trading-relevant signal.
+
+Env (allt valfritt — bra defaults):
+  TRUMP_ACCOUNT_ID     Truth Social-konto-id (default = realDonaldTrump)
+  TRUMP_SOURCE_URL     hela käll-URL:en om du vill peka på annan källa/spegel
+  TRUMP_SOURCE_TYPE    "mastodon" (default) eller "rss"
+  TRUMP_POLL_SEC       hur ofta vi kollar (default 90 s)
+  TRUMP_NOTIFY_FILTER  kommaseparerade ord — notera BARA inlägg som matchar
+                       (tomt = notera alla). Alla inlägg visas ändå i flödet.
+
+OBS: Truth Social har hårt bot-skydd. Funkar deras API inte från servern —
+peka TRUMP_SOURCE_URL på en fungerande RSS-spegel så funkar resten oförändrat.
+"""
+
+import os
+import re
+import json
+import time
+import html
+import threading
+
+try:
+    import requests
+except Exception:                       # pragma: no cover
+    requests = None
+
+_DATA_DIR = os.environ.get("DATA_DIR", ".")
+_POSTS_FILE = os.path.join(_DATA_DIR, "trump_posts.json")
+_ACCOUNT_ID = os.environ.get("TRUMP_ACCOUNT_ID", "107780257626128497")  # realDonaldTrump
+_POLL_SEC = int(os.environ.get("TRUMP_POLL_SEC", "90") or "90")
+_MAX_KEEP = 40
+
+_HEADERS = {
+    "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                   "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"),
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "en-US,en;q=0.9",
+}
+
+_lock = threading.Lock()
+_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def _source_url() -> str:
+    u = os.environ.get("TRUMP_SOURCE_URL", "").strip()
+    if u:
+        return u
+    return ("https://truthsocial.com/api/v1/accounts/%s/statuses"
+            "?exclude_replies=true&limit=20" % _ACCOUNT_ID)
+
+
+def _source_type() -> str:
+    t = os.environ.get("TRUMP_SOURCE_TYPE", "").strip().lower()
+    if t:
+        return t
+    return "rss" if _source_url().lower().rstrip("/").endswith((".rss", ".xml", "/rss", "/feed")) else "mastodon"
+
+
+def _clean(txt: str) -> str:
+    txt = _TAG_RE.sub(" ", txt or "")
+    txt = html.unescape(txt)
+    return re.sub(r"\s+", " ", txt).strip()
+
+
+def _load_posts() -> list:
+    try:
+        with open(_POSTS_FILE) as f:
+            return json.load(f) or []
+    except Exception:
+        return []
+
+
+def _save_posts(posts) -> None:
+    try:
+        os.makedirs(_DATA_DIR, exist_ok=True)
+        tmp = _POSTS_FILE + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(posts[:_MAX_KEEP], f, ensure_ascii=False)
+        os.replace(tmp, _POSTS_FILE)
+    except Exception as e:
+        print("[trump] kunde inte spara:", e)
+
+
+def _fetch() -> list:
+    """Returnerar lista av {id, text, url, ts} — nyast först. Tyst [] vid fel."""
+    if requests is None:
+        return []
+    url = _source_url()
+    try:
+        r = requests.get(url, headers=_HEADERS, timeout=12)
+        if r.status_code != 200:
+            print("[trump] källa HTTP %s" % r.status_code)
+            return []
+    except Exception as e:
+        print("[trump] hämtningsfel:", type(e).__name__)
+        return []
+
+    out = []
+    if _source_type() == "rss":
+        try:
+            import xml.etree.ElementTree as ET
+            root = ET.fromstring(r.content)
+            for it in root.iter("item"):
+                def _g(tag):
+                    el = it.find(tag)
+                    return (el.text or "") if el is not None else ""
+                out.append({"id": _g("guid") or _g("link"),
+                            "text": _clean(_g("title") + " " + _g("description")),
+                            "url": _g("link"), "ts": _g("pubDate")})
+        except Exception as e:
+            print("[trump] rss-parse fel:", e)
+    else:  # mastodon-JSON (Truth Social)
+        try:
+            for s in (r.json() or []):
+                out.append({"id": str(s.get("id") or ""),
+                            "text": _clean(s.get("content") or ""),
+                            "url": s.get("url") or s.get("uri") or "",
+                            "ts": s.get("created_at") or ""})
+        except Exception as e:
+            print("[trump] json-parse fel:", e)
+    return [p for p in out if p.get("id") and p.get("text")]
+
+
+def _filter_words():
+    raw = os.environ.get("TRUMP_NOTIFY_FILTER", "").strip()
+    return [w.strip().lower() for w in raw.split(",") if w.strip()]
+
+
+def _relevant(text: str) -> bool:
+    words = _filter_words()
+    if not words:
+        return True
+    low = (text or "").lower()
+    return any(w in low for w in words)
+
+
+def poll_once(push=None) -> int:
+    """Hämtar, sparar nya inlägg och pushar de relevanta. Returnerar antal nya."""
+    fresh = _fetch()
+    if not fresh:
+        return 0
+    with _lock:
+        old = _load_posts()
+        seen = {p.get("id") for p in old}
+        new = [p for p in fresh if p.get("id") not in seen]
+        if new:
+            merged = new + old
+            _save_posts(merged)
+    if not new:
+        return 0
+    # Första körningen (tom historik) -> pusha inte allt bakåt i tiden.
+    # Notis går till ALLA som slagit på notiser (ingen separat opt-in).
+    if old:
+        for p in reversed(new):                 # äldsta först
+            if not _relevant(p["text"]):
+                continue
+            body = p["text"][:140] + ("…" if len(p["text"]) > 140 else "")
+            try:
+                if push:
+                    push.send_all("The Trump Signal", body,
+                                  url=p.get("url") or "/", tag="trump")
+            except Exception as e:
+                print("[trump] push-fel:", e)
+    print("[trump] %d nya inlägg" % len(new))
+    return len(new)
+
+
+def recent(limit: int = 20) -> list:
+    with _lock:
+        return _load_posts()[:max(1, min(limit, _MAX_KEEP))]
+
+
+def _loop():
+    time.sleep(20)
+    try:
+        import push_notify as PN
+    except Exception:
+        PN = None
+    while True:
+        try:
+            poll_once(PN)
+        except Exception as e:
+            print("[trump] loop-fel:", e)
+        time.sleep(_POLL_SEC)
+
+
+def start_in_background():
+    threading.Thread(target=_loop, daemon=True).start()
+
+
+def register(app) -> None:
+    @app.get("/api/trump")
+    def trump_feed(limit: int = 20):
+        return {"posts": recent(limit)}
+
+    start_in_background()

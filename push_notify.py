@@ -108,6 +108,25 @@ def all_watch_tickers():
     return sorted(out)
 
 
+def set_flag(endpoint: str, key: str, val: bool) -> bool:
+    """Sätter en av/på-flagga (t.ex. ett topic som 'trump') på en prenumeration."""
+    with _lock:
+        subs = _load()
+        found = False
+        for s in subs:
+            if s.get("endpoint") == endpoint:
+                s[key] = bool(val)
+                found = True
+        if found:
+            _save(subs)
+        return found
+
+
+def flag_count(key: str) -> int:
+    with _lock:
+        return sum(1 for s in _load() if s.get(key))
+
+
 def remove_subscription(endpoint: str) -> int:
     with _lock:
         subs = [s for s in _load() if s.get("endpoint") != endpoint]
@@ -188,3 +207,12 @@ def send_watchlist(ticker: str, title: str, body: str, url: str = "/") -> dict:
     if not subs:
         return {"skickade": 0, "doda": 0, "fel": 0, "not": "inga bevakare av " + tk}
     return _send_to(subs, title, body, url, tag="grabit-" + tk)
+
+
+def send_flagged(key: str, title: str, body: str, url: str = "/", tag: str = "grabit") -> dict:
+    """Skickar bara till prenumeranter som slagit på flaggan `key` (t.ex. 'trump')."""
+    with _lock:
+        subs = [s for s in _load() if s.get(key)]
+    if not subs:
+        return {"skickade": 0, "doda": 0, "fel": 0, "not": "inga med flagga " + key}
+    return _send_to(subs, title, body, url, tag)
