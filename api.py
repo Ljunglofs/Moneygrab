@@ -3317,6 +3317,23 @@ def _us_market_open():
     return 13 <= now.hour < 21   # tacker 9:30-16:00 ET bade sommar- och vintertid
 
 
+import re as _re_sent
+_BULL_RE = _re_sent.compile(r"\b(?:beats?|surges?|soars?|rall(?:y|ies)|record|upgrade[ds]?|raises?|boosts?|"
+    r"partnership|deal|wins?|approv(?:al|ed|es)|expansion|jumps?|gains?|buyback|outperform|breakthrough|"
+    r"milestone|secures?|backed|contract|launch(?:es)?|tops|rebounds?|rises?|soaring|bullish|beat)\b", _re_sent.I)
+_BEAR_RE = _re_sent.compile(r"\b(?:miss(?:es)?|falls?|drops?|plunges?|plummets?|crash(?:es)?|cuts?|halve[sd]?|"
+    r"crackdown|probe|lawsuit|sue[sd]?|downgrade[ds]?|warns?|warning|recall|layoffs?|bans?|banned|declines?|"
+    r"weak|loss(?:es)?|bankrupt(?:cy)?|fraud|investigation|slump|halts?|delays?|sinks?|tumbles?|sanctions?|bearish)\b",
+    _re_sent.I)
+
+
+def _news_sentiment(text):
+    """Grov bull/bear-klassning av en rubrik. Returnerar 'bull', 'bear' eller 'neutral'."""
+    t = text or ""
+    b = len(_BULL_RE.findall(t)); s = len(_BEAR_RE.findall(t))
+    return "bull" if b > s else ("bear" if s > b else "neutral")
+
+
 def _watchlist_scan_once():
     import push_notify as PN
     import datetime as _dt2
@@ -3340,9 +3357,15 @@ def _watchlist_scan_once():
                 elif _nts > _seen:
                     st[_nkey] = _nts
                     if _t2.time() - _nts < 21600:
-                        PN.send_watchlist(tk, tk + " \u00b7 Nyhet",
-                                          (_lat.get("headline") or "")[:120],
-                                          url=_lat.get("url") or "/")
+                        _hd = (_lat.get("headline") or "")[:120]
+                        _sent = _news_sentiment(_hd)
+                        if _sent == "bull":
+                            _title = "\U0001F7E2 Bullish nyhet \u00b7 $" + tk
+                        elif _sent == "bear":
+                            _title = "\U0001F534 Bearish nyhet \u00b7 $" + tk
+                        else:
+                            _title = "$" + tk + " \u00b7 Nyhet"
+                        PN.send_watchlist(tk, _title, _hd, url=_lat.get("url") or "/")
         except Exception:
             pass
         # Insider-larm — ny köp/sälj hos en bevakad aktie (dygnet runt)
