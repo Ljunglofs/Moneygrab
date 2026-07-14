@@ -225,6 +225,36 @@ def _robber_status():
     return out
 
 
+@app.get("/robber/stats")
+def _robber_stats_page():
+    """Robotens träffstatistik (win rate, R) som en enkel webb-sida."""
+    from fastapi.responses import HTMLResponse
+    try:
+        from nasdaq_robber import stats_text, STATUS
+        txt = stats_text()
+        scans = STATUS.get("scans_total", 0)
+        fired = STATUS.get("fired_total", 0)
+    except Exception as e:
+        return HTMLResponse("<body style='background:#0A0E12;color:#fff;font-family:system-ui;"
+                            "padding:24px'>Kunde inte läsa stats: %s</body>" % e)
+    body = txt.replace("\n", "<br>")
+    html = ("<!doctype html><meta charset='utf-8'>"
+            "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+            "<title>NASDAQ ROBBER · Stats</title>"
+            "<body style='margin:0;background:#0A0E12;color:#e8edf5;"
+            "font-family:-apple-system,Segoe UI,Roboto,sans-serif'>"
+            "<div style='max-width:520px;margin:0 auto;padding:28px 18px'>"
+            "<h2 style='color:#F5C542;margin:0 0 14px'>NASDAQ ROBBER</h2>"
+            "<div style='font-size:15px;line-height:1.75;background:#12161d;"
+            "border:1px solid rgba(245,197,66,.25);border-radius:14px;padding:18px'>"
+            + body + "</div>"
+            "<p style='color:#8891a0;font-size:12.5px;margin-top:14px;line-height:1.6'>"
+            "Skannat totalt: %s · larm skickade: %s.<br>"
+            "Historik före den beständiga disken (nyligen satt upp) är borta — "
+            "statistiken byggs upp härifrån.</p></div></body>") % (scans, fired)
+    return HTMLResponse(html)
+
+
 @app.get("/robber/testsignal")
 def _robber_testsignal(key: str = ""):
     if not _robber_key_ok(key):
