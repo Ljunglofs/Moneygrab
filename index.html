@@ -3173,24 +3173,31 @@ async function loadFacit(){
   const st=j.stats||{};
   const FACIT_MIN=20;                 // visa sammanställd statistik först vid tillräckligt underlag
   const evald=j.rader||[], pend=j.pending||[];
+  const alfaTag=function(a){
+    if(a==null)return '';
+    const up=a>=0;
+    return '<span class="fc-alpha" style="color:'+(up?"var(--pos)":"var(--neg)")+'">'+(up?"+":"")+a+'% vs S&P</span>';
+  };
   const evRow=function(e){
     const up=e.utfall_pct>=0;
     const prisTxt=(e.pris!=null?("$"+e.pris):"")+(e.slutpris!=null?(" → $"+e.slutpris):"");
-    return '<div class="fc-row" onclick="openStock(\''+e.ticker+'\')" style="cursor:pointer"><span>'+e.roll+' · <b>'+e.ticker+'</b>'
+    return '<div class="fc-row" onclick="openStock(\''+e.ticker+'\')" style="cursor:pointer"><span class="fc-l">'+e.roll+' · <b>'+e.ticker+'</b>'
       +(prisTxt?' <span style="color:var(--mut)">'+prisTxt+'</span>':'')
-      +'</span><span class="num" style="color:'+(up?"var(--pos)":"var(--neg)")+';font-weight:800">'+(up?"+":"")+e.utfall_pct+'%</span></div>';
+      +'</span><span class="fc-r"><b class="num" style="color:'+(up?"var(--pos)":"var(--neg)")+';font-weight:800">'+(up?"+":"")+e.utfall_pct+'%</b>'+alfaTag(e.alfa)+'</span></div>';
   };
   const pendRow=function(e){
     const nar=(e.dgr_kvar===0)?(EN?"outcome soon":"utfall snart")
              :(e.dgr_kvar!=null?(EN?(e.dgr_kvar+"d left"):(e.dgr_kvar+" dgr kvar")):"");
     const hasNow=(e.nupris!=null),up=(e.nu_pct>=0);
     const prisTxt=(e.pris!=null?("$"+e.pris):"")+(hasNow?(" → $"+e.nupris):"");
-    const right=hasNow&&e.nu_pct!=null
-      ? '<b class="num" style="color:'+(up?"var(--pos)":"var(--neg)")+'">'+(up?"+":"")+e.nu_pct+'%</b><span style="font-size:10.5px;color:var(--mut);font-weight:600;margin-left:7px">'+nar+'</span>'
-      : '<span style="font-size:11.5px;color:var(--gold2);font-weight:700">'+nar+'</span>';
-    return '<div class="fc-row" onclick="openStock(\''+(e.ticker||"")+'\')" style="cursor:pointer"><span>'+(e.roll||"")+' · <b>'+(e.ticker||"")+'</b>'
+    const live=(hasNow&&e.nu_pct!=null)
+      ? '<span class="num" style="color:'+(up?"var(--pos)":"var(--neg)")+';font-weight:700;font-size:12px">'+(up?"+":"")+e.nu_pct+'%</span>'
+      : '';
+    const sub=(live||e.alfa_nu!=null)
+      ? '<span style="white-space:nowrap">'+live+(e.alfa_nu!=null?(live?' ':'')+alfaTag(e.alfa_nu):'')+'</span>' : '';
+    return '<div class="fc-row" onclick="openStock(\''+(e.ticker||"")+'\')" style="cursor:pointer"><span class="fc-l">'+(e.roll||"")+' · <b>'+(e.ticker||"")+'</b>'
       +(prisTxt?' <span style="color:var(--mut)">'+prisTxt+'</span>':'')
-      +'</span><span style="white-space:nowrap">'+right+'</span></div>';
+      +'</span><span class="fc-r"><span class="fc-kvar">'+nar+'</span>'+sub+'</span></div>';
   };
   // Full sammanställning (träffar/snitt/bästa) bara när det finns ett meningsfullt underlag
   if(st.antal>=FACIT_MIN){
@@ -3200,18 +3207,22 @@ async function loadFacit(){
       +'<div class="fc-big"><b class="num" style="color:var(--gold2)">'+st.traffprocent+'%</b><i>'+(EN?"Hits":"Träffar")+'</i></div>'
       +'<div class="fc-big"><b class="num" style="color:'+(st.snitt_pct>=0?"var(--pos)":"var(--neg)")+'">'+(st.snitt_pct>=0?"+":"")+st.snitt_pct+'%</b><i>'+(EN?"Avg 5d":"Snitt 5 dgr")+'</i></div>'
       +'<div class="fc-big"><b>'+(st.basta?st.basta.ticker:"–")+'</b><i>'+(EN?"Best ":"Bästa ")+(st.basta?("+"+st.basta.pct+"%"):"")+'</i></div>'
-      +'</div><div class="fc-rows">'+evald.map(evRow).join("")+'</div>'
-      +'<div class="to-disc">'+(EN?"Outcome measured ~5 trading days after logging.":"Utfall mäts ~5 handelsdagar efter loggning.")+'</div>';
+      +'</div>'
+      +(st.slog_mkt_antal?('<div class="fc-alfaline">'+(EN?("Beat the market in "+st.slog_mkt+"/"+st.slog_mkt_antal+" setups"):("Slog marknaden i "+st.slog_mkt+"/"+st.slog_mkt_antal+" setups"))+(st.snitt_alfa!=null?(' · '+(st.snitt_alfa>=0?"+":"")+st.snitt_alfa+'% '+(EN?"avg vs S&P":"snitt vs S&P")):'')+'</div>'):'')
+      +'<div class="fc-rows">'+evald.map(evRow).join("")+'</div>'
+      +'<div class="to-disc">'+(EN?"Outcome measured ~5 trading days after logging. “vs S&P” = the pick vs the market over the same window.":"Utfall mäts ~5 handelsdagar efter loggning. ”vs S&P” = picken mot marknaden över samma period.")+'</div>';
     return;
   }
-  // Annars: öppen logg utan sammanställd siffra (för litet underlag = ingen vilseledande statistik)
-  const allRows=pend.map(pendRow).join("")+evald.map(evRow).join("");
-  if(allRows){
+  // Annars: öppen logg — AVGJORDA setups först (det är den riktiga statistiken),
+  // PÅGÅENDE (ej utvärderade) i egen sektion så en röd börsdag inte färgar allt rött.
+  const settledHtml=evald.length?('<div class="fc-sub">'+(EN?"Settled setups":"Avgjorda setups")+'</div><div class="fc-rows">'+evald.map(evRow).join("")+'</div>'):'';
+  const pendHtml=pend.length?('<div class="fc-sub">'+(EN?"In progress · not scored yet":"Pågående · inte utvärderade än")+'</div><div class="fc-rows">'+pend.map(pendRow).join("")+'</div>'):'';
+  if(settledHtml||pendHtml){
     el.style.display="";
     el.innerHTML='<div class="fc-h">'+(EN?"GRABIT track record · open log":"Grabits facit · loggade setups")+'</div>'
-      +'<div class="fc-rows">'+allRows+'</div>'
-      +'<div class="to-disc">'+(EN?"Every setup is logged openly with its entry price. Aggregate stats appear once there's a meaningful sample."
-                                   :"Varje setup loggas öppet med sitt entry-pris. Sammanställd statistik visas när underlaget är tillräckligt stort.")+'</div>';
+      +settledHtml+pendHtml
+      +'<div class="to-disc">'+(EN?"Every setup is logged openly with its entry price. “vs S&P” shows how the pick did against the market over the same window — open positions aren't scored until 5 trading days have passed."
+                                   :"Varje setup loggas öppet med sitt entry-pris. ”vs S&P” visar hur picken gick mot marknaden över samma period — pågående positioner räknas inte förrän 5 handelsdagar har gått.")+'</div>';
   }else if(j.loggade_totalt>0){el.style.display="";
     el.innerHTML='<div class="fc-h">Grabits facit</div><div class="wl-empty">Varje börsdags setups loggas öppet ('+j.loggade_totalt+' loggade hittills).</div>';}
   else{el.style.display="none";}
@@ -3831,8 +3842,15 @@ html,body{overflow-x:clip}
 .fc-big{flex:1;text-align:center;background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:12px;padding:10px 6px;min-width:0}
 .fc-big b{display:block;font-size:19px}
 .fc-big i{font-style:normal;font-size:9px;color:var(--mut);letter-spacing:.07em;text-transform:uppercase}
-.fc-rows{margin-top:10px}
+.fc-rows{margin-top:8px}
 .fc-row{display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-top:1px solid var(--line);font-size:12.5px}
+.fc-l{min-width:0}
+.fc-r{display:flex;flex-direction:column;align-items:flex-end;gap:1px;flex:none;white-space:nowrap}
+.fc-alpha{font-size:10px;font-weight:700;letter-spacing:.01em}
+.fc-kvar{font-size:10px;color:var(--gold2);font-weight:700}
+.fc-sub{margin-top:14px;font-size:10.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--mut)}
+.fc-sub:first-of-type{margin-top:12px}
+.fc-alfaline{margin-top:9px;text-align:center;font-size:11.5px;font-weight:700;color:var(--gold2)}
 /* ===== Setup-kortens nivåer + score ===== */
 .pk-lvl{display:flex;gap:5px;font-size:10px;margin-top:7px;color:var(--mut);flex-wrap:wrap}
 .pk-lvl span{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:6px;padding:2px 6px;white-space:nowrap}

@@ -3639,20 +3639,103 @@ def _facit_now_prices(tickers):
     return px or _FACIT_NOW["px"]
 
 
+_SPX = {"ts": 0.0, "map": {}, "dates": [], "last": None}
+
+
+def _spx_daily():
+    """^GSPC dagliga stängningar (senaste ~90 dgr), cachat 30 min. {isodatum: close}."""
+    now = time.time()
+    if _SPX["map"] and now - _SPX["ts"] < 1800:
+        return _SPX
+    if yf is None:
+        return _SPX
+    try:
+        h = yf.Ticker("^GSPC").history(period="90d", auto_adjust=True)
+        if h is not None and not h.empty:
+            closes = h["Close"].dropna()
+            m = {}
+            for idx, v in closes.items():
+                try:
+                    m[str(idx.date())] = float(v)
+                except Exception:
+                    continue
+            if m:
+                dates = sorted(m.keys())
+                _SPX.update({"ts": now, "map": m, "dates": dates, "last": m[dates[-1]]})
+    except Exception as ex:
+        print("Facit: kunde inte hämta S&P-serie:", ex)
+    return _SPX
+
+
+def _spx_on_or_before(datum_str):
+    """S&P-stängning på eller närmast före angivet datum."""
+    spx = _spx_daily()
+    if not spx["dates"]:
+        return None
+    d = (datum_str or "")[:10]
+    prev = None
+    for iso in spx["dates"]:
+        if iso <= d:
+            prev = spx["map"][iso]
+        else:
+            break
+    return prev if prev is not None else spx["map"][spx["dates"][0]]
+
+
+def _add_trading_days(datum_str, n):
+    import datetime as _dt2
+    try:
+        d = _dt2.date.fromisoformat((datum_str or "")[:10])
+    except Exception:
+        return datum_str
+    added = 0
+    while added < n:
+        d += _dt2.timedelta(days=1)
+        if d.weekday() < 5:
+            added += 1
+    return d.isoformat()
+
+
+def _spx_return(from_date, to_date=None):
+    """S&P-avkastning i % mellan två datum (to=None → senaste stängning)."""
+    a = _spx_on_or_before(from_date)
+    b = _SPX["last"] if to_date is None else _spx_on_or_before(to_date)
+    if not a or not b:
+        return None
+    try:
+        return round((b - a) / a * 100, 2)
+    except Exception:
+        return None
+
+
 @app.get("/api/facit")
 def facit():
     rows = _facit_load()
     klara = [e for e in rows if "utfall_pct" in e]
     senaste = klara[-20:]
     n = len(senaste)
+    # Marknadsrelativ avkastning (alfa) — hur mycket picken slog S&P över samma
+    # fönster. En röd dag då hela marknaden faller ska inte se ut som en miss.
+    _spx_daily()
+    def _alpha_settled(e):
+        m = _spx_return(e.get("datum", ""), _add_trading_days(e.get("datum", ""), _FACIT_EVAL_TRADING))
+        if m is None or e.get("utfall_pct") is None:
+            return None, None
+        return m, round(e["utfall_pct"] - m, 2)
     if n:
         traffar = sum(1 for e in senaste if e.get("traff"))
         snitt = round(sum(e["utfall_pct"] for e in senaste) / n, 1)
         basta = max(senaste, key=lambda e: e["utfall_pct"])
+        alfas = [a for a in (_alpha_settled(e)[1] for e in senaste) if a is not None]
+        slog_mkt = sum(1 for a in alfas if a > 0)
         stats = {"antal": n, "traffar": traffar,
                  "traffprocent": round(traffar / n * 100),
                  "snitt_pct": snitt,
                  "basta": {"ticker": basta["ticker"], "pct": basta["utfall_pct"]}}
+        if alfas:
+            stats["snitt_alfa"] = round(sum(alfas) / len(alfas), 1)
+            stats["slog_mkt"] = slog_mkt
+            stats["slog_mkt_antal"] = len(alfas)
     else:
         stats = {"antal": 0}
     # Loggade men ännu ej utvärderade picks — visas så kortet aldrig står tomt.
@@ -3677,7 +3760,18 @@ def facit():
             p["nu_pct"] = round((np - float(p["pris"])) / float(p["pris"]) * 100, 2) if (np and p.get("pris")) else None
         except Exception:
             p["nu_pct"] = None
-    return {"stats": stats, "rader": list(reversed(senaste[-8:])),
+        # Marknadsrörelse sen loggning + alfa (rörelse mot S&P hittills).
+        mkt = _spx_return(p.get("datum", ""))
+        p["mkt_pct"] = mkt
+        p["alfa_nu"] = round(p["nu_pct"] - mkt, 2) if (mkt is not None and p.get("nu_pct") is not None) else None
+    rader = []
+    for e in reversed(senaste[-8:]):
+        mkt, alfa = _alpha_settled(e)
+        rader.append({"datum": e.get("datum", ""), "roll": e.get("roll", ""),
+                      "ticker": e.get("ticker", ""), "pris": e.get("pris"),
+                      "slutpris": e.get("slutpris"), "utfall_pct": e.get("utfall_pct"),
+                      "traff": e.get("traff"), "mkt_pct": mkt, "alfa": alfa})
+    return {"stats": stats, "rader": rader,
             "pending": pending, "loggade_totalt": len(rows)}
 
 
