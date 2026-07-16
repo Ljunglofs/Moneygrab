@@ -61,6 +61,9 @@ class Config:
     # #3 Partial + break-even: säkra halva vid +PARTIAL_R, flytta stop till BE,
     #    låt resten löpa mot TARGETS_R[0]. 0 = av (gammalt rent 2R-utfall).
     PARTIAL_R        = float(os.environ.get("ROBBER_PARTIAL_R", "1.0"))
+    # #4 Trendlinje-entries: studs på stigande stöd / fallande motstånd + brott
+    #    igenom linjen. Ger en confluence-poäng och höjer confidence.
+    USE_TRENDLINE    = os.environ.get("ROBBER_TRENDLINE", "1") != "0"
 
     # --- Risk ---
     # Bredare stop: ORB vid öppningen behöver luft — för tight SL stoppade ut
@@ -96,6 +99,7 @@ class Config:
         "vwap":      10,   # VWAP Bounce -- institutionellt snitt försvarat
         "pullback":  12,   # Trend Pullback -- rekyl till EMA20 i stark trend
         "failbreak": 10,   # Failed Breakout -- fakeout som handlas åt motsatt håll
+        "trendline": 13,   # Trendlinje -- studs på stöd/motstånd eller brott igenom
     }
     CONF_GREEN    = int(os.environ.get("CONF_GREEN",  "75"))   # gron A+ (stark konfluens)
     CONF_YELLOW   = int(os.environ.get("CONF_YELLOW", "55"))   # gul / bevaka
@@ -474,11 +478,26 @@ def build_signal(ticker, df, bias):
     long_s, long_r   = score_long(cur, prev, bias)
     short_s, short_r = score_short(cur, prev, bias)
 
+    # #4 Trendlinje-entry som confluence-poäng (studs på stöd/motstånd eller
+    #    brott igenom). Kan lyfta ett läge över triggern — det är hela poängen.
+    tl_kind = None
+    if Config.USE_TRENDLINE:
+        _tl, _lvl, _k = detect_trendline(df, "LONG")
+        if _tl:
+            long_s += 1; long_r = long_r + ["Trendlinje %s @ %s" % (_k, _lvl)]
+            if long_s >= short_s:
+                tl_kind = _k
+        _tl, _lvl, _k = detect_trendline(df, "SHORT")
+        if _tl:
+            short_s += 1; short_r = short_r + ["Trendlinje %s @ %s" % (_k, _lvl)]
+            if short_s > long_s:
+                tl_kind = _k
+
     side = None
     if long_s >= cur_min_score() and long_s >= short_s:
-        side, score, reasons = "LONG", long_s, long_r
+        side, score, reasons = "LONG", min(long_s, 7), long_r
     elif short_s >= cur_min_score() and short_s > long_s:
-        side, score, reasons = "SHORT", short_s, short_r
+        side, score, reasons = "SHORT", min(short_s, 7), short_r
     else:
         return None
 
@@ -532,6 +551,7 @@ def build_signal(ticker, df, bias):
         "price": price, "atr": round(atr, 2), "stop": stop,
         "risk_per_share": round(risk, 2), "targets": targets, "tp_labels": tp_labels,
         "shares": shares, "bias": bias, "reasons": reasons,
+        "tl_kind": tl_kind,
         "bar_time": df.index[-1].isoformat(),
     }
 
@@ -738,6 +758,73 @@ def detect_pullback(df, side, lookback=6):
     return False, None
 
 
+def _fit_line(xs, ys):
+    m, b = np.polyfit(np.asarray(xs, float), np.asarray(ys, float), 1)
+    return float(m), float(b)
+
+
+def detect_trendline(df, side, lookback=40, min_touches=2):
+    """Trendlinje-entry. Drar en linje genom de senaste swing-lågpunkterna
+    (stöd) resp. swing-högpunkterna (motstånd) och letar två saker:
+      · STUDS:  priset rekylerar TILL linjen och studsar (fortsättning i trend).
+      · BROTT:  priset stänger IGENOM linjen åt handelshållet (breakout).
+    LONG  = studs på stigande stöd  ELLER brott upp genom fallande motstånd.
+    SHORT = studs mot fallande motstånd ELLER brott ner genom stigande stöd.
+    Returnerar (bool, nivå, kind) där kind = 'studs' | 'brott'."""
+    H = df["High"].to_numpy(); L = df["Low"].to_numpy(); C = df["Close"].to_numpy()
+    n = len(C)
+    if n < 12:
+        return False, None, None
+    atr = float(df["atr"].iloc[-1]) if "atr" in df.columns else 0.0
+    if atr <= 0:
+        atr = float(np.nanmean(H[-20:] - L[-20:])) or 1.0
+    band = 0.4 * atr
+    tol = 0.1 * atr
+    sh, sl = _swings(H, L, k=2)
+    lo = max(0, n - lookback)
+
+    def line_from(idxs, arr):
+        pts = [i for i in idxs if lo <= i <= n - 3]
+        if len(pts) < min_touches:
+            return None
+        pts = pts[-3:] if len(pts) >= 3 else pts[-2:]
+        if pts[-1] - pts[0] < 3:                       # linjen måste spänna över tid
+            return None
+        m, b = _fit_line(pts, [arr[i] for i in pts])
+        resid = max(abs(arr[i] - (m * i + b)) for i in pts)
+        if resid > 0.6 * atr:                          # punkterna måste ligga på linjen
+            return None
+        return m, b
+
+    if side == "LONG":
+        r = line_from(sl, L)                           # stigande stöd → studs
+        if r:
+            m, b = r
+            lv = m * (n - 1) + b
+            if m >= -tol and L[-1] <= lv + band and C[-1] > lv and C[-1] >= C[-2]:
+                return True, round(lv, 2), "studs"
+        r = line_from(sh, H)                            # fallande motstånd → brott upp
+        if r:
+            m, b = r
+            lv, lvp = m * (n - 1) + b, m * (n - 2) + b
+            if m <= tol and C[-2] <= lvp + band and C[-1] > lv + 0.1 * atr:
+                return True, round(lv, 2), "brott"
+    else:
+        r = line_from(sh, H)                            # fallande motstånd → studs (reject)
+        if r:
+            m, b = r
+            lv = m * (n - 1) + b
+            if m <= tol and H[-1] >= lv - band and C[-1] < lv and C[-1] <= C[-2]:
+                return True, round(lv, 2), "studs"
+        r = line_from(sl, L)                            # stigande stöd → brott ner
+        if r:
+            m, b = r
+            lv, lvp = m * (n - 1) + b, m * (n - 2) + b
+            if m >= -tol and C[-2] >= lvp - band and C[-1] < lv - 0.1 * atr:
+                return True, round(lv, 2), "brott"
+    return False, None, None
+
+
 def detect_failed_breakout(df, side, lookback=24):
     """Failed Breakout: nivå bryts men håller inte -> pris tillbaka i rangen,
     handla åt motsatt håll (stop hunt / fakeout). LONG = misslyckad breakdown
@@ -815,6 +902,7 @@ def compute_confidence(df, bias, side):
     vwapb, vwap_lvl = detect_vwap_bounce(df, side)
     pull,  pull_lvl = detect_pullback(df, side)
     failb, failb_lvl = detect_failed_breakout(df, side)
+    tl, tl_lvl, tl_kind = (detect_trendline(df, side) if Config.USE_TRENDLINE else (False, None, None))
     W = Config.CONF_WEIGHTS
     conf = (W["trend"] * trend_frac
             + (W["sweep"]     if sweep   else 0)
@@ -827,13 +915,14 @@ def compute_confidence(df, bias, side):
             + (W.get("retest", 0)    if retest else 0)
             + (W.get("vwap", 0)      if vwapb  else 0)
             + (W.get("pullback", 0)  if pull   else 0)
-            + (W.get("failbreak", 0) if failb  else 0))
+            + (W.get("failbreak", 0) if failb  else 0)
+            + (W.get("trendline", 0) if tl     else 0))
     conf = max(0, min(100, int(round(conf))))
     groups = {
         "Trend": trend_frac >= 0.5, "Liquidity Sweep": bool(sweep), "BOS": bos, "CHoCH": choch,
         "FVG": bool(fvg), "Order Block": bool(ob), "Retest": bool(retest),
         "VWAP-studs": bool(vwapb), "Trend-pullback": bool(pull), "Failed breakout": bool(failb),
-        "Volym": vol, "Orderflow": flow_ok,
+        "Trendlinje": bool(tl), "Volym": vol, "Orderflow": flow_ok,
     }
     comps = {
         "trend_frac": round(trend_frac, 2), "htf": htf, "ema": ema, "mom": mom,
@@ -844,6 +933,7 @@ def compute_confidence(df, bias, side):
         "vwap_bounce": bool(vwapb), "vwap_lvl": vwap_lvl,
         "pullback": bool(pull), "pullback_lvl": pull_lvl,
         "failed_breakout": bool(failb), "failbreak_lvl": failb_lvl,
+        "trendline": bool(tl), "trendline_lvl": tl_lvl, "trendline_kind": tl_kind,
     }
     return conf, comps, groups
 
