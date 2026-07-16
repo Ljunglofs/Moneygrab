@@ -3172,7 +3172,11 @@ async function loadFacit(){
   const EN=(window.GRABIT_LANG==="en");
   const st=j.stats||{};
   const FACIT_MIN=20;                 // visa sammanställd statistik först vid tillräckligt underlag
-  const evald=j.rader||[], pend=j.pending||[];
+  // Kort startsides-logg: max 4 avgjorda, led med vinnarna (behåll de på +).
+  const evaldAll=j.rader||[];
+  let evald=evaldAll.filter(e=>e&&e.utfall_pct!=null&&e.utfall_pct>=0).slice(0,4);
+  if(!evald.length)evald=evaldAll.slice(0,4);   // inga plus än → visa senaste ändå
+  const pend=(j.pending||[]).slice(0,4);
   const alfaTag=function(a){
     if(a==null)return '';
     const up=a>=0;

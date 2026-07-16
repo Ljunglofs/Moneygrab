@@ -55,14 +55,20 @@ class Config:
     # --- Edge-filter (lärdomar från live: 14% träff, -17R på 29 trades) ---
     # #1 Handla bara MED 1h-bias — ingen counter-trend (blockera long i SHORT-bias osv).
     REQUIRE_BIAS     = os.environ.get("ROBBER_REQUIRE_BIAS", "1") != "0"
-    # #2 Tämja NY-öppningen: skippa första X min efter 15:30 (fakeout-fönstret).
-    NYOPEN_DELAY_MIN = int(os.environ.get("ROBBER_NYOPEN_DELAY_MIN", "15"))
+    # #2 NY-open cooldown AV som standard — ORB vid öppningen är en bra setup.
+    #    (Sätt ROBBER_NYOPEN_DELAY_MIN=15 om öppningen börjar chippa igen.)
+    NYOPEN_DELAY_MIN = int(os.environ.get("ROBBER_NYOPEN_DELAY_MIN", "0"))
     # #3 Partial + break-even: säkra halva vid +PARTIAL_R, flytta stop till BE,
     #    låt resten löpa mot TARGETS_R[0]. 0 = av (gammalt rent 2R-utfall).
     PARTIAL_R        = float(os.environ.get("ROBBER_PARTIAL_R", "1.0"))
 
     # --- Risk ---
-    ATR_STOP_MULT  = 1.3          # stop = swing-buffert eller ATR*mult (tightast vinner ej, säkrast)
+    # Bredare stop: ORB vid öppningen behöver luft — för tight SL stoppade ut
+    # trades som sen gick rätt. Golv (MIN_STOP_ATR) hindrar att en tight range
+    # ger en mikroskopisk stop.
+    ATR_STOP_MULT  = float(os.environ.get("ROBBER_ATR_STOP_MULT", "1.8"))   # tak för stop-avstånd
+    SWING_BUF_ATR  = float(os.environ.get("ROBBER_SWING_BUF_ATR", "0.5"))   # buffert under/över swing (var 0.25)
+    MIN_STOP_ATR   = float(os.environ.get("ROBBER_MIN_STOP_ATR", "1.0"))    # golv: aldrig tightare än detta
     TARGETS_R      = [2.0, 2.67]  # TP1 ~2R, TP2 ~2.67R  (≈300/400 kr vid 150 kr risk)
     # Nivå-medvetna TP: snäpp R-målet till närmaste logiska nivå (PDH/PDL, runda tal)
     SNAP_TP    = os.environ.get("SNAP_TP", "1") == "1"
@@ -493,16 +499,24 @@ def build_signal(ticker, df, bias):
     # Risk: stop = swing-extrem (senaste 5 barer) buffrad med 0.25*ATR,
     # men aldrig längre bort än ATR*mult.
     lookback = df.iloc[-6:-1]
+    buf = Config.SWING_BUF_ATR * atr
+    min_dist = Config.MIN_STOP_ATR * atr        # golv för stop-avstånd
     if side == "LONG":
-        swing = float(lookback.Low.min()) - 0.25 * atr
+        swing = float(lookback.Low.min()) - buf
         atr_stop = price - atr * Config.ATR_STOP_MULT
-        stop = round(max(swing, atr_stop), 2)
+        stop = max(swing, atr_stop)
+        if price - stop < min_dist:             # för nära → tvinga minsta avstånd
+            stop = price - min_dist
+        stop = round(stop, 2)
         risk = price - stop
         targets = [round(price + risk * r, 2) for r in Config.TARGETS_R]
     else:
-        swing = float(lookback.High.max()) + 0.25 * atr
+        swing = float(lookback.High.max()) + buf
         atr_stop = price + atr * Config.ATR_STOP_MULT
-        stop = round(min(swing, atr_stop), 2)
+        stop = min(swing, atr_stop)
+        if stop - price < min_dist:
+            stop = price + min_dist
+        stop = round(stop, 2)
         risk = stop - price
         targets = [round(price - risk * r, 2) for r in Config.TARGETS_R]
 
