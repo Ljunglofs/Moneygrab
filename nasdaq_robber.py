@@ -52,6 +52,15 @@ class Config:
     MIN_REL_VOLUME = 1.2          # volym mot 20-snitt
     MIN_ATR_PCT    = 0.0008       # filtrera bort död chop (ATR/pris)
 
+    # --- Edge-filter (lärdomar från live: 14% träff, -17R på 29 trades) ---
+    # #1 Handla bara MED 1h-bias — ingen counter-trend (blockera long i SHORT-bias osv).
+    REQUIRE_BIAS     = os.environ.get("ROBBER_REQUIRE_BIAS", "1") != "0"
+    # #2 Tämja NY-öppningen: skippa första X min efter 15:30 (fakeout-fönstret).
+    NYOPEN_DELAY_MIN = int(os.environ.get("ROBBER_NYOPEN_DELAY_MIN", "15"))
+    # #3 Partial + break-even: säkra halva vid +PARTIAL_R, flytta stop till BE,
+    #    låt resten löpa mot TARGETS_R[0]. 0 = av (gammalt rent 2R-utfall).
+    PARTIAL_R        = float(os.environ.get("ROBBER_PARTIAL_R", "1.0"))
+
     # --- Risk ---
     ATR_STOP_MULT  = 1.3          # stop = swing-buffert eller ATR*mult (tightast vinner ej, säkrast)
     TARGETS_R      = [2.0, 2.67]  # TP1 ~2R, TP2 ~2.67R  (≈300/400 kr vid 150 kr risk)
@@ -442,6 +451,20 @@ def build_signal(ticker, df, bias):
     if atr_pct < Config.MIN_ATR_PCT:
         return None  # för död marknad
 
+    # #2 Tämja NY-open: hoppa över första minuterna efter 15:30 (fakeout-fönstret
+    #    där -11R av -17R kom ifrån). Låt öppningsvolatiliteten flusha först.
+    if Config.NYOPEN_DELAY_MIN > 0:
+        try:
+            from zoneinfo import ZoneInfo
+            _n = datetime.now(ZoneInfo(Config.LOCAL_TZ))
+            _cur = _n.hour * 60 + _n.minute
+            if 930 <= _cur < 930 + Config.NYOPEN_DELAY_MIN:   # 930 = 15:30 svensk tid
+                STATUS["blocked_last"] = "%s %s: NY-open cooldown (%d min)" % (
+                    _n.strftime("%H:%M"), ticker, Config.NYOPEN_DELAY_MIN)
+                return None
+        except Exception:
+            pass
+
     long_s, long_r   = score_long(cur, prev, bias)
     short_s, short_r = score_short(cur, prev, bias)
 
@@ -451,6 +474,13 @@ def build_signal(ticker, df, bias):
     elif short_s >= cur_min_score() and short_s > long_s:
         side, score, reasons = "SHORT", short_s, short_r
     else:
+        return None
+
+    # #1 Trend-gate: handla inte MOT 1h-bias (i en bearish tape blir longs slakt).
+    if Config.REQUIRE_BIAS and bias in ("LONG", "SHORT") and side != bias:
+        STATUS["blocked_last"] = "%s %s %s: counter-trend mot 1h-bias (%s)" % (
+            datetime.now(timezone.utc).strftime("%H:%M"), side, ticker, bias)
+        print("[guard] %s %s: counter-trend mot bias %s" % (side, ticker, bias))
         return None
 
     block = _entry_guards(ticker, side, df, price, atr)
@@ -1009,18 +1039,45 @@ def open_trade(sig, sent):
 
 
 def _eval_trade(t, df, r1):
-    """(outcome, R, tid) eller (None,None,None) om fortfarande öppen. SL först vid krock."""
+    """(outcome, R, tid) eller (None,None,None) om fortfarande öppen. SL först vid krock.
+
+    Med Config.PARTIAL_R > 0 modelleras aktiv förvaltning: säkra halva vid +PARTIAL_R
+    och flytta stop till break-even, låt resten löpa mot tp1 (TARGETS_R[0]).
+      · SL före partial            -> -1.0R
+      · partial, sen BE på resten  -> +0.5*PARTIAL_R   (outcome "BE")
+      · partial, sen tp1 på resten -> 0.5*PARTIAL_R + 0.5*r1  (outcome "TP")
+    Utan PARTIAL_R = gammalt beteende (rent tp1 vs SL)."""
     side, sl, tp1 = t["side"], t["sl"], t["targets"][0]
+    entry = float(t["entry"])
+    risk = abs(entry - float(sl)) or 1e-9
+    pr = Config.PARTIAL_R
+    partial_px = (entry + pr * risk) if side == "LONG" else (entry - pr * risk)
     try:
         after = df[df.index > pd.Timestamp(t["bar_time"])]
     except Exception:
         after = df.iloc[0:0]
+    partial_done = False
     for ts, row in after.iterrows():
         hi, lo = float(row["High"]), float(row["Low"])
-        sl_hit = (lo <= sl) if side == "LONG" else (hi >= sl)
         tp_hit = (hi >= tp1) if side == "LONG" else (lo <= tp1)
+        if pr > 0 and partial_done:
+            # Halva säkrad vid +PARTIAL_R, stop nu på break-even (entry).
+            be_hit = (lo <= entry) if side == "LONG" else (hi >= entry)
+            if be_hit:
+                return "BE", round(0.5 * pr, 2), ts
+            if tp_hit:
+                return "TP", round(0.5 * pr + 0.5 * float(r1), 2), ts
+            continue
+        sl_hit = (lo <= sl) if side == "LONG" else (hi >= sl)
         if sl_hit:
             return "SL", -1.0, ts
+        if pr > 0:
+            partial_hit = (hi >= partial_px) if side == "LONG" else (lo <= partial_px)
+            if partial_hit:
+                partial_done = True
+                if tp_hit:                       # nådde både partial och tp1 i samma bar
+                    return "TP", round(0.5 * pr + 0.5 * float(r1), 2), ts
+                continue
         if tp_hit:
             return "TP1", round(float(r1), 2), ts
     try:
@@ -1028,8 +1085,13 @@ def _eval_trade(t, df, r1):
     except Exception:
         age_h = 0.0
     if age_h > Config.TRADE_MAX_HRS and len(df):
-        last = float(df["Close"].iloc[-1]); risk = abs(t["entry"] - t["sl"]) or 1e-9
-        r = (last - t["entry"]) / risk if side == "LONG" else (t["entry"] - last) / risk
+        last = float(df["Close"].iloc[-1])
+        rr = (last - entry) / risk if side == "LONG" else (entry - last) / risk
+        if pr > 0 and partial_done:
+            # Halva säkrad; resten kan inte förlora (stop på BE) — golv 0.
+            r = 0.5 * pr + 0.5 * max(0.0, rr)
+        else:
+            r = rr
         return "timeout", round(r, 2), df.index[-1]
     return None, None, None
 
@@ -1065,8 +1127,10 @@ def _summarize(rows):
     n = len(rows)
     if not n:
         return None
-    wins = sum(1 for r in rows if r.get("outcome") == "TP1")
-    losses = sum(1 for r in rows if r.get("outcome") == "SL")
+    # Vinst/förlust efter realiserad R (partial+BE gör att en trade kan sluta
+    # på +0.5R = vinst, inte bara "träff = TP1"). Scratch (0R) räknas som varken.
+    wins = sum(1 for r in rows if float(r.get("r") or 0) > 0)
+    losses = sum(1 for r in rows if float(r.get("r") or 0) < 0)
     tos = sum(1 for r in rows if r.get("outcome") == "timeout")
     decided = wins + losses
     totR = sum(float(r.get("r") or 0) for r in rows)
@@ -1220,8 +1284,15 @@ def format_alert(sig):
         f"Risk/Reward: {rrtxt}",
         f"Plan: risk {Config.RISK_PER_TRADE_KR} kr  \u00b7  TP-mål "
         + " / ".join(f"~{int(round(Config.RISK_PER_TRADE_KR*r))} kr" for r in Config.TARGETS_R),
-        # Aktiv förvaltning (Zennbot-stil): säkra + flytta till break-even vid TP1,
-        # låt vinnaren löpa mot TP2 med trailing. Ingen revenge, ingen chansning.
+        # Aktiv förvaltning: säkra halva vid +PARTIAL_R och flytta stop till
+        # break-even; låt resten löpa mot målen. Ingen revenge, ingen chansning.
+        (("⚙️ Förvaltning: vid <b>+%gR</b> (%.2f) → säkra halva & flytta SL till break-even (%s); låt resten löpa mot <b>TP1/TP2</b> "
+          % (Config.PARTIAL_R,
+             (sig['price'] + Config.PARTIAL_R * sig['risk_per_share']) if sig["side"] == "LONG"
+             else (sig['price'] - Config.PARTIAL_R * sig['risk_per_share']),
+             sig['price']))
+         + ("med trailing under senaste swing." if sig["side"] == "LONG" else "med trailing över senaste swing."))
+        if Config.PARTIAL_R > 0 else
         ("⚙️ Förvaltning: vid <b>TP1</b> → säkra halva & flytta SL till "
          f"break-even ({sig['price']}); låt resten löpa mot <b>TP2</b> med trailing "
          + ("under senaste swing." if sig["side"] == "LONG" else "över senaste swing.")),
@@ -1327,7 +1398,8 @@ def scan_once():
             mtf = add_indicators(mtf)
             for _c in settle_trades(ticker, mtf):
                 if Config.NOTIFY_CLOSE and _c.get("sent"):
-                    _e = "\u2705" if _c["outcome"] == "TP1" else ("\u274c" if _c["outcome"] == "SL" else "\u23F1")
+                    _rv = float(_c.get("r") or 0)
+                    _e = "\u2705" if _rv > 0 else ("\u274c" if _rv < 0 else "\u23F1")
                     send_telegram(f"{_e} <b>{Config.NAMES.get(ticker, ticker)} {_c['side']}</b> st\u00e4ngd: "
                                   f"{_c['outcome']} ({_c['r']:+.2f}R) \u00b7 entry {_c['entry']}")
             bias = htf_bias(htf)
