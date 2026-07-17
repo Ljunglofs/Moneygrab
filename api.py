@@ -982,6 +982,17 @@ def _amount_pretty(a: str) -> str:
     return a or ""
 
 
+def _amount_mid(a: str) -> float:
+    """Numeriskt mittvärde ur ett belopp/intervall ('$1,001 - $15,000' -> 8000)."""
+    import re as _re
+    nums = [int(n.replace(",", "")) for n in _re.findall(r"[\d,]+", a or "")]
+    if len(nums) >= 2:
+        return (nums[0] + nums[1]) / 2.0
+    if nums:
+        return float(nums[0])
+    return 0.0
+
+
 def _days_ago(mmddyyyy: str):
     import datetime as _d
     for fmt in ("%m/%d/%Y", "%Y-%m-%d"):
@@ -1041,6 +1052,7 @@ def _congress_flow():
                 "chamber": chamber, "party": (t.get("party") or "").strip(),
                 "ticker": tk, "name": (t.get("assetDescription") or tk).strip(),
                 "action": action, "amount": _amount_pretty(t.get("amount", "")),
+                "usd_num": _amount_mid(t.get("amount", "")),
                 "days_ago": da, "url": t.get("link") or ""}
 
     for path, chamber in (("/api/v4/senate-trading-rss-feed", "SENATE"),
@@ -1087,7 +1099,7 @@ def _fh_insider_flow(ticker):
             "kind": "insider", "person": (t.get("name") or "").strip(),
             "role": "INSIDER", "chamber": "", "party": "",
             "ticker": ticker, "name": ticker, "action": action,
-            "amount": amt, "days_ago": da, "url": "",
+            "amount": amt, "usd_num": round(usd), "days_ago": da, "url": "",
         })
     _FH_CACHE[k] = items
     return items
@@ -1144,9 +1156,30 @@ def insider_flow(limit: int = 50, token: str = ""):
     except Exception:
         is_pro = False
     total = len(items)
+    # Aggregat (säkert att visa gratis — summering, inte de PRO-låsta raderna):
+    # köp vs sälj i antal + USD, samt en kumulativ sparkline-serie per sida.
+    def _cum(lst, n=16):
+        xs = sorted(lst, key=lambda x: -(x.get("days_ago") or 0))   # äldst först
+        tot, pts = 0.0, []
+        for x in xs:
+            tot += float(x.get("usd_num") or 0) or 1.0
+            pts.append(tot)
+        if not pts:
+            return []
+        if len(pts) <= n:
+            return [round(p, 2) for p in pts]
+        step = len(pts) / float(n)
+        return [round(pts[min(len(pts) - 1, int(i * step))], 2) for i in range(n)]
+    buys = [it for it in items if it["action"] == "KÖP"]
+    sells = [it for it in items if it["action"] == "SÄLJ"]
+    agg = {"buys": len(buys), "sells": len(sells),
+           "buy_usd": round(sum(float(x.get("usd_num") or 0) for x in buys)),
+           "sell_usd": round(sum(float(x.get("usd_num") or 0) for x in sells)),
+           "buy_series": _cum(buys), "sell_series": _cum(sells)}
     free_n = int(os.getenv("PRO_FREE_ITEMS", "3"))
     shown = items[:limit] if is_pro else items[:free_n]
-    return {"items": shown, "locked": (not is_pro), "total": total,
+    shown = [{k: v for k, v in it.items() if k != "usd_num"} for it in shown]
+    return {"items": shown, "locked": (not is_pro), "total": total, "agg": agg,
             "confluence_tickers": (sorted(conf_tk) if is_pro else []),
             "has_congress": bool(os.getenv("FMP_API_KEY", "")),
             "has_insider": bool(os.getenv("FINNHUB_API_KEY", "")),
