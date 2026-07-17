@@ -46,7 +46,7 @@ class Config:
     # är borttaget — det användes inte längre och gav vilseledande varningar.
 
     # --- Confluence thresholds ---
-    MIN_SCORE      = int(os.environ.get("ROBBER_MIN_SCORE", "5"))  # av 7; sänk t.ex. till 4 via env för fler larm
+    MIN_SCORE      = int(os.environ.get("ROBBER_MIN_SCORE", "6"))  # 6 av 7 krävs; sänk via env för fler larm
     RSI_LONG_LOW, RSI_LONG_HIGH   = 50, 82   # tak höjt: stark RSI i en pump = momentum, inte svaghet
     RSI_SHORT_LOW, RSI_SHORT_HIGH = 18, 50   # golv sänkt: stark nedmomentum räknas
     MIN_REL_VOLUME = 1.2          # volym mot 20-snitt
@@ -162,7 +162,7 @@ except Exception as _e:
 #   defensiv   -> choppigt/osäkert: bara A+-lägen (högre trösklar)
 _MODE_PRESETS = {
     "aggressiv": {"min_score": 4, "conf_min_send": 50, "min_rel_volume": 1.10},
-    "normal":    {"min_score": 5, "conf_min_send": 55, "min_rel_volume": 1.20},
+    "normal":    {"min_score": 6, "conf_min_send": 55, "min_rel_volume": 1.20},
     "defensiv":  {"min_score": 6, "conf_min_send": 66, "min_rel_volume": 1.40},
 }
 _MODE_ALIASES = {"aggressive": "aggressiv", "agg": "aggressiv", "bull": "aggressiv",
