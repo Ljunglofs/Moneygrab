@@ -1750,7 +1750,44 @@ def _macro_events():
     if _MACRO_LAST_GOOD["events"] and now_ts - _MACRO_LAST_GOOD["ts"] < 7200:
         return _MACRO_LAST_GOOD["events"]
     raw, errs = None, []
-    for url in _MACRO_URLS:
+    # 1) FMP economic calendar — stabil primärkälla (tillåter server-IP med nyckel).
+    fmp_key = os.getenv("FMP_API_KEY", "")
+    if fmp_key:
+        try:
+            today = _dt.date.today()
+            r = requests.get("https://financialmodelingprep.com/api/v3/economic_calendar",
+                             params={"from": today.isoformat(),
+                                     "to": (today + _dt.timedelta(days=8)).isoformat(),
+                                     "apikey": fmp_key}, timeout=12)
+            if r.status_code == 200:
+                cmap = {"US": "USD", "USA": "USD", "UNITED STATES": "USD",
+                        "EA": "EUR", "EMU": "EUR", "EURO ZONE": "EUR", "EUROZONE": "EUR",
+                        "EURO AREA": "EUR", "GERMANY": "EUR", "DE": "EUR", "FRANCE": "EUR",
+                        "FR": "EUR", "ITALY": "EUR", "IT": "EUR", "SPAIN": "EUR", "ES": "EUR",
+                        "GB": "GBP", "UK": "GBP", "UNITED KINGDOM": "GBP",
+                        "JP": "JPY", "JAPAN": "JPY", "CH": "CHF", "SWITZERLAND": "CHF",
+                        "CA": "CAD", "CANADA": "CAD", "AU": "AUD", "AUSTRALIA": "AUD",
+                        "NZ": "NZD", "NEW ZEALAND": "NZD", "CN": "CNY", "CHINA": "CNY",
+                        "SE": "SEK", "SWEDEN": "SEK"}
+                fmp_raw = []
+                for x in (r.json() or []):
+                    cc = cmap.get((x.get("country") or "").strip().upper())
+                    if not cc:
+                        continue                       # bara de stora ekonomierna
+                    fmp_raw.append({"title": x.get("event", ""), "country": cc,
+                                    "date": (x.get("date") or "").replace(" ", "T"),
+                                    "impact": str(x.get("impact") or "").title() or "Low",
+                                    "forecast": x.get("estimate", ""),
+                                    "previous": x.get("previous", "")})
+                if fmp_raw:
+                    raw = fmp_raw
+                    _MACRO_LAST_GOOD["src"] = "fmp"
+            else:
+                errs.append("fmp -> HTTP %s" % r.status_code)
+        except Exception as e:
+            errs.append("fmp -> %s" % type(e).__name__)
+    # 2) ForexFactory-feeden (om FMP saknas/failar)
+    for url in ([] if raw is not None else _MACRO_URLS):
         for _forsok in range(2):                      # 2 försök per host
             try:
                 r = requests.get(url, headers=_MACRO_HEADERS, timeout=12)
