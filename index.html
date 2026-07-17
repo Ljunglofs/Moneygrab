@@ -309,6 +309,69 @@ main{padding:16px 16px 110px}
 .macro-ttl{font-size:12px;color:#cdd5e1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .macro-cc{font-size:10px;color:var(--mut);flex-shrink:0}
 .macro-vals{display:flex;flex-direction:column;align-items:flex-end;font-size:10px;color:var(--mut);flex-shrink:0}
+/* ===== Kalender & bevakning — premium-paneler ===== */
+.evt-panel{border-radius:18px;padding:14px 14px 12px;margin-bottom:12px;position:relative;overflow:hidden}
+.evt-panel.gold{border:1px solid rgba(245,197,66,.4);background:radial-gradient(120% 130% at 0% 0%,rgba(245,197,66,.09),#070a0e 62%);box-shadow:0 0 24px -12px rgba(245,197,66,.5),inset 0 0 26px -20px rgba(245,197,66,.5)}
+.evt-panel.blue{border:1px solid rgba(56,189,248,.42);background:radial-gradient(120% 130% at 0% 0%,rgba(56,189,248,.09),#060a0e 62%);box-shadow:0 0 24px -12px rgba(56,189,248,.5),inset 0 0 26px -20px rgba(56,189,248,.5)}
+.evt-top{display:flex;align-items:center;gap:11px;margin-bottom:12px}
+.evt-hex{position:relative;flex:none;width:44px;height:44px;display:flex;align-items:center;justify-content:center}
+.evt-hex .hexbg{position:absolute;inset:0;width:100%;height:100%}
+.evt-hex .hex-ic{position:relative;display:flex}
+.evt-hex .hex-ic svg{width:20px;height:20px}
+.evt-panel.gold .evt-hex{color:var(--gold2);filter:drop-shadow(0 0 6px rgba(245,197,66,.5))}
+.evt-panel.blue .evt-hex{color:#38bdf8;filter:drop-shadow(0 0 6px rgba(56,189,248,.5))}
+.evt-htx{flex:1;min-width:0}
+.evt-ttl{font-family:var(--disp);font-weight:800;font-size:14px;letter-spacing:.03em;line-height:1.1}
+.evt-panel.gold .evt-ttl{color:var(--gold2)}
+.evt-panel.blue .evt-ttl{color:#7dd3fc}
+.evt-sub{font-size:11px;color:var(--mut);margin-top:2px}
+.evt-pill{flex:none;display:inline-flex;align-items:center;gap:5px;font-size:8.5px;font-weight:900;letter-spacing:.06em;padding:5px 9px;border-radius:8px;white-space:nowrap}
+.evt-pill svg{width:11px;height:11px}
+.evt-panel.gold .evt-pill{color:var(--gold2);border:1px solid rgba(245,197,66,.45);background:rgba(245,197,66,.08)}
+.evt-panel.blue .evt-pill{color:#7dd3fc;border:1px solid rgba(56,189,248,.45);background:rgba(56,189,248,.08)}
+.evt-pill i{width:6px;height:6px;border-radius:50%;background:#38bdf8;box-shadow:0 0 7px #38bdf8;animation:liveblink 1.05s steps(1,end) infinite}
+.evt-rows{display:flex;flex-direction:column;gap:8px}
+.evt-empty{padding:16px 6px;text-align:center;color:var(--mut);font-size:12.5px}
+.mev{display:flex;gap:11px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-radius:12px;padding:10px 11px}
+.mev-dt{flex:none;width:50px;display:flex;flex-direction:column;justify-content:center;border-right:1px solid rgba(255,255,255,.08);padding-right:9px}
+.mev-dt b{font-size:11px;font-weight:800;color:#e8edf5;letter-spacing:.02em}
+.mev-dt span{font-size:10px;color:var(--mut);margin-top:1px}
+.mev-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px;justify-content:center}
+.mev-top{display:flex;align-items:center;gap:7px;min-width:0}
+.mev-flag{flex:none;font-size:14px}
+.mev-nm{font-size:12.5px;font-weight:700;color:#dbe2ea;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mev-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.mev-imp{font-size:8.5px;font-weight:900;letter-spacing:.05em;padding:2px 6px;border-radius:5px}
+.mev-imp.high{color:#ff6b6b;background:rgba(255,75,75,.13);border:1px solid rgba(255,75,75,.35)}
+.mev-imp.med{color:var(--gold2);background:rgba(245,197,66,.12);border:1px solid rgba(245,197,66,.32)}
+.mev-v{font-size:10.5px;color:var(--mut)}
+.mev-v b{color:#e8edf5;font-weight:700;margin-left:3px}
+.fev{display:flex;gap:10px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-radius:12px;padding:10px 11px;text-decoration:none;color:inherit}
+.fev-dt{flex:none;width:46px;display:flex;flex-direction:column;justify-content:center}
+.fev-dt b{font-size:10.5px;font-weight:800;color:#e8edf5}
+.fev-dt span{font-size:9.5px;color:var(--mut);margin-top:1px}
+.fev-logo{flex:none;align-self:flex-start;margin-top:1px}
+.fev-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.fev-tk{font-size:12px}
+.fev-tk b{color:#7dd3fc;font-weight:800}
+.fev-tk span{color:var(--mut);font-weight:600;margin-left:5px;font-size:11px}
+.fev-hl{font-size:12.5px;line-height:1.4;color:#dbe2ea}
+.fev-meta{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:1px}
+.fev-cat{font-size:8.5px;font-weight:900;letter-spacing:.04em;padding:2px 7px;border-radius:5px;border:1px solid}
+.fev-cat.approved{color:#4ade80;border-color:rgba(74,222,128,.4);background:rgba(74,222,128,.1)}
+.fev-cat.nda{color:#7dd3fc;border-color:rgba(56,189,248,.4);background:rgba(56,189,248,.1)}
+.fev-cat.phase{color:#a78bfa;border-color:rgba(167,139,250,.4);background:rgba(167,139,250,.1)}
+.fev-cat.reg{color:#c4b5fd;border-color:rgba(196,181,253,.35);background:rgba(196,181,253,.08)}
+.fev-cat.crl{color:#ff6b6b;border-color:rgba(255,75,75,.4);background:rgba(255,75,75,.1)}
+.fev-imp{display:inline-flex;align-items:center;gap:4px;font-size:8.5px;font-weight:900;letter-spacing:.05em}
+.fev-imp.high{color:#ff6b6b}.fev-imp.med{color:var(--gold2)}
+.fev-imp .dots{display:inline-flex;gap:2px}
+.fev-imp .dots i{width:5px;height:5px;border-radius:50%;background:currentColor}
+.evt-ai{display:flex;align-items:center;gap:9px;margin-top:10px;padding:11px 12px;border-radius:12px;border:1px solid rgba(56,189,248,.28);background:linear-gradient(100deg,rgba(56,189,248,.08),rgba(255,255,255,.01));cursor:pointer}
+.evt-ai .eai-ic{color:#7dd3fc;display:flex}.evt-ai .eai-ic svg{width:17px;height:17px}
+.evt-ai .eai-tx{flex:1;font-size:12.5px;font-weight:700;color:#cdd5e1}
+.evt-ai .eai-tx b{color:#7dd3fc}
+.evt-ai .eai-go{color:#7dd3fc;font-weight:800;font-size:17px}
 .tempg{padding:13px 12px;display:flex;flex-direction:column;align-items:center;justify-content:center}
 .tempg .tg-l{font-size:9.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--mut)}
 .tempg .tg-s{font-size:13px;font-weight:900;margin-top:2px}
@@ -1263,8 +1326,8 @@ else _i18nBoot();
     <div class="evrow" id="events"></div>
     <div class="card facitcard" id="facitcard" style="display:none"></div>
     <div class="sect"><h2>Kalender &amp; bevakning</h2></div>
-    <div class="card macrocal" id="macrocal"></div>
-    <div class="card macrocal" id="fdacal" style="display:none"></div>
+    <div id="macrocal"></div>
+    <div id="fdacal" style="display:none"></div>
     <div class="sect"><h2>10 hetaste just nu</h2><a onclick="go('marknad')">Mer</a></div>
     <div class="card" id="hetaste"></div>
     <div class="sect"><h2>Snabbval</h2></div>
@@ -2985,18 +3048,46 @@ if(typeof openStock==="function"){
   const _origOpenStock=openStock;
   window.openStock=function(tkr){_origOpenStock(tkr);try{loadStockAI(tkr);}catch(e){}try{loadStockChart(tkr);}catch(e){}};
 }
-/* ===== Makrokalender på Översikt ===== */
+/* ===== Kalender & bevakning på Översikt ===== */
+var _HEX_SVG='<svg class="hexbg" viewBox="0 0 100 100"><polygon points="50,3 93,26 93,74 50,97 7,74 7,26" fill="none" stroke="currentColor" stroke-width="4"/></svg>';
+function _hex(ic){return _HEX_SVG+'<span class="hex-ic">'+ic+'</span>';}
+var _IC_GLOBE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9.2"/><ellipse cx="12" cy="12" rx="4" ry="9.2"/><path d="M2.8 12h18.4"/><path d="M4.6 6.4h14.8M4.6 17.6h14.8"/></svg>';
+var _IC_DNA='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M8 3c0 4 8 5 8 9s-8 5-8 9"/><path d="M16 3c0 4-8 5-8 9s8 5 8 9"/><path d="M9 6h6M8.6 9h6.8M8.6 15h6.8M9 18h6"/></svg>';
+var _IC_BARS='<svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="13" width="4" height="8" rx="1"/><rect x="10" y="8" width="4" height="13" rx="1"/><rect x="17" y="3" width="4" height="18" rx="1"/></svg>';
+var _IC_SPARK='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.6 4.8L18 8l-4.4 1.2L12 14l-1.6-4.8L6 8l4.4-1.2z"/><circle cx="18.5" cy="16.5" r="1.8"/><circle cx="6" cy="17" r="1.3"/></svg>';
 function macroImpactColor(imp){
   if(imp==="High")return"var(--neg)";if(imp==="Medium")return"var(--gold2)";return"#7c8a9a";
 }
 function macroRows(rows){
+  var EN=(window.GRABIT_LANG==="en");
   return rows.slice(0,6).map(function(e){
-    return '<div class="macro-row"><div class="macro-dt">'+(e.date||"")+' '+(e.time||"")+'</div>'
-      +'<div class="macro-mid"><span class="macro-dot" style="background:'+macroImpactColor(e.impact)+'"></span>'
-      +'<span class="macro-ttl">'+String(e.title||"").replace(/</g,"&lt;")+'</span>'
-      +'<span class="macro-cc">'+(e.country||"")+'</span></div>'
-      +'<div class="macro-vals">'+(e.forecast?'<span>prog. '+e.forecast+'</span>':'')+(e.previous?'<span>fg. '+e.previous+'</span>':'')+'</div></div>';
+    var imp=(e.impact==="High")?"high":(e.impact==="Medium"?"med":"");
+    var impLbl=(e.impact==="High")?"HIGH IMPACT":(e.impact==="Medium"?"MEDIUM":"");
+    var impPill=imp?'<span class="mev-imp '+imp+'">'+impLbl+'</span>':'';
+    var est=e.forecast?'<span class="mev-v">'+(EN?"Est":"Prog")+'<b>'+String(e.forecast).replace(/</g,"&lt;")+'</b></span>':'';
+    var prev=e.previous?'<span class="mev-v">'+(EN?"Prev":"Föreg")+'<b>'+String(e.previous).replace(/</g,"&lt;")+'</b></span>':'';
+    return '<div class="mev"><div class="mev-dt"><b>'+String(e.date||"").toUpperCase()+'</b><span>'+(e.time||"")+'</span></div>'
+      +'<div class="mev-body"><div class="mev-top"><span class="mev-flag">'+(e.country||"")+'</span>'
+      +'<span class="mev-nm">'+String(e.title||"").replace(/</g,"&lt;")+'</span></div>'
+      +'<div class="mev-meta">'+impPill+est+prev+'</div></div></div>';
   }).join("");
+}
+function macroPanel(rows){
+  var EN=(window.GRABIT_LANG==="en");
+  var anyHigh=rows.some(function(e){return e.impact==="High";});
+  return '<div class="evt-panel gold"><div class="evt-top"><span class="evt-hex">'+_hex(_IC_GLOBE)+'</span>'
+    +'<div class="evt-htx"><div class="evt-ttl">'+(EN?"MACRO EVENTS · THIS WEEK":"MAKROHÄNDELSER · DENNA VECKA")+'</div>'
+    +'<div class="evt-sub">'+(EN?"Key economic events shaping the markets.":"Viktiga ekonomiska event för marknaden.")+'</div></div>'
+    +(anyHigh?'<span class="evt-pill">'+_IC_BARS+'HIGH IMPACT</span>':'')
+    +'</div><div class="evt-rows">'+macroRows(rows)+'</div></div>';
+}
+function fdaCat(rubrik){
+  var s=(rubrik||"").toLowerCase();
+  if(/crl|complete response|rejects?|failed|discontinu/.test(s))return["crl","CRL","high"];
+  if(/\bapprov|approved|clearance|510\(k\)/.test(s))return["approved","APPROVED","high"];
+  if(/nda accepted|accepts nda|\bnda\b|\bbla\b|priority review|pdufa|fast track|breakthrough/.test(s))return["nda","NDA ACCEPTED","high"];
+  if(/phase 3|phase iii|topline|pivotal/.test(s))return["phase","PHASE 3","med"];
+  return["reg","REGULATORY","med"];
 }
 var _FF_FLAG={USD:"🇺🇸",EUR:"🇪🇺",GBP:"🇬🇧",JPY:"🇯🇵",CHF:"🇨🇭",CAD:"🇨🇦",AUD:"🇦🇺",NZD:"🇳🇿",CNY:"🇨🇳",SEK:"🇸🇪"};
 async function macroDirect(){
@@ -3046,12 +3137,15 @@ async function loadMacro(){
     }catch(e){}
   }
   el.style.display="";
+  var EN=(window.GRABIT_LANG==="en");
   if(!rows.length){
-    el.innerHTML='<div class="ai-h"><span class="dot2"></span>Makrohändelser · denna vecka</div>'
-      +'<div class="macro-row"><div class="macro-mid"><span class="macro-ttl" style="color:#7c8a9a">Kalendern kunde inte hämtas just nu — försöker igen automatiskt.</span></div></div>';
+    el.innerHTML='<div class="evt-panel gold"><div class="evt-top"><span class="evt-hex">'+_hex(_IC_GLOBE)+'</span>'
+      +'<div class="evt-htx"><div class="evt-ttl">'+(EN?"MACRO EVENTS · THIS WEEK":"MAKROHÄNDELSER · DENNA VECKA")+'</div>'
+      +'<div class="evt-sub">'+(EN?"Key economic events shaping the markets.":"Viktiga ekonomiska event för marknaden.")+'</div></div></div>'
+      +'<div class="evt-empty">'+(EN?"Calendar couldn't load right now — retrying automatically.":"Kalendern kunde inte hämtas just nu — försöker igen automatiskt.")+'</div></div>';
     return;
   }
-  el.innerHTML='<div class="ai-h"><span class="dot2"></span>Makrohändelser · denna vecka</div>'+macroRows(rows);
+  el.innerHTML=macroPanel(rows);
 }
 function renderTopMovers(){
   const el=document.getElementById("topmovers");if(!el)return;
@@ -3086,13 +3180,32 @@ async function loadFda(){
   try{const r=await fetch(B+"/api/fda",{cache:"no-store"});const j=await r.json();rows=(j&&j.news)||[];}catch(e){}
   if(!rows.length){el.style.display="none";return;}
   el.style.display="";
-  el.innerHTML='<div class="ai-h"><span class="dot2"></span>FDA-bevakning · Biotech</div>'+rows.slice(0,6).map(function(n){
-    var t='<div class="macro-row"><div class="macro-dt">'+String(n.tid||"").slice(5,16)+'</div>'
-      +'<div class="macro-mid"><span class="macro-dot" style="background:#22d3ee"></span>'
-      +'<span class="macro-ttl">'+(n.ticker?'<b style="color:var(--gold2)">'+n.ticker+'</b> · ':'')+String(n.rubrik||"").replace(/</g,"&lt;")+'</span></div>'
-      +'<div class="macro-vals"></div></div>';
-    return n.url?'<a href="'+n.url+'" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;display:block">'+t+'</a>':t;
+  var EN=(window.GRABIT_LANG==="en");
+  var body=rows.slice(0,6).map(function(n){
+    var c=fdaCat(n.rubrik);
+    var badge=(window.lic?lic(n.ticker||"?",30,"#7dd3fc"):"");
+    var nm=(window.NAMES&&NAMES[n.ticker])||"";
+    var tid=String(n.tid||""),dd="",tt="";
+    try{var dto=new Date(tid);if(!isNaN(dto.getTime())){dd=dto.toLocaleDateString(EN?"en-US":"sv-SE",{day:"2-digit",month:"short"}).toUpperCase();tt=dto.toLocaleTimeString("sv-SE",{hour:"2-digit",minute:"2-digit"});}}catch(e){}
+    if(!dd){dd=tid.slice(5,10);tt=tid.slice(11,16);}
+    var dots=(c[2]==="high")?'<i></i><i></i><i></i>':'<i></i><i></i>';
+    var impLbl=(c[2]==="high")?"HIGH":"MEDIUM";
+    var inner='<div class="fev-dt"><b>'+dd+'</b><span>'+tt+'</span></div>'
+      +'<span class="fev-logo">'+badge+'</span>'
+      +'<div class="fev-body"><div class="fev-tk"><b>'+(n.ticker||"")+'</b>'+(nm?'<span>'+String(nm).replace(/</g,"&lt;")+'</span>':'')+'</div>'
+      +'<div class="fev-hl">'+String(n.rubrik||"").replace(/</g,"&lt;")+'</div>'
+      +'<div class="fev-meta"><span class="fev-cat '+c[0]+'">'+c[1]+'</span>'
+      +'<span class="fev-imp '+c[2]+'">'+impLbl+'<span class="dots">'+dots+'</span></span></div></div>';
+    return n.url?'<a class="fev" href="'+encodeURI(n.url)+'" target="_blank" rel="noopener">'+inner+'</a>':'<div class="fev">'+inner+'</div>';
   }).join("");
+  el.innerHTML='<div class="evt-panel blue"><div class="evt-top"><span class="evt-hex">'+_hex(_IC_DNA)+'</span>'
+    +'<div class="evt-htx"><div class="evt-ttl">'+(EN?"FDA WATCH · BIOTECH":"FDA-BEVAKNING · BIOTECH")+'</div>'
+    +'<div class="evt-sub">'+(EN?"Real-time FDA news & biotech catalysts.":"FDA-nyheter & biotech-katalysatorer.")+'</div></div>'
+    +'<span class="evt-pill"><i></i>LIVE FEED</span></div>'
+    +'<div class="evt-rows">'+body+'</div>'
+    +'<div class="evt-ai" onclick="openAI()"><span class="eai-ic">'+_IC_SPARK+'</span>'
+    +'<span class="eai-tx"><b>'+(EN?"AI summary":"AI-sammanfattning")+'</b> — '+(EN?"key insights in seconds":"nyckelinsikter på sekunder")+'</span>'
+    +'<span class="eai-go">&#8250;</span></div></div>';
 }
 async function loadTrump(){
   const el=document.getElementById("trumpbar");if(!el)return;
