@@ -1179,10 +1179,14 @@ def insider_flow(limit: int = 50, token: str = ""):
     free_n = int(os.getenv("PRO_FREE_ITEMS", "3"))
     shown = items[:limit] if is_pro else items[:free_n]
     shown = [{k: v for k, v in it.items() if k != "usd_num"} for it in shown]
+    # Faktisk data-närvaro (inte bara "nyckel finns") — så frontend kan dölja
+    # tomma flikar. FMP:s senat-data ligger ofta bakom betalplan = tomt flöde.
+    has_pol = any(it.get("kind") == "politiker" for it in items)
     return {"items": shown, "locked": (not is_pro), "total": total, "agg": agg,
             "confluence_tickers": (sorted(conf_tk) if is_pro else []),
             "has_congress": bool(os.getenv("FMP_API_KEY", "")),
             "has_insider": bool(os.getenv("FINNHUB_API_KEY", "")),
+            "has_pol": has_pol, "has_conf": bool(conf_tk),
             "updated": int(_time.time())}
 
 

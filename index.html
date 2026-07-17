@@ -3604,14 +3604,22 @@ function _iflowLockedCard(i){
 function renderInsiderFlow(){
   var box=document.getElementById("feed2");if(!box)return;
   var J=window.__IFLOW||{items:[]};var items=J.items||[];
+  // Visa bara flikar som faktiskt har data (politiker-flödet är tomt utan betald FMP-plan).
+  var showPol=(J.has_pol!==undefined)?J.has_pol:items.some(function(it){return it.kind==="politiker";});
+  var showConf=(J.has_conf!==undefined)?J.has_conf:items.some(function(it){return it.confluence;});
   var f=IFLOWFILTER;
+  if((f==="politiker"&&!showPol)||(f==="conf"&&!showConf)){f=IFLOWFILTER="allt";}
   var list=items.filter(function(it){
     if(f==="kop")return it.action==="KÖP";
     if(f==="politiker")return it.kind==="politiker";
     if(f==="insider")return it.kind==="insider";
     if(f==="conf")return it.confluence;
     return true;});
-  var chips=[["allt","Allt"],["kop","Köp"],["politiker","Politiker"],["insider","VD / Insider"],["conf","Confluence"]]
+  var chipDefs=[["allt","Allt"],["kop","Köp"]];
+  if(showPol)chipDefs.push(["politiker","Politiker"]);
+  chipDefs.push(["insider","VD / Insider"]);
+  if(showConf)chipDefs.push(["conf","Confluence"]);
+  var chips=chipDefs
     .map(function(c){return '<button class="if-chip'+(f===c[0]?' on':'')+'" onclick="setIflow(\''+c[0]+'\')">'+c[1]+'</button>';}).join("");
   var cards;
   var _locked=(J.locked===true)||(!isPro()&&J.locked!==false);
