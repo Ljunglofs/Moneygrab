@@ -3552,10 +3552,15 @@ async function loadInsiderBox(){
   if(!a)return;
   var EN=(window.GRABIT_LANG==="en");
   var fmtUsd=function(v){v=+v||0;if(v>=1e6)return "$"+(v/1e6).toFixed(v>=1e7?0:1).replace(/\.0$/,"")+"M";if(v>=1e3)return "$"+Math.round(v/1e3)+"K";return "$"+Math.round(v);};
+  // Per sida: visa USD om det finns, annars antal, annars ren "—" (aldrig "$0").
+  var sideVal=function(usd,cnt,kind){
+    if(usd>0)return fmtUsd(usd)+' <small>USD</small>';
+    if(cnt>0)return cnt+' <small>'+kind+'</small>';
+    return '<span style="color:var(--mut);font-weight:700;font-size:15px">—</span>';
+  };
   var bv=document.getElementById("if-buyval"),sv=document.getElementById("if-sellval");
-  var hasUsd=(a.buy_usd||a.sell_usd);
-  if(bv)bv.innerHTML=hasUsd?(fmtUsd(a.buy_usd)+' <small>USD</small>'):((a.buys||0)+' <small>'+(EN?"buys":"köp")+'</small>');
-  if(sv)sv.innerHTML=hasUsd?(fmtUsd(a.sell_usd)+' <small>USD</small>'):((a.sells||0)+' <small>'+(EN?"sells":"sälj")+'</small>');
+  if(bv)bv.innerHTML=sideVal(a.buy_usd,a.buys,EN?"buys":"köp");
+  if(sv)sv.innerHTML=sideVal(a.sell_usd,a.sells,EN?"sells":"sälj");
   var bs=document.getElementById("if-buyspark"),ss=document.getElementById("if-sellspark");
   if(bs)bs.innerHTML=(a.buy_series&&a.buy_series.length>1)?spark(a.buy_series,"#38bdf8"):"";
   if(ss)ss.innerHTML=(a.sell_series&&a.sell_series.length>1)?spark(a.sell_series,"#FF4B4B"):"";
