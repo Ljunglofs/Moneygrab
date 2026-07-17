@@ -338,7 +338,9 @@ main{padding:16px 16px 110px}
 .mev-dt span{font-size:10px;color:var(--mut);margin-top:1px}
 .mev-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px;justify-content:center}
 .mev-top{display:flex;align-items:center;gap:7px;min-width:0}
-.mev-flag{flex:none;font-size:14px}
+.mev-flag{flex:none;display:flex;align-items:center}
+.flg{width:19px;height:13px;border-radius:2.5px;display:block;box-shadow:0 0 0 1px rgba(255,255,255,.14)}
+.flg-chip{display:inline-flex;align-items:center;justify-content:center;min-width:19px;height:13px;padding:0 3px;border-radius:3px;font-size:8px;font-weight:900;color:var(--mut);background:rgba(255,255,255,.08)}
 .mev-nm{font-size:12.5px;font-weight:700;color:#dbe2ea;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mev-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .mev-imp{font-size:8.5px;font-weight:900;letter-spacing:.05em;padding:2px 6px;border-radius:5px}
@@ -350,7 +352,8 @@ main{padding:16px 16px 110px}
 .fev-dt{flex:none;width:46px;display:flex;flex-direction:column;justify-content:center}
 .fev-dt b{font-size:10.5px;font-weight:800;color:#e8edf5}
 .fev-dt span{font-size:9.5px;color:var(--mut);margin-top:1px}
-.fev-logo{flex:none;align-self:flex-start;margin-top:1px}
+.fev-logo{flex:none;align-self:flex-start;margin-top:1px;width:30px;height:30px;display:flex;align-items:center;justify-content:center}
+.fev-img{width:30px;height:30px;border-radius:8px;object-fit:contain;background:#fff;padding:2px;box-sizing:border-box}
 .fev-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
 .fev-tk{font-size:12px}
 .fev-tk b{color:#7dd3fc;font-weight:800}
@@ -3055,6 +3058,28 @@ var _IC_GLOBE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke
 var _IC_DNA='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M8 3c0 4 8 5 8 9s-8 5-8 9"/><path d="M16 3c0 4-8 5-8 9s8 5 8 9"/><path d="M9 6h6M8.6 9h6.8M8.6 15h6.8M9 18h6"/></svg>';
 var _IC_BARS='<svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="13" width="4" height="8" rx="1"/><rect x="10" y="8" width="4" height="13" rx="1"/><rect x="17" y="3" width="4" height="18" rx="1"/></svg>';
 var _IC_SPARK='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.6 4.8L18 8l-4.4 1.2L12 14l-1.6-4.8L6 8l4.4-1.2z"/><circle cx="18.5" cy="16.5" r="1.8"/><circle cx="6" cy="17" r="1.3"/></svg>';
+/* Kod-ritade SVG-flaggor (emoji-flaggor ser fula ut på Android) */
+var _FLAG_CODE={"🇺🇸":"US","🇪🇺":"EU","🇬🇧":"GB","🇯🇵":"JP","🇨🇭":"CH","🇨🇦":"CA","🇦🇺":"AU","🇳🇿":"NZ","🇨🇳":"CN","🇸🇪":"SE"};
+var _CUR_CODE={USD:"US",EUR:"EU",GBP:"GB",JPY:"JP",CHF:"CH",CAD:"CA",AUD:"AU",NZD:"NZ",CNY:"CN",SEK:"SE"};
+var _FLAGS={
+US:'<rect width="20" height="14" fill="#b22234"/><rect y="2" width="20" height="2" fill="#fff"/><rect y="6" width="20" height="2" fill="#fff"/><rect y="10" width="20" height="2" fill="#fff"/><rect width="9" height="8" fill="#3c3b6e"/>',
+EU:'<rect width="20" height="14" fill="#039"/><g fill="#fc0"><circle cx="10" cy="2.6" r="0.7"/><circle cx="13.1" cy="3.9" r="0.7"/><circle cx="14.4" cy="7" r="0.7"/><circle cx="13.1" cy="10.1" r="0.7"/><circle cx="10" cy="11.4" r="0.7"/><circle cx="6.9" cy="10.1" r="0.7"/><circle cx="5.6" cy="7" r="0.7"/><circle cx="6.9" cy="3.9" r="0.7"/></g>',
+GB:'<rect width="20" height="14" fill="#012169"/><path d="M0 0L20 14M20 0L0 14" stroke="#fff" stroke-width="3"/><path d="M0 0L20 14M20 0L0 14" stroke="#C8102E" stroke-width="1.3"/><rect x="8" width="4" height="14" fill="#fff"/><rect y="5" width="20" height="4" fill="#fff"/><rect x="8.8" width="2.4" height="14" fill="#C8102E"/><rect y="5.8" width="20" height="2.4" fill="#C8102E"/>',
+JP:'<rect width="20" height="14" fill="#fff"/><circle cx="10" cy="7" r="3.8" fill="#bc002d"/>',
+CH:'<rect width="20" height="14" fill="#d52b1e"/><rect x="8.6" y="3" width="2.8" height="8" fill="#fff"/><rect x="6" y="5.6" width="8" height="2.8" fill="#fff"/>',
+CA:'<rect width="20" height="14" fill="#fff"/><rect width="5" height="14" fill="#d52b1e"/><rect x="15" width="5" height="14" fill="#d52b1e"/><circle cx="10" cy="7" r="2.3" fill="#d52b1e"/>',
+SE:'<rect width="20" height="14" fill="#006aa7"/><rect x="6" width="2.6" height="14" fill="#fecc00"/><rect y="5.7" width="20" height="2.6" fill="#fecc00"/>',
+CN:'<rect width="20" height="14" fill="#de2910"/><circle cx="5" cy="4.3" r="1.9" fill="#ffde00"/>',
+AU:'<rect width="20" height="14" fill="#00247d"/><circle cx="4" cy="3.6" r="1" fill="#fff"/><circle cx="14" cy="9" r="0.8" fill="#fff"/><circle cx="16.6" cy="5" r="0.7" fill="#fff"/>',
+NZ:'<rect width="20" height="14" fill="#00247d"/><circle cx="14" cy="5" r="0.9" fill="#c8102e"/><circle cx="16.6" cy="8.6" r="0.9" fill="#c8102e"/><circle cx="13.4" cy="10" r="0.9" fill="#c8102e"/>'};
+function flagSvg(country){
+  var code=_FLAG_CODE[country]||_CUR_CODE[String(country||"").toUpperCase()]||"";
+  if(!code&&/^[A-Za-z]{2}$/.test(country||""))code=String(country).toUpperCase();
+  var body=_FLAGS[code];
+  if(body)return '<svg class="flg" viewBox="0 0 20 14">'+body+'</svg>';
+  var lbl=code||String(country||"").replace(/[^A-Za-z]/g,"").slice(0,2).toUpperCase();
+  return lbl?'<span class="flg-chip">'+lbl+'</span>':'';
+}
 function macroImpactColor(imp){
   if(imp==="High")return"var(--neg)";if(imp==="Medium")return"var(--gold2)";return"#7c8a9a";
 }
@@ -3067,7 +3092,7 @@ function macroRows(rows){
     var est=e.forecast?'<span class="mev-v">'+(EN?"Est":"Prog")+'<b>'+String(e.forecast).replace(/</g,"&lt;")+'</b></span>':'';
     var prev=e.previous?'<span class="mev-v">'+(EN?"Prev":"Föreg")+'<b>'+String(e.previous).replace(/</g,"&lt;")+'</b></span>':'';
     return '<div class="mev"><div class="mev-dt"><b>'+String(e.date||"").toUpperCase()+'</b><span>'+(e.time||"")+'</span></div>'
-      +'<div class="mev-body"><div class="mev-top"><span class="mev-flag">'+(e.country||"")+'</span>'
+      +'<div class="mev-body"><div class="mev-top"><span class="mev-flag">'+flagSvg(e.country)+'</span>'
       +'<span class="mev-nm">'+String(e.title||"").replace(/</g,"&lt;")+'</span></div>'
       +'<div class="mev-meta">'+impPill+est+prev+'</div></div></div>';
   }).join("");
@@ -3089,6 +3114,7 @@ function fdaCat(rubrik){
   if(/phase 3|phase iii|topline|pivotal/.test(s))return["phase","PHASE 3","med"];
   return["reg","REGULATORY","med"];
 }
+function fdaLogoFail(img){try{var s=img.parentNode;var tk=s.getAttribute("data-tk")||"?";s.innerHTML=(window.lic?lic(tk,30,"#7dd3fc"):tk);}catch(e){}}
 var _FF_FLAG={USD:"🇺🇸",EUR:"🇪🇺",GBP:"🇬🇧",JPY:"🇯🇵",CHF:"🇨🇭",CAD:"🇨🇦",AUD:"🇦🇺",NZD:"🇳🇿",CNY:"🇨🇳",SEK:"🇸🇪"};
 async function macroDirect(){
   /* Fallback: hämta ForexFactory-feeden i webbläsaren. Direktfetch stoppas ofta
@@ -3183,7 +3209,8 @@ async function loadFda(){
   var EN=(window.GRABIT_LANG==="en");
   var body=rows.slice(0,6).map(function(n){
     var c=fdaCat(n.rubrik);
-    var badge=(window.lic?lic(n.ticker||"?",30,"#7dd3fc"):"");
+    var tk=(n.ticker||"?");
+    var logo='<span class="fev-logo" data-tk="'+tk+'"><img class="fev-img" src="https://financialmodelingprep.com/image-stock/'+encodeURIComponent(tk)+'.png" alt="'+tk+'" loading="lazy" onerror="fdaLogoFail(this)"></span>';
     var nm=(window.NAMES&&NAMES[n.ticker])||"";
     var tid=String(n.tid||""),dd="",tt="";
     try{var dto=new Date(tid);if(!isNaN(dto.getTime())){dd=dto.toLocaleDateString(EN?"en-US":"sv-SE",{day:"2-digit",month:"short"}).toUpperCase();tt=dto.toLocaleTimeString("sv-SE",{hour:"2-digit",minute:"2-digit"});}}catch(e){}
@@ -3191,7 +3218,7 @@ async function loadFda(){
     var dots=(c[2]==="high")?'<i></i><i></i><i></i>':'<i></i><i></i>';
     var impLbl=(c[2]==="high")?"HIGH":"MEDIUM";
     var inner='<div class="fev-dt"><b>'+dd+'</b><span>'+tt+'</span></div>'
-      +'<span class="fev-logo">'+badge+'</span>'
+      +logo
       +'<div class="fev-body"><div class="fev-tk"><b>'+(n.ticker||"")+'</b>'+(nm?'<span>'+String(nm).replace(/</g,"&lt;")+'</span>':'')+'</div>'
       +'<div class="fev-hl">'+String(n.rubrik||"").replace(/</g,"&lt;")+'</div>'
       +'<div class="fev-meta"><span class="fev-cat '+c[0]+'">'+c[1]+'</span>'
@@ -3742,7 +3769,10 @@ function renderInsiderFlow(){
       ?(EN2?"The politician feed turns on when a free FMP key is connected. CEO / insider data is live in the meantime."
            :"Politiker-flödet tänds när en gratis FMP-nyckel kopplas. VD / insider-datan är live så länge.")
       :(EN2?"No matches in this category right now.":"Inga träffar i den här kategorin just nu.");
-    cards='<div class="if-empty"><div class="if-empty-ic">'+(_polEmpty?"🏛️":"📄")+'</div>'
+    var _emIc=_polEmpty
+      ?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M4 10h16"/><path d="M5 10V21M9 10V21M15 10V21M19 10V21"/><path d="M12 3l8 4H4z"/></svg>'
+      :'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h8l4 4v16H6z"/><path d="M14 2v4h4"/><path d="M9 12h6M9 16h6"/></svg>';
+    cards='<div class="if-empty"><div class="if-empty-ic">'+_emIc+'</div>'
       +'<div class="if-empty-tx">'+_msg+'</div>'
       +(_polEmpty?'<button class="if-empty-cta" onclick="setIflow(\'insider\')">'+(EN2?"Show CEO / Insider":"Visa VD / Insider")+'</button>':'')
       +'</div>';}
@@ -3819,7 +3849,8 @@ async function loadPolyInsiders(force){
 .if-note{background:rgba(245,197,66,.06);border:1px solid rgba(245,197,66,.18);border-radius:12px;padding:10px 13px;color:#d7c690;font-size:12.5px;margin-bottom:11px}
 .if-list{display:flex;flex-direction:column;gap:11px}
 .if-empty{display:flex;flex-direction:column;align-items:center;gap:11px;text-align:center;padding:32px 20px;border:1px solid rgba(245,197,66,.16);border-radius:16px;background:linear-gradient(150deg,rgba(245,197,66,.055),rgba(10,10,11,.28))}
-.if-empty-ic{font-size:26px;line-height:1;opacity:.92;filter:drop-shadow(0 0 10px rgba(245,197,66,.3))}
+.if-empty-ic{line-height:1;opacity:.92;color:var(--gold2);filter:drop-shadow(0 0 10px rgba(245,197,66,.3))}
+.if-empty-ic svg{width:27px;height:27px}
 .if-empty-tx{color:var(--mut,#8b97a3);font-size:13px;line-height:1.55;max-width:300px}
 .if-empty-cta{margin-top:1px;padding:9px 17px;border-radius:999px;border:1px solid rgba(245,197,66,.5);background:rgba(245,197,66,.1);color:var(--gold2);font-weight:800;font-size:12.5px;cursor:pointer}
 .if-empty-cta:active{transform:scale(.98)}
