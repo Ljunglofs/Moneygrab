@@ -3617,7 +3617,16 @@ function renderInsiderFlow(){
     .map(function(c){return '<button class="if-chip'+(f===c[0]?' on':'')+'" onclick="setIflow(\''+c[0]+'\')">'+c[1]+'</button>';}).join("");
   var cards;
   var _locked=(J.locked===true)||(!isPro()&&J.locked!==false);
-  if(!list.length&&!_locked){cards='<div class="sig-empty">Inga träffar i den här kategorin just nu.</div>';}
+  if(!list.length&&!_locked){var EN2=(window.GRABIT_LANG==="en");
+    var _polEmpty=((f==="politiker"||f==="conf")&&!J.has_congress);
+    var _msg=_polEmpty
+      ?(EN2?"The politician feed turns on when a free FMP key is connected. CEO / insider data is live in the meantime."
+           :"Politiker-flödet tänds när en gratis FMP-nyckel kopplas. VD / insider-datan är live så länge.")
+      :(EN2?"No matches in this category right now.":"Inga träffar i den här kategorin just nu.");
+    cards='<div class="if-empty"><div class="if-empty-ic">'+(_polEmpty?"🏛️":"📄")+'</div>'
+      +'<div class="if-empty-tx">'+_msg+'</div>'
+      +(_polEmpty?'<button class="if-empty-cta" onclick="setIflow(\'insider\')">'+(EN2?"Show CEO / Insider":"Visa VD / Insider")+'</button>':'')
+      +'</div>';}
   else if(_locked){var EN=(window.GRABIT_LANG==="en");
     var _shown=items.length;var _more=(J.total?(J.total-_shown):5);if(_more<1)_more=5;
     cards=list.map(_iflowCard).join("")
@@ -3690,6 +3699,11 @@ async function loadPolyInsiders(force){
 .if-chip.on{color:#0B0B0D;background:#F5C542;border-color:#F5C542}
 .if-note{background:rgba(245,197,66,.06);border:1px solid rgba(245,197,66,.18);border-radius:12px;padding:10px 13px;color:#d7c690;font-size:12.5px;margin-bottom:11px}
 .if-list{display:flex;flex-direction:column;gap:11px}
+.if-empty{display:flex;flex-direction:column;align-items:center;gap:11px;text-align:center;padding:32px 20px;border:1px solid rgba(245,197,66,.16);border-radius:16px;background:linear-gradient(150deg,rgba(245,197,66,.055),rgba(10,10,11,.28))}
+.if-empty-ic{font-size:26px;line-height:1;opacity:.92;filter:drop-shadow(0 0 10px rgba(245,197,66,.3))}
+.if-empty-tx{color:var(--mut,#8b97a3);font-size:13px;line-height:1.55;max-width:300px}
+.if-empty-cta{margin-top:1px;padding:9px 17px;border-radius:999px;border:1px solid rgba(245,197,66,.5);background:rgba(245,197,66,.1);color:var(--gold2);font-weight:800;font-size:12.5px;cursor:pointer}
+.if-empty-cta:active{transform:scale(.98)}
 .if-card{background:#0C0C0D;border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:14px 15px;cursor:pointer}
 .if-card.conf{border-color:rgba(245,197,66,.55);background:linear-gradient(150deg,rgba(245,197,66,.07),#0A0A0B)}
 .if-conf{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:800;letter-spacing:.06em;color:var(--gold2);margin-bottom:10px;padding-bottom:9px;border-bottom:1px solid rgba(245,197,66,.18)}
