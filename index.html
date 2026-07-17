@@ -311,15 +311,19 @@ main{padding:16px 16px 110px}
 .macro-vals{display:flex;flex-direction:column;align-items:flex-end;font-size:10px;color:var(--mut);flex-shrink:0}
 /* ===== Kalender & bevakning — premium-paneler ===== */
 .evt-panel{border-radius:18px;padding:14px 14px 12px;margin-bottom:12px;position:relative;overflow:hidden}
-.evt-panel.gold{border:1px solid rgba(245,197,66,.4);background:radial-gradient(120% 130% at 0% 0%,rgba(245,197,66,.09),#070a0e 62%);box-shadow:0 0 24px -12px rgba(245,197,66,.5),inset 0 0 26px -20px rgba(245,197,66,.5)}
-.evt-panel.blue{border:1px solid rgba(56,189,248,.42);background:radial-gradient(120% 130% at 0% 0%,rgba(56,189,248,.09),#060a0e 62%);box-shadow:0 0 24px -12px rgba(56,189,248,.5),inset 0 0 26px -20px rgba(56,189,248,.5)}
+.evt-panel.gold{border:1px solid rgba(245,197,66,.5);background:radial-gradient(130% 140% at 0% 0%,rgba(245,197,66,.13),#080b0f 60%);box-shadow:0 0 36px -10px rgba(245,197,66,.6),inset 0 0 32px -18px rgba(245,197,66,.6),inset 0 1px 0 rgba(245,197,66,.25)}
+.evt-panel.blue{border:1px solid rgba(56,189,248,.5);background:radial-gradient(130% 140% at 0% 0%,rgba(56,189,248,.13),#060a0e 60%);box-shadow:0 0 36px -10px rgba(56,189,248,.6),inset 0 0 32px -18px rgba(56,189,248,.6),inset 0 1px 0 rgba(56,189,248,.25)}
+.evt-deco{position:absolute;top:6px;right:0;width:158px;height:100px;opacity:.22;pointer-events:none;z-index:0}
+.evt-panel.gold .evt-deco{color:var(--gold2)}
+.evt-panel.blue .evt-deco{color:#38bdf8}
+.evt-panel>.evt-top,.evt-panel>.evt-rows,.evt-panel>.evt-ai,.evt-panel>.evt-empty{position:relative;z-index:1}
 .evt-top{display:flex;align-items:center;gap:11px;margin-bottom:12px}
 .evt-hex{position:relative;flex:none;width:44px;height:44px;display:flex;align-items:center;justify-content:center}
 .evt-hex .hexbg{position:absolute;inset:0;width:100%;height:100%}
 .evt-hex .hex-ic{position:relative;display:flex}
 .evt-hex .hex-ic svg{width:20px;height:20px}
-.evt-panel.gold .evt-hex{color:var(--gold2);filter:drop-shadow(0 0 6px rgba(245,197,66,.5))}
-.evt-panel.blue .evt-hex{color:#38bdf8;filter:drop-shadow(0 0 6px rgba(56,189,248,.5))}
+.evt-panel.gold .evt-hex{color:var(--gold2);filter:drop-shadow(0 0 9px rgba(245,197,66,.7))}
+.evt-panel.blue .evt-hex{color:#38bdf8;filter:drop-shadow(0 0 9px rgba(56,189,248,.75))}
 .evt-htx{flex:1;min-width:0}
 .evt-ttl{font-family:var(--disp);font-weight:800;font-size:14px;letter-spacing:.03em;line-height:1.1}
 .evt-panel.gold .evt-ttl{color:var(--gold2)}
@@ -3052,7 +3056,8 @@ if(typeof openStock==="function"){
   window.openStock=function(tkr){_origOpenStock(tkr);try{loadStockAI(tkr);}catch(e){}try{loadStockChart(tkr);}catch(e){}};
 }
 /* ===== Kalender & bevakning på Översikt ===== */
-var _HEX_SVG='<svg class="hexbg" viewBox="0 0 100 100"><polygon points="50,3 93,26 93,74 50,97 7,74 7,26" fill="none" stroke="currentColor" stroke-width="4"/></svg>';
+var _HEX_SVG='<svg class="hexbg" viewBox="0 0 100 100"><polygon points="50,3 93,26 93,74 50,97 7,74 7,26" fill="currentColor" fill-opacity=".09"/><polygon points="50,3 93,26 93,74 50,97 7,74 7,26" fill="none" stroke="currentColor" stroke-width="4"/><polygon points="50,13 84,31 84,69 50,87 16,69 16,31" fill="none" stroke="currentColor" stroke-width="1.4" stroke-opacity=".4"/></svg>';
+var _EVT_DECO='<svg class="evt-deco" viewBox="0 0 170 110" fill="none" preserveAspectRatio="xMaxYMin meet"><g stroke="currentColor" stroke-width="1"><path d="M170 14 H124 L114 24 H80"/><path d="M170 40 H140 L132 32"/><path d="M170 64 H104 L96 56 H74"/><path d="M170 88 H132 L124 96"/></g><g fill="currentColor"><circle cx="80" cy="24" r="2.2"/><circle cx="74" cy="56" r="2.2"/><circle cx="132" cy="32" r="1.6"/><circle cx="124" cy="96" r="1.6"/></g></svg>';
 function _hex(ic){return _HEX_SVG+'<span class="hex-ic">'+ic+'</span>';}
 var _IC_GLOBE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9.2"/><ellipse cx="12" cy="12" rx="4" ry="9.2"/><path d="M2.8 12h18.4"/><path d="M4.6 6.4h14.8M4.6 17.6h14.8"/></svg>';
 var _IC_DNA='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M8 3c0 4 8 5 8 9s-8 5-8 9"/><path d="M16 3c0 4-8 5-8 9s8 5 8 9"/><path d="M9 6h6M8.6 9h6.8M8.6 15h6.8M9 18h6"/></svg>';
@@ -3100,7 +3105,7 @@ function macroRows(rows){
 function macroPanel(rows){
   var EN=(window.GRABIT_LANG==="en");
   var anyHigh=rows.some(function(e){return e.impact==="High";});
-  return '<div class="evt-panel gold"><div class="evt-top"><span class="evt-hex">'+_hex(_IC_GLOBE)+'</span>'
+  return '<div class="evt-panel gold">'+_EVT_DECO+'<div class="evt-top"><span class="evt-hex">'+_hex(_IC_GLOBE)+'</span>'
     +'<div class="evt-htx"><div class="evt-ttl">'+(EN?"MACRO EVENTS · THIS WEEK":"MAKROHÄNDELSER · DENNA VECKA")+'</div>'
     +'<div class="evt-sub">'+(EN?"Key economic events shaping the markets.":"Viktiga ekonomiska event för marknaden.")+'</div></div>'
     +(anyHigh?'<span class="evt-pill">'+_IC_BARS+'HIGH IMPACT</span>':'')
@@ -3165,7 +3170,7 @@ async function loadMacro(){
   el.style.display="";
   var EN=(window.GRABIT_LANG==="en");
   if(!rows.length){
-    el.innerHTML='<div class="evt-panel gold"><div class="evt-top"><span class="evt-hex">'+_hex(_IC_GLOBE)+'</span>'
+    el.innerHTML='<div class="evt-panel gold">'+_EVT_DECO+'<div class="evt-top"><span class="evt-hex">'+_hex(_IC_GLOBE)+'</span>'
       +'<div class="evt-htx"><div class="evt-ttl">'+(EN?"MACRO EVENTS · THIS WEEK":"MAKROHÄNDELSER · DENNA VECKA")+'</div>'
       +'<div class="evt-sub">'+(EN?"Key economic events shaping the markets.":"Viktiga ekonomiska event för marknaden.")+'</div></div></div>'
       +'<div class="evt-empty">'+(EN?"Calendar couldn't load right now — retrying automatically.":"Kalendern kunde inte hämtas just nu — försöker igen automatiskt.")+'</div></div>';
@@ -3225,7 +3230,7 @@ async function loadFda(){
       +'<span class="fev-imp '+c[2]+'">'+impLbl+'<span class="dots">'+dots+'</span></span></div></div>';
     return n.url?'<a class="fev" href="'+encodeURI(n.url)+'" target="_blank" rel="noopener">'+inner+'</a>':'<div class="fev">'+inner+'</div>';
   }).join("");
-  el.innerHTML='<div class="evt-panel blue"><div class="evt-top"><span class="evt-hex">'+_hex(_IC_DNA)+'</span>'
+  el.innerHTML='<div class="evt-panel blue">'+_EVT_DECO+'<div class="evt-top"><span class="evt-hex">'+_hex(_IC_DNA)+'</span>'
     +'<div class="evt-htx"><div class="evt-ttl">'+(EN?"FDA WATCH · BIOTECH":"FDA-BEVAKNING · BIOTECH")+'</div>'
     +'<div class="evt-sub">'+(EN?"Real-time FDA news & biotech catalysts.":"FDA-nyheter & biotech-katalysatorer.")+'</div></div>'
     +'<span class="evt-pill"><i></i>LIVE FEED</span></div>'

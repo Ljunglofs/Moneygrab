@@ -954,7 +954,7 @@ def _fh_insider_buys(ticker):
 #  House-flödet är nedlagt (S3 403) -> valfritt via FMP_API_KEY senare.
 # ============================================================
 import time as _time
-_IFLOW_CACHE = {"congress": (0.0, []), "corp": (0.0, [])}
+_IFLOW_CACHE = {"congress": (0.0, []), "corp": (0.0, []), "fmpins": (0.0, [])}
 # Politiker-data: FMP:s gratisnivå (nyckel = env FMP_API_KEY, gratis signup).
 # Täcker BÅDE senaten och representanthuset (Pelosi m.fl.) med FÄRSK data.
 # De nyckelfria community-flödena (S3/GitHub) är nedlagda/inaktuella.
@@ -1134,12 +1134,71 @@ def unlock(code: str = ""):
     return {"ok": bool(c) and c in codes}
 
 
+def _fmp_insider_flow():
+    """Marknadsbred insider-trading (Form 4) via FMP — fångar KÖP över hela
+    marknaden (bolagsinsiders i din curated-lista säljer nästan bara). Cachas 6h."""
+    now = _time.time()
+    ts, data = _IFLOW_CACHE.get("fmpins", (0.0, []))
+    if data and now - ts < 21600:
+        return data
+    if not os.getenv("FMP_API_KEY", ""):
+        return []
+    out = []
+    for page in (0, 1):
+        j = _fmp("/api/v4/insider-trading-rss-feed", {"page": page})
+        if not isinstance(j, list) or not j:
+            break
+        for t in j:
+            tt = (t.get("transactionType") or "").upper()
+            if tt.startswith("P"):
+                action = "KÖP"
+            elif tt.startswith("S"):
+                action = "SÄLJ"
+            else:
+                continue
+            tk = (t.get("symbol") or "").strip().upper()
+            if not tk:
+                continue
+            da = _days_ago((t.get("transactionDate") or "")[:10])
+            if da is None or da < 0 or da > 120:
+                continue
+            try:
+                shares = float(t.get("securitiesTransacted") or 0)
+                price = float(t.get("price") or 0)
+            except Exception:
+                shares = price = 0.0
+            usd = shares * price
+            if action == "KÖP" and usd and usd < 25000:
+                continue                       # filtrera bort mikroköp (brus)
+            amt = (("$%.1fM" % (usd / 1e6)).replace(".0M", "M") if usd >= 1e6
+                   else (("$%dK" % round(usd / 1000)) if usd >= 1000
+                         else (("$%d" % int(usd)) if usd else "")))
+            out.append({"kind": "insider", "person": (t.get("reportingName") or "").strip(),
+                        "role": "INSIDER", "chamber": "", "party": "", "ticker": tk,
+                        "name": tk, "action": action, "amount": amt,
+                        "usd_num": round(usd), "days_ago": da, "url": t.get("link") or ""})
+    out.sort(key=lambda x: (x["action"] != "KÖP", x["days_ago"]))   # köp först, sen nyast
+    out = out[:60]
+    if out:
+        _IFLOW_CACHE["fmpins"] = (now, out)
+    return out
+
+
 @app.get("/api/insider_flow")
 def insider_flow(limit: int = 50, token: str = ""):
     """Enat 'smart money'-flöde: senatorer (gratis) + VD/insider (Finnhub).
     Confluence = samma ticker köps av BÅDE politiker och bolagsinsider (senaste 120 d)."""
     pol = _congress_flow()
-    corp = _corp_flow()
+    # Curated bolagsinsider (Finnhub) + marknadsbred insider-feed (FMP, ger köpen).
+    corp_raw = _corp_flow() + _fmp_insider_flow()
+    seen_c, corp = set(), []
+    for it in corp_raw:
+        k = (it.get("ticker"), it.get("person", ""), it.get("action"), it.get("days_ago"))
+        if k in seen_c:
+            continue
+        seen_c.add(k)
+        corp.append(it)
+    corp.sort(key=lambda x: (x.get("action") != "KÖP", x.get("days_ago", 999)))
     # Confluence: tickers med KÖP i båda flödena (politiker + bolagsinsider)
     pol_buy = {x["ticker"] for x in pol if x["action"] == "KÖP"}
     corp_buy = {x["ticker"] for x in corp if x["action"] == "KÖP"}
