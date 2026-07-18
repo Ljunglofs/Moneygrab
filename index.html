@@ -3453,9 +3453,9 @@ function renderMostBullish(){
       +'<div class="tmv-r"><b class="num" style="color:'+col+'">+'+r.chg+'%</b>'+(r.px!=null?'<i class="num">'+fmtPx(r.px)+'</i>':'')+'</div></div>';
   };
   var rows;
-  if(isPro()||src.length<=4){rows=src.map(_row).join("");}
-  else{rows=src.slice(0,4).map(_row).join("")
-    +'<div class="pro-gated" data-lock="'+(src.length-4)+(EN?" more":" fler")+'">'+src.slice(4).map(_row).join("")+'</div>';}
+  if(isPro()||src.length<=3){rows=src.map(_row).join("");}
+  else{rows=src.slice(0,3).map(_row).join("")
+    +'<div class="pro-gated" data-lock="'+(src.length-3)+(EN?" more":" fler")+'">'+src.slice(3).map(_row).join("")+'</div>';}
   el.style.display="";
   el.innerHTML='<div class="tmv-h"><span>'+(EN?"Most bullish":"Most bullish")+'</span>'
     +'<span class="tmv-sub">'+(EN?"5 trading days \u00B7 \u22655%":"5 handelsdagar \u00B7 \u22655%")+'</span></div>'+rows
