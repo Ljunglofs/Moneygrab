@@ -1707,9 +1707,53 @@ def news():
 
 
 # ----- KOMMANDE RAPPORTER (riktiga earnings-datum via yfinance) ------
+def _fmt_rev(v):
+    try:
+        v = float(v)
+    except Exception:
+        return ""
+    if v >= 1e9:
+        return ("$%.2fB" % (v / 1e9)).replace(".00B", "B")
+    if v >= 1e6:
+        return ("$%.1fM" % (v / 1e6)).replace(".0M", "M")
+    if v >= 1e3:
+        return "$%dK" % round(v / 1e3)
+    return ("$%d" % v) if v else ""
+
+
+def _enrich_events(evs):
+    """Lägger till expected move (ur realiserad volatilitet), sparkline och
+    AI-impact-stjärnor per rapport-event. Tyst om yfinance saknas."""
+    if yf is None or not evs:
+        return
+    import statistics as _st
+    tks = list(dict.fromkeys([e["tkr"] for e in evs]))
+    try:
+        data = yf.download(" ".join(tks), period="2mo", progress=False,
+                           auto_adjust=True, threads=False)
+        closes = data["Close"]
+        for e in evs:
+            try:
+                col = closes if len(tks) == 1 else closes[e["tkr"]]
+                s = [float(x) for x in col.dropna().tolist()]
+                if len(s) < 6:
+                    continue
+                rets = [(s[i] - s[i - 1]) / s[i - 1] * 100 for i in range(1, len(s)) if s[i - 1]]
+                vol = _st.pstdev(rets[-20:]) if len(rets) >= 5 else 0.0
+                em = max(3.0, min(25.0, round(vol * 2.2, 1)))   # ~earnings-dagsrörelse
+                e["exp_move"] = em
+                e["hist"] = [round(x, 2) for x in s[-14:]]
+                e["stars"] = 5 if em >= 12 else (4 if em >= 8 else (3 if em >= 5 else 2))
+            except Exception:
+                continue
+    except Exception as ex:
+        print("events-enrich:", ex)
+
+
 @cached(6 * 3600)
 def _events_list():
-    """Kommande rapportdatum via Finnhub (funkar på Render, kräver FINNHUB_API_KEY)."""
+    """Kommande rapportdatum via Finnhub (funkar på Render, kräver FINNHUB_API_KEY).
+    Berikas med EPS-/revenue-estimat, expected move och sparkline."""
     import datetime as _dt
     today = _dt.date.today()
     horizon = today + _dt.timedelta(days=45)
@@ -1730,10 +1774,15 @@ def _events_list():
             except Exception:
                 continue
             if 0 <= days <= 45:
-                out.append({"tkr": t, "date": str(d), "days": days})
+                eps = e.get("epsEstimate")
+                out.append({"tkr": t, "date": str(d), "days": days,
+                            "eps": (("$%.2f" % float(eps)) if eps not in (None, "") else ""),
+                            "rev": _fmt_rev(e.get("revenueEstimate"))})
                 break
     out.sort(key=lambda x: x["days"])
-    return out[:8]
+    out = out[:8]
+    _enrich_events(out)
+    return out
 
 
 @app.get("/api/events")

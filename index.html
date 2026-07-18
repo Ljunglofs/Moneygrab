@@ -753,6 +753,37 @@ body{background:
 .evcard .ebody .ed{font-size:12px;color:#8a93a3;margin-top:9px;display:flex;align-items:center;gap:6px}
 .evcard .ebody .ed svg{width:14px;height:14px}
 .evcard .ebody .enote{font-size:12px;margin-top:5px;font-weight:600;display:flex;align-items:center;gap:6px}
+/* Kommande event — rika rapportkort (earnings) */
+.evc{flex:none;width:266px;border-radius:18px;padding:14px 14px 12px;position:relative;overflow:hidden;cursor:pointer;background:radial-gradient(120% 100% at 0% 0%,rgba(245,197,66,.07),#08090c 60%);border:1px solid rgba(245,197,66,.32);box-shadow:0 0 26px -12px rgba(245,197,66,.4),inset 0 0 26px -20px rgba(245,197,66,.5)}
+.evc:active{transform:scale(.99)}
+.evc-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px}
+.evc-tag{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:800;letter-spacing:.05em;color:var(--gold2);border:1px solid rgba(245,197,66,.45);border-radius:8px;padding:5px 9px}
+.evc-tag svg{width:12px;height:12px}
+.evc-ai{display:flex;flex-direction:column;align-items:flex-end;gap:3px;font-size:8.5px;font-weight:800;letter-spacing:.06em;color:var(--cyan)}
+.evc-stars{font-size:11px;letter-spacing:1px;color:#2a3340;line-height:1}
+.evc-stars .on{color:var(--cyan)}
+.evc-co{display:flex;align-items:center;gap:11px;margin-bottom:12px}
+.evc-logo{flex:none;width:44px;height:44px;border-radius:11px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.evc-img{width:44px;height:44px;border-radius:11px;object-fit:contain;background:#fff;padding:3px;box-sizing:border-box}
+.evc-nm{font-size:16px;font-weight:800;color:#fff;line-height:1.1}
+.evc-tk{font-size:12px;color:var(--mut);font-weight:600;margin-top:2px}
+.evc-move{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:11px 0;border-top:1px solid rgba(255,255,255,.07);border-bottom:1px solid rgba(255,255,255,.07)}
+.evc-k{font-size:9px;font-weight:800;letter-spacing:.06em;color:var(--mut)}
+.evc-em{font-size:22px;font-weight:900;color:var(--gold2);margin-top:3px;letter-spacing:-.01em}
+.evc-spark{flex:none;width:104px;height:34px}
+.evc-spark .spark{width:100%;height:34px}
+.evc-est{display:flex;align-items:center;gap:10px;padding:11px 0 12px}
+.evc-est>div:not(.evc-sep){flex:1;min-width:0}
+.evc-sep{width:1px;align-self:stretch;background:rgba(255,255,255,.08)}
+.evc-v{font-size:18px;font-weight:800;color:#fff;margin-top:3px}
+.evc-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:11px;border-top:1px solid rgba(255,255,255,.07)}
+.evc-date{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:800;color:#e8edf5}
+.evc-date svg{width:14px;height:14px;color:var(--cyan)}
+.evc-ring{position:relative;flex:none;width:52px;height:52px}
+.evc-ring svg{width:52px;height:52px;display:block}
+.evc-rn{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
+.evc-rn b{font-size:18px;font-weight:900;color:#fff}
+.evc-rn i{font-size:7px;font-weight:800;letter-spacing:.1em;color:var(--mut);font-style:normal;margin-top:1px}
 /* foto-bakgrund på pick-kort (Dagens Bull / Veckans Setup) */
 .pick{position:relative;overflow:hidden}
 .pkbg{position:absolute;right:0;top:0;bottom:0;width:60%;background-size:cover;background-position:center right;
@@ -2374,12 +2405,7 @@ function render(d){
   // picks + fråga grabit
   if($("#picks"))$("#picks").innerHTML=d.picks.filter(function(p){return p.kicker!=="DAGENS BULL";}).map(pickCard).join("");
   // events (bildkort med riktiga foton ur mockupen)
-  if($("#events"))$("#events").innerHTML=d.events.map(e=>`<div class="evcard" ${e.tkr?`onclick="openStock('${e.tkr}')"`:""}>
-    <div class="ehead" style="background-image:url('${IMGS[e.img]||""}');background-size:cover;background-position:center">
-      <span class="etag" style="color:${e.bc};background:${e.bc}22;border:1px solid ${e.bc}55">${I[e.i]||""}${e.bdg}</span>
-    </div>
-    <div class="ebody"><div class="et">${e.t}</div><div class="ed">${I.calendar} ${e.d}</div><div class="enote" style="color:${e.bc}">${e.note||""}</div></div>
-  </div>`).join("");
+  if($("#events"))$("#events").innerHTML=d.events.map(evCard).join("");
   // 10 hetaste
   if($("#hetaste")){var _hl=d.hetaste||[],_hh;if(isPro()||_hl.length<=4){_hh=_hl.map((h,i)=>hetRow(h,i)).join("");}else{var _EN=(window.GRABIT_LANG==="en");_hh=_hl.slice(0,4).map((h,i)=>hetRow(h,i)).join("")+'<div class="pro-gated" data-lock="'+(_hl.length-4)+(_EN?" more":" fler")+'">'+_hl.slice(4).map((h,i)=>hetRow(h,i+4)).join("")+'</div>';}$("#hetaste").innerHTML=_hh;if(window.applyProLocks)applyProLocks($("#hetaste"));}
   // snabbval-flikar
@@ -2611,12 +2637,34 @@ function mapScreen(rows,d){
 }
 const _SVm=["jan","feb","mar","apr","maj","jun","jul","aug","sep","okt","nov","dec"];
 function mapEvents(arr){
-  return arr.map(e=>{
-    const dt=new Date((e.date||"")+"T00:00:00");
-    const ds=isNaN(dt.getTime())?(e.date||""):(dt.getDate()+" "+_SVm[dt.getMonth()]);
-    const note=e.days===0?"Idag":e.days===1?"Imorgon":("Om "+e.days+" dgr");
-    return {tkr:e.tkr,t:(NAMES[e.tkr]||e.tkr)+" – rapport",d:ds,bdg:"Rapport",i:"calendar",bc:"#F5C542",note,img:""};
+  return arr.map(function(e){
+    var dt=new Date((e.date||"")+"T00:00:00");
+    var ds=isNaN(dt.getTime())?(e.date||""):(dt.getDate()+" "+(_SVm[dt.getMonth()]||"").toUpperCase());
+    return {tkr:e.tkr,name:(NAMES[e.tkr]||e.tkr),date:ds,days:e.days,
+            eps:e.eps||"",rev:e.rev||"",exp_move:(e.exp_move!=null?e.exp_move:null),
+            hist:(e.hist||null),stars:(e.stars||4)};
   });
+}
+function evLogoFail(img){try{var s=img.parentNode;s.innerHTML=(window.lic?lic(s.getAttribute("data-tk")||"?",44,"#7dd3fc"):"");}catch(e){}}
+function evCard(e){
+  var EN=(window.GRABIT_LANG==="en"),tk=(e.tkr||"");
+  var logo=tk?'<span class="evc-logo" data-tk="'+tk+'"><img class="evc-img" src="https://financialmodelingprep.com/image-stock/'+encodeURIComponent(tk)+'.png" alt="'+tk+'" onerror="evLogoFail(this)"></span>':'';
+  var stars=e.stars||4,starHtml='';for(var i=0;i<5;i++)starHtml+='<span class="'+(i<stars?'on':'')+'">★</span>';
+  var em=(e.exp_move!=null)?('±'+(+e.exp_move).toFixed(1)+'%'):'—';
+  var spk=(e.hist&&e.hist.length>2)?spark(e.hist,'#F5C542'):'';
+  var days=(e.days!=null)?e.days:0,urgent=(days<=10),ringCol=urgent?'#F5C542':'#22d3ee';
+  var frac=Math.max(.15,Math.min(.92,(30-days)/30)),circ=163.4,off=(circ*(1-frac)).toFixed(1);
+  return '<div class="evc" onclick="openStock(\''+tk+'\')">'
+    +'<div class="evc-top"><span class="evc-tag">'+(I.calendar||"")+' '+(EN?"EARNINGS":"RAPPORT")+'</span>'
+    +'<span class="evc-ai">'+(EN?"AI IMPACT":"AI-IMPACT")+'<span class="evc-stars">'+starHtml+'</span></span></div>'
+    +'<div class="evc-co">'+logo+'<div class="evc-cn"><div class="evc-nm">'+polyEsc(e.name||tk)+'</div><div class="evc-tk">'+tk+'</div></div></div>'
+    +'<div class="evc-move"><div><div class="evc-k">'+(EN?"EXPECTED MOVE":"FÖRVÄNTAD RÖRELSE")+'</div><div class="evc-em">'+em+'</div></div><div class="evc-spark">'+spk+'</div></div>'
+    +'<div class="evc-est"><div><div class="evc-k">'+(EN?"CONSENSUS EPS":"KONSENSUS EPS")+'</div><div class="evc-v">'+(e.eps||"—")+'</div></div><div class="evc-sep"></div>'
+    +'<div><div class="evc-k">'+(EN?"REVENUE EST.":"OMSÄTTN. EST.")+'</div><div class="evc-v">'+(e.rev||"—")+'</div></div></div>'
+    +'<div class="evc-foot"><span class="evc-date">'+(I.calendar||"")+' '+(e.date||"")+'</span>'
+    +'<span class="evc-ring"><svg viewBox="0 0 60 60"><circle cx="30" cy="30" r="26" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="4"/>'
+    +'<circle cx="30" cy="30" r="26" fill="none" stroke="'+ringCol+'" stroke-width="4" stroke-linecap="round" stroke-dasharray="'+circ+'" stroke-dashoffset="'+off+'" transform="rotate(-90 30 30)" style="filter:drop-shadow(0 0 4px '+ringCol+'aa)"/></svg>'
+    +'<span class="evc-rn"><b>'+days+'</b><i>'+(EN?"DAYS":"DGR")+'</i></span></span></div></div>';
 }
 async function load(){
   // Instant paint: visa förra sessionens data DIREKT (annars demo) så appen aldrig står och laddar
