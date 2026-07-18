@@ -169,7 +169,7 @@ UNIVERSE = {
 }
 TICKER_THEME = {t: k for k, v in UNIVERSE.items() for t in v}
 ALL_TICKERS = sorted({t for v in UNIVERSE.values() for t in v})
-INDICES = [("Nasdaq", "^NDX"), ("S&P 500", "^GSPC"), ("Bitcoin", "BTC-USD"),
+INDICES = [("Nasdaq", "^NDX"), ("S&P 500", "^GSPC"), ("Dow", "^DJI"), ("Bitcoin", "BTC-USD"),
            ("Guld", "GC=F"), ("Silver", "SI=F"), ("Olja WTI", "CL=F"), ("VIX", "^VIX")]
 
 # =====================================================================
@@ -1966,6 +1966,92 @@ def fda():
     return {"news": _fda_news()}
 
 
+# ---- Breaking News: 1 utvald viktig händelse från de stora bolagen -----------
+_BIGCAPS = ["AAPL", "NVDA", "MSFT", "AMZN", "GOOGL", "META", "TSLA", "AVGO",
+            "AMD", "NFLX", "JPM", "V", "BRK-B", "LLY", "COST", "PLTR"]
+
+
+def _breaking_news():
+    """Senaste viktiga nyheterna för mega-caps (Alpaca News) med rubrik + URL."""
+    import os as _os
+    k = _os.getenv("APCA_API_KEY_ID", "") or _os.getenv("ALPACA_KEY", "")
+    s = _os.getenv("APCA_API_SECRET_KEY", "") or _os.getenv("ALPACA_SECRET", "")
+    if not (k and s):
+        return []
+    try:
+        import requests as _rq
+        r = _rq.get("https://data.alpaca.markets/v1beta1/news",
+                    headers={"APCA-API-KEY-ID": k, "APCA-API-SECRET-KEY": s},
+                    params={"symbols": ",".join(_BIGCAPS), "limit": 20, "sort": "desc"},
+                    timeout=10)
+        out = []
+        for n in (r.json().get("news") or []):
+            h = (n.get("headline") or "").strip()
+            if not h:
+                continue
+            syms = [x for x in (n.get("symbols") or []) if x in _BIGCAPS]
+            out.append({"ticker": (syms[0] if syms else ""), "headline": h,
+                        "url": n.get("url") or "",
+                        "tid": (n.get("created_at") or "")[:16].replace("T", " "),
+                        "source": (n.get("source") or "")})
+            if len(out) >= 10:
+                break
+        return out
+    except Exception:
+        return []
+
+
+@app.get("/api/breaking")
+def breaking():
+    return {"items": _breaking_news()}
+
+
+# ---- Sektor-heatmap: dagens rörelse per sektor (ETF:er) ----------------------
+_HEATMAP = [
+    ("Technology", "XLK", "tech"),
+    ("AI & Big Data", "AIQ", "ai"),
+    ("Semiconductors", "SMH", "semi"),
+    ("Biotech", "XBI", "bio"),
+    ("Energy", "XLE", "energi"),
+    ("Financials", "XLF", "finans"),
+]
+_SECTOR_CACHE = {"ts": 0.0, "data": []}
+
+
+@app.get("/api/sectors")
+def sectors():
+    """Dagens sektor-performance via ETF:er + liten sparkline. Cachat 5 min."""
+    now = time.time()
+    if _SECTOR_CACHE["data"] and now - _SECTOR_CACHE["ts"] < 300:
+        return {"sectors": _SECTOR_CACHE["data"]}
+    if yf is None:
+        return {"sectors": _SECTOR_CACHE["data"]}
+    out = []
+    try:
+        tickers = [e[1] for e in _HEATMAP]
+        data = yf.download(" ".join(tickers), period="1mo", progress=False,
+                           auto_adjust=True, threads=False)
+        closes = data["Close"]
+        for name, etf, theme in _HEATMAP:
+            try:
+                col = closes if len(tickers) == 1 else closes[etf]
+                s = col.dropna()
+                if len(s) < 2:
+                    continue
+                last, prev = float(s.iloc[-1]), float(s.iloc[-2])
+                pct = round((last - prev) / prev * 100, 2) if prev else 0.0
+                hist = [round(float(x), 2) for x in s.iloc[-14:].tolist()]
+                out.append({"name": name, "theme": theme, "pct": pct, "hist": hist})
+            except Exception:
+                continue
+    except Exception as ex:
+        print("Sektor-fel:", ex)
+    if out:
+        _SECTOR_CACHE["data"] = out
+        _SECTOR_CACHE["ts"] = now
+    return {"sectors": out or _SECTOR_CACHE["data"]}
+
+
 @app.get("/api/macro")
 def macro():
     ev = _macro_events()
@@ -2917,18 +3003,29 @@ def ai_daily(lang: str = "sv"):
     else:
         rubrik = ("Börja med ETT av orden BULLISH, BEARISH eller NEUTRAL i versaler, "
                   "följt av ' — ' och en mening som motiverar riktningen utifrån indexrörelserna.")
+    _today = _dt.date.today()
+    _closed = _today.weekday() >= 5      # helg → börserna stängda
+    if _closed:
+        dag_line = ("%s (helg — börserna är STÄNGDA idag; siffrorna ovan är senaste "
+                    "stängningskurser, inte live)" % _today.strftime("%A %d %B"))
+    else:
+        dag_line = _today.strftime("%A %d %B")
     sysp = ("Du är Grabit, svensk marknadsanalytiker. Skriv 'Dagens läge' i exakt detta format: "
             + rubrik + " "
             "Sedan en mening om vad som sticker ut bland de hetaste aktierna (nämn 1-2 tickers). "
             "Avsluta med en mening om vad som kan röra marknaden framöver, baserat på "
             "makrohändelserna om sådana finns, annars på det allmänna läget (helgdag, tunn volym osv). "
             "Max 4 meningar totalt. Vardaglig men skarp svenska. Ingen rådgivning, "
-            "hitta aldrig på siffror utöver de givna.")
+            "hitta aldrig på siffror utöver de givna. "
+            "VIKTIGT: Om det är helg eller helgdag och börsen är stängd — behandla siffrorna "
+            "som senaste stängning, sammanfatta veckan som gått och vad som väntar nästa "
+            "handelsdag. Vägra ALDRIG och kommentera ALDRIG att datan inte kan stämma, att det "
+            "är omöjligt, eller att marknaden är stängd som ett problem. Skriv ALLTID en färdig "
+            "'Dagens läge' i formatet ovan, oavsett veckodag.")
     txt = _ai_text(key + ":" + (forced or "fri"), sysp,
                    "INDEX: %s\nMARKNADSBREDD: %s\nHETAST: %s\nMAKRO KOMMANDE: %s\nIdag är det %s.\nSkriv 'Dagens läge'."
                    % (idx_line, breadth_line or "okänd", hot_line,
-                      ev_line or "(inga större händelser)",
-                      _dt.date.today().strftime("%A %d %B")), 300, lang=lang)
+                      ev_line or "(inga större händelser)", dag_line), 300, lang=lang)
     if not txt:
         # AI:n nere/nyckel saknas -> visa senaste lyckade "Dagens läge" i stället för tomt
         stale = [v for k2, v in _AI_TEXT_CACHE.items() if k2.startswith("daily:")]
