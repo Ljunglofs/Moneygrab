@@ -164,6 +164,11 @@ main{padding:16px 16px 110px}
 .cat .cc{font-size:11px;color:var(--mut);font-weight:600;margin-top:2px}
 .cat .gl{position:absolute;right:-18px;top:-18px;width:80px;height:80px;border-radius:50%;opacity:.5;pointer-events:none}
 .qrow{display:flex;align-items:center;gap:12px;padding:12px 15px;border-bottom:1px solid var(--line)}.qrow:last-child{border-bottom:none}
+.cat-why{margin:2px 0 4px;padding:13px 14px;border-radius:14px;border:1px solid rgba(245,197,66,.3);background:radial-gradient(120% 120% at 0% 0%,rgba(245,197,66,.09),rgba(10,10,11,.35) 62%);box-shadow:inset 0 0 26px -20px rgba(245,197,66,.6)}
+.cat-why-h{display:flex;align-items:center;gap:7px;font-size:10.5px;font-weight:800;letter-spacing:.09em;color:var(--gold2);margin-bottom:7px}
+.cat-why-h i{width:6px;height:6px;border-radius:50%;background:var(--gold);box-shadow:0 0 7px var(--gold)}
+.cat-why p{margin:0;font-size:12.5px;line-height:1.5;color:#cdd5e1}
+.cat-why p b{color:#fff;font-weight:800}
 .qrow .lic{width:36px;height:36px;font-size:13px}
 .qrow .nm{flex:1;min-width:0}.qrow .nm .t{font-weight:800;font-size:14.5px}.qrow .nm .s{font-size:11px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .qrow .chg{font-weight:800;font-size:14px;letter-spacing:-.02em}
@@ -2492,9 +2497,29 @@ function renderPortfolio(p){
 function pfTab(name,btn){['innehav','prestanda','exponering'].forEach(n=>{const el=$("#pf-"+n);if(el)el.hidden=(n!==name);});
   btn.parentNode.querySelectorAll("button").forEach(b=>b.classList.remove("on"));btn.classList.add("on");}
 
-function openCat(i){const t=THEMES[i];$("#cat-list-title").textContent=t.key;
-  $("#cat-list").innerHTML=t.tk.map(tk=>`<div class="qrow" onclick="openStock('${tk}')">${lic(tk,36,t.c)}<div class="nm"><div class="t">${tk}</div>
+var _CAT_WHY={
+  "AI-infra":"Datacenter, nätverk och compute som hela AI-vågen står och faller med.",
+  "Halvledare":"Chippen allt annat byggs ovanpå — hjärtat i varje AI-server.",
+  "Quantum":"Tidiga men explosiva — pionjärerna inom kvantberäkning.",
+  "Rare earth":"Strategiska metaller som Väst måste säkra bort från Kina.",
+  "Nuclear/Energi":"Baskraften bakom AI:ns skenande elbehov.",
+  "Försvar/Drönare":"Rekordbudgetar och en global drönar-kapplöpning.",
+  "Lidar/Phys.AI":"Sensorerna och fysisk AI som ger robotar och fordon ögon.",
+  "Space":"Uppskjutning, satelliter och rymd-infrastruktur i tidig fas.",
+  "Mjukvara/AI":"Bolagen som faktiskt paketerar AI till riktiga intäkter.",
+  "Bio/Hälsa":"Där AI möter läkemedel, diagnostik och hälsodata."
+};
+function openCat(i){const t=THEMES[i];const EN=(window.GRABIT_LANG==="en");
+  $("#cat-list-title").textContent=t.key;
+  var angle=_CAT_WHY[t.key]||"";
+  var why='<div class="cat-why"><div class="cat-why-h"><i></i>'+(EN?"WHY THESE COMPANIES?":"VARFÖR JUST DESSA BOLAG?")+'</div><p>'
+    +(EN
+      ?('Grabit chases the setup, not thousands of tickers at random. We\'ve hand-picked the names in <b>'+t.key+'</b> with the clearest exposure, the most liquidity and the best setup potential — so when the theme moves, you\'re already watching the right ones. Everything else is noise.')
+      :('Grabit jagar setuppen — inte tusentals bolag på måfå. Vi har handplockat namnen inom <b>'+t.key+'</b> med tydligast exponering, mest likviditet och bäst setup-potential. '+(angle?angle+' ':'')+'Så när temat rör sig bevakar du redan rätt aktier. Resten är brus.'))
+    +'</p></div>';
+  var rows=t.tk.map(tk=>`<div class="qrow" onclick="openStock('${tk}')">${lic(tk,36,t.c)}<div class="nm"><div class="t">${tk}</div>
     <div class="s">${NAMES[tk]||tk}</div></div><div class="chg mut">Visa &rarr;</div></div>`).join("");
+  $("#cat-list").innerHTML=why+rows;
   $("#cat-list-sect").style.display="flex"; $("#cat-list").style.display="block";
   $("#cat-list-sect").scrollIntoView({behavior:"smooth",block:"start"});}
 function clearCat(){$("#cat-list-sect").style.display="none";$("#cat-list").style.display="none";}
