@@ -2514,12 +2514,13 @@ function _catRows(tickers,t){
     <div class="s">${NAMES[tk]||tk}</div></div><div class="chg mut">Visa &rarr;</div></div>`).join("");
 }
 async function openCat(i){const t=THEMES[i];const EN=(window.GRABIT_LANG==="en");
+  window._curCat=i;
   $("#cat-list-title").textContent=t.key;
   var angle=_CAT_WHY[t.key]||"";
-  var why='<div class="cat-why"><div class="cat-why-h"><i></i>'+(EN?"WHY THESE COMPANIES?":"VARFÖR JUST DESSA BOLAG?")+'</div><p>'
+  var why='<div class="cat-why"><div class="cat-why-h"><i></i>'+(EN?"ALREADY SCANNED FOR YOU":"REDAN SCANNAT ÅT DIG")+'</div><p>'
     +(EN
-      ?('Grabit chases the setup, not thousands of tickers at random. We\'ve hand-picked the names in <b>'+t.key+'</b> with the clearest exposure, the most liquidity and the best setup potential — so when the theme moves, you\'re already watching the right ones. Everything else is noise.')
-      :('Grabit jagar setuppen — inte tusentals bolag på måfå. Vi har handplockat namnen inom <b>'+t.key+'</b> med tydligast exponering, mest likviditet och bäst setup-potential. '+(angle?angle+' ':'')+'Så när temat rör sig bevakar du redan rätt aktier. Resten är brus.'))
+      ?('Grabit has already scanned the whole market. These <b>'+t.key+'</b> names are here because they have the right setup — clear exposure to the theme, enough liquidity to trade, and technicals worth watching. We did the grunt work so you don\'t have to dig through thousands of tickers.')
+      :('Grabit har redan scannat hela marknaden. De här bolagen inom <b>'+t.key+'</b> ligger här för att de har rätt setup — tydlig exponering mot temat, likviditet nog att handla och tekniska lägen värda att bevaka. '+(angle?angle+' ':'')+'Vi har gjort grovjobbet så du slipper gräva i tusentals tickers.'))
     +'</p></div>';
   $("#cat-list-sect").style.display="flex"; $("#cat-list").style.display="block";
   $("#cat-list").innerHTML=why+_catRows(t.tk,t)+'<div class="scl-empty" id="cat-loading" style="padding:12px">'+(EN?"Loading full list…":"Laddar hela listan…")+'</div>';
@@ -2527,8 +2528,13 @@ async function openCat(i){const t=THEMES[i];const EN=(window.GRABIT_LANG==="en")
   // Hämta HELA temats lista från backend (frontend-tk är bara ett urval).
   var tickers=t.tk||[];
   var B=CONFIG.API_BASE?CONFIG.API_BASE.replace(/\/$/,""):"";
-  if(B&&t.uk){try{var r=await fetch(B+"/api/theme?key="+encodeURIComponent(t.uk),{cache:"no-store"});var j=await r.json();if(j&&Array.isArray(j.tickers)&&j.tickers.length)tickers=j.tickers;}catch(e){}}
-  if($("#cat-list-title").textContent!==t.key)return;   // användaren bytte kategori
+  if(B&&t.uk){try{
+    var ctrl=new AbortController();var to=setTimeout(function(){ctrl.abort();},9000);
+    var r=await fetch(B+"/api/theme?key="+encodeURIComponent(t.uk),{cache:"no-store",signal:ctrl.signal});
+    clearTimeout(to);var j=await r.json();
+    if(j&&Array.isArray(j.tickers)&&j.tickers.length)tickers=j.tickers;
+  }catch(e){}}
+  if(window._curCat!==i)return;   // användaren bytte kategori
   $("#cat-list").innerHTML=why+_catRows(tickers,t);}
 function clearCat(){$("#cat-list-sect").style.display="none";$("#cat-list").style.display="none";}
 
