@@ -2055,6 +2055,12 @@ def breaking():
     return {"items": _breaking_news()}
 
 
+@app.get("/api/theme")
+def theme_stocks(key: str = ""):
+    """Hela ticker-listan för ett tema (kategori-sidan i Research)."""
+    return {"key": key, "tickers": UNIVERSE.get(key, [])}
+
+
 # ---- Sektor-heatmap: dagens rörelse per sektor (ETF:er) ----------------------
 _HEATMAP = [
     ("Technology", "XLK", "tech"),

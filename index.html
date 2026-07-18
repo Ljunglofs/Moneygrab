@@ -1601,16 +1601,16 @@ const UNIVERSE=[{t:"EQIX",n:"Equinix",d:"equinix.com"},{t:"DLR",n:"Digital Realt
 const NAMES={},DOMAINS={};UNIVERSE.forEach(x=>{NAMES[x.t]=x.n;if(x.d)DOMAINS[x.t]=x.d;});
 
 const THEMES = [
-  { key:"AI-infra",        ic:"&#129516;", c:"#22d3ee", n:37, tk:["NVDA","AVGO","AMD","CRDO","SMCI"] },
-  { key:"Halvledare",      ic:"&#128268;", c:"#22d3ee", n:37,  tk:["SIVE","MRVL","NVTS"] },
-  { key:"Quantum",         ic:"&#9883;",   c:"#a78bfa", n:8,  tk:["IONQ","QUBT","RGTI"] },
-  { key:"Rare earth",      ic:"&#9935;",   c:"#F5C542", n:8,  tk:["USAR","MP"] },
-  { key:"Nuclear/Energi",  ic:"&#9889;",   c:"#facc15", n:30, tk:["OKLO","SMR","VST","CEG"] },
-  { key:"Försvar/Drönare", ic:"&#128737;", c:"#FF3B30", n:25,  tk:["KTOS","AVAV","ONDS"] },
-  { key:"Lidar/Phys.AI",   ic:"&#128663;", c:"#38bdf8", n:9,  tk:["OUST","LAZR","AEVA"] },
-  { key:"Space",           ic:"&#128640;", c:"#f472b6", n:13,  tk:["RKLB","ASTS","RDW"] },
-  { key:"Mjukvara/AI",     ic:"&#128187;", c:"#818cf8", n:29,  tk:["PLTR","NVDA","TSLA"] },
-  { key:"Bio/Hälsa",       ic:"&#129516;", c:"#7dd3fc", n:29,  tk:["RXRX","HIMS"] }
+  { key:"AI-infra", uk:"AI-infra",        ic:"&#129516;", c:"#22d3ee", n:37, tk:["NVDA","AVGO","AMD","CRDO","SMCI"] },
+  { key:"Halvledare", uk:"Halvledare",      ic:"&#128268;", c:"#22d3ee", n:37,  tk:["SIVE","MRVL","NVTS"] },
+  { key:"Quantum", uk:"Quantum",         ic:"&#9883;",   c:"#a78bfa", n:8,  tk:["IONQ","QUBT","RGTI"] },
+  { key:"Rare earth", uk:"Rare earth",      ic:"&#9935;",   c:"#F5C542", n:8,  tk:["USAR","MP"] },
+  { key:"Nuclear/Energi", uk:"Nuclear/Energi",  ic:"&#9889;",   c:"#facc15", n:30, tk:["OKLO","SMR","VST","CEG"] },
+  { key:"Försvar/Drönare", uk:"Defense/Drone", ic:"&#128737;", c:"#FF3B30", n:25,  tk:["KTOS","AVAV","ONDS"] },
+  { key:"Lidar/Phys.AI", uk:"Lidar/Phys.AI",   ic:"&#128663;", c:"#38bdf8", n:9,  tk:["OUST","LAZR","AEVA"] },
+  { key:"Space", uk:"Space",           ic:"&#128640;", c:"#f472b6", n:13,  tk:["RKLB","ASTS","RDW"] },
+  { key:"Mjukvara/AI", uk:"Mjukvara",     ic:"&#128187;", c:"#818cf8", n:29,  tk:["PLTR","NVDA","TSLA"] },
+  { key:"Bio/Hälsa", uk:"Bio",       ic:"&#129516;", c:"#7dd3fc", n:29,  tk:["RXRX","HIMS"] }
 ];
 
 const DEMO = {
@@ -2509,7 +2509,11 @@ var _CAT_WHY={
   "Mjukvara/AI":"Bolagen som faktiskt paketerar AI till riktiga intäkter.",
   "Bio/Hälsa":"Där AI möter läkemedel, diagnostik och hälsodata."
 };
-function openCat(i){const t=THEMES[i];const EN=(window.GRABIT_LANG==="en");
+function _catRows(tickers,t){
+  return tickers.map(tk=>`<div class="qrow" onclick="openStock('${tk}')">${lic(tk,36,t.c)}<div class="nm"><div class="t">${tk}</div>
+    <div class="s">${NAMES[tk]||tk}</div></div><div class="chg mut">Visa &rarr;</div></div>`).join("");
+}
+async function openCat(i){const t=THEMES[i];const EN=(window.GRABIT_LANG==="en");
   $("#cat-list-title").textContent=t.key;
   var angle=_CAT_WHY[t.key]||"";
   var why='<div class="cat-why"><div class="cat-why-h"><i></i>'+(EN?"WHY THESE COMPANIES?":"VARFÖR JUST DESSA BOLAG?")+'</div><p>'
@@ -2517,11 +2521,15 @@ function openCat(i){const t=THEMES[i];const EN=(window.GRABIT_LANG==="en");
       ?('Grabit chases the setup, not thousands of tickers at random. We\'ve hand-picked the names in <b>'+t.key+'</b> with the clearest exposure, the most liquidity and the best setup potential — so when the theme moves, you\'re already watching the right ones. Everything else is noise.')
       :('Grabit jagar setuppen — inte tusentals bolag på måfå. Vi har handplockat namnen inom <b>'+t.key+'</b> med tydligast exponering, mest likviditet och bäst setup-potential. '+(angle?angle+' ':'')+'Så när temat rör sig bevakar du redan rätt aktier. Resten är brus.'))
     +'</p></div>';
-  var rows=t.tk.map(tk=>`<div class="qrow" onclick="openStock('${tk}')">${lic(tk,36,t.c)}<div class="nm"><div class="t">${tk}</div>
-    <div class="s">${NAMES[tk]||tk}</div></div><div class="chg mut">Visa &rarr;</div></div>`).join("");
-  $("#cat-list").innerHTML=why+rows;
   $("#cat-list-sect").style.display="flex"; $("#cat-list").style.display="block";
-  $("#cat-list-sect").scrollIntoView({behavior:"smooth",block:"start"});}
+  $("#cat-list").innerHTML=why+_catRows(t.tk,t)+'<div class="scl-empty" id="cat-loading" style="padding:12px">'+(EN?"Loading full list…":"Laddar hela listan…")+'</div>';
+  $("#cat-list-sect").scrollIntoView({behavior:"smooth",block:"start"});
+  // Hämta HELA temats lista från backend (frontend-tk är bara ett urval).
+  var tickers=t.tk||[];
+  var B=CONFIG.API_BASE?CONFIG.API_BASE.replace(/\/$/,""):"";
+  if(B&&t.uk){try{var r=await fetch(B+"/api/theme?key="+encodeURIComponent(t.uk),{cache:"no-store"});var j=await r.json();if(j&&Array.isArray(j.tickers)&&j.tickers.length)tickers=j.tickers;}catch(e){}}
+  if($("#cat-list-title").textContent!==t.key)return;   // användaren bytte kategori
+  $("#cat-list").innerHTML=why+_catRows(tickers,t);}
 function clearCat(){$("#cat-list-sect").style.display="none";$("#cat-list").style.display="none";}
 
 function onSearch(v){const q=v.trim().toUpperCase();const res=$("#search-res");
