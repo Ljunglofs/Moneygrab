@@ -1360,7 +1360,7 @@ else _i18nBoot();
   <div class="legal">GRABIT tillhandahåller teknisk analys och information — inte finansiell rådgivning. Handel med värdepapper innebär risk och kan leda till förluster. Historisk avkastning är ingen garanti för framtida resultat.<div class="legal-links"><a href="/villkor" target="_blank" rel="noopener">Villkor</a> · <a href="/privacy" target="_blank" rel="noopener">Integritetspolicy</a> · <a href="mailto:support@grabitlabs.com">Support</a></div></div>
   </section>
 
-  <section class="screen" id="s-signal"><div class="sigfilter" id="sigfilter"><button class="sigchip on" data-k="allt" onclick="setSig('allt')">Allt</button><button class="sigchip" data-k="setup" onclick="setSig('setup')">Setups</button><button class="sigchip" data-k="insider" onclick="setSig('insider')">Insiders</button><button class="sigchip" data-k="nyhet" onclick="setSig('nyhet')">Nyheter</button></div><div class="card feed" id="feed2" style="margin-top:8px"></div><div class="legal">GRABIT tillhandahåller teknisk analys och information — inte finansiell rådgivning. Handel med värdepapper innebär risk och kan leda till förluster. Historisk avkastning är ingen garanti för framtida resultat.<div class="legal-links"><a href="/villkor" target="_blank" rel="noopener">Villkor</a> · <a href="/privacy" target="_blank" rel="noopener">Integritetspolicy</a> · <a href="mailto:support@grabitlabs.com">Support</a></div></div>
+  <section class="screen" id="s-signal"><div class="sigfilter" id="sigfilter"><button class="sigchip on" data-k="allt" onclick="setSig('allt')">Allt</button><button class="sigchip" data-k="setup" onclick="setSig('setup')">Setups</button><button class="sigchip" data-k="insider" onclick="setSig('insider')">Insiders</button><button class="sigchip" data-k="fda" onclick="setSig('fda')">FDA</button><button class="sigchip" data-k="nyhet" onclick="setSig('nyhet')">Nyheter</button></div><div class="card feed" id="feed2" style="margin-top:8px"></div><div class="legal">GRABIT tillhandahåller teknisk analys och information — inte finansiell rådgivning. Handel med värdepapper innebär risk och kan leda till förluster. Historisk avkastning är ingen garanti för framtida resultat.<div class="legal-links"><a href="/villkor" target="_blank" rel="noopener">Villkor</a> · <a href="/privacy" target="_blank" rel="noopener">Integritetspolicy</a> · <a href="mailto:support@grabitlabs.com">Support</a></div></div>
   </section>
   <section class="screen" id="s-daytrade"><div class="dt-head" id="dt-head"></div><div class="dt-list" id="dtlist"></div><div class="legal">GRABIT tillhandahåller teknisk analys och information — inte finansiell rådgivning. Handel med värdepapper innebär risk och kan leda till förluster. Historisk avkastning är ingen garanti för framtida resultat.<div class="legal-links"><a href="/villkor" target="_blank" rel="noopener">Villkor</a> · <a href="/privacy" target="_blank" rel="noopener">Integritetspolicy</a> · <a href="mailto:support@grabitlabs.com">Support</a></div></div>
   </section>
@@ -3204,6 +3204,33 @@ function renderTopMovers(){
     <div class="tmv-all" onclick="go('marknad')">Visa alla \u203A</div>`;
   if(window.applyProLocks)applyProLocks(el);
 }
+function _fdaRow(n){
+  var EN=(window.GRABIT_LANG==="en");
+  var c=fdaCat(n.rubrik);
+  var tk=(n.ticker||"?");
+  var logo='<span class="fev-logo" data-tk="'+tk+'"><img class="fev-img" src="https://financialmodelingprep.com/image-stock/'+encodeURIComponent(tk)+'.png" alt="'+tk+'" loading="lazy" onerror="fdaLogoFail(this)"></span>';
+  var nm=(window.NAMES&&NAMES[n.ticker])||"";
+  var tid=String(n.tid||""),dd="",tt="";
+  try{var dto=new Date(tid);if(!isNaN(dto.getTime())){dd=dto.toLocaleDateString(EN?"en-US":"sv-SE",{day:"2-digit",month:"short"}).toUpperCase();tt=dto.toLocaleTimeString("sv-SE",{hour:"2-digit",minute:"2-digit"});}}catch(e){}
+  if(!dd){dd=tid.slice(5,10);tt=tid.slice(11,16);}
+  var dots=(c[2]==="high")?'<i></i><i></i><i></i>':'<i></i><i></i>';
+  var impLbl=(c[2]==="high")?"HIGH":"MEDIUM";
+  var inner='<div class="fev-dt"><b>'+dd+'</b><span>'+tt+'</span></div>'
+    +logo
+    +'<div class="fev-body"><div class="fev-tk"><b>'+(n.ticker||"")+'</b>'+(nm?'<span>'+String(nm).replace(/</g,"&lt;")+'</span>':'')+'</div>'
+    +'<div class="fev-hl">'+String(n.rubrik||"").replace(/</g,"&lt;")+'</div>'
+    +'<div class="fev-meta"><span class="fev-cat '+c[0]+'">'+c[1]+'</span>'
+    +'<span class="fev-imp '+c[2]+'">'+impLbl+'<span class="dots">'+dots+'</span></span></div></div>';
+  return n.url?'<a class="fev" href="'+encodeURI(n.url)+'" target="_blank" rel="noopener">'+inner+'</a>':'<div class="fev">'+inner+'</div>';
+}
+/* PRO-lås: 1 rad fri, resten blurras för icke-PRO. */
+function _fdaGate(rows){
+  if(!rows.length)return "";
+  if(isPro()||rows.length<=1)return rows.map(_fdaRow).join("");
+  var EN=(window.GRABIT_LANG==="en");
+  return _fdaRow(rows[0])
+    +'<div class="pro-gated" data-lock="'+(EN?"FDA feed · PRO":"FDA-flödet · PRO")+'">'+rows.slice(1).map(_fdaRow).join("")+'</div>';
+}
 async function loadFda(){
   const el=document.getElementById("fdacal");if(!el)return;
   const B=CONFIG.API_BASE?CONFIG.API_BASE.replace(/\/$/,""):"";if(!B)return;
@@ -3212,32 +3239,26 @@ async function loadFda(){
   if(!rows.length){el.style.display="none";return;}
   el.style.display="";
   var EN=(window.GRABIT_LANG==="en");
-  var body=rows.slice(0,6).map(function(n){
-    var c=fdaCat(n.rubrik);
-    var tk=(n.ticker||"?");
-    var logo='<span class="fev-logo" data-tk="'+tk+'"><img class="fev-img" src="https://financialmodelingprep.com/image-stock/'+encodeURIComponent(tk)+'.png" alt="'+tk+'" loading="lazy" onerror="fdaLogoFail(this)"></span>';
-    var nm=(window.NAMES&&NAMES[n.ticker])||"";
-    var tid=String(n.tid||""),dd="",tt="";
-    try{var dto=new Date(tid);if(!isNaN(dto.getTime())){dd=dto.toLocaleDateString(EN?"en-US":"sv-SE",{day:"2-digit",month:"short"}).toUpperCase();tt=dto.toLocaleTimeString("sv-SE",{hour:"2-digit",minute:"2-digit"});}}catch(e){}
-    if(!dd){dd=tid.slice(5,10);tt=tid.slice(11,16);}
-    var dots=(c[2]==="high")?'<i></i><i></i><i></i>':'<i></i><i></i>';
-    var impLbl=(c[2]==="high")?"HIGH":"MEDIUM";
-    var inner='<div class="fev-dt"><b>'+dd+'</b><span>'+tt+'</span></div>'
-      +logo
-      +'<div class="fev-body"><div class="fev-tk"><b>'+(n.ticker||"")+'</b>'+(nm?'<span>'+String(nm).replace(/</g,"&lt;")+'</span>':'')+'</div>'
-      +'<div class="fev-hl">'+String(n.rubrik||"").replace(/</g,"&lt;")+'</div>'
-      +'<div class="fev-meta"><span class="fev-cat '+c[0]+'">'+c[1]+'</span>'
-      +'<span class="fev-imp '+c[2]+'">'+impLbl+'<span class="dots">'+dots+'</span></span></div></div>';
-    return n.url?'<a class="fev" href="'+encodeURI(n.url)+'" target="_blank" rel="noopener">'+inner+'</a>':'<div class="fev">'+inner+'</div>';
-  }).join("");
   el.innerHTML='<div class="evt-panel blue">'+_EVT_DECO+'<div class="evt-top"><span class="evt-hex">'+_hex(_IC_DNA)+'</span>'
     +'<div class="evt-htx"><div class="evt-ttl">'+(EN?"FDA WATCH · BIOTECH":"FDA-BEVAKNING · BIOTECH")+'</div>'
     +'<div class="evt-sub">'+(EN?"Real-time FDA news & biotech catalysts.":"FDA-nyheter & biotech-katalysatorer.")+'</div></div>'
     +'<span class="evt-pill"><i></i>LIVE FEED</span></div>'
-    +'<div class="evt-rows">'+body+'</div>'
-    +'<div class="evt-ai" onclick="openAI()"><span class="eai-ic">'+_IC_SPARK+'</span>'
-    +'<span class="eai-tx"><b>'+(EN?"AI summary":"AI-sammanfattning")+'</b> — '+(EN?"key insights in seconds":"nyckelinsikter på sekunder")+'</span>'
+    +'<div class="evt-rows">'+_fdaGate(rows.slice(0,4))+'</div>'
+    +'<div class="evt-ai" onclick="'+(isPro()?'openAI()':'go(\'signal\');setSig(\'fda\')')+'"><span class="eai-ic">'+_IC_SPARK+'</span>'
+    +'<span class="eai-tx"><b>'+(EN?(isPro()?"AI summary":"See all FDA"):(isPro()?"AI-sammanfattning":"Se hela FDA-flödet"))+'</b> — '+(EN?"key insights in seconds":"nyckelinsikter på sekunder")+'</span>'
     +'<span class="eai-go">&#8250;</span></div></div>';
+  if(window.applyProLocks)applyProLocks(el);
+}
+async function loadFdaSignals(){
+  var box=document.getElementById("feed2");if(!box)return;
+  var B=CONFIG.API_BASE?CONFIG.API_BASE.replace(/\/$/,""):"";
+  var EN=(window.GRABIT_LANG==="en");
+  if(!B){box.innerHTML='<div class="sig-empty">'+(EN?"Connect the API for the FDA feed.":"Koppla API:t för FDA-flödet.")+'</div>';return;}
+  box.innerHTML='<div class="sig-empty">'+(EN?"Loading FDA…":"Laddar FDA…")+'</div>';
+  var rows=[];try{var r=await fetch(B+"/api/fda",{cache:"no-store"});var j=await r.json();rows=(j&&j.news)||[];}catch(e){}
+  if(!rows.length){box.innerHTML='<div class="sig-empty">'+(EN?"No FDA catalysts right now.":"Inga FDA-katalysatorer just nu.")+'</div>';return;}
+  box.innerHTML='<div class="evt-rows">'+_fdaGate(rows.slice(0,25))+'</div>';
+  if(window.applyProLocks)applyProLocks(box);
 }
 async function loadTrump(){
   const el=document.getElementById("trumpbar");if(!el)return;
@@ -3661,6 +3682,7 @@ function _sigCard(f){var nm=(typeof NAMES!=="undefined"&&NAMES[f.tkr])||f.tkr;
 function _newsCard(t){return `<div class="sig sigf newsf" style="border-color:#22d3ee55"><div class="sig-c"><div class="sig-time">Marknadsnyhet</div><div class="sig-sub" style="color:#dfe7ee;font-weight:600">${t}</div></div></div>`;}
 function applySigFilter(){var box=document.getElementById("feed2");if(!box)return;
   if(SIGFILTER==="insider"){loadInsiderFlow();return;}
+  if(SIGFILTER==="fda"){loadFdaSignals();return;}
   var S=window.__SIG||{feed:[],news:[],allHTML:""};
   var feed=S.feed||[],news=S.news||[];
   var SET={flame:1,trend:1,pulse:1,dot:1};var html="";

@@ -1954,7 +1954,7 @@ def _fda_news():
             out.append({"rubrik": h, "ticker": (syms[0] if syms else ""),
                         "tid": (n.get("created_at") or "")[:16].replace("T", " "),
                         "url": n.get("url") or ""})
-            if len(out) >= 8:
+            if len(out) >= 30:
                 break
         return out
     except Exception:
