@@ -604,10 +604,7 @@ def assetlinks():
     return Response(content=_j.dumps(data), media_type="application/json")
 
 
-_LEGAL_HEAD = ("""<!doctype html><html lang="sv"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>GRABIT — %s</title>
-<style>body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#0A0E12;color:#e8edf5;
+_LEGAL_CSS = """<style>body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#0A0E12;color:#e8edf5;
 max-width:720px;margin:0 auto;padding:30px 20px 60px;line-height:1.62}
 h1{font-size:23px;color:#F5C542;margin:0 0 4px}
 .upd{color:#8891a0;font-size:12.5px;margin:0 0 22px}
@@ -615,12 +612,114 @@ h2{font-size:16px;margin-top:28px;color:#F5C542}
 p,li{font-size:14.5px;color:#c7d0dc}b{color:#e8edf5}a{color:#F5C542}
 .nav{margin-top:34px;padding-top:16px;border-top:1px solid rgba(255,255,255,.08);font-size:13px}
 .note{background:rgba(245,197,66,.08);border:1px solid rgba(245,197,66,.3);border-radius:10px;padding:12px 14px;font-size:13px;color:#d9e0ea}
-</style></head><body>""")
+.langbar{display:flex;gap:8px;margin:0 0 24px}
+.langbar button{font:inherit;font-size:13px;font-weight:700;cursor:pointer;padding:7px 16px;border-radius:20px;
+border:1px solid rgba(245,197,66,.35);background:transparent;color:#8891a0}
+.langbar button.on{background:#F5C542;color:#0A0E12;border-color:#F5C542}
+.L{display:none}.L.on{display:block}
+</style>"""
 
 # OBS: Fyll i operatörens juridiska namn / firma nedan (ORG_LEGAL_NAME) innan lansering.
 _LEGAL_OP = os.environ.get("GRABIT_LEGAL_NAME", "GRABIT (drivs som enskild näringsidkare i Sverige)").strip()
 
-_PRIVACY_HTML = _LEGAL_HEAD % "Integritetspolicy" + ("""
+
+def _legal_page(title, en_body, sv_body):
+    return ("""<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GRABIT — """ + title + """</title>
+""" + _LEGAL_CSS + """</head><body>
+<div class="langbar"><button id="b-en" class="on" onclick="setL('en')">English</button><button id="b-sv" onclick="setL('sv')">Svenska</button></div>
+<div class="L en on" id="L-en">""" + en_body + """</div>
+<div class="L sv" id="L-sv">""" + sv_body + """</div>
+<script>
+function setL(l){
+  document.documentElement.lang=l;
+  document.getElementById('L-en').classList.toggle('on',l==='en');
+  document.getElementById('L-sv').classList.toggle('on',l==='sv');
+  document.getElementById('b-en').classList.toggle('on',l==='en');
+  document.getElementById('b-sv').classList.toggle('on',l==='sv');
+  try{localStorage.setItem('grabit_legal_lang',l);}catch(e){}
+}
+(function(){
+  var saved=null;try{saved=localStorage.getItem('grabit_legal_lang');}catch(e){}
+  var l=saved||((navigator.language||'en').toLowerCase().indexOf('sv')===0?'sv':'en');
+  setL(l);
+})();
+</script>
+</body></html>""")
+
+
+_PRIVACY_EN = ("""
+<h1>Privacy Policy for GRABIT</h1>
+<p class="upd">Last updated: July 2026</p>
+<p>GRABIT is an app for technical stock analysis and information. We process as
+little personal data as possible and never sell your data. This policy explains
+what we process and why.</p>
+
+<h2>Data controller</h2>
+<p>""" + _LEGAL_OP + """. Contact:
+<a href="mailto:support@grabitlabs.com">support@grabitlabs.com</a>.</p>
+
+<h2>What data do we process?</h2>
+<ul>
+<li><b>Email address</b> — if you create an account, buy PRO or log in. Used for
+login (one-time code), to restore your PRO on other devices, for receipts/order
+confirmations and for important information about the service.</li>
+<li><b>Login codes</b> — temporary one-time codes sent to your email and deleted
+after a short time.</li>
+<li><b>Portfolio and watchlists</b> — if you are logged in, your watched stocks
+(ticker symbols) are synced to the server so they follow you between devices. If you
+are not logged in they are stored only locally on your device.</li>
+<li><b>Push notifications</b> — if you enable notifications we store your device's
+push address (a technical identifier), your watched tickers and any price alerts, so
+alerts can be delivered correctly.</li>
+<li><b>Payment</b> — purchases are handled by Stripe. We never receive or store
+card numbers. We store a subscription ID and its status (active/cancelled) and the
+link to your email, in order to give you the right access.</li>
+</ul>
+
+<h2>Legal basis</h2>
+<p>Account, PRO and payment are processed to <b>perform our contract</b> with you.
+Notifications are based on your <b>consent</b> (you turn them on yourself). Some
+processing is based on our <b>legitimate interest</b> in secure and functioning
+operation.</p>
+
+<h2>Who do we share data with?</h2>
+<p>We use the following providers (data processors) solely to operate the service:</p>
+<ul>
+<li><b>Stripe</b> — payment and subscriptions (acts as Merchant of Record).</li>
+<li><b>Resend</b> — sending email (codes, receipts, important info).</li>
+<li><b>Render</b> — hosting of the server.</li>
+<li><b>Push service</b> — Google (FCM) and Apple respectively deliver the
+notifications to your device, which is technically necessary.</li>
+</ul>
+<p>Prices, news and insider data are fetched from external sources by our server —
+<b>your</b> data is never sent there. We use no ad networks and no tracking across
+other websites.</p>
+
+<h2>Retention</h2>
+<p>Account data is kept as long as you have an account. Push and alert data is kept
+until you turn off notifications. Payment data is kept as long as the law requires
+(e.g. accounting). You can request deletion at any time.</p>
+
+<h2>Your rights</h2>
+<p>You have the right to access, correct or delete your data, to object to or
+restrict processing, to data portability and to withdraw consent. Contact
+<a href="mailto:support@grabitlabs.com">support@grabitlabs.com</a>. You may also lodge
+a complaint with the Swedish Authority for Privacy Protection (IMY).</p>
+
+<h2>Deletion</h2>
+<p>Turn off notifications (the bell in the app) to delete your push subscription,
+watched tickers and price alerts. To delete your entire account, email support and we
+will remove your data. Clear your browser data to remove a locally stored portfolio.</p>
+
+<h2>Important note about the content</h2>
+<p>GRABIT provides technical analysis and information — <b>not</b> financial advice.
+Trading securities involves risk and can lead to losses.</p>
+
+<div class="nav"><a href="/terms">Read our Terms →</a></div>""")
+
+_PRIVACY_SV = ("""
 <h1>Integritetspolicy för GRABIT</h1>
 <p class="upd">Senast uppdaterad: juli 2026</p>
 <p>GRABIT är en app för teknisk aktieanalys och information. Vi behandlar så få
@@ -689,10 +788,77 @@ portfölj.</p>
 <p>GRABIT tillhandahåller teknisk analys och information — <b>inte</b> finansiell
 rådgivning. Handel med värdepapper innebär risk och kan leda till förluster.</p>
 
-<div class="nav"><a href="/terms">Läs våra Villkor →</a></div>
-</body></html>""")
+<div class="nav"><a href="/terms">Läs våra Villkor →</a></div>""")
 
-_TERMS_HTML = _LEGAL_HEAD % "Villkor" + ("""
+_TERMS_EN = ("""
+<h1>Terms of Use for GRABIT</h1>
+<p class="upd">Last updated: July 2026</p>
+<p>These terms apply between you and """ + _LEGAL_OP + """ ("we", "us") when you use
+GRABIT. By using the app or buying PRO you accept these terms.</p>
+
+<h2>1. What the service is</h2>
+<p>GRABIT is an app for <b>technical stock analysis and information</b>. The content
+is general and is not directed at any individual person. GRABIT does <b>not provide
+financial advice</b> and is not an investment recommendation under law. You make all
+investment decisions yourself and at your own risk. Trading securities can lead to
+losses. Historical accuracy is no guarantee of future results.</p>
+
+<h2>2. Account</h2>
+<p>Some features require you to log in with your email address and a one-time code.
+You are responsible for ensuring the email address you provide is yours and for the
+activity on your account.</p>
+
+<h2>3. PRO subscription and price</h2>
+<p>GRABIT PRO is a subscription. Current prices are shown in the app (currently
+SEK&nbsp;174/month or SEK&nbsp;1&nbsp;566/year, incl. VAT). The subscription
+<b>renews automatically</b> at the end of each period until you cancel it.</p>
+
+<h2>4. Payment</h2>
+<p>Payment is handled by <b>Stripe</b>, which acts as Merchant of Record and is
+responsible for charging and reporting VAT. We never handle your card details.</p>
+
+<h2>5. Cancellation</h2>
+<p>You can cancel your subscription at any time. You keep PRO until the end of the
+paid period, after which access ends. Already paid periods are not refunded, except
+for the right of withdrawal below.</p>
+
+<h2>6. Right of withdrawal</h2>
+<p>As a consumer you normally have a 14-day right of withdrawal under the Swedish
+Distance Contracts Act. Because PRO is a digital service you get access to
+immediately, at purchase you agree that the service begins to be delivered
+immediately and that the <b>right of withdrawal therefore lapses</b> once delivery
+has begun. Contact support if you have questions about a purchase.</p>
+
+<h2>7. Permitted use</h2>
+<p>Content and data in GRABIT are for your personal use only. You may not resell,
+copy at scale, automatically retrieve (scrape) or otherwise exploit the service's
+data commercially without our written consent.</p>
+
+<h2>8. Intellectual property</h2>
+<p>The app, its design, texts and analyses belong to us or our licensors and are
+protected by copyright.</p>
+
+<h2>9. Limitation of liability</h2>
+<p>The service is provided "as is". We make no warranties that data is always
+correct, complete or available without interruption, and we are not liable for
+losses arising from investment decisions you make based on the content. This does not
+limit liability that cannot be limited under mandatory law.</p>
+
+<h2>10. Changes</h2>
+<p>We may update these terms and prices. Price changes apply from the next period,
+and we inform you in advance when required. Continued use means you accept the
+updated terms.</p>
+
+<h2>11. Governing law and disputes</h2>
+<p>Swedish law applies. If you are a consumer and we cannot reach agreement, you can
+turn to the Swedish National Board for Consumer Disputes (ARN) or a general court.</p>
+
+<h2>12. Contact</h2>
+<p><a href="mailto:support@grabitlabs.com">support@grabitlabs.com</a></p>
+
+<div class="nav"><a href="/privacy">Read our Privacy Policy →</a></div>""")
+
+_TERMS_SV = ("""
 <h1>Användarvillkor för GRABIT</h1>
 <p class="upd">Senast uppdaterad: juli 2026</p>
 <p>Dessa villkor gäller mellan dig och """ + _LEGAL_OP + """ ("vi", "oss") när du
@@ -759,8 +925,10 @@ till Allmänna reklamationsnämnden (ARN) eller allmän domstol.</p>
 <h2>12. Kontakt</h2>
 <p><a href="mailto:support@grabitlabs.com">support@grabitlabs.com</a></p>
 
-<div class="nav"><a href="/privacy">Läs vår Integritetspolicy →</a></div>
-</body></html>""")
+<div class="nav"><a href="/privacy">Läs vår Integritetspolicy →</a></div>""")
+
+_PRIVACY_HTML = _legal_page("Privacy Policy", _PRIVACY_EN, _PRIVACY_SV)
+_TERMS_HTML = _legal_page("Terms of Use", _TERMS_EN, _TERMS_SV)
 
 
 @app.get("/privacy", response_class=HTMLResponse)
