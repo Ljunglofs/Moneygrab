@@ -8,3 +8,4 @@ feedparser
 ta
 requests
 pywebpush
+ctrader-open-api
