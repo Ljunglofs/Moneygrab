@@ -73,6 +73,14 @@ class Config:
     # #7 VWAP-sida: long bara med pris ÖVER dags-VWAP, short bara UNDER.
     #    Två döda signaler i rad handlades utan VWAP-stöd — aldrig mer.
     REQUIRE_VWAP_SIDE = os.environ.get("ROBBER_REQUIRE_VWAP_SIDE", "1") != "0"
+    # #8 Entry-policy (tiers): föredra retest, men tillåt breakout-entry när
+    #    momentum är EXCEPTIONELLT (annars är breakout-köp bara jagande):
+    #      conf >= MOMO_CONF och exceptionellt momentum -> ta breakouten DIREKT
+    #      annars                                       -> VÄNTA PÅ RETEST (limit i VWAP-zonen)
+    #    Exceptionellt = rel_vol >= MOMO_RELVOL och candlen stänger i yttersta
+    #    25% av sitt range i signalens riktning.
+    MOMO_CONF   = int(os.environ.get("ROBBER_MOMO_CONF", "85"))
+    MOMO_RELVOL = float(os.environ.get("ROBBER_MOMO_RELVOL", "1.5"))
 
     # --- Risk ---
     # Bredare stop: ORB vid öppningen behöver luft — för tight SL stoppade ut
@@ -112,7 +120,7 @@ class Config:
     }
     CONF_GREEN    = int(os.environ.get("CONF_GREEN",  "75"))   # gron A+ (stark konfluens)
     CONF_YELLOW   = int(os.environ.get("CONF_YELLOW", "55"))   # gul / bevaka
-    CONF_MIN_SEND = int(os.environ.get("CONF_MIN_SEND","55"))  # 5/7-basen ar triggern; confidence ar betyget
+    CONF_MIN_SEND = int(os.environ.get("CONF_MIN_SEND","75"))  # under grönt = INGEN trade-signal (tier-policyn #8); sänk till 55 för gamla BEVAKA-larmen
     SHADOW_LOG    = os.environ.get("SHADOW_LOG", "robber_shadow.jsonl")
     # --- Trade-journal (utfall + stats) ---
     DATA_DIR      = os.environ.get("DATA_DIR", ".")   # peka på Render Persistent Disk (t.ex. /var/data) för beständighet
@@ -528,17 +536,24 @@ def build_signal(ticker, df, bias):
 
     # #7 VWAP-sida: handla bara på RÄTT sida om dags-VWAP — long över, short
     # under. En short över VWAP slåss mot det institutionella snittet.
+    try:
+        _vw = _vwap_now(df)
+    except Exception:
+        _vw = float("nan")
     if Config.REQUIRE_VWAP_SIDE:
-        try:
-            _vw = _vwap_now(df)
-        except Exception:
-            _vw = float("nan")
         if np.isfinite(_vw) and ((side == "LONG" and price <= _vw)
                                  or (side == "SHORT" and price >= _vw)):
             STATUS["blocked_last"] = "%s %s %s: fel sida om VWAP (pris %.2f vs %.2f)" % (
                 datetime.now(timezone.utc).strftime("%H:%M"), side, ticker, price, _vw)
             print("[guard] %s %s: fel sida om VWAP — signal släppt" % (side, ticker))
             return None
+
+    # #8 Momentum-klassning för entry-policyn: exceptionell candle = rel_vol
+    # över MOMO_RELVOL och stängning i yttersta 25% av range i signalens riktning.
+    _rng = float(cur.High - cur.Low) or 1e-9
+    _pos = ((float(cur.Close) - float(cur.Low)) / _rng if side == "LONG"
+            else (float(cur.High) - float(cur.Close)) / _rng)
+    momo = bool(float(cur.rel_vol) >= Config.MOMO_RELVOL and _pos >= 0.75)
 
     block = _entry_guards(ticker, side, df, price, atr)
     if block:
@@ -583,7 +598,8 @@ def build_signal(ticker, df, bias):
         "price": price, "atr": round(atr, 2), "stop": stop,
         "risk_per_share": round(risk, 2), "targets": targets, "tp_labels": tp_labels,
         "shares": shares, "bias": bias, "reasons": reasons,
-        "tl_kind": tl_kind,
+        "tl_kind": tl_kind, "momo": momo,
+        "vwap_lvl": round(float(_vw), 2) if np.isfinite(_vw) else None,
         "bar_time": df.index[-1].isoformat(),
     }
 
@@ -1415,9 +1431,24 @@ def format_alert(sig):
         f"\U0001F525 Confidence: <b>{conf}/100</b>  \u00b7  {tier}",
         f"HTF Bias: {bias_txt}",
     ]
+    # Entry-policy (#8): f\u00f6redra retest \u2014 breakout-entry bara vid exceptionellt
+    # momentum OCH h\u00f6g confidence. Annars l\u00e4ggs limit i VWAP-zonen, jaga aldrig.
+    if bool(sig.get("momo")) and conf >= Config.MOMO_CONF:
+        mode_line = "\U0001F680 <b>MOMENTUM-ENTRY</b>: exceptionell styrka \u2014 ta breakouten direkt"
+    else:
+        _vl = sig.get("vwap_lvl")
+        if _vl:
+            _b = 0.1 * float(sig.get("atr") or 0)
+            _lim = round(_vl + _b, 2) if sig["side"] == "LONG" else round(_vl - _b, 2)
+            mode_line = (f"\u23f3 <b>V\u00c4NTA P\u00c5 RETEST</b>: l\u00e4gg limit i VWAP-zonen ~<b>{_lim}</b> "
+                         "\u2014 jaga INTE marknadspris; fylls den inte, ingen trade")
+        else:
+            mode_line = ("\u23f3 <b>V\u00c4NTA P\u00c5 RETEST</b>: entry vid \u00e5tertest av breakout-niv\u00e5n "
+                         "\u2014 jaga INTE marknadspris")
     lines += core_lines
     lines += [
         "\u2500\u2500\u2500\u2500\u2500",
+        mode_line,
         f"Entry: <b>{sig['price']}</b>",
         f"SL: {sig['stop']}   (risk {sig['risk_per_share']}/enhet)",
         tplines,
