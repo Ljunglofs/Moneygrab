@@ -149,7 +149,9 @@ class CTraderExecutor:
         self.client.setMessageReceivedCallback(self._on_message)
         self.client.startService()
         task.LoopingCall(self._poll).start(POLL_SEC, now=False)
-        reactor.run()
+        # installSignalHandlers=False -> går att köra i en bakgrundstråd inuti
+        # grabit-api (signalhanterare får bara sättas i huvudtråden).
+        reactor.run(installSignalHandlers=False)
 
     # ---- anslutning / auth ----
     def _on_connected(self, client):
@@ -380,6 +382,22 @@ def _dry_only_loop():
             state.setdefault("processed", []).append(rec["id"])
             _save_state(state)
         time.sleep(POLL_SEC)
+
+
+def start_in_background():
+    """Starta executorn i en daemon-tråd så den kan köras inuti grabit-api
+    (samma process/disk som boten -> delar kön). Gör inget om avstängd."""
+    if os.environ.get("SKILLING_ENABLED", "0") != "1":
+        return
+    import threading
+
+    def _run():
+        try:
+            main()
+        except Exception as e:
+            _log("executor-tråd dog:", e)
+    threading.Thread(target=_run, name="skilling-exec", daemon=True).start()
+    _log(f"executor startad i bakgrundstråd (mode={MODE}, dry_run={DRY_RUN})")
 
 
 def main():

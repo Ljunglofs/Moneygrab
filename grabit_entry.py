@@ -25,6 +25,15 @@ except Exception as e:
     # Roboten får ALDRIG hindra grabit från att starta.
     print(f"Robber kunde inte starta (grabit kör vidare): {e}")
 
+# 2a) Skilling/cTrader-executor (bakgrundstråd, samma disk som boten -> delar
+#     kön). Startar bara om SKILLING_ENABLED=1; utan SDK/creds kör den ren
+#     kö-loggning. Får ALDRIG hindra grabit från att starta.
+try:
+    import skilling_exec
+    skilling_exec.start_in_background()
+except Exception as e:
+    print(f"Skilling-executor kunde inte starta (grabit kör vidare): {e}")
+
 # 2b) Äkta serversidig PRO-låsning för webben (Stripe).
 try:
     import billing_web
