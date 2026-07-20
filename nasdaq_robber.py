@@ -711,23 +711,27 @@ def _vwap_now(df, bars=78):
 
 
 def detect_vwap_bounce(df, side, lookback=6):
-    """VWAP Bounce: pris i trend på rätt sida om VWAP, rekylerar TILL VWAP och
-    studsar (institutioner försvarar snittet). LONG över, SHORT under."""
+    """VWAP-retest: pris i trend på rätt sida om VWAP, rekylerar NER TILL VWAP
+    (touch) och stänger tillbaka på rätt sida — entry på ÅTERTESTET, inte på
+    approach. LONG = stängning ÖVER VWAP, SHORT = stängning UNDER VWAP.
+    Institutionerna försvarar snittet; vi tar bekräftelsen, inte gissningen."""
     v = _vwap_now(df)
     if not np.isfinite(v):
         return False, None
     atr = float(df["atr"].iloc[-1]) if "atr" in df.columns else 0.0
     if atr <= 0:
         atr = 1.0
-    band = 0.4 * atr
+    touch = 0.12 * atr    # baren måste faktiskt nudda VWAP (äkta retest)
     H = df["High"].to_numpy(); L = df["Low"].to_numpy(); C = df["Close"].to_numpy()
     m = min(5, len(C) - 1)
     prev_mean = float(np.nanmean(C[-m-1:-1])) if m > 0 else C[-1]
     if side == "LONG":
-        if prev_mean > v and (L[-1] <= v + band) and (C[-1] > v):
+        # uppåt-trend på rätt sida, low tar sig NED till VWAP, close reclaimar över
+        if prev_mean > v and (L[-1] <= v + touch) and (C[-1] > v):
             return True, round(v, 2)
     else:
-        if prev_mean < v and (H[-1] >= v - band) and (C[-1] < v):
+        # nedåt-trend på rätt sida, high tar sig UPP till VWAP, close rejectar under
+        if prev_mean < v and (H[-1] >= v - touch) and (C[-1] < v):
             return True, round(v, 2)
     return False, None
 
@@ -2039,6 +2043,44 @@ def _orb_check():
             print("[orb] ingen breakout idag")
             return
 
+        # ---- HÅRDA GATES: handla BARA med trenden och på rätt sida om VWAP ----
+        # Trend inom dagen (EMA20 vs EMA50 på 5m) + institutionellt snitt (VWAP)
+        # är de setups som gett bäst utfall — counter-trend-breakouts sållas bort.
+        ema20 = ema50 = None
+        try:
+            ema20 = float(df["Close"].ewm(span=20).mean().iloc[-1])
+            ema50 = float(df["Close"].ewm(span=50).mean().iloc[-1])
+        except Exception:
+            pass
+        trend_ok = (ema20 is None or ema50 is None) or (
+            ema20 > ema50 if side == "LONG" else ema20 < ema50)
+        if os.environ.get("ORB_REQUIRE_TREND", "1") == "1" and ema20 is not None and not trend_ok:
+            _ORB_STATE["fired"] = True
+            STATUS["orb_last"] = f"{today}: {side}-breakout MOT trenden (EMA20/50) — hoppar"
+            print(f"[orb] {side} counter-trend (EMA20/50) — skippad")
+            return
+
+        # Dagsankrad session-VWAP fram till breakout-baren
+        vwap = None
+        try:
+            m_day = np.array([t.date() == d0 for t in idx])
+            hi = df["High"].values[m_day].astype(float)
+            lo = df["Low"].values[m_day].astype(float)
+            cl = df["Close"].values[m_day].astype(float)
+            vo = df["Volume"].values[m_day].astype(float)
+            tp = (hi + lo + cl) / 3.0
+            vsum = float(vo.sum())
+            if vsum > 0:
+                vwap = float((tp * vo).sum() / vsum)
+        except Exception:
+            pass
+        vwap_ok = vwap is None or (c > vwap if side == "LONG" else c < vwap)
+        if os.environ.get("ORB_REQUIRE_VWAP", "1") == "1" and vwap is not None and not vwap_ok:
+            _ORB_STATE["fired"] = True
+            STATUS["orb_last"] = f"{today}: {side}-breakout fel sida om VWAP ({c:.1f} vs {vwap:.1f}) — hoppar"
+            print(f"[orb] {side} fel sida om VWAP — skippad")
+            return
+
         # SL: breakout-candelns extrem; range-kanten om den är orimligt tajt (<0.05%)
         if side == "LONG":
             sl = float(bo["Low"])
@@ -2055,7 +2097,7 @@ def _orb_check():
         if risk <= 0:
             return
 
-        # Filter -> confidence
+        # Filter -> confidence  (trend & VWAP redan säkrade som hårda gates ovan)
         conf = 60
         try:
             vol_avg = float(df["Volume"].tail(30).mean())
@@ -2063,13 +2105,10 @@ def _orb_check():
                 conf += 15
         except Exception:
             pass
-        try:
-            ema20 = float(df["Close"].ewm(span=20).mean().iloc[-1])
-            ema50 = float(df["Close"].ewm(span=50).mean().iloc[-1])
-            if (side == "LONG" and ema20 > ema50) or (side == "SHORT" and ema20 < ema50):
-                conf += 15
-        except Exception:
-            pass
+        if ema20 is not None and trend_ok:      # breakout MED intradagstrenden
+            conf += 15
+        if vwap is not None and vwap_ok:         # på rätt sida om VWAP
+            conf += 10
         news_risk, news_title = _orb_news_near_open(now_se)
         if news_risk:
             conf -= 20     # stor nyhet vid öppning -> breakouts blir opålitliga
@@ -2089,6 +2128,7 @@ def _orb_check():
             f"\U0001F3AF Entry: <b>{f(c)}</b>\n"
             f"\U0001F6D1 Stop: {f(sl)}\n"
             f"\U0001F4B0 TP1: {f(tp1)}  \u00b7  TP2: {f(tp2)}\n"
+            f"\U0001F4CA Med trenden · " + (f"stängning {'över' if side=='LONG' else 'under'} VWAP ({f(vwap)})" if vwap is not None else "VWAP saknas") + "\n"
             f"\U0001F916 Confidence: <b>{conf}/100</b>"
             + (f"\n\u26A0\uFE0F Makronyhet nära öppning: {news_title}" if news_risk else ""))
         try:
