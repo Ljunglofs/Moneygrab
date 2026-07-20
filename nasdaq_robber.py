@@ -2147,6 +2147,233 @@ def _orb_check():
         print("[orb] fel:", e)
 
 
+# =====================================================================
+#  GRABIT VWAP RETEST  ·  huvudsetup #2 (vid sidan av ORB 15/5)
+#  KÄRNREGEL: handla ALLTID med trenden — counter-trend är FÖRBJUDET.
+#
+#  LONG:  pris ÖVER stigande VWAP + EMA20>EMA50 + HH/HL-struktur.
+#         Rekyl nuddar/bryter VWAP lätt -> candle stänger ÖVER igen
+#         (bullish body, close i övre halvan, volym >= föregående)
+#         -> entry vid break av bekräftelse-candelns high.
+#  SHORT: spegelvänt under fallande VWAP med LL/LH-struktur.
+#
+#  HANDLAS INTE: flack VWAP · sidledes (EMA20~EMA50) · låg volym ·
+#  långt från VWAP (jaga aldrig) · counter-trend.
+#  Env: VWAP_ENABLED=1 · VWAP_MIN_CONF=65 · VWAP_MAX_PER_SIDE=1 ·
+#       VWAP_SLOPE_MIN_PCT=0.02 (%/30 min) · VWAP_REQUIRE_STRUCT=1
+# =====================================================================
+_VWAP_STATE = {"day": "", "fired": {"LONG": 0, "SHORT": 0}, "last_bar": ""}
+
+
+def _swing_pivots(H, L, k=2):
+    """Swing-pivoter: bar som är högst/lägst av k grannar åt varje håll.
+    Struktur bedöms på SWINGAR — inte på enskilda candles (en retest som
+    bryter VWAP lite gör ofta en lokal lower low utan att strukturen är bruten)."""
+    ph, pl = [], []
+    for i in range(k, len(H) - k):
+        if H[i] >= max(H[i - k:i + k + 1]):
+            ph.append(float(H[i]))
+        if L[i] <= min(L[i - k:i + k + 1]):
+            pl.append(float(L[i]))
+    return ph, pl
+
+
+def _vwap_retest_check():
+    if os.environ.get("VWAP_ENABLED", "1") != "1":
+        return
+    from zoneinfo import ZoneInfo
+    tz_se = ZoneInfo("Europe/Stockholm")
+    now_se = datetime.now(tz_se)
+    if now_se.weekday() > 4:
+        return
+    minutes = now_se.hour * 60 + now_se.minute
+    # US-sessionen minus första 20 min (VWAP måste sätta sig) och sista 30 min
+    if not (15 * 60 + 50 <= minutes <= 21 * 60 + 30):
+        return
+    today = now_se.strftime("%Y-%m-%d")
+    if _VWAP_STATE["day"] != today:
+        _VWAP_STATE["day"] = today
+        _VWAP_STATE["fired"] = {"LONG": 0, "SHORT": 0}
+        _VWAP_STATE["last_bar"] = ""
+    try:
+        import yfinance as yf
+        df = yf.download("NQ=F", period="2d", interval="5m", progress=False, auto_adjust=False)
+        if df is None or len(df) < 60:
+            return
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
+        tz_ny = ZoneInfo("America/New_York")
+        try:
+            idx = df.index.tz_convert(tz_ny)
+        except TypeError:
+            idx = df.index.tz_localize("UTC").tz_convert(tz_ny)
+        now_ny = now_se.astimezone(tz_ny)
+        d0 = now_ny.date()
+        # bara FÄRDIGA barer (yfinance sista rad är ofta pågående)
+        keep = [i for i, t in enumerate(idx) if t + timedelta(minutes=5) <= now_ny]
+        if len(keep) < 60:
+            return
+        H = df["High"].to_numpy(float)[keep]; L = df["Low"].to_numpy(float)[keep]
+        C = df["Close"].to_numpy(float)[keep]; O = df["Open"].to_numpy(float)[keep]
+        V = df["Volume"].to_numpy(float)[keep]
+        T = [idx[i] for i in keep]
+
+        bar_id = T[-1].isoformat()
+        if _VWAP_STATE["last_bar"] == bar_id:
+            return                      # den här baren är redan bedömd
+        _VWAP_STATE["last_bar"] = bar_id
+
+        # dagens RTH-barer (>= 09:30 NY) -> session-ankrad VWAP (kumulativ)
+        ses = [i for i in range(len(T))
+               if T[i].date() == d0 and (T[i].hour, T[i].minute) >= (9, 30) and T[i].hour < 16]
+        if len(ses) < 5:
+            return                      # för tidigt — VWAP inte etablerad
+        tp = (H[ses] + L[ses] + C[ses]) / 3.0
+        vv = V[ses].copy(); vv[vv <= 0] = 1.0
+        vw = np.cumsum(tp * vv) / np.cumsum(vv)      # VWAP per session-bar
+        vwap_now = float(vw[-1]); price = float(C[-1])
+
+        # ATR14 för buffertar
+        prevC = np.roll(C, 1); prevC[0] = C[0]
+        tr = np.maximum(H - L, np.maximum(np.abs(H - prevC), np.abs(L - prevC)))
+        atr = float(pd.Series(tr).rolling(14).mean().iloc[-1]) or 1.0
+
+        # ---- Sida följer VWAP-sidan: pris över VWAP => BARA long (aldrig counter) ----
+        side = "LONG" if price > vwap_now else "SHORT"
+        if _VWAP_STATE["fired"][side] >= int(os.environ.get("VWAP_MAX_PER_SIDE", "1")):
+            return
+
+        # ---- Trendfilter: EMA-stack + inte sidledes ----
+        ema20 = float(pd.Series(C).ewm(span=20).mean().iloc[-1])
+        ema50 = float(pd.Series(C).ewm(span=50).mean().iloc[-1])
+        ema_ok = ema20 > ema50 if side == "LONG" else ema20 < ema50
+        if not ema_ok:
+            STATUS["vwap_last"] = f"{today}: {side} men EMA20/50 emot — counter-trend, väntar"
+            return
+        if abs(ema20 - ema50) < 0.08 * atr:
+            STATUS["vwap_last"] = f"{today}: sidledes (EMA20~EMA50) — handlas inte"
+            return
+
+        # ---- VWAP-lutning: flack VWAP handlas inte ----
+        back = min(6, len(vw) - 1)      # ~30 min
+        slope_pct = (float(vw[-1]) - float(vw[-1 - back])) / price * 100.0
+        slope_min = float(os.environ.get("VWAP_SLOPE_MIN_PCT", "0.02"))
+        slope_ok = slope_pct >= slope_min if side == "LONG" else slope_pct <= -slope_min
+        if not slope_ok:
+            STATUS["vwap_last"] = f"{today}: flack VWAP ({slope_pct:+.3f}%/30m) — handlas inte"
+            return
+
+        # ---- Struktur: HH/HL för long, LL/LH för short (på swingar) ----
+        ph, pl = _swing_pivots(H[-40:], L[-40:], k=2)
+        struct_confirmed = None
+        if len(ph) >= 2 and len(pl) >= 2:
+            struct_confirmed = (ph[-1] > ph[-2] and pl[-1] > pl[-2]) if side == "LONG" \
+                          else (ph[-1] < ph[-2] and pl[-1] < pl[-2])
+        if os.environ.get("VWAP_REQUIRE_STRUCT", "1") == "1" and struct_confirmed is False:
+            STATUS["vwap_last"] = f"{today}: {side} men strukturen är inte {'HH/HL' if side == 'LONG' else 'LL/LH'} — väntar"
+            return
+
+        # ---- Pullback: någon av senaste 4 barerna nuddar/bryter VWAP LÄTT ----
+        touch = price * 0.0008          # touch-band ~0.08%
+        depth = price * 0.004           # max 0.4% igenom — djupare är breakdown, inte retest
+        retest_lo = retest_hi = None
+        for j in range(max(0, len(ses) - 4), len(ses)):
+            gi = ses[j]; v_j = float(vw[j])
+            if side == "LONG" and v_j - depth <= L[gi] <= v_j + touch:
+                retest_lo = L[gi] if retest_lo is None else min(retest_lo, L[gi])
+            if side == "SHORT" and v_j - touch <= H[gi] <= v_j + depth:
+                retest_hi = H[gi] if retest_hi is None else max(retest_hi, H[gi])
+        if (side == "LONG" and retest_lo is None) or (side == "SHORT" and retest_hi is None):
+            return                      # ingen retest — inget läge (normalläget, tyst)
+
+        # ---- Bekräftelse-candle (senaste färdiga baren) ----
+        rng = max(H[-1] - L[-1], 1e-9)
+        vol_avg = float(np.mean(V[-20:])) or 1.0
+        if side == "LONG":
+            conf_ok = (C[-1] > vwap_now and C[-1] > O[-1]          # stängning ÖVER + bullish body
+                       and (C[-1] - L[-1]) / rng >= 0.5            # close i övre halvan
+                       and V[-1] >= V[-2] and V[-1] >= 0.8 * vol_avg)
+            entry = float(H[-1]) + 0.05 * atr                      # break av bekräftelse-high
+            sl = min(float(retest_lo), vwap_now - 0.5 * atr)       # under retest-low / 0.5xATR under VWAP
+        else:
+            conf_ok = (C[-1] < vwap_now and C[-1] < O[-1]
+                       and (H[-1] - C[-1]) / rng >= 0.5
+                       and V[-1] >= V[-2] and V[-1] >= 0.8 * vol_avg)
+            entry = float(L[-1]) - 0.05 * atr
+            sl = max(float(retest_hi), vwap_now + 0.5 * atr)
+        if not conf_ok:
+            return                      # retest utan bekräftelse — vänta på rätt candle
+        # ---- Jaga aldrig: entry måste ligga nära VWAP ----
+        if abs(entry - vwap_now) / price > 0.004:
+            STATUS["vwap_last"] = f"{today}: {side} men {abs(entry - vwap_now) / price * 100:.2f}% från VWAP — jagar inte"
+            return
+        risk = abs(entry - sl)
+        if risk <= 0 or risk > 2.5 * atr:
+            return
+
+        tp1 = entry + 2 * risk if side == "LONG" else entry - 2 * risk
+        if side == "LONG":              # TP2 = närmsta swing bortom TP1, annars 3R
+            cands = [p for p in ph if p > tp1]
+            tp2 = min(cands) if cands else entry + 3 * risk
+        else:
+            cands = [p for p in pl if p < tp1]
+            tp2 = max(cands) if cands else entry - 3 * risk
+
+        # ---- Confidence ----
+        conf = 60
+        if abs(slope_pct) >= 2 * slope_min: conf += 10             # VWAP lutar ordentligt
+        if struct_confirmed:                conf += 10             # bekräftad HH/HL / LL/LH
+        if V[-1] > vol_avg:                 conf += 10             # volym över snittet
+        news_risk, news_title = (False, None)
+        try:
+            news_risk, news_title = _orb_news_near_open(now_se)
+        except Exception:
+            pass
+        if news_risk: conf -= 15
+        conf = min(conf, 95)
+        if conf < int(os.environ.get("VWAP_MIN_CONF", "65")):
+            STATUS["vwap_last"] = f"{today}: {side} men conf {conf} under tröskeln"
+            return
+
+        _VWAP_STATE["fired"][side] += 1
+        STATUS["vwap_last"] = f"{today}: {side} conf {conf} entry break {entry:.1f}"
+        f = lambda v: f"{v:,.1f}".replace(",", " ")
+        pil = "\U0001F4C8" if side == "LONG" else "\U0001F4C9"
+        notify(
+            "\U0001F4D0 <b>VWAP RETEST</b> · GRABIT VWAP\n"
+            f"{pil} <b>{side}</b> – US100 · med trenden\n"
+            f"\U0001F3AF Entry: break av <b>{f(entry)}</b> (giltig ~15 min)\n"
+            f"\U0001F6D1 Stop: {f(sl)}\n"
+            f"\U0001F4B0 TP1: {f(tp1)} (2R) · TP2: {f(tp2)} · trail 9 EMA efter TP1\n"
+            f"\U0001F4CA VWAP {f(vwap_now)} ({slope_pct:+.3f}%/30m) · "
+            + ("struktur " + ("HH/HL" if side == "LONG" else "LL/LH") + " · " if struct_confirmed else "")
+            + "volym ok\n"
+            f"\U0001F916 Confidence: <b>{conf}/100</b>"
+            + (f"\n⚠️ Makronyhet: {news_title}" if news_risk else ""))
+        try:
+            import push_notify as PN
+            PN.send_all(
+                f"\U0001F4D0 VWAP RETEST · {side} US100 · {conf}/100",
+                (f"Entry: break {f(entry)} | SL: {f(sl)} | TP1: {f(tp1)}"),
+                url="/", tag="grabit-vwap")
+        except Exception as e:
+            print("[vwap] push-fel:", e)
+        try:                             # egen ledger -> statistik innan något går live
+            with open(os.path.join(Config.DATA_DIR, "vwap_signals.jsonl"), "a", encoding="utf-8") as fh:
+                fh.write(json.dumps({
+                    "ts": now_se.isoformat(timespec="seconds"), "setup": "VWAP_RETEST",
+                    "side": side, "entry": round(entry, 2), "sl": round(sl, 2),
+                    "tp1": round(tp1, 2), "tp2": round(tp2, 2),
+                    "vwap": round(vwap_now, 2), "slope_pct": round(slope_pct, 4),
+                    "conf": conf}) + "\n")
+        except Exception:
+            pass
+        print(f"[vwap] {side} skickad: entry break {entry:.1f} sl {sl:.1f} tp1 {tp1:.1f} conf {conf}")
+    except Exception as e:
+        STATUS["vwap_last"] = f"{_VWAP_STATE.get('day', '?')}: FEL {type(e).__name__}: {str(e)[:140]}"
+        print("[vwap] fel:", e)
+
+
 def run_loop():
     print("=== NASDAQ ROBBER startad ===")
     print(f"Tickers: {Config.TICKERS}  |  {Config.MTF_TIMEFRAME} setup / {Config.HTF_TIMEFRAME} bias  |  data=yfinance (futures)")
@@ -2190,6 +2417,10 @@ def run_loop():
                 _orb_check()                    # GRABIT ORB 15/5 vid US-öppningen
             except Exception as e:
                 print(f"[orb] loop-fel: {e}")
+            try:
+                _vwap_retest_check()            # GRABIT VWAP RETEST · alltid med trenden
+            except Exception as e:
+                print(f"[vwap] loop-fel: {e}")
             scan_once()                         # skannar 24/7 (håller koll på natten/Asien)
             poly_scan()                         # Polymarket 24/7
         except Exception as e:
