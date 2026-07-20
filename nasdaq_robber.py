@@ -70,6 +70,9 @@ class Config:
     # #6 Volym-gate: relativ volym under tröskeln = fakeout-risk. En signal
     #    utan volymbekräftelse skickas inte alls (DO NOT TRADE: low volume).
     REQUIRE_VOLUME   = os.environ.get("ROBBER_REQUIRE_VOLUME", "1") != "0"
+    # #7 VWAP-sida: long bara med pris ÖVER dags-VWAP, short bara UNDER.
+    #    Två döda signaler i rad handlades utan VWAP-stöd — aldrig mer.
+    REQUIRE_VWAP_SIDE = os.environ.get("ROBBER_REQUIRE_VWAP_SIDE", "1") != "0"
 
     # --- Risk ---
     # Bredare stop: ORB vid öppningen behöver luft — för tight SL stoppade ut
@@ -522,6 +525,20 @@ def build_signal(ticker, df, bias):
             float(cur.rel_vol), cur_min_rel_volume())
         print("[guard] %s %s: låg volym — signal släppt" % (side, ticker))
         return None
+
+    # #7 VWAP-sida: handla bara på RÄTT sida om dags-VWAP — long över, short
+    # under. En short över VWAP slåss mot det institutionella snittet.
+    if Config.REQUIRE_VWAP_SIDE:
+        try:
+            _vw = _vwap_now(df)
+        except Exception:
+            _vw = float("nan")
+        if np.isfinite(_vw) and ((side == "LONG" and price <= _vw)
+                                 or (side == "SHORT" and price >= _vw)):
+            STATUS["blocked_last"] = "%s %s %s: fel sida om VWAP (pris %.2f vs %.2f)" % (
+                datetime.now(timezone.utc).strftime("%H:%M"), side, ticker, price, _vw)
+            print("[guard] %s %s: fel sida om VWAP — signal släppt" % (side, ticker))
+            return None
 
     block = _entry_guards(ticker, side, df, price, atr)
     if block:
