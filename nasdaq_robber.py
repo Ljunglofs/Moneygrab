@@ -64,6 +64,12 @@ class Config:
     # #4 Trendlinje-entries: studs på stigande stöd / fallande motstånd + brott
     #    igenom linjen. Ger en confluence-poäng och höjer confidence.
     USE_TRENDLINE    = os.environ.get("ROBBER_TRENDLINE", "1") != "0"
+    # #5 Natt/Asien-fönstret (22:00-08:00 SE) HANDLAS INTE — straffet -15
+    #    räckte inte, signalerna därifrån var dåliga. Hårt stopp i stället.
+    BLOCK_CHOP       = os.environ.get("ROBBER_BLOCK_CHOP", "1") != "0"
+    # #6 Volym-gate: relativ volym under tröskeln = fakeout-risk. En signal
+    #    utan volymbekräftelse skickas inte alls (DO NOT TRADE: low volume).
+    REQUIRE_VOLUME   = os.environ.get("ROBBER_REQUIRE_VOLUME", "1") != "0"
 
     # --- Risk ---
     # Bredare stop: ORB vid öppningen behöver luft — för tight SL stoppade ut
@@ -506,6 +512,15 @@ def build_signal(ticker, df, bias):
         STATUS["blocked_last"] = "%s %s %s: counter-trend mot 1h-bias (%s)" % (
             datetime.now(timezone.utc).strftime("%H:%M"), side, ticker, bias)
         print("[guard] %s %s: counter-trend mot bias %s" % (side, ticker, bias))
+        return None
+
+    # #6 Volym-gate: breakout/retest UTAN relativ volym är fakeout-benägen —
+    # skickas inte alls (DO NOT TRADE: low volume).
+    if Config.REQUIRE_VOLUME and float(cur.rel_vol) < cur_min_rel_volume():
+        STATUS["blocked_last"] = "%s %s %s: låg volym (rel %.2f < %.2f)" % (
+            datetime.now(timezone.utc).strftime("%H:%M"), side, ticker,
+            float(cur.rel_vol), cur_min_rel_volume())
+        print("[guard] %s %s: låg volym — signal släppt" % (side, ticker))
         return None
 
     block = _entry_guards(ticker, side, df, price, atr)
@@ -1515,10 +1530,17 @@ def scan_once():
             if sig:
                 conf, comps, groups = compute_confidence(mtf, bias, sig["side"])
                 kz_delta, kz_label = killzone_adjust(datetime.now(ZoneInfo(Config.LOCAL_TZ)))
-                conf = max(0, min(100, conf + kz_delta))
-                sig["confidence"] = conf; sig["groups"] = groups; sig["components"] = comps
-                sig["setup"] = _primary_setup(comps)
-                sig["killzone"] = kz_label; sig["kz_delta"] = kz_delta
+                # #5 Natt/Asien-chop HANDLAS INTE — hårt stopp, inte bara -15.
+                if Config.BLOCK_CHOP and kz_label == "lågvolym/chop":
+                    STATUS["blocked_last"] = "%s %s %s: lågvolym/chop-fönster — handlas inte" % (
+                        datetime.now(timezone.utc).strftime("%H:%M"), sig["side"], ticker)
+                    print("[guard] %s %s: chop-fönster — signal släppt" % (sig["side"], ticker))
+                    sig = None
+                else:
+                    conf = max(0, min(100, conf + kz_delta))
+                    sig["confidence"] = conf; sig["groups"] = groups; sig["components"] = comps
+                    sig["setup"] = _primary_setup(comps)
+                    sig["killzone"] = kz_label; sig["kz_delta"] = kz_delta
 
             if sig:
                 try:
@@ -1613,18 +1635,21 @@ def scan_now(send: bool = False) -> dict:
             if sig:
                 conf, comps, groups = compute_confidence(mtf, bias, sig["side"])
                 kz_delta, kz_label = killzone_adjust(datetime.now(ZoneInfo(Config.LOCAL_TZ)))
+                # #5 chop-fönstret: visa setupen i diagnostiken men skicka aldrig larm
+                chop_block = Config.BLOCK_CHOP and kz_label == "lågvolym/chop"
                 conf = max(0, min(100, conf + kz_delta))
                 sig["confidence"] = conf; sig["groups"] = groups; sig["components"] = comps
                 sig["setup"] = _primary_setup(comps)
                 sig["killzone"] = kz_label; sig["kz_delta"] = kz_delta
-                would = conf >= cur_conf_min_send()
+                would = conf >= cur_conf_min_send() and not chop_block
                 fresh = age <= Config.BAR_MINUTES * 3
                 row.update({"setup": sig["setup"], "side": sig["side"], "confidence": conf,
                             "entry": sig["price"], "sl": sig["stop"], "targets": sig.get("targets"),
                             "over_troskel": would, "fardata": fresh, "conf_troskel": cur_conf_min_send(),
                             "i_handelsfonster": tradable})
-                row["status"] = ("SETUP: %s %s %d/100%s%s" % (
-                    sig["side"], sig["setup"], conf, "" if would else " (under larmtröskel)",
+                row["status"] = ("SETUP: %s %s %d/100%s%s%s" % (
+                    sig["side"], sig["setup"], conf, "" if would or chop_block else " (under larmtröskel)",
+                    " · chop-fönster — handlas inte" if chop_block else "",
                     "" if fresh else " · stale data (marknad stängd?)"))
                 if send and would and fresh:
                     try:
