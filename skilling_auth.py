@@ -55,10 +55,21 @@ def main():
         "client_id": CLIENT_ID, "redirect_uri": REDIRECT,
         "scope": SCOPE, "product": "web"})
 
-    print("\n1) Öppna den här länken i webbläsaren och godkänn ditt DEMO-konto:\n")
-    print("   " + auth_url + "\n")
-    print("2) Du hamnar på en http://localhost/?code=... som inte laddar (normalt).")
-    raw = input("3) Klistra in hela adressen (eller bara code): ").strip()
+    # Koden kan skickas som argument (python skilling_auth.py "http://localhost/?code=..")
+    # eller via env CT_CODE — smidigt i Render-shellen. Annars frågar vi interaktivt.
+    raw = (sys.argv[1] if len(sys.argv) > 1 else os.environ.get("CT_CODE", "")).strip()
+    if not raw:
+        print("\n1) Öppna den här länken i webbläsaren och godkänn ditt DEMO-konto:\n")
+        print("   " + auth_url + "\n")
+        print("2) Du hamnar på en http://localhost/?code=... som inte laddar (normalt).")
+        print("3) Kör sen igen med koden som argument:")
+        print('     python skilling_auth.py "http://localhost/?code=DIN_KOD"\n')
+        try:
+            raw = input("   …eller klistra in hela adressen här nu: ").strip()
+        except EOFError:
+            raw = ""
+        if not raw:
+            return
 
     code = raw
     if "code=" in raw:
