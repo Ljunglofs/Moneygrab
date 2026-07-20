@@ -1009,12 +1009,60 @@ def _shadow_log(sig, sent):
 
 
 def maybe_autotrade(sig):
-    """Exekvering via Alpaca. Styrs av env EXECUTE=off|paper|live."""
+    """Exekvering. Alpaca via EXECUTE=off|paper|live, Skilling/cTrader via
+    SKILLING_ENABLED=1 (fristående executor läser kön)."""
     if Config.EXECUTE in ("paper", "live"):
         execute_signal(sig)
     else:
         print("[exec] EXECUTE=off -- signal skickad men ingen order "
               "(satt EXECUTE=paper i Render for att handla i Alpaca paper)")
+    # Skilling/cTrader: skriv BARA en kö-rad (aldrig blockerande) — en separat
+    # process (skilling_exec.py) autentiserar och lägger ordern. Så kan aldrig
+    # en hängande mäklar-anslutning frysa skannern.
+    if os.environ.get("SKILLING_ENABLED", "0") == "1":
+        try:
+            skilling_enqueue(sig)
+        except Exception as _se:
+            print(f"[skilling] enqueue-fel (signalen påverkas inte): {_se}")
+
+
+def skilling_enqueue(sig):
+    """Normalisera signalen och lägg den i skilling_queue.jsonl. Instant, inga
+    tunga beroenden — själva order-läggningen sker i skilling_exec.py."""
+    conf = int(sig.get("confidence") or 0)
+    momo = bool(sig.get("momo"))
+    # Entry-policy #8: exceptionellt momentum -> MARKET, annars LIMIT i VWAP-zonen.
+    if momo and conf >= Config.MOMO_CONF:
+        order, limit_price = "MARKET", None
+    else:
+        vl = sig.get("vwap_lvl")
+        buf = 0.1 * float(sig.get("atr") or 0)
+        limit_price = (round(vl + buf, 2) if sig["side"] == "LONG" else round(vl - buf, 2)) \
+            if vl else sig["price"]
+        order = "LIMIT"
+    tgs = sig.get("targets") or []
+    _skilling_put({
+        "id": f"{sig['ticker']}:{sig['side']}:{sig['bar_time']}",
+        "source": sig.get("setup") or "ROBBER",
+        "ticker": sig["ticker"], "side": sig["side"],
+        "order": order, "entry": sig["price"], "limit_price": limit_price,
+        "sl": sig["stop"], "tp1": tgs[0] if tgs else None,
+        "tp2": tgs[1] if len(tgs) > 1 else None,
+        "conf": conf, "momo": momo,
+    })
+
+
+def _skilling_put(rec):
+    """Skriv en normaliserad kö-rad (instant append). Delas av huvudmotorn,
+    ORB och VWAP-retest. Gör inget om SKILLING_ENABLED != 1."""
+    if os.environ.get("SKILLING_ENABLED", "0") != "1":
+        return
+    rec.setdefault("ts", datetime.now(timezone.utc).isoformat(timespec="seconds"))
+    path = os.path.join(Config.DATA_DIR, "skilling_queue.jsonl")
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(rec) + "\n")
+    print(f"[skilling] köad: {rec.get('side')} {rec.get('ticker')} "
+          f"{rec.get('order')} conf {rec.get('conf')}")
 
 
 # ==================================================================
@@ -2214,6 +2262,14 @@ def _orb_check():
                 url="/", tag="grabit-orb")
         except Exception as e:
             print("[orb] push-fel:", e)
+        try:
+            _skilling_put({"id": f"ORB:{side}:{today}", "source": "ORB",
+                           "ticker": "NQ=F", "side": side, "order": "STOP",
+                           "entry": round(c, 2), "limit_price": round(c, 2),
+                           "sl": round(sl, 2), "tp1": round(tp1, 2), "tp2": round(tp2, 2),
+                           "conf": conf, "momo": True})
+        except Exception as _se:
+            print("[orb] skilling-enqueue-fel:", _se)
         print(f"[orb] {side} skickad: entry {c:.1f} sl {sl:.1f} tp1 {tp1:.1f} conf {conf}")
     except Exception as e:
         STATUS["orb_last"] = f"{_ORB_STATE.get('day','?')}: FEL {type(e).__name__}: {str(e)[:140]}"
@@ -2461,6 +2517,14 @@ def _vwap_retest_check():
                     "conf": conf}) + "\n")
         except Exception:
             pass
+        try:
+            _skilling_put({"id": f"VWAP:{sess}:{side}:{bar_id}", "source": f"VWAP-{sess}",
+                           "ticker": "NQ=F", "side": side, "order": "STOP",
+                           "entry": round(entry, 2), "limit_price": round(entry, 2),
+                           "sl": round(sl, 2), "tp1": round(tp1, 2), "tp2": round(tp2, 2),
+                           "conf": conf, "momo": False})
+        except Exception as _se:
+            print("[vwap] skilling-enqueue-fel:", _se)
         print(f"[vwap] {side} skickad: entry break {entry:.1f} sl {sl:.1f} tp1 {tp1:.1f} conf {conf}")
     except Exception as e:
         STATUS["vwap_last"] = f"{_VWAP_STATE.get('day', '?')}: FEL {type(e).__name__}: {str(e)[:140]}"

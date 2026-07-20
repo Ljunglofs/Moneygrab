@@ -1,0 +1,5 @@
+# Endast för skilling_exec.py (cTrader-executorn) — körs som EGEN process,
+# inte tillsammans med API:t/boten (undviker att dra in twisted överallt).
+ctrader-open-api
+protobuf
+twisted
