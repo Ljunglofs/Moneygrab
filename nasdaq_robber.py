@@ -2159,10 +2159,14 @@ def _orb_check():
 #
 #  HANDLAS INTE: flack VWAP · sidledes (EMA20~EMA50) · låg volym ·
 #  långt från VWAP (jaga aldrig) · counter-trend.
-#  Env: VWAP_ENABLED=1 · VWAP_MIN_CONF=65 · VWAP_MAX_PER_SIDE=1 ·
+#  Sessioner: LONDON 09:15-13:30 SE (Globex-ankrad VWAP, 18:00 NY) och
+#             US 15:50-21:30 SE (RTH-ankrad VWAP, 09:30 NY).
+#  Env: VWAP_ENABLED=1 · VWAP_LONDON=1 · VWAP_MIN_CONF=65 ·
+#       VWAP_MAX_PER_SIDE=1 (per session & sida) ·
 #       VWAP_SLOPE_MIN_PCT=0.02 (%/30 min) · VWAP_REQUIRE_STRUCT=1
 # =====================================================================
-_VWAP_STATE = {"day": "", "fired": {"LONG": 0, "SHORT": 0}, "last_bar": ""}
+_VWAP_STATE = {"day": "", "fired": {"LDN": {"LONG": 0, "SHORT": 0},
+                                    "US": {"LONG": 0, "SHORT": 0}}, "last_bar": ""}
 
 
 def _swing_pivots(H, L, k=2):
@@ -2187,13 +2191,19 @@ def _vwap_retest_check():
     if now_se.weekday() > 4:
         return
     minutes = now_se.hour * 60 + now_se.minute
-    # US-sessionen minus första 20 min (VWAP måste sätta sig) och sista 30 min
-    if not (15 * 60 + 50 <= minutes <= 21 * 60 + 30):
+    # Två sessioner:
+    #  · LONDON 09:15-13:30 SE — VWAP ankras i futures-dygnets start (18:00 NY)
+    #  · US     15:50-21:30 SE — VWAP ankras i RTH-öppningen (09:30 NY),
+    #    minus första 20 min (VWAP måste sätta sig) och sista 30 min
+    in_ldn = (9 * 60 + 15 <= minutes <= 13 * 60 + 30) and os.environ.get("VWAP_LONDON", "1") == "1"
+    in_us  = (15 * 60 + 50 <= minutes <= 21 * 60 + 30)
+    if not (in_ldn or in_us):
         return
+    sess = "LDN" if in_ldn else "US"
     today = now_se.strftime("%Y-%m-%d")
     if _VWAP_STATE["day"] != today:
         _VWAP_STATE["day"] = today
-        _VWAP_STATE["fired"] = {"LONG": 0, "SHORT": 0}
+        _VWAP_STATE["fired"] = {"LDN": {"LONG": 0, "SHORT": 0}, "US": {"LONG": 0, "SHORT": 0}}
         _VWAP_STATE["last_bar"] = ""
     try:
         import yfinance as yf
@@ -2223,9 +2233,18 @@ def _vwap_retest_check():
             return                      # den här baren är redan bedömd
         _VWAP_STATE["last_bar"] = bar_id
 
-        # dagens RTH-barer (>= 09:30 NY) -> session-ankrad VWAP (kumulativ)
-        ses = [i for i in range(len(T))
-               if T[i].date() == d0 and (T[i].hour, T[i].minute) >= (9, 30) and T[i].hour < 16]
+        # Sessionsbarer -> ankrad VWAP (kumulativ)
+        if sess == "US":
+            # RTH-ankrad: dagens barer från 09:30 NY
+            ses = [i for i in range(len(T))
+                   if T[i].date() == d0 and (T[i].hour, T[i].minute) >= (9, 30) and T[i].hour < 16]
+        else:
+            # Globex-ankrad: från futures-dygnets start (18:00 NY) — det är
+            # rätt ankare på Londonmorgonen, innan RTH ens har öppnat
+            anchor = now_ny.replace(hour=18, minute=0, second=0, microsecond=0)
+            if now_ny < anchor:
+                anchor -= timedelta(days=1)
+            ses = [i for i in range(len(T)) if T[i] >= anchor]
         if len(ses) < 5:
             return                      # för tidigt — VWAP inte etablerad
         tp = (H[ses] + L[ses] + C[ses]) / 3.0
@@ -2240,7 +2259,7 @@ def _vwap_retest_check():
 
         # ---- Sida följer VWAP-sidan: pris över VWAP => BARA long (aldrig counter) ----
         side = "LONG" if price > vwap_now else "SHORT"
-        if _VWAP_STATE["fired"][side] >= int(os.environ.get("VWAP_MAX_PER_SIDE", "1")):
+        if _VWAP_STATE["fired"][sess][side] >= int(os.environ.get("VWAP_MAX_PER_SIDE", "1")):
             return
 
         # ---- Trendfilter: EMA-stack + inte sidledes ----
@@ -2335,12 +2354,13 @@ def _vwap_retest_check():
             STATUS["vwap_last"] = f"{today}: {side} men conf {conf} under tröskeln"
             return
 
-        _VWAP_STATE["fired"][side] += 1
-        STATUS["vwap_last"] = f"{today}: {side} conf {conf} entry break {entry:.1f}"
+        _VWAP_STATE["fired"][sess][side] += 1
+        sess_name = "London" if sess == "LDN" else "New York"
+        STATUS["vwap_last"] = f"{today}: {side} ({sess_name}) conf {conf} entry break {entry:.1f}"
         f = lambda v: f"{v:,.1f}".replace(",", " ")
         pil = "\U0001F4C8" if side == "LONG" else "\U0001F4C9"
         notify(
-            "\U0001F4D0 <b>VWAP RETEST</b> · GRABIT VWAP\n"
+            "\U0001F4D0 <b>VWAP RETEST</b> · GRABIT VWAP · " + sess_name + "\n"
             f"{pil} <b>{side}</b> – US100 · med trenden\n"
             f"\U0001F3AF Entry: break av <b>{f(entry)}</b> (giltig ~15 min)\n"
             f"\U0001F6D1 Stop: {f(sl)}\n"
@@ -2354,7 +2374,7 @@ def _vwap_retest_check():
             import push_notify as PN
             PN.send_all(
                 f"\U0001F4D0 VWAP RETEST · {side} US100 · {conf}/100",
-                (f"Entry: break {f(entry)} | SL: {f(sl)} | TP1: {f(tp1)}"),
+                (f"{sess_name}\nEntry: break {f(entry)} | SL: {f(sl)} | TP1: {f(tp1)}"),
                 url="/", tag="grabit-vwap")
         except Exception as e:
             print("[vwap] push-fel:", e)
@@ -2362,7 +2382,7 @@ def _vwap_retest_check():
             with open(os.path.join(Config.DATA_DIR, "vwap_signals.jsonl"), "a", encoding="utf-8") as fh:
                 fh.write(json.dumps({
                     "ts": now_se.isoformat(timespec="seconds"), "setup": "VWAP_RETEST",
-                    "side": side, "entry": round(entry, 2), "sl": round(sl, 2),
+                    "session": sess, "side": side, "entry": round(entry, 2), "sl": round(sl, 2),
                     "tp1": round(tp1, 2), "tp2": round(tp2, 2),
                     "vwap": round(vwap_now, 2), "slope_pct": round(slope_pct, 4),
                     "conf": conf}) + "\n")
