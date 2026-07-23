@@ -2109,9 +2109,11 @@ def _orb_check():
     now_se = datetime.now(tz_se)
     if now_se.weekday() > 4:
         return
-    # Fönstret: breakout-candeln stänger 15:50 -> kolla 15:50-16:20
+    # Fönster: från att 9:45-baren stängt (15:50 SE) tills bortre gränsen —
+    # breakouten får utvecklas, vi jagar den på VILKEN stapel som helst i fönstret.
     minutes = now_se.hour * 60 + now_se.minute
-    if not (15 * 60 + 50 <= minutes <= 16 * 60 + 20):
+    ORB_END = int(os.environ.get("ORB_WINDOW_END_MIN", str(16 * 60 + 45)))  # 10:45 NY
+    if not (15 * 60 + 50 <= minutes <= ORB_END):
         return
     today = now_se.strftime("%Y-%m-%d")
     if _ORB_STATE["day"] == today and _ORB_STATE["fired"]:
@@ -2120,7 +2122,10 @@ def _orb_check():
 
     try:
         import yfinance as yf
-        df = yf.download("NQ=F", period="1d", interval="5m", progress=False, auto_adjust=False)
+        # 5 dagar 5m -> EMA20/50 blir ett MENINGSFULLT trendmått (period="1d"
+        # gav bara några staplar vid öppningen = brus). OR/VWAP filtreras ändå
+        # på dagens datum, så mer historik påverkar dem inte.
+        df = yf.download("NQ=F", period="5d", interval="5m", progress=False, auto_adjust=False)
         if df is None or len(df) < 4:
             STATUS["orb_last"] = f"{today}: ingen/för lite 5m-data ({0 if df is None else len(df)} barer)"
             return
@@ -2135,7 +2140,8 @@ def _orb_check():
             idx = df.index.tz_convert(tz_ny)
         except TypeError:
             idx = df.index.tz_localize("UTC").tz_convert(tz_ny)
-        d0 = now_se.astimezone(tz_ny).date()
+        now_ny = now_se.astimezone(tz_ny)
+        d0 = now_ny.date()
 
         def bar_at(h, m):
             for i, t in enumerate(idx):
@@ -2143,26 +2149,38 @@ def _orb_check():
                     return df.iloc[i]
             return None
 
+        # Opening range = 9:30/9:35/9:40 (15 min).
         b1 = bar_at(9, 30); b2 = bar_at(9, 35); b3 = bar_at(9, 40)
-        bo = bar_at(9, 45)
-        if b1 is None or b2 is None or b3 is None or bo is None:
-            STATUS["orb_last"] = (f"{today}: väntar på barer "
+        if b1 is None or b2 is None or b3 is None:
+            STATUS["orb_last"] = (f"{today}: väntar på opening range "
                                   f"(9:30 {'ok' if b1 is not None else '-'}, 9:35 {'ok' if b2 is not None else '-'}, "
-                                  f"9:40 {'ok' if b3 is not None else '-'}, 9:45 {'ok' if bo is not None else '-'})")
-            return  # baren inte klar än — provas igen nästa cykel
+                                  f"9:40 {'ok' if b3 is not None else '-'})")
+            return  # barerna inte klara än — provas igen nästa cykel
         or_high = max(float(b1["High"]), float(b2["High"]), float(b3["High"]))
         or_low = min(float(b1["Low"]), float(b2["Low"]), float(b3["Low"]))
-        c = float(bo["Close"])
 
-        if c > or_high:
-            side = "LONG"
-        elif c < or_low:
-            side = "SHORT"
-        else:
-            _ORB_STATE["fired"] = True   # ingen breakout idag — klart för idag
-            STATUS["orb_last"] = f"{today}: ingen breakout (range {or_low:.1f}-{or_high:.1f}, stängning {c:.1f})"
-            print("[orb] ingen breakout idag")
+        # Leta breakout på NÅGON färdig stapel från 9:45 och framåt (inte bara
+        # 9:45-baren). Första stapeln som STÄNGER utanför rangen är breakouten.
+        bo = None; side = None
+        for i, t in enumerate(idx):
+            if t.date() != d0 or (t.hour, t.minute) < (9, 45) or t.hour >= 12:
+                continue
+            if t + timedelta(minutes=5) > now_ny:      # bara FÄRDIGA staplar
+                continue
+            cc = float(df.iloc[i]["Close"])
+            if cc > or_high:
+                bo, side = df.iloc[i], "LONG"; break
+            if cc < or_low:
+                bo, side = df.iloc[i], "SHORT"; break
+        if bo is None:
+            if minutes >= ORB_END:                     # fönstret slut -> ingen breakout idag
+                _ORB_STATE["fired"] = True
+                STATUS["orb_last"] = f"{today}: ingen breakout (range {or_low:.1f}-{or_high:.1f})"
+                print("[orb] ingen breakout idag")
+            else:                                      # vänta — breakouten kan komma
+                STATUS["orb_last"] = f"{today}: väntar på breakout (range {or_low:.1f}-{or_high:.1f})"
             return
+        c = float(bo["Close"])
 
         # ---- HÅRDA GATES: handla BARA med trenden och på rätt sida om VWAP ----
         # Trend inom dagen (EMA20 vs EMA50 på 5m) + institutionellt snitt (VWAP)
