@@ -4338,6 +4338,116 @@ def topop():
     return {"pick": out, "regim": reg}
 
 
+# =====================================================================
+#  GRABIT RADAR  ·  "varför ligger den här aktien på radarn idag?"
+#  Till skillnad från Top Opportunity (entry/stop/mål) förklarar Radar
+#  vad som är OVANLIGT med aktien just idag — med riktiga siffror.
+#  VIKTIGT: varje punkt härleds ur faktisk data. Vi hittar aldrig på
+#  katalysatorer ("nytt kontrakt") — finns ingen nyhet står det inget.
+# =====================================================================
+def _radar_rank(r):
+    """Ovanlighet, inte kvalitet: volymavvikelse väger tyngst."""
+    rv = float(r.get("rank_rel_vol", r.get("rel_vol")) or 0)
+    mom = float(r.get("rank_momentum", r.get("momentum")) or 0)
+    near_hi = 1.0 if -6 <= float(r.get("pct_from_high") or -99) <= 1 else 0.0
+    bos = 1.0 if str(r.get("bos", "")).upper().startswith("BULL") else 0.0
+    return rv * 3.0 + mom * 0.12 + near_hi * 2.0 + bos * 1.5
+
+
+@cached(900)
+def _radar_pick():
+    scanned = scan_universe(None) or []
+    reg = _market_regime()
+    # Bara lägen som håller kvalitetskraven — radarn ska inte lyfta en
+    # kollapsande aktie bara för att volymen är hög.
+    cand = [r for r in scanned if _pick_eligible(r, reg)]
+    if not cand:
+        cand = [r for r in scanned if str(r.get("label")) in _BULL_LABELS]
+    if not cand:
+        return None
+    cand = _mix_markets(sorted(cand, key=_radar_rank, reverse=True), 8)
+    r = cand[0]
+    tk = r.get("ticker")
+    rv = float(r.get("rank_rel_vol", r.get("rel_vol")) or 0)
+
+    # ---- Bevis: BARA det datan faktiskt visar ----
+    ev = []
+    if rv >= 1.3:
+        ev.append({"ic": "volume", "txt": "+%d%% ovanlig volym mot 20-dagarssnittet"
+                   % round((rv - 1) * 100)})
+    if float(r.get("ret_5") or 0) >= 3:
+        ev.append({"ic": "momentum", "txt": "Momentum ökar — +%.1f%% på 5 dagar"
+                   % float(r.get("ret_5") or 0)})
+    pfh = float(r.get("pct_from_high") or -99)
+    if -6 <= pfh <= 1:
+        ev.append({"ic": "breakout", "txt": "Testar 52-veckorstoppen (%.1f%% under)" % abs(pfh)})
+    if str(r.get("bos", "")).upper().startswith("BULL"):
+        ev.append({"ic": "breakout", "txt": "Bryter struktur uppåt (BOS bekräftad)"})
+    if float(r.get("ret_20") or 0) >= 10:
+        ev.append({"ic": "momentum", "txt": "+%.0f%% senaste månaden" % float(r.get("ret_20") or 0)})
+
+    # Insiderköp = riktigt "smart money"-bevis. Vi kallar det ALDRIG
+    # "institutionellt intresse" — det är insiders, och det säger vi.
+    try:
+        for it in (_fmp_insider_flow() or []):
+            if it.get("ticker") == tk and it.get("action") == "KÖP":
+                ev.append({"ic": "insider", "txt": "Insiderköp registrerat (%s)" % (it.get("amount") or "Form 4")})
+                break
+    except Exception:
+        pass
+
+    # Katalysator = en VERKLIG nyhetsrubrik. Ingen nyhet -> ingen rad.
+    catalyst = None
+    try:
+        nw = _company_news(tk) or []
+        if nw:
+            catalyst = {"headline": nw[0].get("headline"), "url": nw[0].get("url"),
+                        "source": nw[0].get("source")}
+    except Exception:
+        pass
+
+    sc = float(r.get("score10") or 0)
+    conf = int(max(35, min(95, round(sc * 8 + min(rv, 3) * 6))))
+    atrp = float(r.get("atr_pct") or 0)
+    risk = "Låg" if atrp < 3 else ("Medium" if atrp < 6 else "Hög")
+    rr = round(max(1.0, min(4.0, (100 - conf) and (conf / 25.0))), 1)
+
+    return {"ticker": tk, "name": (company_info(tk) or {}).get("name") or tk,
+            "price": r.get("last"), "score": sc, "tier": _pick_tier(r, reg),
+            "confidence": conf, "risk": risk, "rr": rr, "rel_vol": round(rv, 2),
+            "evidence": ev[:5], "catalyst": catalyst,
+            "label": r.get("label", ""), "regim": reg}
+
+
+@app.get("/api/radar")
+def radar(lang: str = "sv"):
+    p = _radar_pick()
+    if not p:
+        return {"pick": None}
+    # Bull/bear-case från Claude — men BARA på siffrorna ovan, aldrig påhittat.
+    ev = "; ".join(e["txt"] for e in p["evidence"]) or "inga extrema avvikelser"
+    cat = (p.get("catalyst") or {}).get("headline") or "ingen färsk nyhet"
+    txt = _ai_text(
+        "radar:%s:%s:%s" % (p["ticker"], p["score"], p["rel_vol"]),
+        ("Du är en nykter aktieanalytiker. Skriv EXAKT två rader, inget annat:\n"
+         "BULL: <en mening>\nBEAR: <en mening>\n"
+         "Utgå ENBART från de givna datapunkterna. Hitta ALDRIG på nyheter, "
+         "kontrakt eller siffror som inte står i underlaget. Ingen rådgivning."),
+        ("Aktie: %s (%s). GRABIT-score %.1f/10. Signaler: %s. Senaste nyhet: %s."
+         % (p["ticker"], p["name"], p["score"], ev, cat)),
+        max_tokens=180, lang=lang)
+    bull = bear = ""
+    for line in (txt or "").splitlines():
+        s = line.strip()
+        if s.upper().startswith("BULL"):
+            bull = s.split(":", 1)[-1].strip()
+        elif s.upper().startswith("BEAR"):
+            bear = s.split(":", 1)[-1].strip()
+    p["bull"] = bull
+    p["bear"] = bear
+    return {"pick": p}
+
+
 # ---- Facit / track record ---------------------------------------------------
 # Loggar dagens picks varje börsdag och utvärderar dem efter ~en handelsvecka.
 # Det är det här som visar att appen faktiskt levererar — öppet och ärligt.
