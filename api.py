@@ -2204,7 +2204,8 @@ def events():
 #  makrorad. Vi fyller aldrig ut med påhittat innehåll.
 # =====================================================================
 @cached(600)
-def _today3():
+def _today3(lang: str = "sv"):
+    EN = str(lang).lower().startswith("en")
     import datetime as _dt2
     out = []
     today = _dt2.date.today()
@@ -2228,8 +2229,8 @@ def _today3():
             dt, e = best
             out.append({"kind": "macro", "title": e.get("title", ""),
                         "sub": " · ".join(x for x in [
-                            ("Väntat " + str(e.get("forecast"))) if e.get("forecast") else "",
-                            ("förra " + str(e.get("previous"))) if e.get("previous") else ""] if x),
+                            (("Forecast " if EN else "Väntat ") + str(e.get("forecast"))) if e.get("forecast") else "",
+                            (("prev. " if EN else "förra ") + str(e.get("previous"))) if e.get("previous") else ""] if x),
                         "cc": e.get("country", ""), "when": dt.strftime("%H:%M"),
                         "date": dt.date().isoformat(),
                         "days": (dt.date() - today).days, "high": True})
@@ -2242,11 +2243,12 @@ def _today3():
         if evs:
             e = evs[0]
             em = e.get("exp_move")
-            out.append({"kind": "earnings", "title": e["tkr"] + " rapporterar",
+            out.append({"kind": "earnings",
+                        "title": e["tkr"] + (" reports" if EN else " rapporterar"),
                         "ticker": e["tkr"],
                         "sub": " · ".join(x for x in [
-                            ("Väntad rörelse ±%.1f%%" % em) if em else "",
-                            ("EPS-est " + e["eps"]) if e.get("eps") else ""] if x),
+                            ((("Expected move ±%.1f%%" if EN else "Väntad rörelse ±%.1f%%") % em)) if em else "",
+                            ((("EPS est. " if EN else "EPS-est ") + e["eps"])) if e.get("eps") else ""] if x),
                         "when": e.get("date", ""), "days": e.get("days"), "high": False})
     except Exception as ex:
         print("today3 rapport:", ex)
@@ -2256,9 +2258,11 @@ def _today3():
         p = _radar_pick()
         if p and p.get("ticker"):
             ev = (p.get("evidence") or [])
-            out.append({"kind": "radar", "title": p["ticker"] + " på radarn",
+            out.append({"kind": "radar",
+                        "title": p["ticker"] + (" on the radar" if EN else " på radarn"),
                         "ticker": p["ticker"],
-                        "sub": " · ".join(e["txt"] for e in ev[:2]),
+                        "sub": " · ".join((e.get("en") or e.get("txt")) if EN else e.get("txt")
+                                          for e in ev[:2]),
                         "conf": p.get("confidence"), "high": False})
     except Exception as ex:
         print("today3 radar:", ex)
@@ -2266,8 +2270,8 @@ def _today3():
 
 
 @app.get("/api/today3")
-def today3():
-    return {"items": _today3()}
+def today3(lang: str = "sv"):
+    return {"items": _today3("en" if str(lang).lower().startswith("en") else "sv")}
 
 
 # ----- MAKROKALENDER (gratis, ingen nyckel — ForexFactory veckofeed) --
@@ -4473,27 +4477,42 @@ def _radar_pick():
     rv = float(r.get("rank_rel_vol", r.get("rel_vol")) or 0)
 
     # ---- Bevis: BARA det datan faktiskt visar ----
+    # Varje bevis bär BÅDA språken — inga svenska strängar läcker in i den
+    # engelska appen (och tvärtom). Formateras vid utskick, inte här.
     ev = []
     if rv >= 1.3:
-        ev.append({"ic": "volume", "txt": "+%d%% ovanlig volym mot 20-dagarssnittet"
-                   % round((rv - 1) * 100)})
+        ev.append({"ic": "volume",
+                   "txt": "+%d%% ovanlig volym mot 20-dagarssnittet" % round((rv - 1) * 100),
+                   "en": "+%d%% unusual volume vs the 20-day average" % round((rv - 1) * 100)})
     if float(r.get("ret_5") or 0) >= 3:
-        ev.append({"ic": "momentum", "txt": "Momentum ökar — +%.1f%% på 5 dagar"
-                   % float(r.get("ret_5") or 0)})
+        _r5 = float(r.get("ret_5") or 0)
+        ev.append({"ic": "momentum",
+                   "txt": "Momentum ökar — +%.1f%% på 5 dagar" % _r5,
+                   "en": "Momentum building — +%.1f%% over 5 days" % _r5})
     pfh = float(r.get("pct_from_high") or -99)
     if -6 <= pfh <= 1:
-        ev.append({"ic": "breakout", "txt": "Testar 52-veckorstoppen (%.1f%% under)" % abs(pfh)})
+        ev.append({"ic": "breakout",
+                   "txt": "Testar 52-veckorstoppen (%.1f%% under)" % abs(pfh),
+                   "en": "Testing the 52-week high (%.1f%% below)" % abs(pfh)})
     if str(r.get("bos", "")).upper().startswith("BULL"):
-        ev.append({"ic": "breakout", "txt": "Bryter struktur uppåt (BOS bekräftad)"})
+        ev.append({"ic": "breakout",
+                   "txt": "Bryter struktur uppåt (BOS bekräftad)",
+                   "en": "Breaking structure to the upside (BOS confirmed)"})
     if float(r.get("ret_20") or 0) >= 10:
-        ev.append({"ic": "momentum", "txt": "+%.0f%% senaste månaden" % float(r.get("ret_20") or 0)})
+        _r20 = float(r.get("ret_20") or 0)
+        ev.append({"ic": "momentum",
+                   "txt": "+%.0f%% senaste månaden" % _r20,
+                   "en": "+%.0f%% over the past month" % _r20})
 
     # Insiderköp = riktigt "smart money"-bevis. Vi kallar det ALDRIG
     # "institutionellt intresse" — det är insiders, och det säger vi.
     try:
         for it in (_fmp_insider_flow() or []):
             if it.get("ticker") == tk and it.get("action") == "KÖP":
-                ev.append({"ic": "insider", "txt": "Insiderköp registrerat (%s)" % (it.get("amount") or "Form 4")})
+                _amt = it.get("amount") or "Form 4"
+                ev.append({"ic": "insider",
+                           "txt": "Insiderköp registrerat (%s)" % _amt,
+                           "en": "Insider buying filed (%s)" % _amt})
                 break
     except Exception:
         pass
@@ -4512,11 +4531,13 @@ def _radar_pick():
     conf = int(max(35, min(95, round(sc * 8 + min(rv, 3) * 6))))
     atrp = float(r.get("atr_pct") or 0)
     risk = "Låg" if atrp < 3 else ("Medium" if atrp < 6 else "Hög")
+    risk_en = "Low" if atrp < 3 else ("Medium" if atrp < 6 else "High")
     rr = round(max(1.0, min(4.0, (100 - conf) and (conf / 25.0))), 1)
 
     return {"ticker": tk, "name": (company_info(tk) or {}).get("name") or tk,
             "price": r.get("last"), "score": sc, "tier": _pick_tier(r, reg),
-            "confidence": conf, "risk": risk, "rr": rr, "rel_vol": round(rv, 2),
+            "confidence": conf, "risk": risk, "risk_en": risk_en,
+            "rr": rr, "rel_vol": round(rv, 2),
             "evidence": ev[:5], "catalyst": catalyst,
             "label": r.get("label", ""), "regim": reg}
 
@@ -4547,6 +4568,17 @@ def radar(lang: str = "sv"):
             bear = s.split(":", 1)[-1].strip()
     p["bull"] = bull
     p["bear"] = bear
+    # Välj språkvariant vid utskick — cachen håller båda, så inget dubbelarbete.
+    if str(lang).lower().startswith("en"):
+        p = dict(p)
+        p["risk"] = p.get("risk_en") or p.get("risk")
+        p["evidence"] = [{"ic": e.get("ic"), "txt": e.get("en") or e.get("txt")}
+                         for e in (p.get("evidence") or [])]
+    else:
+        p = dict(p)
+        p["evidence"] = [{"ic": e.get("ic"), "txt": e.get("txt")}
+                         for e in (p.get("evidence") or [])]
+    p.pop("risk_en", None)
     return {"pick": p}
 
 

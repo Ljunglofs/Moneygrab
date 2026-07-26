@@ -1168,6 +1168,43 @@ var _I18N_EXACT = {
   "AVVAKTA":"WAIT",
   "UNDVIK":"AVOID",
   "LADDAR":"LOADING",
+  "EJ TILLGÄNGLIG":"UNAVAILABLE",
+  "Grabit tänker…":"Grabit is thinking…",
+  "Grabit tänker":"Grabit is thinking",
+  "Inget svar just nu — försök igen.":"No answer right now — try again.",
+  "Kunde inte nå Grabit just nu. Försök igen.":"Couldn't reach Grabit right now. Try again.",
+  "Söker…":"Searching…",
+  "Inga träffar — lossa något filter.":"No matches — loosen a filter.",
+  "Kunde inte hämta data — kör appen mot live-API:t.":"Couldn't load data — point the app at the live API.",
+  "Slå på notiser":"Turn on notifications",
+  "Få larm om nyheter & insiderhandel i din portfölj + ROBBER-signaler.":"Get alerts on news & insider trading in your portfolio + ROBBER signals.",
+  "Notiser PÅ — du får larm för aktierna i din portfölj + ROBBER-signaler":"Notifications ON — you'll get alerts for the stocks in your portfolio + ROBBER signals",
+  "Din webbläsare stödjer inte push":"Your browser doesn't support push",
+  "Notiser kräver att appen laddats klart":"Notifications require the app to finish loading",
+  "Notiser blockerade — tillåt i webbläsarens inställningar":"Notifications blocked — allow them in your browser settings",
+  "okänt fel":"unknown error",
+  "Ingen bekräftad":"None confirmed",
+  "Vad rör sig mest idag?":"What's moving most today?",
+  "Visa lägen med R/R över 3":"Show setups with R/R above 3",
+  "Datacenter, nätverk och compute som hela AI-vågen står och faller med.":"Data centres, networking and compute the entire AI wave rests on.",
+  "Chippen allt annat byggs ovanpå — hjärtat i varje AI-server.":"The chips everything else is built on — the heart of every AI server.",
+  "Tidiga men explosiva — pionjärerna inom kvantberäkning.":"Early but explosive — the pioneers of quantum computing.",
+  "Strategiska metaller som Väst måste säkra bort från Kina.":"Strategic metals the West must secure away from China.",
+  "Rekordbudgetar och en global drönar-kapplöpning.":"Record budgets and a global drone race.",
+  "Sensorerna och fysisk AI som ger robotar och fordon ögon.":"The sensors and physical AI giving robots and vehicles eyes.",
+  "Bolagen som faktiskt paketerar AI till riktiga intäkter.":"The companies actually turning AI into real revenue.",
+  "Där AI möter läkemedel, diagnostik och hälsodata.":"Where AI meets drugs, diagnostics and health data.",
+  "Vi har gjort grovjobbet så du slipper gräva i tusentals tickers.":"We did the grunt work so you don't have to dig through thousands of tickers.",
+  " träffar":" matches",
+  "% från 52v-topp":"% from 52w high",
+  "Live-kursen gick inte att hämta just nu.":"Couldn't fetch the live price right now.",
+  "Grabit visar aldrig nivåer på uppskattad data. ":"Grabit never shows levels on estimated data. ",
+  "Försök igen":"Try again",
+  "Dagens Top Opportunity":"Today's Top Opportunity",
+  "Sannolikhet":"Probability",
+  "Väntad rörelse":"Expected move",
+  "VISA SETUP →":"VIEW SETUP →",
+  "Teknisk analys — inte finansiell rådgivning.":"Technical analysis — not financial advice.",
   "Avvakta – ingen entry rekommenderas just nu.":"Wait – no entry recommended right now.",
   "Hämtar live-kurs… nivåer visas när riktig data laddats.":"Fetching live price… levels appear once real data has loaded.",
   "Grabit räknar entry, stop och mål på live-priset – aldrig på uppskattningar.":"Grabit calculates entry, stop and target on the live price – never on estimates.",
@@ -3801,7 +3838,7 @@ async function loadToday3(){
   const B=CONFIG.API_BASE?CONFIG.API_BASE.replace(/\/$/,""):"";if(!B)return;
   const EN=(window.GRABIT_LANG==="en");
   let items=[];
-  try{const r=await fetch(B+"/api/today3",{cache:"no-store"});const j=await r.json();items=(j&&j.items)||[];}catch(e){}
+  try{const r=await fetch(B+"/api/today3"+(EN?"?lang=en":""),{cache:"no-store"});const j=await r.json();items=(j&&j.items)||[];}catch(e){}
   if(!items.length){el.style.display="none";return;}
   const now=new Date();
   const dstr=now.toLocaleDateString(EN?"en-GB":"sv-SE",{weekday:"short",day:"numeric",month:"short"}).toUpperCase()
