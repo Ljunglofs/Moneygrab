@@ -208,6 +208,15 @@ def scan(ticker: str):
         return None
     a["ticker"] = ticker
     a["theme"] = TICKER_THEME.get(ticker, "")
+    # Sessionsnormalisering: handlas börsen just nu är sista baren ofärdig.
+    # Priset som visas ska vara live — men RANKNINGEN måste ske på senaste
+    # FÄRDIGA session, annars jämförs öppna börser mot stängda.
+    a["live_bar"] = _bar_is_live(ticker, df)
+    if a["live_bar"] and len(df) > 26:
+        rm = _rank_metrics(df.iloc[:-1])
+        if rm:
+            a["rank_momentum"] = rm["momentum"]
+            a["rank_rel_vol"] = rm["rel_vol"]
     return a
 
 
@@ -290,9 +299,13 @@ def trade_motor_v2(a):
 
 
 def hetta_of(a) -> int:
-    """0–100 'hetta': momentum + relativ volym. Approx för Hetast-listan."""
-    base = a.get("momentum", 0) / 35 * 60          # 0–60 av momentum
-    vol  = min(40, max(0, (a.get("rel_vol", 0) - 0.8) * 40))  # 0–40 av rel.vol
+    """0–100 'hetta': momentum + relativ volym. Approx för Hetast-listan.
+    Använder de sessionsnormaliserade måtten när sista baren är ofärdig, så
+    en öppen börs inte rankas mot en stängd."""
+    mom = a.get("rank_momentum", a.get("momentum", 0))
+    rv  = a.get("rank_rel_vol", a.get("rel_vol", 0))
+    base = mom / 35 * 60                           # 0–60 av momentum
+    vol  = min(40, max(0, (rv - 0.8) * 40))        # 0–40 av rel.vol
     return int(max(0, min(100, base + vol)))
 
 
@@ -304,6 +317,65 @@ def _market_of(ticker: str) -> str:
     suf = t.rsplit(".", 1)[-1]
     return {"ST": "SE", "OL": "NO", "CO": "DK", "HE": "FI",
             "PA": "FR", "DE": "DE", "L": "UK", "TO": "CA"}.get(suf, suf)
+
+
+# Tidszon + stängningstid per marknad — används för att avgöra om sista
+# dagsbaren är FÄRDIG eller fortfarande PÅGÅENDE.
+_MKT_TZ = {
+    "US": ("America/New_York", 16, 0), "CA": ("America/Toronto", 16, 0),
+    "SE": ("Europe/Stockholm", 17, 30), "NO": ("Europe/Oslo", 16, 20),
+    "DK": ("Europe/Copenhagen", 17, 0), "FI": ("Europe/Helsinki", 18, 30),
+    "FR": ("Europe/Paris", 17, 30), "DE": ("Europe/Berlin", 17, 30),
+    "UK": ("Europe/London", 16, 30),
+}
+
+
+def _bar_is_live(ticker, df):
+    """True om sista dagsbaren är dagens PÅGÅENDE bar (börsen handlas nu).
+
+    Det här är kärnan i snedvridningen: mitt på dagen svensk tid innehåller
+    svenska barer dagens rörelse medan USA:s sista bar är gårdagens färdiga
+    session. Jämförs de rakt av vinner alltid den börs som råkar vara öppen.
+    """
+    try:
+        from zoneinfo import ZoneInfo
+        import datetime as _dt3
+        tzname, ch, cm = _MKT_TZ.get(_market_of(ticker), _MKT_TZ["US"])
+        now = _dt3.datetime.now(ZoneInfo(tzname))
+        last = df.index[-1]
+        d = last.date() if hasattr(last, "date") else None
+        if d != now.date():
+            return False                       # sista baren är en tidigare dag
+        return (now.hour, now.minute) < (ch, cm)   # börsen har inte stängt än
+    except Exception:
+        return False
+
+
+def _rank_metrics(df):
+    """Lätt momentum/volym-mått för RANKNING (inte display). Medvetet billigt —
+    körs över hela universumet på en 512 MB-instans."""
+    try:
+        c = df["Close"].dropna()
+        v = df["Volume"].dropna()
+        if len(c) < 25 or len(v) < 21:
+            return None
+        last = float(c.iloc[-1])
+        ret_5 = (last / float(c.iloc[-6]) - 1) * 100
+        ret_20 = (last / float(c.iloc[-21]) - 1) * 100
+        d = c.diff()
+        up = d.clip(lower=0).tail(14).mean()
+        dn = (-d.clip(upper=0)).tail(14).mean()
+        rsi = 100.0 if dn == 0 else 100 - 100 / (1 + up / dn)
+        m = float(np.interp(ret_20, [-15, 0, 30], [0, 8, 18])
+                  + np.interp(ret_5, [-10, 0, 15], [0, 4, 9]))
+        if 50 <= rsi <= 70:   m += 8
+        elif 40 <= rsi < 50:  m += 4
+        elif rsi > 78:        m -= 4
+        avg = float(v.tail(20).mean())
+        return {"momentum": max(0.0, min(m, 35.0)),
+                "rel_vol": (float(v.iloc[-1]) / avg) if avg else 1.0}
+    except Exception:
+        return None
 
 
 def _mix_markets(rows, n, per_market=None):
@@ -4056,9 +4128,10 @@ def _pick_eligible(r, regime=None):
             return False
     except Exception:
         return False
-    # #2 volym krävs
+    # #2 volym krävs (normaliserad: en halvfärdig dagsvolym ska inte döma ut
+    #    en aktie bara för att dess börs råkar vara öppen just nu)
     try:
-        if float(r.get("rel_vol") or 0) < _PICK_MIN_RELVOL:
+        if float(r.get("rank_rel_vol", r.get("rel_vol")) or 0) < _PICK_MIN_RELVOL:
             return False
     except Exception:
         return False
