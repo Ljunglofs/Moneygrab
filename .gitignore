@@ -5,3 +5,20 @@ facit.json
 ai_text_cache.json
 push_watch_state.json
 robber_mode.txt
+
+# Android/TWA — signeringsnycklar får ALDRIG hamna i git.
+# Läcker upload-nyckeln kan någon annan signera uppdateringar till appen.
+*.keystore
+*.jks
+*.p12
+android.keystore
+bubblewrap.log
+/android/
+
+# Skilling/cTrader — lokala köer och tokens
+skilling_queue.jsonl
+skilling_fills.jsonl
+skilling_state.json
+vwap_signals.jsonl
+robber_outcomes.jsonl
+robber_open_trades.json
