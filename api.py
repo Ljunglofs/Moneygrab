@@ -950,6 +950,17 @@ activity on your account.</p>
 SEK&nbsp;174/month or SEK&nbsp;1&nbsp;566/year, incl. VAT). The subscription
 <b>renews automatically</b> at the end of each period until you cancel it.</p>
 
+<h2>3b. Free trial (7 days)</h2>
+<p>New customers can start a <b>7-day free trial</b>. A valid payment card is
+required to start the trial, but <b>no payment is taken during those 7 days</b>.</p>
+<p>If you do <b>not</b> cancel before the trial ends, the subscription
+<b>automatically converts to a running subscription</b> and the selected price is
+charged — and then at the start of each new period until you cancel. If you cancel
+during the trial you are charged <b>nothing</b>. You can cancel at any time in the
+app or by emailing
+<a href="mailto:support@grabitlabs.com">support@grabitlabs.com</a>.</p>
+<p>The trial is limited to one per customer.</p>
+
 <h2>4. Payment</h2>
 <p>Payment is handled by <b>Stripe</b>, which acts as Merchant of Record and is
 responsible for charging and reporting VAT. We never handle your card details.</p>
@@ -1018,6 +1029,17 @@ aktiviteten på ditt konto.</p>
 <p>GRABIT PRO är en prenumeration. Aktuella priser visas i appen (för närvarande
 174 kr/månad respektive 1&nbsp;566 kr/år, inklusive moms). Prenumerationen
 <b>förnyas automatiskt</b> vid varje periods slut tills du säger upp den.</p>
+
+<h2>3b. Kostnadsfri provperiod (7 dagar)</h2>
+<p>Nya kunder kan starta en <b>7 dagar kostnadsfri provperiod</b>. Ett giltigt
+betalkort krävs för att starta provperioden, men <b>ingen betalning dras under
+de 7 dagarna</b>.</p>
+<p>Säger du <b>inte</b> upp före provperiodens slut övergår prenumerationen
+<b>automatiskt till ett löpande abonnemang</b> och det valda priset debiteras —
+därefter vid varje ny period tills du säger upp. Avslutar du under provperioden
+debiteras <b>ingenting</b>. Du kan avsluta när som helst i appen eller genom att
+mejla <a href="mailto:support@grabitlabs.com">support@grabitlabs.com</a>.</p>
+<p>Provperioden gäller en gång per kund.</p>
 
 <h2>4. Betalning</h2>
 <p>Betalning hanteras av <b>Stripe</b>, som agerar Merchant of Record och ansvarar

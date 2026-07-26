@@ -1532,16 +1532,19 @@ else _i18nBoot();
   <div class="pw-card">
     <button class="pw-close" id="pw-close" onclick="hidePaywall()" aria-label="Stäng">&#10005;</button>
     <div class="pw-logo"><img id="pw-brand" alt="GRABIT"><span class="pw-badge">PRO</span></div>
-    <div class="pw-trial" id="pw-sub"><b>Lås upp allt</b></div>
-    <div class="pw-big"><span class="pw-149">174 kr</span><span class="pw-per">/månad</span></div>
-    <div class="pw-cancel">Avsluta när som helst.</div>
+    <div class="pw-trial" id="pw-sub"><b>7 dagar gratis</b></div>
+    <div class="pw-big"><span class="pw-149">0 kr</span><span class="pw-per">i 7 dagar</span></div>
+    <div class="pw-cancel" id="pw-after">Sedan 174 kr/mån. Avsluta när som helst.</div>
     <div class="pw-feats2"><div class="pwf"><span class="pwf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.6" fill="#22d3ee" stroke="none"/><line x1="12" y1="2.5" x2="12" y2="5.5"/><line x1="12" y1="18.5" x2="12" y2="21.5"/><line x1="2.5" y1="12" x2="5.5" y2="12"/><line x1="18.5" y1="12" x2="21.5" y2="12"/></svg></span><span class="pwf-tx"><b>Dagens Top Opportunity</b><i>Med entry, stopp &amp; targets</i></span></div><div class="pwf"><span class="pwf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4a3 3 0 0 0-3 3v10a3 3 0 0 0 6 0V7a3 3 0 0 0-3-3z"/><path d="M9 8H7a3 3 0 0 0 0 6h2"/><path d="M15 8h2a3 3 0 0 1 0 6h-2"/><circle cx="12" cy="12" r="1.3" fill="#22d3ee" stroke="none"/></svg></span><span class="pwf-tx"><b>AI-analys på alla aktier</b><i>+ Fråga Grabit</i></span></div><div class="pwf"><span class="pwf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></span><span class="pwf-tx"><b>Push-larm för din watchlist</b><i>Pris-larm, nyheter &amp; rapporter</i></span></div><div class="pwf"><span class="pwf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="16.2" y1="16.2" x2="21" y2="21"/></svg></span><span class="pwf-tx"><b>Screeners, facit</b><i>och hela scannern</i></span></div></div>
     <div class="pw-buybox">
       <div class="pw-plans">
         <button type="button" class="pw-plan on" data-plan="monthly" onclick="setProPlan('monthly',this)"><span class="pp-t">Månad</span><span class="pp-p">174 kr<i>/mån</i></span></button>
         <button type="button" class="pw-plan" data-plan="annual" onclick="setProPlan('annual',this)"><span class="pp-badge">3 MÅN GRATIS</span><span class="pp-t">År</span><span class="pp-p">1566 kr<i>/år</i></span><span class="pp-save">Spara 25%</span></button>
       </div>
-      <button class="pw-btn" onclick="buyPro()">Fortsätt med PRO <span class="pw-arrow">&#8594;</span></button>
+      <button class="pw-btn" onclick="buyPro()">Starta 7 dagar gratis <span class="pw-arrow">&#8594;</span></button>
+      <div class="pw-terms" id="pw-terms">Gratis i 7 dagar. Därefter <b>174 kr/mån</b> tills du säger upp.
+        Prenumerationen <b>förnyas automatiskt</b> &mdash; avsluta när som helst innan perioden löper ut, utan avgift.
+        Betalkort krävs. Du får en påminnelse innan första betalningen.</div>
       <div class="pw-restore" onclick="restorePro()">Har du redan PRO? Återställ köp &#8250;</div>
       <div class="pw-code"><input id="pw-code-in" placeholder="Har du en medlemskod?" autocomplete="off" autocapitalize="off" spellcheck="false" onkeydown="if(event.key==='Enter')unlockWithCode()"><button onclick="unlockWithCode()">Lås upp</button></div>
     </div>
@@ -3859,7 +3862,22 @@ function showPaywall(msg,dismissable){
 function hidePaywall(){var el=document.getElementById("paywall");if(el)el.style.display="none";
   var tb=document.getElementById("trialbar");if(tb)tb.style.display="none";}
 window._proPlan="monthly";
-function setProPlan(p,btn){window._proPlan=p;var ps=document.querySelectorAll(".pw-plan");Array.prototype.forEach.call(ps,function(x){x.classList.remove("on");});if(btn)btn.classList.add("on");}
+function setProPlan(p,btn){window._proPlan=p;var ps=document.querySelectorAll(".pw-plan");Array.prototype.forEach.call(ps,function(x){x.classList.remove("on");});if(btn)btn.classList.add("on");syncTrialText(p);}
+/* Villkorstexten MÅSTE spegla vald plan — pris efter trial, automatisk
+   förnyelse och hur man avslutar. Krav vid abonnemang som förnyas själv. */
+function syncTrialText(p){var EN=(window.GRABIT_LANG==="en");
+  var yr=(p==="annual");
+  var pris=yr?(EN?"SEK 1,566/year":"1 566 kr/år"):(EN?"SEK 174/month":"174 kr/mån");
+  var a=document.getElementById("pw-after");
+  if(a)a.textContent=(EN?("Then "+pris+". Cancel anytime."):("Sedan "+pris+". Avsluta när som helst."));
+  var t=document.getElementById("pw-terms");
+  if(t)t.innerHTML=EN
+    ?("Free for 7 days. Then <b>"+pris+"</b> until you cancel. The subscription <b>renews automatically</b> "
+      +"&mdash; cancel any time before the period ends, at no charge. A payment card is required. "
+      +"You get a reminder before the first payment.")
+    :("Gratis i 7 dagar. Därefter <b>"+pris+"</b> tills du säger upp. Prenumerationen <b>förnyas automatiskt</b> "
+      +"&mdash; avsluta när som helst innan perioden löper ut, utan avgift. Betalkort krävs. "
+      +"Du får en påminnelse innan första betalningen.");}
 function _proSku(){return (window._proPlan==="annual")?"grabit_pro_annual":"grabit_pro_monthly";}
 async function buyPro(){
   var EN=(window.GRABIT_LANG==="en");
@@ -4549,6 +4567,8 @@ html,body{overflow-x:clip}
 .pwf-tx b{display:block;font-size:13.5px;letter-spacing:.05em;text-transform:uppercase;color:#f2f5f9}
 .pwf-tx i{font-style:normal;display:block;font-size:12px;color:#8a93a3;margin-top:1px}
 .pw-buybox{margin-top:14px;border:1.5px solid rgba(245,197,66,.55);border-radius:18px;padding:14px 13px;background:rgba(245,197,66,.04);box-shadow:0 0 26px rgba(245,197,66,.08)}
+.pw-terms{margin-top:10px;font-size:10.5px;line-height:1.5;color:#8e99a8;text-align:center}
+.pw-terms b{color:#cfd8e2;font-weight:800}
 .pw-price2{font-family:var(--disp);font-size:26px;font-weight:900;color:var(--gold2)}
 .pw-price2 span{font-size:13px;color:#c9a53f;font-weight:700}
 .pw-plans{display:flex;gap:9px;margin-bottom:11px}
