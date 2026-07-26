@@ -2649,7 +2649,6 @@ def _bench_close():
         return None
 
 
-@cached(90)
 def _stock_payload(ticker: str):
     """Tung del av aktiekortet. Cachad: öppnar man samma aktie igen (eller
     två användare tittar på samma) svarar servern direkt.
@@ -2661,13 +2660,18 @@ def _stock_payload(ticker: str):
     df = None
     try:
         df = _fetch_daily(ticker)
-    except Exception:
+    except Exception as e:
+        print("stock %s: hämtning misslyckades: %s" % (ticker, e))
         df = None
     if df is None:
+        # Ingen cachning av misslyckanden — annars fastnar ett tillfälligt
+        # Yahoo-glapp i minnet och aktien är "död" i flera minuter.
+        print("stock %s: ingen prisdata (Yahoo + Stooq gav inget)" % ticker)
         return None, None
     try:
         a = analyze(df)
-    except Exception:
+    except Exception as e:
+        print("stock %s: analyze() misslyckades: %s" % (ticker, e))
         return None, None
     a["ticker"] = ticker
     a["theme"] = TICKER_THEME.get(ticker, "")
@@ -2699,11 +2703,23 @@ def stock(ticker: str):
             ticker, a, eng = alt, a_alt, eng_alt
     if not a:
         raise HTTPException(404, f"Ingen data för {ticker}")
+
+    # Priset och nivåerna är det viktigaste på kortet. En krånglande
+    # delkomponent (t.ex. yf.info som är notoriskt flakig) fick tidigare hela
+    # svaret att bli 500 — och då fastnade appen i "Fetching live price…"
+    # trots att kursen fanns. Varje del får nu fallera för sig.
+    def _safe(fn, default=None, what=""):
+        try:
+            return fn()
+        except Exception as e:
+            print("stock %s: %s misslyckades: %s" % (ticker, what, e))
+            return default
+
     return {
         "analysis": _jsonable(a),
-        "ai_score": ai_score_components(a),
-        "trade_motor": trade_motor_v2(a),
-        "company": company_info(ticker),
+        "ai_score": _safe(lambda: ai_score_components(a), None, "ai_score"),
+        "trade_motor": _safe(lambda: trade_motor_v2(a), None, "trade_motor"),
+        "company": _safe(lambda: company_info(ticker), {}, "company_info"),
         "engine": eng,
     }
 
