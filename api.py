@@ -74,7 +74,7 @@ except Exception:
     yf = None
 
 # Din riktiga logik
-from sok_module import fetch as _fetch_raw, analyze, fetch_many   # noqa
+from sok_module import fetch as _fetch_raw, fetch_daily as _fetch_daily, analyze, fetch_many   # noqa
 try:
     from breakout_engine import evaluate as engine_evaluate
 except Exception:
@@ -120,7 +120,10 @@ def cached(ttl: int):
         return wrap
     return deco
 
-fetch = cached(300)(_fetch_raw)   # 5 min, som i appen
+fetch = cached(300)(_fetch_raw)          # 5 min, som i appen
+# Dagsdata utan 5m-anropet — den heta vägen för aktiekortet. Samma TTL, och
+# cachen gör att andra besöket på en aktie svarar direkt.
+_fetch_daily = cached(300)(_fetch_daily)
 
 # ----- BATCH-PREFETCH (för stora universum) --------------------------
 _PREFETCH: dict = {}              # ticker -> df (dagsdata), fylls inför en scan
@@ -197,7 +200,7 @@ def scan(ticker: str):
     try:
         df = _PREFETCH.get(ticker)
         if df is None:
-            df, _ = fetch(ticker)
+            df = _fetch_daily(ticker)
     except Exception:
         return None
     if df is None:
@@ -417,7 +420,7 @@ def _mix_markets(rows, n, per_market=None):
 @cached(600)
 def regime_of(ticker):
     try:
-        df, _ = fetch(ticker)
+        df = _fetch_daily(ticker)
     except Exception:
         return "BLANDAD", 0.0
     if df is None or len(df) < 200:
@@ -2576,7 +2579,7 @@ def ownership(ticker: str):
 def _index_quote(ticker):
     """(senaste pris, dagsforandring %) for ett index/krypto via dagliga barer."""
     try:
-        df, _ = fetch(ticker)
+        df = _fetch_daily(ticker)
     except Exception:
         return None, 0.0
     if df is None or len(df) < 2:
@@ -2607,7 +2610,7 @@ def indices():
         price, pct = _index_quote(tk)
         hist = []
         try:
-            df, _ = fetch(tk)
+            df = _fetch_daily(tk)
             if df is not None:
                 hist = [round(float(x), 4) for x in df["Close"].dropna().iloc[-15:]]
         except Exception:
@@ -2636,38 +2639,73 @@ def screen(themes: Optional[str] = Query(None, description="Komma-separerade tem
     return {"count": len(rows), "rows": rows}
 
 
+@cached(120)
+def _bench_close():
+    """S&P-serien är samma för ALLA aktier — hämta den en gång, inte per anrop."""
+    try:
+        bench = _fetch_daily("^GSPC")
+        return bench["Close"] if bench is not None else None
+    except Exception:
+        return None
+
+
+@cached(90)
+def _stock_payload(ticker: str):
+    """Tung del av aktiekortet. Cachad: öppnar man samma aktie igen (eller
+    två användare tittar på samma) svarar servern direkt.
+
+    Prestanda: tidigare hämtades 1-årsdatan TVÅ gånger (en i scan(), en till
+    för breakout-motorn) plus S&P per anrop. Nu hämtas den en gång och
+    återanvänds — det var den stora källan till 'LOADING'-väntan.
+    """
+    df = None
+    try:
+        df = _fetch_daily(ticker)
+    except Exception:
+        df = None
+    if df is None:
+        return None, None
+    try:
+        a = analyze(df)
+    except Exception:
+        return None, None
+    a["ticker"] = ticker
+    a["theme"] = TICKER_THEME.get(ticker, "")
+    a["live_bar"] = _bar_is_live(ticker, df)
+    if a["live_bar"] and len(df) > 26:
+        rm = _rank_metrics(df.iloc[:-1])
+        if rm:
+            a["rank_momentum"] = rm["momentum"]
+            a["rank_rel_vol"] = rm["rel_vol"]
+    a["hetta"] = hetta_of(a)
+    eng = None
+    if engine_evaluate is not None:
+        try:
+            eng = _jsonable(engine_evaluate(df, _bench_close()))
+        except Exception:
+            eng = None
+    return a, eng
+
+
 @app.get("/api/stock/{ticker}")
 def stock(ticker: str):
     ticker = ticker.upper()
-    a = scan(ticker)
+    a, eng = _stock_payload(ticker)
     if not a and "." not in ticker:
         # Svenska bolag ligger på .ST hos Yahoo (OVZON -> OVZON.ST). Testa den varianten.
         alt = ticker + ".ST"
-        a_alt = scan(alt)
+        a_alt, eng_alt = _stock_payload(alt)
         if a_alt:
-            ticker, a = alt, a_alt
+            ticker, a, eng = alt, a_alt, eng_alt
     if not a:
         raise HTTPException(404, f"Ingen data för {ticker}")
-    payload = {
+    return {
         "analysis": _jsonable(a),
         "ai_score": ai_score_components(a),
         "trade_motor": trade_motor_v2(a),
         "company": company_info(ticker),
-        "engine": None,
+        "engine": eng,
     }
-    # Breakout-motor (ringar + entry/exit) om modulen finns
-    if engine_evaluate is not None:
-        try:
-            df, _ = fetch(ticker)
-            try:
-                bench, _ = fetch("^GSPC")
-                bench_close = bench["Close"] if bench is not None else None
-            except Exception:
-                bench_close = None
-            payload["engine"] = _jsonable(engine_evaluate(df, bench_close))
-        except Exception:
-            payload["engine"] = None
-    return payload
 
 
 # ---------- AKTIEKORT: nyheter + analytiker (riktkurs/konsensus) ----------

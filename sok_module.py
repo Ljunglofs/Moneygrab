@@ -105,7 +105,10 @@ def _stooq_df(ticker):
 #  HÄMTA DATA  (cache 5 min så vi inte spammar Yahoo)
 # ----------------------------------------------------------
 @st.cache_data(ttl=300, show_spinner=False)
-def fetch(ticker):
+def fetch_daily(ticker):
+    """Bara dagsdatan — hoppar över 5m-anropet. Nästan alla anropare kastar
+    ändå bort intradagsdatan, och det extra nätverksanropet är en stor del av
+    laddtiden på aktiekortet."""
     df = None
     try:
         t = yf.Ticker(ticker)
@@ -114,8 +117,14 @@ def fetch(ticker):
         df = None
     if df is None or getattr(df, "empty", True) or len(df) < 60:
         # Yahoo gav inget (vanligt från moln-IP) -> reservkälla Stooq
-        sdf = _stooq_df(ticker)
-        return (sdf, None) if sdf is not None else (None, None)
+        return _stooq_df(ticker)
+    return df
+
+
+def fetch(ticker):
+    df = fetch_daily(ticker)
+    if df is None:
+        return None, None
     try:
         intr = yf.Ticker(ticker).history(period="1d", interval="5m", auto_adjust=False)
     except Exception:
