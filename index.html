@@ -3743,7 +3743,36 @@ async function loadRadar(){
     +'<div><i>'+(EN?"Volume":"Volym")+'</i><b>'+p.rel_vol+'x</b></div></div>'
     +bb
     +'<div class="rd-btn" onclick="openStock(\''+p.ticker+'\')">'+(EN?"VIEW ANALYSIS →":"VISA ANALYS →")+'</div>'
+    +'<div id="rd-hist"></div>'
     +'<div class="rd-disc">'+(EN?"Technical analysis — not financial advice.":"Teknisk analys — inte finansiell rådgivning.")+'</div>';
+  loadRadarHistory();
+}
+/* Radar-historik: tidigare radar-aktier och hur de faktiskt gick. Mätt 5
+   handelsdagar efter loggning — samma metod som Facit. Visas bara när det
+   finns verkligt underlag; vi presenterar aldrig ett tomt eller för tunt
+   urval som ett track record. */
+async function loadRadarHistory(){
+  const box=document.getElementById("rd-hist");if(!box)return;
+  const B=CONFIG.API_BASE?CONFIG.API_BASE.replace(/\/$/,""):"";if(!B)return;
+  const EN=(window.GRABIT_LANG==="en");
+  let j=null;try{const r=await fetch(B+"/api/radar/history?limit=7",{cache:"no-store"});j=await r.json();}catch(e){}
+  const rows=(j&&j.rader)||[];const st=(j&&j.stats)||{};
+  const done=rows.filter(function(r){return r.utfall_pct!=null;});
+  if(!done.length){box.innerHTML="";return;}
+  const head=(st.traffprocent!=null)
+    ? '<span class="rdh-stat">'+st.traffprocent+'% '+(EN?"hits":"träff")
+      +' · '+(st.snitt_pct>=0?"+":"")+st.snitt_pct+'% '+(EN?"avg":"snitt")
+      +' <i>('+st.antal+' '+(EN?"measured":"mätta")+')</i></span>' : "";
+  box.innerHTML='<div class="rdh"><div class="rdh-k">'+(EN?"EARLIER ON THE RADAR":"TIDIGARE PÅ RADARN")+head+'</div>'
+    +done.slice(0,5).map(function(r){
+      var pos=r.utfall_pct>=0;
+      return '<div class="rdh-row" onclick="openStock(\''+r.ticker+'\')">'
+        +'<span class="rdh-d">'+String(r.datum).slice(5)+'</span>'
+        +'<span class="rdh-t">'+r.ticker+'</span>'
+        +'<span class="rdh-p" style="color:'+(pos?"var(--cyan)":"var(--neg)")+'">'
+        +(pos?"+":"")+r.utfall_pct+'%</span></div>';}).join("")
+    +'<div class="rdh-f">'+(EN?"Outcome measured ~5 trading days after the stock appeared on the radar."
+                              :"Utfall mätt ~5 handelsdagar efter att aktien dök upp på radarn.")+'</div></div>';
 }
 async function loadTopOp(){
   const el=document.getElementById("topop");if(!el)return;
@@ -4562,6 +4591,15 @@ html,body{overflow-x:clip}
 .rd-case.bear i{color:#ff8a95}
 .rd-btn{margin-top:13px;text-align:center;font-size:12px;font-weight:800;letter-spacing:.06em;color:#0A0E12;
   background:linear-gradient(180deg,var(--gold2),var(--gold));border-radius:11px;padding:11px;cursor:pointer}
+.rdh{margin-top:13px;padding-top:11px;border-top:1px solid rgba(255,255,255,.08)}
+.rdh-k{display:flex;align-items:center;gap:8px;font-size:9px;letter-spacing:.11em;font-weight:800;color:var(--mut);text-transform:uppercase;margin-bottom:7px}
+.rdh-stat{margin-left:auto;color:var(--gold2);letter-spacing:.03em;text-transform:none;font-size:10px}
+.rdh-stat i{font-style:normal;color:var(--mut);font-weight:700}
+.rdh-row{display:flex;align-items:center;gap:9px;padding:5px 0;cursor:pointer;font-size:12px}
+.rdh-d{color:var(--mut);font-size:10.5px;width:38px;flex:none;font-variant-numeric:tabular-nums}
+.rdh-t{font-weight:800;color:#dbe2ea}
+.rdh-p{margin-left:auto;font-weight:800;font-variant-numeric:tabular-nums}
+.rdh-f{margin-top:7px;font-size:9.5px;color:#69747f;line-height:1.35}
 .rd-disc{margin-top:8px;font-size:10px;color:#69747f;text-align:center}
 .to-k{display:flex;align-items:center;gap:6px;font-size:10.5px;letter-spacing:.14em;font-weight:800;color:var(--gold2);text-transform:uppercase}
 .to-row{display:flex;align-items:center;gap:12px;margin-top:11px}

@@ -4768,6 +4768,94 @@ def facit():
             "pending": pending, "loggade_totalt": len(rows)}
 
 
+_RADAR_FILE = os.path.join(os.environ.get("DATA_DIR", "."), "radar_history.json")
+
+
+def _radar_hist_load():
+    import json as _j
+    try:
+        with open(_RADAR_FILE) as f:
+            return _j.load(f)
+    except Exception:
+        return []
+
+
+def _radar_hist_save(rows):
+    import json as _j
+    try:
+        tmp = _RADAR_FILE + ".tmp"
+        with open(tmp, "w") as f:
+            _j.dump(rows[-120:], f, ensure_ascii=False)
+        os.replace(tmp, _RADAR_FILE)
+    except Exception as e:
+        print("Radar: kunde inte spara historik:", e)
+
+
+def _radar_log_today():
+    """Logga dagens radar-aktie en gång per börsdag."""
+    import datetime as _dt2
+    today = _dt2.date.today()
+    if today.weekday() >= 5:
+        return
+    rows = _radar_hist_load()
+    tid = today.isoformat()
+    if any(r.get("datum") == tid for r in rows):
+        return
+    p = _radar_pick()
+    if not p or not p.get("ticker") or p.get("price") in (None, 0):
+        return
+    rows.append({"datum": tid, "ticker": p["ticker"], "name": p.get("name") or p["ticker"],
+                 "pris": round(float(p["price"]), 2), "conf": p.get("confidence"),
+                 "rel_vol": p.get("rel_vol"), "risk": p.get("risk"),
+                 "tier": p.get("tier"), "regim": p.get("regim"),
+                 "skal": [e.get("txt") for e in (p.get("evidence") or [])][:3]})
+    _radar_hist_save(rows)
+    print("Radar: loggade %s för %s" % (p["ticker"], tid))
+
+
+def _radar_evaluate():
+    """Mät utfall 5 handelsdagar efter loggning — samma metod som Facit, och
+    med samma regel: en misslyckad mätning bokförs ALDRIG som en förlust."""
+    if yf is None:
+        return
+    rows = _radar_hist_load()
+    todo = [r for r in rows if r.get("utfall_pct") is None
+            and "utfall_pct" not in r
+            and _trading_days_since(r.get("datum", "")) >= _FACIT_EVAL_TRADING][:3]
+    if not todo:
+        return
+    for e in todo:
+        try:
+            h = yf.Ticker(e["ticker"]).history(start=e["datum"], auto_adjust=True)
+            closes = h["Close"].dropna() if (h is not None and not h.empty) else None
+            if closes is None or len(closes) < 6:
+                e["matfel"] = int(e.get("matfel", 0)) + 1
+                if e["matfel"] >= 5:
+                    e["utfall_pct"] = None
+                    e["utvarderad_ej"] = True
+                continue
+            slut = float(closes.iloc[:6].iloc[-1])
+            e.pop("matfel", None)
+            e["slutpris"] = round(slut, 2)
+            e["utfall_pct"] = round((slut - float(e["pris"])) / float(e["pris"]) * 100, 2)
+            e["traff"] = bool(e["utfall_pct"] > 0)
+        except Exception as ex:
+            print("Radar: kunde inte utvärdera %s: %s" % (e.get("ticker"), ex))
+    _radar_hist_save(rows)
+
+
+@app.get("/api/radar/history")
+def radar_history(limit: int = 7):
+    rows = _radar_hist_load()
+    out = list(reversed(rows))[:max(1, min(limit, 30))]
+    klara = [r for r in rows if r.get("utfall_pct") is not None]
+    stats = {"antal": len(klara)}
+    if len(klara) >= 3:      # under 3 säger siffran ingenting
+        stats["traffprocent"] = round(sum(1 for r in klara if r.get("traff")) / len(klara) * 100)
+        stats["snitt_pct"] = round(sum(r["utfall_pct"] for r in klara) / len(klara), 1)
+    return {"rader": out, "stats": stats}
+
+
 def _facit_loop():
     import datetime as _dt2
     time.sleep(180)   # låt warmup-cachen fyllas först
@@ -4776,7 +4864,15 @@ def _facit_loop():
             now = _dt2.datetime.utcnow()
             if now.weekday() < 5 and now.hour >= 14:   # efter USA-öppning
                 _facit_log_today()
+                try:
+                    _radar_log_today()
+                except Exception as e:
+                    print("Radar-logg-fel:", e)
             _facit_evaluate()
+            try:
+                _radar_evaluate()
+            except Exception as e:
+                print("Radar-eval-fel:", e)
         except Exception as e:
             print("Facit-fel:", e)
         time.sleep(1800)   # var 30:e minut
