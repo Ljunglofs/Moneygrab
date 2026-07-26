@@ -487,6 +487,13 @@ body.not-pro .trumphero .th-cta.pro{display:inline-block}
 .pick{min-width:0;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px;cursor:pointer}
 .pick:active{transform:scale(.99)}
 .pick .pk-k{font-size:10px;font-weight:900;letter-spacing:.07em;text-transform:uppercase;margin-bottom:10px}
+/* Konviktionsgrad: A+ = guld (alla krav uppfyllda), BEVAKA = cyan (saknar något) */
+.tierb{display:inline-flex;align-items:center;gap:4px;font-size:8.5px;font-weight:900;letter-spacing:.08em;
+  padding:2px 7px;border-radius:6px;vertical-align:middle;white-space:nowrap}
+.tierb svg{width:9px;height:9px}
+.tierb.a{color:#0A0E12;background:linear-gradient(180deg,var(--gold2),var(--gold));box-shadow:0 0 12px -3px rgba(245,197,66,.75)}
+.tierb.b{color:#7dd3fc;background:rgba(56,189,248,.12);border:1px solid rgba(56,189,248,.45)}
+.pick .pk-k .tierb{margin-left:6px}
 .pick .pk-top{display:flex;align-items:center;gap:9px}
 .pick .pk-nm .t{font-weight:800;font-size:16px;letter-spacing:-.01em}
 .pick .pk-nm .s{font-size:10.5px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:96px}
@@ -2270,10 +2277,21 @@ function miniGauge(score,color){const r=52,C=2*Math.PI*r,frac=0.74,track=C*frac,
     <text x="75" y="89" text-anchor="middle" fill="${color}" font-size="42" font-weight="700" font-family="Rajdhani" style="filter:drop-shadow(0 0 14px rgba(245,197,66,.4))">${score}</text></svg>`;}
 const PKIMG={HBM:"bull",MRVL:"chipset"};
 function fmtPx(v){return (+v).toLocaleString("sv-SE",{maximumFractionDigits:2});}
+/* Konviktions-badge. A = alla krav uppfyllda (med trenden, volym, inte
+   avsvalnande, rätt marknadsregim). B = med trenden men saknar något.
+   C visas utan badge — inget löfte ges. */
+const _TIER_STAR='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3 6.3 6.9.9-5 4.9 1.2 6.9L12 17.8 5.9 21l1.2-6.9-5-4.9 6.9-.9z"/></svg>';
+const _TIER_EYE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M1.5 12S5 5.5 12 5.5 22.5 12 22.5 12 19 18.5 12 18.5 1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+function tierBadge(t){
+  const EN=(window.GRABIT_LANG==="en");
+  if(t==="A")return '<span class="tierb a">'+_TIER_STAR+(EN?"A+ SETUP":"A+ LÄGE")+'</span>';
+  if(t==="B")return '<span class="tierb b">'+_TIER_EYE+(EN?"WATCH":"BEVAKA")+'</span>';
+  return "";
+}
 function pickCard(p){const col=p.c||scoreColor(p.score);const bg=PKIMG[p.tkr];
   const sc100=p.s100!=null?p.s100:Math.round((p.score||0)*10);
   const lvl=(p.entry!=null&&p.stopp!=null)?`<div class="pk-lvl"><span>E ${fmtPx(p.entry)}</span><span class="neg">S ${fmtPx(p.stopp)}</span>${p.t2!=null?`<span class="pos">T ${fmtPx(p.t2)}</span>`:""}</div>`:"";
-  return `<div class="pick" onclick="openStock('${p.tkr}')">${bg?`<div class="pkbg" style="background-image:url('${IMGS[bg]||""}')"></div>`:""}<div class="pk-k" style="color:${col}">${p.kicker}</div>
+  return `<div class="pick" onclick="openStock('${p.tkr}')">${bg?`<div class="pkbg" style="background-image:url('${IMGS[bg]||""}')"></div>`:""}<div class="pk-k" style="color:${col}">${p.kicker}${tierBadge(p.tier)}</div>
     <div class="pk-top">${lic(p.tkr,34,col)}<div class="pk-nm"><div class="t">${p.tkr}</div><div class="s">${NAMES[p.tkr]||p.tkr}</div></div><div class="pk-sc100 num" style="color:${col};border-color:${col}66">${sc100}</div></div>
     <div class="pk-spark">${spark(p.trend||[4,5,4,6,7,6,8,9],col)}</div>
     ${lvl}
@@ -2636,7 +2654,7 @@ function mapOverview(o,d){
   }
   if(o.picks){
     const P=o.picks, ks=[["veckans_case","VECKANS SETUP"],["wildcard","WILDCARD"]];
-    const pk=ks.filter(k=>P[k[0]]).map(k=>{const a=P[k[0]];return {kicker:k[1],tkr:a.ticker,score:sc(a),tag:tg(a),c:scoreColor(sc(a)),trend:[3,4,3,5,6,5,7,8,9],
+    const pk=ks.filter(k=>P[k[0]]).map(k=>{const a=P[k[0]];return {kicker:k[1],tkr:a.ticker,score:sc(a),tag:tg(a),c:scoreColor(sc(a)),tier:a.tier,trend:[3,4,3,5,6,5,7,8,9],
       s100:(a.setup_score&&a.setup_score>0)?Math.round(a.setup_score):Math.round(sc(a)*10),
       entry:a.last!=null?+(+a.last).toFixed(2):null,
       stopp:(a.ob_support!=null?+(+a.ob_support).toFixed(2):(a.atr_dn_1!=null?+(+a.atr_dn_1).toFixed(2):null)),
@@ -3650,7 +3668,7 @@ async function loadTopOp(){
   if(!p||!p.ticker){window._topTries=(window._topTries||0)+1;if(window._topTries<=5)setTimeout(loadTopOp,30000);return;}
   const col=scoreColor((p.score||0)/10);
   el.style.display="";
-  el.innerHTML=`<div class="to-k">Dagens Top Opportunity</div>
+  el.innerHTML=`<div class="to-k">Dagens Top Opportunity${tierBadge(p.tier)}</div>
    <div class="to-row">${lic(p.ticker,44,col)}<div><div class="to-tk">${p.ticker}</div><div class="to-nm">${NAMES[p.ticker]||""}</div></div>
      <div class="to-score"><i>AI SCORE</i><b class="num">${p.score}</b></div></div>
    <div class="to-stats">
