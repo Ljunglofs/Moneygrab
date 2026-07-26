@@ -3968,9 +3968,22 @@ def _facit_load():
     import json as _j
     try:
         with open(_FACIT_FILE) as f:
-            return _j.load(f)
+            rows = _j.load(f)
     except Exception:
         return []
+    # Engångsreparation: den gamla koden skrev utfall_pct=0.0 när kursdatan
+    # inte gick att hämta — en misslyckad MÄTNING som sen räknades som en miss.
+    # En äkta mätning sätter alltid slutpris, så rader med exakt 0.0 UTAN
+    # slutpris är garanterat sådana fel. Nolla dem så de mäts om på riktigt.
+    fixed = 0
+    for e in rows:
+        if e.get("utfall_pct") == 0.0 and "slutpris" not in e:
+            e.pop("utfall_pct", None); e.pop("traff", None)
+            fixed += 1
+    if fixed:
+        print("Facit: nollställde %d felaktiga 0.00%%-rader (mäts om)" % fixed)
+        _facit_save(rows)
+    return rows
 
 
 def _facit_save(rows):
@@ -4048,14 +4061,23 @@ def _facit_evaluate():
     for e in todo:
         try:
             h = yf.Ticker(e["ticker"]).history(start=e["datum"], auto_adjust=True)
-            if h is None or h.empty:
-                e["utfall_pct"] = 0.0
-            else:
-                closes = h["Close"].dropna()
-                ref = closes.iloc[:6]        # ~5 handelsdagar efter loggning
-                slut = float(ref.iloc[-1])
-                e["slutpris"] = round(slut, 2)
-                e["utfall_pct"] = round((slut - float(e["pris"])) / float(e["pris"]) * 100, 2)
+            closes = h["Close"].dropna() if (h is not None and not h.empty) else None
+            # Kräv HELA fönstret (loggdag + 5 handelsdagar = 6 stängningar) innan
+            # utfallet skrivs. Saknas data är det en MISSLYCKAD MÄTNING — inte en
+            # förlust. Att skriva 0.0 % gjorde varje datamiss till en "miss" och
+            # drog ner både träffprocent och snitt permanent (raden togs aldrig om).
+            if closes is None or len(closes) < 6:
+                e["matfel"] = int(e.get("matfel", 0)) + 1
+                if e["matfel"] >= 5:      # ticker svarar inte -> uteslut ur facit
+                    e["utvarderad_ej"] = True
+                    e["utfall_pct"] = None
+                print("Facit: ofullständig data för %s (%s försök) — mäts om senare"
+                      % (e.get("ticker"), e["matfel"]))
+                continue
+            slut = float(closes.iloc[:6].iloc[-1])
+            e.pop("matfel", None)
+            e["slutpris"] = round(slut, 2)
+            e["utfall_pct"] = round((slut - float(e["pris"])) / float(e["pris"]) * 100, 2)
             e["traff"] = bool(e["utfall_pct"] > 0)
         except Exception as ex:
             print("Facit: kunde inte utvärdera %s: %s" % (e.get("ticker"), ex))
@@ -4164,7 +4186,10 @@ def _spx_return(from_date, to_date=None):
 @app.get("/api/facit")
 def facit():
     rows = _facit_load()
-    klara = [e for e in rows if "utfall_pct" in e]
+    # Bara picks med ETT RIKTIGT MÄTT utfall. Rader som aldrig gick att mäta
+    # (utfall_pct=None) räknas varken som träff eller miss — de ska inte
+    # förvanska statistiken åt något håll.
+    klara = [e for e in rows if e.get("utfall_pct") is not None]
     senaste = klara[-20:]
     n = len(senaste)
     # Marknadsrelativ avkastning (alfa) — hur mycket picken slog S&P över samma
