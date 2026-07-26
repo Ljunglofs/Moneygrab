@@ -1797,7 +1797,7 @@ function stockData(tkr,live){live=live||{};const r=_rng(_seed(tkr));
   const catPool=[["Kvartalsrapport","28 maj"],["Analytikeruppgradering","denna vecka"],["Sektorn i medvind","pågår"],["Institutionellt inflöde","senaste 10 d"],["Breakout-nivå nära","nu"],["Insynsköp registrerat","nyligen"]];
   const ci=Math.floor(r()*3),catalysts=catPool.slice(ci,ci+3);
   const instOwn=Math.round(28+r()*55),insiderOwn=+(r()*9).toFixed(1),shortInt=+(2+r()*16).toFixed(1);
-  return {tkr,name:live.name||NAMES[tkr]||tkr,land,bors,flag,cur,sector:live.sector||SECT[tkr]||"\u2014",dom:DOMAINS[tkr]||"",liveOk,
+  return {tkr,name:live.name||NAMES[tkr]||tkr,land,bors,flag,cur,sector:live.sector||SECT[tkr]||"\u2014",dom:DOMAINS[tkr]||"",liveOk,liveFail:!!live.failed,
     price,day,score,mom,sent,tech,tag,rsi,relvol,vol,d20,d5,fromHi,ema50,ema200,
     bos,struktur,trendstyrka,setupG,atr,breakout:Math.min(99,breakout),confidence:Math.min(99,confidence),exitrisk:Math.max(4,Math.min(99,exitrisk)),
     bias,conv,riskp,fakeb,bull,risks,desc,mcap,verdict,vcolor,entryLo,entryHi,hitrate,catalysts,instOwn,insiderOwn,shortInt,
@@ -1862,7 +1862,7 @@ function demoAnswer(q){const s=q.toLowerCase();const hot=DEMO.hetaste;
     return `Marknaden är risk-off i dag (sentiment 34/100). Det som håller emot bäst: RDW, USAR och OKLO. Svagast: SIVE och QUBT.\n\nFokus på relativ styrka och blankningslägen tills trenden vänder.\n\n(Demo-data.)`;
   return `Bra fråga! I demo-läge kan jag inte göra live-analys ännu. Koppla API_BASE till din Render-backend så svarar Grabit AI på riktigt – med din scanner, setups, nivåer och nyhetsläge för "${q}".`;}
 
-let _curStock=null;const _liveStock={};
+let _curStock=null;const _liveStock={};const _liveFail={};
 function scoreGauge(score10){
   var s=Math.max(0,Math.min(10,+score10||0));
   var p=Math.round(s*10), col=scoreColor(s);
@@ -1902,7 +1902,7 @@ function openStock(tkr){_curStock=tkr;const d=stockData(tkr,_liveStock[tkr]);
     <div id="st-insider" class="ins-list"><div class="anl-load">Laddar insider…</div></div>
     <div class="st-sec">Om bolaget</div>
     <div class="st-box about secgfx-wrap"><div class="secgfx" style="background-image:url('${IMGS.goldwave}')"></div><div class="ab-facts"><div><span>Sektor</span><b>${d.sector}</b></div><div><span>Marknad</span><b>${d.bors}</b></div><div><span>Land</span><b>${d.land} ${d.flag}</b></div></div><p class="blurb">${d.desc}</p></div>
-    <div class="verdict secgfx-wrap pro-gated" data-lock="${window.GRABIT_LANG==='en'?'Entry · Stop · Target':'Entry · Stop · Mål'}" style="border-color:${d.vcolor}66;background:linear-gradient(160deg,${d.vcolor}1f,#070708)"><div class="secgfx gverdict" style="background-image:url('${IMGS.verdict_chart}')"></div><div class="vd-top"><span class="vd-badge" style="background:${d.liveOk?d.vcolor:'#7c8a9a'}">${d.liveOk?d.verdict:'LADDAR'}</span><span class="vd-hit">${d.liveOk?'Träffsäkerhet <b style="color:'+d.vcolor+'">'+d.hitrate+'%</b>':''}</span></div><div class="vd-line">${!d.liveOk?'Hämtar live-kurs… nivåer visas när riktig data laddats.':(d.verdict==='UNDVIK'?'Avvakta – ingen entry rekommenderas just nu.':'Köp '+d.cur+d.entryLo+'–'+d.cur+d.entryHi+'  ·  Stop '+d.cur+d.stop+'  ·  Mål '+d.cur+d.t2)}</div><div class="vd-sub">${!d.liveOk?'Grabit räknar entry, stop och mål på live-priset – aldrig på uppskattningar.':(d.score>=7.5?'AI-slutsats: stark setup med bekräftad trend och stigande relativ styrka. R/R 1:2.3.':d.score>=6?'AI-slutsats: blandad bild – vänta på bekräftelse (volym + utbrott) innan entry.':'AI-slutsats: svag setup – hög risk. Undvik tills trend och volym förbättras.')}</div></div>
+    <div class="verdict secgfx-wrap pro-gated" data-lock="${window.GRABIT_LANG==='en'?'Entry · Stop · Target':'Entry · Stop · Mål'}" style="border-color:${d.vcolor}66;background:linear-gradient(160deg,${d.vcolor}1f,#070708)"><div class="secgfx gverdict" style="background-image:url('${IMGS.verdict_chart}')"></div><div class="vd-top"><span class="vd-badge" style="background:${d.liveOk?d.vcolor:(d.liveFail?'#b3453f':'#7c8a9a')}">${d.liveOk?d.verdict:(d.liveFail?'EJ TILLGÄNGLIG':'LADDAR')}</span><span class="vd-hit">${d.liveOk?'Träffsäkerhet <b style="color:'+d.vcolor+'">'+d.hitrate+'%</b>':''}</span></div><div class="vd-line">${!d.liveOk?(d.liveFail?'Live-kursen gick inte att hämta just nu.':'Hämtar live-kurs… nivåer visas när riktig data laddats.'):(d.verdict==='UNDVIK'?'Avvakta – ingen entry rekommenderas just nu.':'Köp '+d.cur+d.entryLo+'–'+d.cur+d.entryHi+'  ·  Stop '+d.cur+d.stop+'  ·  Mål '+d.cur+d.t2)}</div><div class="vd-sub">${!d.liveOk?(d.liveFail?'Grabit visar aldrig nivåer på uppskattad data. <b style="cursor:pointer;text-decoration:underline" onclick="event.stopPropagation();retryLive(\''+d.tkr+'\')">Försök igen</b>':'Grabit räknar entry, stop och mål på live-priset – aldrig på uppskattningar.'):(d.score>=7.5?'AI-slutsats: stark setup med bekräftad trend och stigande relativ styrka. R/R 1:2.3.':d.score>=6?'AI-slutsats: blandad bild – vänta på bekräftelse (volym + utbrott) innan entry.':'AI-slutsats: svag setup – hög risk. Undvik tills trend och volym förbättras.')}</div></div>
     <div class="st-sec">GRABIT Score</div>
     <div class="rings">${ring(d.mom,"#22d3ee","Momentum",d.mom>=8?"Starkt":"Bra")}
       ${ring(d.sent,"#F5C542","Sentiment",d.sent>=8?"Positivt":"Neutralt")}
@@ -2089,9 +2089,24 @@ async function fetchLiveStock(tkr){
     if((p=n(a.ob_resist))!=null)ov.obResist=p;
     if(typeof co.name==="string"&&co.name)ov.name=co.name;
     _liveStock[tkr]=Object.assign(_liveStock[tkr]||{},ov);
+    delete _liveFail[tkr];
     if(_curStock===tkr)openStock(tkr);
-  }catch(e){_liveStock[tkr]=_liveStock[tkr]||{};/* behåll demo-data tyst */}
+  }catch(e){
+    // Misslyckas anropet FÅR vyn inte bli hängande i "LOADING". Tidigare
+    // sattes _liveStock[tkr]={} här, vilket både dolde felet och gjorde att
+    // guarden (=== undefined) aldrig försökte igen — rutan stod kvar för evigt.
+    var n=(_liveFail[tkr]||0)+1; _liveFail[tkr]=n;
+    if(n<3){                                  // transienta fel är vanliga
+      delete _liveStock[tkr];                 // släpp guarden så retry får ske
+      setTimeout(function(){ if(_curStock===tkr)fetchLiveStock(tkr); }, n*1200);
+    }else{
+      _liveStock[tkr]=Object.assign(_liveStock[tkr]||{},{failed:true});
+      if(_curStock===tkr)openStock(tkr);      // visa ärligt fel + försök igen
+    }
+  }
 }
+function retryLive(tkr){delete _liveFail[tkr];delete _liveStock[tkr];
+  if(_curStock===tkr){openStock(tkr);fetchLiveStock(tkr);}}
 let _liveCo={};
 async function fetchCompany(tkr){
   if(_liveCo[tkr]!==undefined)return; _liveCo[tkr]={};
