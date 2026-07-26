@@ -1306,18 +1306,32 @@ def _days_ago(mmddyyyy: str):
     return None
 
 
+_FMP_LAST = {}     # path -> kort felbeskrivning, för diagnostik i /api/insider_flow
+
+
 def _fmp(path, params=None):
     import requests
     key = os.getenv("FMP_API_KEY", "")
     if not key:
+        _FMP_LAST[path] = "ingen FMP_API_KEY"
         return None
     try:
         p = dict(params or {}); p["apikey"] = key
         r = requests.get("https://financialmodelingprep.com" + path, params=p, timeout=12)
         if r.status_code == 200:
-            return r.json()
-    except Exception:
-        pass
+            j = r.json()
+            # FMP svarar 200 även vid planbegränsning: {"Error Message": "..."}
+            if isinstance(j, dict) and ("Error Message" in j or "error" in j):
+                _FMP_LAST[path] = str(j.get("Error Message") or j.get("error"))[:160]
+                print("FMP %s: %s" % (path, _FMP_LAST[path]))
+                return None
+            _FMP_LAST[path] = "ok (%d rader)" % (len(j) if isinstance(j, list) else 1)
+            return j
+        _FMP_LAST[path] = "HTTP %d: %s" % (r.status_code, r.text[:120])
+        print("FMP %s: %s" % (path, _FMP_LAST[path]))
+    except Exception as e:
+        _FMP_LAST[path] = "%s: %s" % (type(e).__name__, str(e)[:120])
+        print("FMP %s: %s" % (path, _FMP_LAST[path]))
     return None
 
 
@@ -1446,27 +1460,50 @@ def _fmp_insider_flow():
     if not os.getenv("FMP_API_KEY", ""):
         return []
     out = []
+    # FMP har flyttat sina endpoints; v4-flödet svarar tomt/403 på nyare
+    # nycklar. Prova i tur och ordning tills en väg ger rader.
+    _paths = [("/api/v4/insider-trading-rss-feed", lambda p: {"page": p}),
+              ("/stable/insider-trading-latest", lambda p: {"page": p}),
+              ("/api/v4/insider-trading", lambda p: {"page": p})]
+    src = None
+    for path, mk in _paths:
+        probe = _fmp(path, mk(0))
+        if isinstance(probe, list) and probe:
+            src = (path, mk, probe)
+            break
+    if not src:
+        return []
+    path, mk, first = src
     for page in (0, 1):
-        j = _fmp("/api/v4/insider-trading-rss-feed", {"page": page})
+        j = first if page == 0 else _fmp(path, mk(page))
         if not isinstance(j, list) or not j:
             break
         for t in j:
-            tt = (t.get("transactionType") or "").upper()
-            if tt.startswith("P"):
+            if not isinstance(t, dict):
+                continue
+            # Fältnamnen skiljer sig mellan FMP:s v4- och stable-endpoints.
+            def _g(*keys, default=""):
+                for k in keys:
+                    v = t.get(k)
+                    if v not in (None, ""):
+                        return v
+                return default
+            tt = str(_g("transactionType", "transactionCode", "type")).upper()
+            if tt.startswith("P") or "PURCHASE" in tt or tt.startswith("A"):
                 action = "KÖP"
-            elif tt.startswith("S"):
+            elif tt.startswith("S") or "SALE" in tt or "SOLD" in tt:
                 action = "SÄLJ"
             else:
                 continue
-            tk = (t.get("symbol") or "").strip().upper()
+            tk = str(_g("symbol", "ticker")).strip().upper()
             if not tk:
                 continue
-            da = _days_ago((t.get("transactionDate") or "")[:10])
+            da = _days_ago(str(_g("transactionDate", "filingDate", "date"))[:10])
             if da is None or da < 0 or da > 120:
                 continue
             try:
-                shares = float(t.get("securitiesTransacted") or 0)
-                price = float(t.get("price") or 0)
+                shares = float(_g("securitiesTransacted", "shares", "quantity", default=0) or 0)
+                price = float(_g("price", "pricePerShare", default=0) or 0)
             except Exception:
                 shares = price = 0.0
             usd = shares * price
@@ -1538,12 +1575,26 @@ def insider_flow(limit: int = 50, token: str = ""):
            "sell_usd": round(sum(float(x.get("usd_num") or 0) for x in sells)),
            "buy_series": _cum(buys), "sell_series": _cum(sells)}
     free_n = int(os.getenv("PRO_FREE_ITEMS", "3"))
-    shown = items[:limit] if is_pro else items[:free_n]
+    if is_pro:
+        shown = items[:limit]
+    else:
+        # Gratis-urvalet måste vara REPRESENTATIVT. Listan sorteras på
+        # confluence + färskhet, och insiders säljer betydligt oftare än de
+        # köper — så de 3 första blev nästan alltid SÄLJ, och då stod
+        # "Köp"-fliken tom trots att det fanns köp i datan.
+        shown = items[:free_n]
+        if buys and not any(it["action"] == "KÖP" for it in shown):
+            shown = [buys[0]] + [it for it in shown if it is not buys[0]][:free_n - 1]
     shown = [{k: v for k, v in it.items() if k != "usd_num"} for it in shown]
     # Faktisk data-närvaro (inte bara "nyckel finns") — så frontend kan dölja
     # tomma flikar. FMP:s senat-data ligger ofta bakom betalplan = tomt flöde.
     has_pol = any(it.get("kind") == "politiker" for it in items)
-    return {"items": shown, "locked": (not is_pro), "total": total, "agg": agg,
+    # Diagnostik: gör tyst datasvält synlig (FMP svarar 200 även när endpointen
+    # ligger bakom betalplan). Bara räknare + felsträngar — inga rader läcker.
+    diag = {"pol": len(pol), "corp": len(corp), "buys": len(buys), "sells": len(sells),
+            "fmp": {k: v for k, v in _FMP_LAST.items() if "insider" in k or "senate" in k
+                    or "house" in k or "trading" in k}}
+    return {"items": shown, "locked": (not is_pro), "total": total, "agg": agg, "diag": diag,
             "confluence_tickers": (sorted(conf_tk) if is_pro else []),
             "has_congress": bool(os.getenv("FMP_API_KEY", "")),
             "has_insider": bool(os.getenv("FINNHUB_API_KEY", "")),

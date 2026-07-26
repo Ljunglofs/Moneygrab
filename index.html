@@ -2277,6 +2277,26 @@ function miniGauge(score,color){const r=52,C=2*Math.PI*r,frac=0.74,track=C*frac,
     <text x="75" y="89" text-anchor="middle" fill="${color}" font-size="42" font-weight="700" font-family="Rajdhani" style="filter:drop-shadow(0 0 14px rgba(245,197,66,.4))">${score}</text></svg>`;}
 const PKIMG={HBM:"bull",MRVL:"chipset"};
 function fmtPx(v){return (+v).toLocaleString("sv-SE",{maximumFractionDigits:2});}
+/* Marknad ur tickersuffix — utan suffix = USA. */
+function mktOf(t){t=String(t||"").toUpperCase();if(t.indexOf(".")<0)return "US";
+  var s=t.split(".").pop();
+  return ({ST:"SE",OL:"NO",CO:"DK",HE:"FI",PA:"FR",DE:"DE",L:"UK",TO:"CA"})[s]||s;}
+/* Topp-N med USA-fokus: max ~30% icke-amerikanskt och max 2 per utländsk börs.
+   Speglar _mix_markets i api.py. Kvoten är ett TAK — listan blir aldrig kortare. */
+function mixMk(rows,n,share,perMkt){
+  if(!n||!rows||!rows.length)return [];
+  var cap=Math.max(1,Math.round(n*(share==null?0.3:share)));
+  var per=(perMkt==null?2:perMkt);
+  var out=[],used={},nonus=0;
+  for(var i=0;i<rows.length&&out.length<n;i++){
+    var m=mktOf(rows[i].ticker||rows[i].tkr);
+    if(m!=="US"){ if(nonus>=cap||(used[m]||0)>=per)continue; nonus++; }
+    used[m]=(used[m]||0)+1; out.push(rows[i]);
+  }
+  if(out.length<n)for(var k=0;k<rows.length&&out.length<n;k++)
+    if(out.indexOf(rows[k])<0)out.push(rows[k]);
+  return out;
+}
 /* Konviktions-badge. A = alla krav uppfyllda (med trenden, volym, inte
    avsvalnande, rätt marknadsregim). B = med trenden men saknar något.
    C visas utan badge — inget löfte ges. */
@@ -2669,14 +2689,17 @@ function mapOverview(o,d){
 function mapScreen(rows,d){
   if(!Array.isArray(rows)||!rows.length||!d.scanner)return;
   window._rows=rows;
+  // Spegling av backendens _mix_markets: USA-fokus i topplistorna. Utan den
+  // fylls "Winners/Losers today" av svenska bolag mitt på dagen — Stockholm
+  // handlas då och har dagens rörelse, medan USA ännu inte öppnat.
   const by=(k)=>[...rows].sort((a,b)=>(+b[k]||0)-(+a[k]||0));
   // Dagens % (ret_1). ret_5 bara som fallback om backend är äldre.
   const dchg=r=>(r.ret_1!=null?+r.ret_1:(+r.ret_5||0));
-  d.scanner.gainers=[...rows].sort((a,b)=>dchg(b)-dchg(a)).slice(0,5).map(r=>({tkr:r.ticker,chg:+dchg(r).toFixed(1),px:r.last!=null?+(+r.last).toFixed(2):null}));
-  window._tmv={g:d.scanner.gainers,l:[...rows].sort((a,b)=>dchg(a)-dchg(b)).slice(0,5).map(r=>({tkr:r.ticker,chg:+dchg(r).toFixed(1),px:r.last!=null?+(+r.last).toFixed(2):null}))};
+  d.scanner.gainers=mixMk([...rows].sort((a,b)=>dchg(b)-dchg(a)),5).map(r=>({tkr:r.ticker,chg:+dchg(r).toFixed(1),px:r.last!=null?+(+r.last).toFixed(2):null}));
+  window._tmv={g:d.scanner.gainers,l:mixMk([...rows].sort((a,b)=>dchg(a)-dchg(b)),5).map(r=>({tkr:r.ticker,chg:+dchg(r).toFixed(1),px:r.last!=null?+(+r.last).toFixed(2):null}))};
   renderTopMovers();
   // Most bullish: 10 aktier upp minst 5% över 5 handelsdagar (ret_5)
-  window._mb=[...rows].filter(r=>(+r.ret_5||0)>=5).sort((a,b)=>(+b.ret_5||0)-(+a.ret_5||0)).slice(0,10)
+  window._mb=mixMk([...rows].filter(r=>(+r.ret_5||0)>=5).sort((a,b)=>(+b.ret_5||0)-(+a.ret_5||0)),10)
     .map(r=>({tkr:r.ticker,chg:+(+r.ret_5).toFixed(1),px:r.last!=null?+(+r.last).toFixed(2):null}));
   d.bullish=window._mb;       // full lista (10) under Research; kompakt flik i Top Movers
   renderTopMovers();          // Most Bullish är nu en flik i Top Movers
