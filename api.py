@@ -296,6 +296,43 @@ def hetta_of(a) -> int:
     return int(max(0, min(100, base + vol)))
 
 
+def _market_of(ticker: str) -> str:
+    """Marknad ur tickersuffix. Utan suffix = USA."""
+    t = (ticker or "").upper()
+    if "." not in t:
+        return "US"
+    suf = t.rsplit(".", 1)[-1]
+    return {"ST": "SE", "OL": "NO", "CO": "DK", "HE": "FI",
+            "PA": "FR", "DE": "DE", "L": "UK", "TO": "CA"}.get(suf, suf)
+
+
+def _mix_markets(rows, n, per_market=None):
+    """Plocka topp-N men låt ALDRIG en marknad ta alla platser.
+
+    Varför: yfinance ger dagsbarer. Mitt på dagen svensk tid handlas
+    Stockholm just nu (sista baren = dagens PÅGÅENDE bar, dagens rörelse
+    inräknad) medan USA ännu inte öppnat (sista baren = gårdagens
+    FÄRDIGA bar). Då jämförs äpplen med päron och Stockholm sopar listan.
+    Tills datan är sessionsnormaliserad håller vi en rimlig marknadsmix —
+    appen är USA-fokuserad och ska visa USA-bolag.
+    """
+    if n <= 0 or not rows:
+        return []
+    cap = per_market if per_market is not None else max(2, n // 2)
+    out, used = [], {}
+    for r in rows:                       # rows är redan rankade
+        m = _market_of(r.get("ticker", ""))
+        if used.get(m, 0) >= cap:
+            continue
+        out.append(r); used[m] = used.get(m, 0) + 1
+        if len(out) >= n:
+            break
+    if len(out) < n:                     # fyll upp om kvoten tömde listan
+        have = {id(x) for x in out}
+        out += [r for r in rows if id(r) not in have][:n - len(out)]
+    return out
+
+
 @cached(600)
 def regime_of(ticker):
     try:
@@ -333,6 +370,22 @@ def scan_universe(theme_key: Optional[str] = None) -> list:
                 out.append(_jsonable(a))
         _PREFETCH.clear()             # släpp råa prisdataframes direkt
         _gc.collect()                 # ge minnet tillbaka till OS
+    # Täckning per marknad — Yahoo blockar ibland moln-IP:n, och då tystnar
+    # hela USA-delen utan att något syns i appen. Nu står det i loggen.
+    try:
+        cov = {}
+        for r in out:
+            m = _market_of(r.get("ticker", ""))
+            cov[m] = cov.get(m, 0) + 1
+        tot = {}
+        for t in (tickers or []):
+            m = _market_of(t)
+            tot[m] = tot.get(m, 0) + 1
+        print("Scan: %d/%d tickers · " % (len(out), len(tickers))
+              + " ".join("%s %d/%d" % (m, cov.get(m, 0), tot[m])
+                         for m in sorted(tot, key=lambda k: -tot[k])))
+    except Exception:
+        pass
     return out
 
 # =====================================================================
@@ -2607,8 +2660,9 @@ def overview():
         "wildcard":     vand_like[0] if vand_like else None,
     }
 
-    hetast = by_hetta[:10]
-    dagens_bull = by_hetta[0] if by_hetta else None
+    # Marknadsmix så en enskild börs inte tar alla tio platser.
+    hetast = _mix_markets(by_hetta, 10)
+    dagens_bull = hetast[0] if hetast else None
 
     n = len(rows)
     avg = round(sum(r.get("score10", 0) for r in rows) / n, 1) if n else 0
