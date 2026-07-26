@@ -378,28 +378,37 @@ def _rank_metrics(df):
         return None
 
 
-def _mix_markets(rows, n, per_market=None):
-    """Plocka topp-N men låt ALDRIG en marknad ta alla platser.
+# Andel av en lista som får vara icke-amerikansk. USA är ~85% av universumet,
+# är den överlägset största marknaden och det är där kunderna handlar — därför
+# ska listorna domineras av USA-bolag. Justerbart via env.
+_MIX_NONUS_SHARE = float(os.environ.get("MIX_NONUS_SHARE", "0.3"))   # max 30%
+_MIX_NONUS_PER_MARKET = int(os.environ.get("MIX_NONUS_PER_MARKET", "2"))
 
-    Varför: yfinance ger dagsbarer. Mitt på dagen svensk tid handlas
-    Stockholm just nu (sista baren = dagens PÅGÅENDE bar, dagens rörelse
-    inräknad) medan USA ännu inte öppnat (sista baren = gårdagens
-    FÄRDIGA bar). Då jämförs äpplen med päron och Stockholm sopar listan.
-    Tills datan är sessionsnormaliserad håller vi en rimlig marknadsmix —
-    appen är USA-fokuserad och ska visa USA-bolag.
+
+def _mix_markets(rows, n, per_market=None):
+    """Plocka topp-N med USA-fokus: högst ~30% av platserna får gå till
+    icke-amerikanska bolag (och max 2 per enskild utländsk börs).
+
+    Rankningen är redan sessionsnormaliserad (_bar_is_live/_rank_metrics),
+    så det här handlar inte om att kompensera ett mätfel — det är ett
+    redaktionellt val: appen är USA-fokuserad. Kvoten är ett TAK, inte ett
+    golv: finns inga bra USA-lägen fylls listan ändå upp.
     """
     if n <= 0 or not rows:
         return []
-    cap = per_market if per_market is not None else max(2, n // 2)
-    out, used = [], {}
+    nonus_cap = max(1, int(round(n * _MIX_NONUS_SHARE)))
+    per_cap = per_market if per_market is not None else _MIX_NONUS_PER_MARKET
+    out, used, nonus = [], {}, 0
     for r in rows:                       # rows är redan rankade
         m = _market_of(r.get("ticker", ""))
-        if used.get(m, 0) >= cap:
-            continue
+        if m != "US":
+            if nonus >= nonus_cap or used.get(m, 0) >= per_cap:
+                continue
+            nonus += 1
         out.append(r); used[m] = used.get(m, 0) + 1
         if len(out) >= n:
             break
-    if len(out) < n:                     # fyll upp om kvoten tömde listan
+    if len(out) < n:                     # hellre full lista än tomma platser
         have = {id(x) for x in out}
         out += [r for r in rows if id(r) not in have][:n - len(out)]
     return out
@@ -2718,8 +2727,9 @@ def overview():
     # varje rad (A/B/C) så gränssnittet kan visa konviktionen ärligt.
     reg = _market_regime()
     rows = _rank_picks(rows, reg)
-    by_score = sorted(rows, key=lambda x: ({"A": 0, "B": 1}.get(x.get("tier"), 2),
-                                           -(x.get("score10") or 0)))
+    by_score = _mix_markets(
+        sorted(rows, key=lambda x: ({"A": 0, "B": 1}.get(x.get("tier"), 2),
+                                    -(x.get("score10") or 0))), 12)
     by_hetta = sorted(rows, key=lambda x: ({"A": 0, "B": 1}.get(x.get("tier"), 2),
                                            -(x.get("hetta") or 0)))
 
@@ -4192,6 +4202,9 @@ def topop():
         rank = _rank_picks(scanned, reg)
     if not rank:
         return {"pick": None, "regim": reg}
+    # USA-fokus även här (mixen behåller tier-ordningen, den hoppar bara
+    # över utländska bolag när kvoten är fylld).
+    rank = _mix_markets(rank, min(len(rank), 12))
     best = rank[0]
     out = _opp_of(best)
     out["tier"] = best.get("tier")
@@ -4260,6 +4273,7 @@ def _facit_log_today():
         rank = _rank_picks(scanned, reg)
     if not rank:
         return
+    rank = _mix_markets(rank, min(len(rank), 12))     # USA-fokus
     bull_like = [r for r in rank if str(r.get("label")) in ("BULL", "MOMENTUM", "Rocketcase")]
     vand_like = [r for r in rank if str(r.get("label")) == "VÄNDNING"]
     val = [("Top Opportunity", rank[0]),
