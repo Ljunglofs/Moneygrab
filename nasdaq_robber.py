@@ -1832,7 +1832,12 @@ def poly_relevant(title):
 
 def poly_scan():
     """Pollar Polymarkets Data API efter stora taker-trades och larmar pa nya
-    SOM matchar dina teman (POLY_KEYWORDS). Forsta korningen primar bara seen-set."""
+    SOM matchar dina teman (POLY_KEYWORDS). Forsta korningen primar bara seen-set.
+
+    AV som standard: Polymarket-larmen var brus i Telegram-kanalen bredvid
+    trade-signalerna. Satt POLY_ENABLED=1 for att fa tillbaka dem."""
+    if os.environ.get("POLY_ENABLED", "0") != "1":
+        return
     global _POLY_PRIMED
     import requests
     try:
@@ -2563,8 +2568,9 @@ def run_loop():
             "\u2705 <b>NASDAQ ROBBER startad</b>\n"
             f"Bevakar: {names}\n"
             f"Setup {Config.MTF_TIMEFRAME} / bias {Config.HTF_TIMEFRAME} \u00b7 larm vid \u2265{cur_min_score()}/7\n"
-            "Skannar 24/7 \u00b7 trade-larm 06:00\u201322:00 m\u00e5n\u2013fre \u00b7 \U0001F305 morgonbrief 06:00\n"
-            f"+ Polymarket-monitor: larm vid trades \u2265 ${int(POLY_MIN_USD):,}"
+            "Skannar 24/7 \u00b7 trade-larm 06:00\u201322:00 m\u00e5n\u2013fre \u00b7 \U0001F305 morgonbrief 06:00"
+            + (f"\n+ Polymarket-monitor: larm vid trades \u2265 ${int(POLY_MIN_USD):,}"
+               if os.environ.get("POLY_ENABLED", "0") == "1" else "")
         )
         print(f"Startup-ping till Telegram: {'OK' if ok else 'MISSLYCKADES (kolla TOKEN/CHAT_ID)'}")
     import threading as _th
