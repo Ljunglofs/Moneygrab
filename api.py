@@ -2589,12 +2589,14 @@ def overview():
     rows = scan_universe(None)
     idx = indices()["indices"]
 
-    # Dagens picks måste hålla samma standard som facit mäter — annars visar
-    # appen ett urval och track recordet mäter ett annat.
+    # Appen ska ALLTID ha lägen att visa — men de bästa först. tier sätts på
+    # varje rad (A/B/C) så gränssnittet kan visa konviktionen ärligt.
     reg = _market_regime()
-    kval = [r for r in rows if _pick_eligible(r, reg)]
-    by_score = sorted(kval, key=lambda x: x.get("score10", 0), reverse=True)
-    by_hetta = sorted(kval, key=lambda x: x.get("hetta", 0), reverse=True)
+    rows = _rank_picks(rows, reg)
+    by_score = sorted(rows, key=lambda x: ({"A": 0, "B": 1}.get(x.get("tier"), 2),
+                                           -(x.get("score10") or 0)))
+    by_hetta = sorted(rows, key=lambda x: ({"A": 0, "B": 1}.get(x.get("tier"), 2),
+                                           -(x.get("hetta") or 0)))
 
     bull_like = [r for r in by_score if str(r.get("label")) in ("BULL", "MOMENTUM", "Rocketcase")]
     vand_like = [r for r in by_score if str(r.get("label")) == "VÄNDNING"]
@@ -3984,13 +3986,13 @@ def _market_regime():
 
 
 def _pick_eligible(r, regime=None):
-    """True om picken håller ROBBER-standard. Gäller BARA urvalet av dagens
-    picks — den fria scannern/sökningen visar fortfarande allt."""
+    """True om picken håller ROBBER-standard (A+-läge). Används för att
+    GRADERA — aldrig för att tömma appen. Se _pick_tier()."""
     if not _PICK_GATES:
         return True
     if str(r.get("label")) not in _BULL_LABELS:
         return False
-    # #3 svalnar / rullar över -> aldrig en pick
+    # #3 svalnar / rullar över -> aldrig ett A+-läge
     if r.get("cooling"):
         return False
     # #1 med trenden: över eget EMA50 (och EMA200 om regimen är svag)
@@ -4009,7 +4011,7 @@ def _pick_eligible(r, regime=None):
     if int(r.get("score10") or 0) < _PICK_MIN_SCORE:
         return False
     # #4 regim: i RISK_OFF krävs dessutom att bolaget är över EMA200 och
-    #    har äkta styrka — annars står vi hellre utanför.
+    #    har äkta styrka för att räknas som A+.
     if (regime or _market_regime()) == "RISK_OFF":
         try:
             if e200 is None or float(last) <= float(e200):
@@ -4021,15 +4023,52 @@ def _pick_eligible(r, regime=None):
     return True
 
 
+def _pick_tier(r, regime=None):
+    """Konviktionsgrad. Appen visar ALLTID lägen — men säger ärligt hur
+    starka de är, och facit mäter varje nivå för sig:
+      A  = klarar alla ROBBER-krav (trend + volym + inte avsvalnande + regim)
+      B  = med trenden men saknar något (t.ex. volym) -> bevaka
+      C  = svagt/emot trenden -> visas bara i listor, aldrig som dagens pick
+    """
+    reg = regime or _market_regime()
+    if _pick_eligible(r, reg):
+        return "A"
+    if r.get("cooling") or str(r.get("label")) not in _BULL_LABELS:
+        return "C"
+    last, e50 = r.get("last"), r.get("ema50")
+    try:
+        if last is not None and e50 is not None and float(last) > float(e50):
+            return "B"
+    except Exception:
+        pass
+    return "C"
+
+
+def _rank_picks(rows, regime=None):
+    """Sortera så bästa konviktion hamnar först — men returnera ALLA, så att
+    appen alltid har aktier att visa."""
+    reg = regime or _market_regime()
+    order = {"A": 0, "B": 1, "C": 2}
+    for r in rows:
+        r["tier"] = _pick_tier(r, reg)
+    return sorted(rows, key=lambda r: (order.get(r.get("tier"), 3), -_topop_rank(r)))
+
+
 @app.get("/api/topop")
 def topop():
     scanned = scan_universe(None)
     reg = _market_regime()
-    rows = [r for r in scanned if _pick_eligible(r, reg)]
-    if not rows:      # hellre inget än ett dåligt läge
+    # Visa ALLTID dagens bästa läge — men bara A-lägen får kallas A+.
+    rank = _rank_picks([r for r in scanned
+                        if str(r.get("label")) in _BULL_LABELS], reg)
+    if not rank:
+        rank = _rank_picks(scanned, reg)
+    if not rank:
         return {"pick": None, "regim": reg}
-    best = max(rows, key=_topop_rank)
-    return {"pick": _opp_of(best), "regim": reg}
+    best = rank[0]
+    out = _opp_of(best)
+    out["tier"] = best.get("tier")
+    return {"pick": out, "regim": reg}
 
 
 # ---- Facit / track record ---------------------------------------------------
@@ -4084,18 +4123,19 @@ def _facit_log_today():
     scanned = scan_universe(None)
     if not scanned:
         return
-    # Logga BARA picks som klarar ROBBER-gaten. Tidigare valdes Top Opportunity
-    # ur HELA scannen (utan ens label-filtret som /api/topop hade) — så en
-    # BEAR/AVSVALNING-aktie kunde bli "dagens pick" och sen mätas i facit.
+    # Logga PRECIS de picks appen visar — annars mäter facit något annat än
+    # användaren ser (körsbärsplockad statistik). Varje rad taggas med sin
+    # konviktionsgrad så A+-lägen och bevakningslägen kan redovisas var för sig.
     reg = _market_regime()
-    eligible = [r for r in scanned if _pick_eligible(r, reg)]
-    if not eligible:
-        print("Facit: inga picks klarade kvalitetskraven (%s) — loggar inget idag" % reg)
+    rank = _rank_picks([r for r in scanned
+                        if str(r.get("label")) in _BULL_LABELS], reg)
+    if not rank:
+        rank = _rank_picks(scanned, reg)
+    if not rank:
         return
-    by_score = sorted(eligible, key=lambda x: x.get("score10", 0), reverse=True)
-    bull_like = [r for r in by_score if str(r.get("label")) in ("BULL", "MOMENTUM", "Rocketcase")]
-    vand_like = [r for r in by_score if str(r.get("label")) == "VÄNDNING"]
-    val = [("Top Opportunity", max(eligible, key=_topop_rank)),
+    bull_like = [r for r in rank if str(r.get("label")) in ("BULL", "MOMENTUM", "Rocketcase")]
+    vand_like = [r for r in rank if str(r.get("label")) == "VÄNDNING"]
+    val = [("Top Opportunity", rank[0]),
            ("Dagens Bull", bull_like[0] if bull_like else None),
            ("Veckans Setup", bull_like[1] if len(bull_like) > 1 else None),
            ("Wildcard", vand_like[0] if vand_like else None)]
@@ -4105,6 +4145,7 @@ def _facit_log_today():
             continue
         seen.add(r.get("ticker"))
         rows.append({"datum": tid, "roll": roll, "ticker": r["ticker"],
+                     "tier": r.get("tier") or _pick_tier(r, reg), "regim": reg,
                      "pris": round(float(r["last"]), 2),
                      "score": int(r.get("setup_score") or 0) or int(round(float(r.get("score10") or 0) * 10)),
                      "label": r.get("label", "")})
@@ -4297,6 +4338,19 @@ def facit():
             stats["snitt_alfa"] = round(sum(alfas) / len(alfas), 1)
             stats["slog_mkt"] = slog_mkt
             stats["slog_mkt_antal"] = len(alfas)
+        # Nedbrytning per konviktionsgrad: håller A+-lägena vad de lovar?
+        # Redovisas separat i stället för att gömmas i ett snitt.
+        per_tier = {}
+        for t in ("A", "B", "C"):
+            grp = [e for e in senaste if (e.get("tier") or "") == t]
+            if len(grp) >= 3:     # under 3 säger siffran ingenting
+                per_tier[t] = {
+                    "antal": len(grp),
+                    "traffprocent": round(sum(1 for e in grp if e.get("traff")) / len(grp) * 100),
+                    "snitt_pct": round(sum(e["utfall_pct"] for e in grp) / len(grp), 1),
+                }
+        if per_tier:
+            stats["per_tier"] = per_tier
     else:
         stats = {"antal": 0}
     # Loggade men ännu ej utvärderade picks — visas så kortet aldrig står tomt.
