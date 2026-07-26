@@ -1414,10 +1414,13 @@ def _congress_flow():
 
 
 def _fh_insider_flow(ticker):
-    """Rika insider-transaktioner för en ticker (namn, köp/sälj, storlek, datum)."""
+    """Rika insider-transaktioner för en ticker (namn, köp/sälj, storlek, datum).
+    Egen TTL: _FH_CACHE saknar utgång, och med roterande skanning skulle en
+    ticker annars aldrig läsas om — days_ago hade frusit och nya köp missats."""
     k = ("insflow", ticker)
-    if k in _FH_CACHE:
-        return _FH_CACHE[k]
+    hit = _FH_CACHE.get(k)
+    if isinstance(hit, tuple) and len(hit) == 2 and (_time.time() - hit[0]) < 43200:
+        return hit[1]
     j = _finnhub("/stock/insider-transactions", {"symbol": ticker})
     items = []
     for t in (j or {}).get("data", []):
@@ -1442,26 +1445,52 @@ def _fh_insider_flow(ticker):
             "ticker": ticker, "name": ticker, "action": action,
             "amount": amt, "usd_num": round(usd), "days_ago": da, "url": "",
         })
-    _FH_CACHE[k] = items
+    _FH_CACHE[k] = (_time.time(), items)
     return items
 
 
+# Insiderköp sker nästan ALDRIG i mega-caps — där får ledningen aktier som
+# ersättning och säljer via 10b5-1-planer. Riktiga köp (egna pengar) sker i
+# små/medelstora bolag. Att bara skanna 24 mega-caps gav därför enbart SÄLJ.
+# Vi roterar därför genom HELA universumet, en bit per uppdatering (Finnhubs
+# gratisnivå tål inte 660 anrop på en gång), och sparar fynden mellan varven.
+_IFLOW_ROT = {"i": 0}
+_IFLOW_FOUND: dict = {}          # ticker -> träfflista (färskhet styrs av days_ago)
+_IFLOW_CHUNK = int(os.environ.get("IFLOW_CHUNK", "45"))
+
+
 def _corp_flow():
-    """VD/insider-flödet för kuraterade tickers. Cachas 12h."""
+    """VD/insider-flödet. Mega-caps varje varv (för sälj-flödet) + en roterande
+    del av universumet (där köpen faktiskt finns). Cachas 12h per ticker."""
     now = _time.time()
     ts, data = _IFLOW_CACHE["corp"]
-    if data and now - ts < 43200:
+    if data and now - ts < 3600:      # 1h — rotationen ska hinna bygga på
         return data
-    out = []
-    for tk in _IFLOW_TICKERS:
+
+    rest = [t for t in ALL_TICKERS if t not in _IFLOW_TICKERS and "." not in t]
+    i = _IFLOW_ROT["i"] % max(1, len(rest))
+    batch = list(_IFLOW_TICKERS) + rest[i:i + _IFLOW_CHUNK]
+    _IFLOW_ROT["i"] = (i + _IFLOW_CHUNK) % max(1, len(rest))
+
+    for tk in batch:
         try:
-            out.extend(_fh_insider_flow(tk))
+            hits = _fh_insider_flow(tk)
         except Exception:
             continue
-    out.sort(key=lambda x: x["days_ago"])
-    out = out[:60]
-    if out:
-        _IFLOW_CACHE["corp"] = (now, out)
+        if hits:
+            _IFLOW_FOUND[tk] = hits
+        elif tk in _IFLOW_FOUND:
+            del _IFLOW_FOUND[tk]
+
+    out = [it for hits in _IFLOW_FOUND.values() for it in hits
+           if (it.get("days_ago") or 999) <= 120]
+    # Köp först (de är sällsynta och det är dem användaren vill se), sen nyast.
+    out.sort(key=lambda x: (x.get("action") != "KÖP", x.get("days_ago", 999)))
+    out = out[:80]
+    _IFLOW_CACHE["corp"] = (now, out)
+    _buys = sum(1 for x in out if x.get("action") == "KÖP")
+    print("Insider: skannade %d tickers (rot %d/%d) · %d rader varav %d KÖP"
+          % (len(batch), i, len(rest), len(out), _buys))
     return out
 
 
