@@ -2589,8 +2589,12 @@ def overview():
     rows = scan_universe(None)
     idx = indices()["indices"]
 
-    by_score = sorted(rows, key=lambda x: x.get("score10", 0), reverse=True)
-    by_hetta = sorted(rows, key=lambda x: x.get("hetta", 0), reverse=True)
+    # Dagens picks måste hålla samma standard som facit mäter — annars visar
+    # appen ett urval och track recordet mäter ett annat.
+    reg = _market_regime()
+    kval = [r for r in rows if _pick_eligible(r, reg)]
+    by_score = sorted(kval, key=lambda x: x.get("score10", 0), reverse=True)
+    by_hetta = sorted(kval, key=lambda x: x.get("hetta", 0), reverse=True)
 
     bull_like = [r for r in by_score if str(r.get("label")) in ("BULL", "MOMENTUM", "Rocketcase")]
     vand_like = [r for r in by_score if str(r.get("label")) == "VÄNDNING"]
@@ -3947,14 +3951,85 @@ def _topop_rank(r):
             + float(r.get("hetta") or 0) * 0.2)
 
 
+# =====================================================================
+#  PICK-KVALITET  ·  samma disciplin som NASDAQ ROBBER
+#  Robotens lärdomar gällde bara daytrade-signalerna. Appens picks
+#  (Top Opportunity / Dagens Bull / Veckans Setup / Wildcard) valdes
+#  fortfarande utan trend-, volym- och regimkrav — därför facit-siffrorna.
+#  Nu gäller samma regler:
+#    #1 Med trenden   — aldrig ett bolag under sin egen EMA50
+#    #2 Volym krävs   — utan volymbekräftelse är breakouten en fakeout
+#    #3 Inte avsvalnande (MACD ner + RSI ner) eller rullande över
+#    #4 Marknadsregim — faller S&P under sitt eget snitt höjs ribban
+#  Justerbart via env; sätt PICK_GATES=0 för att köra som förr.
+# =====================================================================
+_PICK_GATES      = os.environ.get("PICK_GATES", "1") != "0"
+_PICK_MIN_RELVOL = float(os.environ.get("PICK_MIN_RELVOL", "1.1"))
+_PICK_MIN_SCORE  = int(os.environ.get("PICK_MIN_SCORE", "6"))     # score10-golv
+_BULL_LABELS     = ("BULL", "MOMENTUM", "Rocketcase", "VÄNDNING", "NEUTRAL/BYGGER")
+
+
+def _market_regime():
+    """RISK_ON / RISK_OFF ur S&P mot sitt eget 50-dagarssnitt (+ 20d-lutning).
+    Motsvarar robotens HTF-bias: i en fallande tape ska ribban vara högre."""
+    s = _spx_daily()
+    dates = s.get("dates") or []
+    if len(dates) < 55:
+        return "OKAND"
+    closes = [s["map"][d] for d in dates]
+    ma50 = sum(closes[-50:]) / 50.0
+    last = closes[-1]
+    trend_up = last > closes[-21]          # högre än för ~20 handelsdagar sen
+    return "RISK_ON" if (last > ma50 and trend_up) else "RISK_OFF"
+
+
+def _pick_eligible(r, regime=None):
+    """True om picken håller ROBBER-standard. Gäller BARA urvalet av dagens
+    picks — den fria scannern/sökningen visar fortfarande allt."""
+    if not _PICK_GATES:
+        return True
+    if str(r.get("label")) not in _BULL_LABELS:
+        return False
+    # #3 svalnar / rullar över -> aldrig en pick
+    if r.get("cooling"):
+        return False
+    # #1 med trenden: över eget EMA50 (och EMA200 om regimen är svag)
+    last, e50, e200 = r.get("last"), r.get("ema50"), r.get("ema200")
+    try:
+        if last is None or e50 is None or float(last) <= float(e50):
+            return False
+    except Exception:
+        return False
+    # #2 volym krävs
+    try:
+        if float(r.get("rel_vol") or 0) < _PICK_MIN_RELVOL:
+            return False
+    except Exception:
+        return False
+    if int(r.get("score10") or 0) < _PICK_MIN_SCORE:
+        return False
+    # #4 regim: i RISK_OFF krävs dessutom att bolaget är över EMA200 och
+    #    har äkta styrka — annars står vi hellre utanför.
+    if (regime or _market_regime()) == "RISK_OFF":
+        try:
+            if e200 is None or float(last) <= float(e200):
+                return False
+        except Exception:
+            return False
+        if int(r.get("score10") or 0) < _PICK_MIN_SCORE + 1:
+            return False
+    return True
+
+
 @app.get("/api/topop")
 def topop():
-    rows = [r for r in scan_universe(None)
-            if str(r.get("label")) in ("BULL", "MOMENTUM", "VÄNDNING", "Rocketcase", "NEUTRAL/BYGGER")]
-    if not rows:
-        return {"pick": None}
+    scanned = scan_universe(None)
+    reg = _market_regime()
+    rows = [r for r in scanned if _pick_eligible(r, reg)]
+    if not rows:      # hellre inget än ett dåligt läge
+        return {"pick": None, "regim": reg}
     best = max(rows, key=_topop_rank)
-    return {"pick": _opp_of(best)}
+    return {"pick": _opp_of(best), "regim": reg}
 
 
 # ---- Facit / track record ---------------------------------------------------
@@ -4009,10 +4084,18 @@ def _facit_log_today():
     scanned = scan_universe(None)
     if not scanned:
         return
-    by_score = sorted(scanned, key=lambda x: x.get("score10", 0), reverse=True)
+    # Logga BARA picks som klarar ROBBER-gaten. Tidigare valdes Top Opportunity
+    # ur HELA scannen (utan ens label-filtret som /api/topop hade) — så en
+    # BEAR/AVSVALNING-aktie kunde bli "dagens pick" och sen mätas i facit.
+    reg = _market_regime()
+    eligible = [r for r in scanned if _pick_eligible(r, reg)]
+    if not eligible:
+        print("Facit: inga picks klarade kvalitetskraven (%s) — loggar inget idag" % reg)
+        return
+    by_score = sorted(eligible, key=lambda x: x.get("score10", 0), reverse=True)
     bull_like = [r for r in by_score if str(r.get("label")) in ("BULL", "MOMENTUM", "Rocketcase")]
     vand_like = [r for r in by_score if str(r.get("label")) == "VÄNDNING"]
-    val = [("Top Opportunity", max(scanned, key=_topop_rank)),
+    val = [("Top Opportunity", max(eligible, key=_topop_rank)),
            ("Dagens Bull", bull_like[0] if bull_like else None),
            ("Veckans Setup", bull_like[1] if len(bull_like) > 1 else None),
            ("Wildcard", vand_like[0] if vand_like else None)]
