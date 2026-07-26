@@ -2168,6 +2168,79 @@ def events():
     return {"events": _events_list()}
 
 
+# =====================================================================
+#  DAGENS 3 SAKER  ·  morgonbriefen på tre rader
+#  Svarar på "vad ska jag bevaka idag?" utan att användaren scrollar.
+#  Regel: UPP TILL tre rader — finns inget högpåverkans-makro visas ingen
+#  makrorad. Vi fyller aldrig ut med påhittat innehåll.
+# =====================================================================
+@cached(600)
+def _today3():
+    import datetime as _dt2
+    out = []
+    today = _dt2.date.today()
+
+    # 1) Nästa makrohändelse med hög påverkan (idag eller närmast framåt)
+    try:
+        best = None
+        for e in (_macro_events() or []):
+            if str(e.get("impact", "")).lower() != "high":
+                continue
+            ds = str(e.get("date") or "")
+            try:
+                dt = _dt2.datetime.fromisoformat(ds.replace("Z", ""))
+            except Exception:
+                continue
+            if dt.date() < today:
+                continue
+            if best is None or dt < best[0]:
+                best = (dt, e)
+        if best:
+            dt, e = best
+            out.append({"kind": "macro", "title": e.get("title", ""),
+                        "sub": " · ".join(x for x in [
+                            ("Väntat " + str(e.get("forecast"))) if e.get("forecast") else "",
+                            ("förra " + str(e.get("previous"))) if e.get("previous") else ""] if x),
+                        "cc": e.get("country", ""), "when": dt.strftime("%H:%M"),
+                        "date": dt.date().isoformat(),
+                        "days": (dt.date() - today).days, "high": True})
+    except Exception as ex:
+        print("today3 makro:", ex)
+
+    # 2) Närmaste rapport (helst idag)
+    try:
+        evs = _events_list() or []
+        if evs:
+            e = evs[0]
+            em = e.get("exp_move")
+            out.append({"kind": "earnings", "title": e["tkr"] + " rapporterar",
+                        "ticker": e["tkr"],
+                        "sub": " · ".join(x for x in [
+                            ("Väntad rörelse ±%.1f%%" % em) if em else "",
+                            ("EPS-est " + e["eps"]) if e.get("eps") else ""] if x),
+                        "when": e.get("date", ""), "days": e.get("days"), "high": False})
+    except Exception as ex:
+        print("today3 rapport:", ex)
+
+    # 3) Dagens radar-aktie + det starkaste skälet
+    try:
+        p = _radar_pick()
+        if p and p.get("ticker"):
+            ev = (p.get("evidence") or [])
+            out.append({"kind": "radar", "title": p["ticker"] + " på radarn",
+                        "ticker": p["ticker"],
+                        "sub": " · ".join(e["txt"] for e in ev[:2]),
+                        "conf": p.get("confidence"), "high": False})
+    except Exception as ex:
+        print("today3 radar:", ex)
+    return out[:3]
+
+
+@app.get("/api/today3")
+def today3():
+    return {"items": _today3()}
+
+
 # ----- MAKROKALENDER (gratis, ingen nyckel — ForexFactory veckofeed) --
 _FF_IMPACT = {"High": "High", "Medium": "Medium", "Low": "Low", "Holiday": "Low"}
 _FF_COUNTRY_FLAG = {

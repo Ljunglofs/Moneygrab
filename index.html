@@ -1437,6 +1437,7 @@ else _i18nBoot();
 
 <main>
   <section class="screen on" id="s-hem">
+    <div class="card d3card prem gold" id="today3" style="display:none"></div>
     <div id="newsbar"></div>
     <div id="trumpbar" style="display:none"></div>
     <div id="aisummary"></div>
@@ -3774,6 +3775,50 @@ async function loadRadarHistory(){
     +'<div class="rdh-f">'+(EN?"Outcome measured ~5 trading days after the stock appeared on the radar."
                               :"Utfall mätt ~5 handelsdagar efter att aktien dök upp på radarn.")+'</div></div>';
 }
+/* ===== DAGENS 3 SAKER — morgonbriefen på tre rader =====
+   Makro (hög påverkan) · närmaste rapport · dagens radar-aktie.
+   UPP TILL tre rader: saknas t.ex. högpåverkans-makro visas ingen sådan
+   rad. Vi fyller aldrig ut med påhittat innehåll. */
+const _D3IC={
+ macro:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg>',
+ earnings:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18"/><path d="M6 20V9M11 20V4M16 20v-7M21 20v-4"/></svg>',
+ radar:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.6"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/></svg>'};
+function _d3When(it,EN){
+  if(it.kind==="macro"){
+    var d=(it.days||0);
+    var lbl=d<=0?(EN?"today":"idag"):(d===1?(EN?"tomorrow":"imorgon"):(d+(EN?" days":" dgr")));
+    return '<span class="d3-when">'+(it.when||"")+'<i>'+lbl+'</i></span>';
+  }
+  if(it.kind==="earnings"){
+    var dd=it.days;
+    var l2=(dd==null)?"":(dd<=0?(EN?"today":"idag"):(dd===1?(EN?"tomorrow":"imorgon"):(dd+(EN?" days":" dgr"))));
+    return '<span class="d3-when">'+String(it.when||"").slice(5)+'<i>'+l2+'</i></span>';
+  }
+  return '<span class="d3-when">'+(it.conf!=null?it.conf:"")+'<i>confidence</i></span>';
+}
+async function loadToday3(){
+  const el=document.getElementById("today3");if(!el)return;
+  const B=CONFIG.API_BASE?CONFIG.API_BASE.replace(/\/$/,""):"";if(!B)return;
+  const EN=(window.GRABIT_LANG==="en");
+  let items=[];
+  try{const r=await fetch(B+"/api/today3",{cache:"no-store"});const j=await r.json();items=(j&&j.items)||[];}catch(e){}
+  if(!items.length){el.style.display="none";return;}
+  const now=new Date();
+  const dstr=now.toLocaleDateString(EN?"en-GB":"sv-SE",{weekday:"short",day:"numeric",month:"short"}).toUpperCase()
+    +" · "+now.toLocaleTimeString(EN?"en-GB":"sv-SE",{hour:"2-digit",minute:"2-digit"});
+  const rows=items.map(function(it){
+    var go=it.ticker?(' onclick="openStock(\''+it.ticker+'\')"')
+                    :(it.kind==="macro"?' onclick="go(\'signaler\')"':"");
+    var tag=it.high?'<span class="d3-tag hi">'+(EN?"HIGH IMPACT":"HÖG PÅVERKAN")+'</span>'
+           :(it.kind==="radar"?'<span class="d3-tag live">'+(EN?"NOW":"NU")+'</span>':"");
+    return '<div class="d3-row"'+go+'><span class="d3-ic '+it.kind+'">'+(_D3IC[it.kind]||"")+'</span>'
+      +'<span class="d3-tx"><span class="d3-t1">'+String(it.title||"").replace(/</g,"&lt;")+tag+'</span>'
+      +(it.sub?'<span class="d3-t2">'+String(it.sub).replace(/</g,"&lt;")+'</span>':"")+'</span>'
+      +_d3When(it,EN)+'</div>';}).join("");
+  el.style.display="";
+  el.innerHTML='<div class="d3-k"><span class="d3-dot"></span>'+(EN?"TODAY’S 3 THINGS":"DAGENS 3 SAKER")
+    +'<span class="d3-time">'+dstr+'</span></div><div class="d3-rows">'+rows+'</div>';
+}
 async function loadTopOp(){
   const el=document.getElementById("topop");if(!el)return;
   const B=CONFIG.API_BASE?CONFIG.API_BASE.replace(/\/$/,""):"";if(!B)return;
@@ -4160,7 +4205,7 @@ if(window.refreshProState)refreshProState();
 if(window.proAutoClaim)proAutoClaim();
 if(window.proCheckStatus)proCheckStatus();
 (function(){var _at="";try{_at=localStorage.getItem("grabit_acc")||"";}catch(e){}if(!_at||!CONFIG.API_BASE)return;fetch(CONFIG.API_BASE.replace(/\/$/,"")+"/api/account/data?token="+encodeURIComponent(_at),{cache:"no-store"}).then(function(r){return r.json();}).then(function(j){if(!j||!j.ok)return;if(j.pro&&j.pro_token){localStorage.setItem("grabit_pro","1");localStorage.setItem("grabit_token",j.pro_token);localStorage.setItem("grabit_pro_src","email");if(window.refreshProState)refreshProState();}if(j.portfolio&&j.portfolio.length){try{localStorage.setItem("grabit_pf",JSON.stringify(j.portfolio));if(window.initPortfolio)initPortfolio();}catch(e){}}}).catch(function(){});})();
-load();loadMonthly();loadDaily();loadMacro();loadFda();loadTrump();loadTopOp();loadRadar();loadWatchrow();loadFacit();loadInsiderBox();loadBreaking();loadHeatmap();
+load();loadToday3();loadMonthly();loadDaily();loadMacro();loadFda();loadTrump();loadTopOp();loadRadar();loadWatchrow();loadFacit();loadInsiderBox();loadBreaking();loadHeatmap();
 function fgInfo(s){s=+s||0;
   if(s>=75)return{label:"Extrem girighet",col:"#22d3ee",dir:1,txt:"Extrem girighet på marknaden — se upp för överhettning."};
   if(s>=55)return{label:"Girighet",col:"#22d3ee",dir:1,txt:"Marknaden är girig. Investerare tar mer risk."};
@@ -4556,6 +4601,28 @@ async function loadPolyInsiders(force){
 html,body{overflow-x:clip}
 /* ===== Top Opportunity (hjältekortet) ===== */
 .topop{position:relative;overflow:hidden;padding:16px;border:1px solid rgba(245,197,66,.3)!important;background:linear-gradient(135deg,#12151c 0%,#1c1508 100%)!important;box-shadow:0 10px 34px rgba(0,0,0,.5),0 0 30px rgba(245,197,66,.08)}
+/* DAGENS 3 SAKER */
+.d3card{padding:14px 14px 12px}
+.d3-k{display:flex;align-items:center;gap:7px;font-size:10px;letter-spacing:.14em;font-weight:800;color:var(--gold2);text-transform:uppercase}
+.d3-dot{width:6px;height:6px;border-radius:50%;background:var(--gold2);box-shadow:0 0 8px var(--gold2);flex:none;animation:liveblink 1.6s steps(1,end) infinite}
+.d3-time{margin-left:auto;font-size:9.5px;color:var(--mut);letter-spacing:.04em;font-weight:700;white-space:nowrap}
+.d3-rows{margin-top:10px;display:flex;flex-direction:column}
+.d3-row{display:flex;align-items:center;gap:11px;padding:10px 0;border-top:1px solid rgba(255,255,255,.06);cursor:pointer}
+.d3-row:first-child{border-top:none;padding-top:2px}
+.d3-row:active{opacity:.75}
+.d3-ic{flex:none;width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center}
+.d3-ic svg{width:15px;height:15px}
+.d3-ic.macro{color:var(--gold2);background:rgba(245,197,66,.10);border:1px solid rgba(245,197,66,.35)}
+.d3-ic.earnings{color:#7dd3fc;background:rgba(56,189,248,.10);border:1px solid rgba(56,189,248,.35)}
+.d3-ic.radar{color:#ff8a95;background:rgba(255,91,107,.10);border:1px solid rgba(255,91,107,.38)}
+.d3-tx{flex:1;min-width:0}
+.d3-t1{display:block;font-size:13.5px;font-weight:700;color:#eef2f5;line-height:1.25}
+.d3-t2{display:block;font-size:11px;color:var(--mut);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.d3-when{flex:none;font-size:11px;font-weight:800;color:#cfd8e2;font-variant-numeric:tabular-nums;text-align:right}
+.d3-when i{display:block;font-style:normal;font-size:9px;color:var(--mut);font-weight:700;margin-top:1px}
+.d3-tag{display:inline-block;font-size:8px;font-weight:900;letter-spacing:.07em;padding:2px 6px;border-radius:5px;margin-left:6px;vertical-align:2px}
+.d3-tag.hi{color:#0A0E12;background:linear-gradient(180deg,var(--gold2),var(--gold))}
+.d3-tag.live{color:#ff8a95;background:rgba(255,91,107,.14);border:1px solid rgba(255,91,107,.4)}
 /* GRABIT RADAR */
 .radarcard{padding:16px 15px}
 .rd-k{display:flex;align-items:center;gap:7px;font-size:10.5px;letter-spacing:.14em;font-weight:800;color:var(--gold2);text-transform:uppercase}
@@ -5043,6 +5110,7 @@ async function pfReview(){
     try{loadDaily();}catch(e){}
     try{loadTopOp();}catch(e){}
     try{loadRadar();}catch(e){}
+    try{loadToday3();}catch(e){}
     try{loadWatchrow();}catch(e){}
     try{loadMacro();}catch(e){}
     try{loadFda();}catch(e){}
