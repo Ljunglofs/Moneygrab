@@ -3736,8 +3736,16 @@ async function loadWatchrow(){
       <div class="wl-px num">${d.last!=null?fmtPx(d.last):"–"}</div>
       <div class="wl-chg num" style="color:${col}">${chg>=0?"+":""}${chg.toFixed(1)}%</div></div>`;}).join("");
 }
+/* Track record dolt på startsidan tills den NYA pick-logiken (trend- och
+   volymkrav, regimfilter, tier A/B/C) byggt ett eget underlag. De gamla
+   raderna valdes utan filter och mättes med 0.00%-buggen — de säger inget
+   om vad appen gör idag. Loggning och mätning fortsätter i bakgrunden;
+   sätt FACIT_SHOW=1 i konsolen (eller flippa konstanten) för att visa igen.
+   Vi döljer alltså — vi hittar aldrig på siffror. */
+const FACIT_SHOW=false;
 async function loadFacit(){
   const el=document.getElementById("facitcard");if(!el)return;
+  if(!FACIT_SHOW&&!window.FACIT_SHOW){el.style.display="none";return;}
   const B=CONFIG.API_BASE?CONFIG.API_BASE.replace(/\/$/,""):"";if(!B)return;
   let j=null;try{const r=await fetch(B+"/api/facit",{cache:"no-store"});j=await r.json();}catch(e){}
   if(!j)return;
