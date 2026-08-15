@@ -827,6 +827,15 @@ body{background:
 /* sektor-hero överst i aktievyn (foto per sektor) */
 .st-hero{height:150px;margin:-16px -16px 8px;background-size:cover;background-position:center;border-radius:0 0 20px 20px}
 /* screener-resultatvy */
+.rk-risk{margin:11px 0;padding:10px 12px;border-radius:11px;font-size:12px;line-height:1.45;color:#ffd9dd;background:rgba(255,59,48,.09);border:1px solid rgba(255,59,48,.38)}
+.rk-risk b{color:#ff8a95}
+.rk-krit{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.rk-krit span{font-size:10px;font-weight:700;color:var(--mut);background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:7px;padding:4px 8px}
+.rk-nums{margin-left:auto;text-align:right;flex:none}
+.rk-nums b{display:block;font-size:15px;font-weight:900;font-variant-numeric:tabular-nums}
+.rk-nums i{font-style:normal;font-size:10px;color:var(--mut)}
+.rk-lock{margin-top:12px;text-align:center;font-size:12px;font-weight:800;color:#0A0E12;cursor:pointer;background:linear-gradient(180deg,var(--gold2),var(--gold));border-radius:11px;padding:11px}
+.rk-miss{margin-top:10px;font-size:10px;color:#69747f;text-align:center;line-height:1.4}
 .scl-head{display:flex;align-items:center;gap:12px;padding:14px;border:1px solid;border-radius:16px;background:linear-gradient(180deg,#0E0E0F,#070708);margin-bottom:14px}
 .scl-ic{width:46px;height:46px;border-radius:13px;display:grid;place-items:center;flex:none}
 .scl-ic svg{width:24px;height:24px}
@@ -1169,6 +1178,9 @@ var _I18N_EXACT = {
   "UNDVIK":"AVOID",
   "LADDAR":"LOADING",
   "EJ TILLGÄNGLIG":"UNAVAILABLE",
+  "Småbolag i tidig fas · volymexplosion":"Small caps, early phase · volume explosion",
+  "HÖG RISK":"HIGH RISK",
+  "Skannar…":"Scanning…",
   "Grabit tänker…":"Grabit is thinking…",
   "Grabit tänker":"Grabit is thinking",
   "Inget svar just nu — försök igen.":"No answer right now — try again.",
@@ -1686,7 +1698,8 @@ const DEMO = {
       {n:"Bekräftade utbrott",d:"Score ≥ 8 · volym över snitt",c:"#22d3ee",ic:"trend",pill:"—",filt:"bull"},
       {n:"Tidiga signaler",d:"Rel. styrka vänder upp",c:"#22d3ee",ic:"pulse",pill:"—",filt:"early"},
       {n:"Microcaps < $5",d:"Hög risk · hög potential",c:"#a78bfa",ic:"flame",pill:"—",filt:"micro"},
-      {n:"Risk Off",d:"BOS↓ · blankningstryck",c:"#FF3B30",ic:"shield",pill:"—",filt:"risk"}
+      {n:"Risk Off",d:"BOS↓ · blankningstryck",c:"#FF3B30",ic:"shield",pill:"—",filt:"risk"},
+      {n:"Rocketscan",d:"Småbolag i tidig fas · volymexplosion",c:"#F5C542",ic:"flame",pill:"HÖG RISK",filt:"rocket"}
     ]
   }
 };
@@ -2186,6 +2199,7 @@ function _filterRows(rows,filt){
 function openScreener(i){
   const s=(window._screeners||[])[i]; if(!s)return;
   const c=s.c;
+  if(s.filt==="rocket"){openRocketscan(s);return;}
   const rows=_filterRows(_screenRows(),s.filt).sort((a,b)=>(+b.score10||0)-(+a.score10||0)).slice(0,40);
   $("#scr-title").textContent=s.n;
   const list=rows.length?rows.map(r=>{const tk=r.ticker,sc=+r.score10||0;
@@ -2193,6 +2207,57 @@ function openScreener(i){
   }).join(""):`<div class="scl-empty">Inga träffar just nu.</div>`;
   $("#scr-body").innerHTML=`<div class="scl-head" style="border-color:${c}55"><div class="scl-ic" style="color:${c};background:${c}1a">${I[s.ic]||I.dot}</div><div class="scl-meta"><div class="scl-h">${s.n}</div><div class="scl-d">${s.d}</div></div><div class="scl-cnt" style="color:${c}">${rows.length}</div></div>${list}`;
   const el=document.getElementById("screener");el.classList.add("on");el.scrollTop=0;
+}
+/* ===== ROCKETSCAN — småbolag i tidig fas =====
+   Detekterar ovanlig aktivitet: litet bolag, få utestående aktier,
+   volymexplosion mot 90-dagarssnittet, pris som lyfter från 52v-botten.
+   Det här DETEKTERAR — det förutsäger inget. Riskraden är obligatorisk och
+   får aldrig tas bort: de flesta bolag med den här profilen faller.
+   Vi skriver aldrig "float" (vi har shares outstanding) och aldrig
+   "short interest" (den datan har vi inte). */
+async function openRocketscan(s){
+  const EN=(window.GRABIT_LANG==="en");
+  const c=(s&&s.c)||"#F5C542";
+  const el=document.getElementById("screener");
+  document.getElementById("scr-title").textContent="Rocketscan";
+  document.getElementById("scr-body").innerHTML='<div class="scl-empty">'+(EN?"Scanning…":"Skannar…")+'</div>';
+  el.classList.add("on");el.scrollTop=0;
+  const B=CONFIG.API_BASE?CONFIG.API_BASE.replace(/\/$/,""):"";
+  let j=null;
+  try{
+    const tok=encodeURIComponent(localStorage.getItem("grabit_token")||"");
+    const r=await fetch(B+"/api/early?token="+tok,{cache:"no-store"});j=await r.json();
+  }catch(e){}
+  const rows=(j&&j.rader)||[];const total=(j&&j.total)||0;const locked=!!(j&&j.locked);
+  const risk='<div class="rk-risk">'+(EN
+      ? "<b>High risk.</b> This detects unusual activity — it predicts nothing. Most companies with this profile fall sharply."
+      : "<b>Hög risk.</b> Detta detekterar ovanlig aktivitet — det förutsäger ingenting. De flesta bolag med den här profilen faller kraftigt.")+'</div>';
+  const krav=(j&&j.krav)||{};
+  const head='<div class="scl-head" style="border-color:'+c+'55">'
+    +'<div class="scl-ic" style="color:'+c+';background:'+c+'1a">'+(I.flame||I.dot)+'</div>'
+    +'<div class="scl-meta"><div class="scl-h">Rocketscan</div><div class="scl-s">'
+    +(EN?"Small caps, early phase":"Småbolag i tidig fas")+' · '+total+' '+(EN?"matches":"träffar")+'</div></div></div>';
+  const krit='<div class="rk-krit">'
+    +'<span>&lt; $'+(krav.mcap_max_musd||300)+'M</span>'
+    +'<span>&lt; '+(krav.shares_max_m||50)+'M '+(EN?"shares out":"aktier ute")+'</span>'
+    +'<span>&ge; '+(krav.vol90_min||3)+'x '+(EN?"90d volume":"90d-volym")+'</span>'
+    +'<span>'+(EN?"lifting off the 52w low":"lyfter från 52v-botten")+'</span></div>';
+  const list=rows.length?rows.map(function(r){
+      var sc=+r.score10||0;
+      return '<div class="scl-row" onclick="closeScreener();openStock(\''+r.ticker+'\')">'
+        +lic(r.ticker,34,scoreColor(sc))
+        +'<div class="scl-nm"><div class="scl-t">'+r.ticker+'</div>'
+        +'<div class="scl-co">'+(r.name||"")+'</div></div>'
+        +'<div class="rk-nums"><b style="color:'+c+'">'+r.vol90+'x</b>'
+        +'<i>$'+r.mcap_musd+'M'+(r.shares_m!=null?(' · '+r.shares_m+'M'):"")+'</i></div></div>';}).join("")
+    :'<div class="scl-empty">'+(EN?"No matches right now — nothing meets the criteria today."
+                                 :"Inga träffar just nu — inget bolag klarar kriterierna idag.")+'</div>';
+  const lock=(locked&&total>rows.length)
+    ? '<div class="rk-lock" onclick="if(window.showPaywall)showPaywall(null,true)">'
+      +(EN?("Unlock "+(total-rows.length)+" more with PRO →"):("Lås upp "+(total-rows.length)+" till med PRO →"))+'</div>' : "";
+  const miss=(j&&j.saknas&&j.saknas.length)
+    ? '<div class="rk-miss">'+(EN?"Not measured: ":"Mäts inte: ")+j.saknas.join(" · ")+'</div>' : "";
+  document.getElementById("scr-body").innerHTML=head+risk+krit+list+lock+miss;
 }
 function closeScreener(){document.getElementById("screener").classList.remove("on");}
 async function askGrabit(tkr,q){if(!q||!q.trim())return;if(!isPro()){if(window.showPaywall)showPaywall(null,true);return;}const ans=$("#ask-ans");ans.classList.add("on");
@@ -2574,7 +2639,7 @@ function renderScanner(s){
   const g=_gate(s.gainers,3,x=>row(x.tkr,(x.chg>=0?'+':'')+x.chg.toFixed(1)+'%','var(--pos)',null,x.chg>=0));
   const v=_gate(s.volume,1,x=>row(x.tkr,x.x.toFixed(1)+'x','var(--gold2)','var(--gold2)',true));
   window._screeners=s.screeners;
-  const scr=s.screeners.map((c,i)=>{var _lk=(!isPro()&&(c.filt==="early"||c.filt==="risk"));return `<div class="scr-card card${_lk?" pro-gated":""}"${_lk?" data-lock=\"PRO\"":""} style="--c:${c.c}" onclick="openScreener(${i})"><div class="scr-ic" style="color:${c.c};background:${c.c}1a;border-color:${c.c}55">${I[c.ic]||I.dot}</div><div class="scr-t">${c.n}</div><div class="scr-d">${c.d}</div><div class="scr-pill" style="color:${c.c};border-color:${c.c}66">${c.pill}</div></div>`;}).join("")+`<div class="scr-card card" style="--c:#F5C542" onclick="openResearch()"><div class="scr-ic" style="color:#F5C542;background:#F5C5421a;border-color:#F5C54255">${I.compass||I.dot}</div><div class="scr-t">Grabit Screen</div><div class="scr-d">Filtrera bolag — kurs, volym, tema</div><div class="scr-pill" style="color:#F5C542;border-color:#F5C54266">40 bolag</div></div>`;
+  const scr=s.screeners.map((c,i)=>{var _lk=(!isPro()&&(c.filt==="early"||c.filt==="risk"||c.filt==="rocket"));return `<div class="scr-card card${_lk?" pro-gated":""}"${_lk?" data-lock=\"PRO\"":""} style="--c:${c.c}" onclick="openScreener(${i})"><div class="scr-ic" style="color:${c.c};background:${c.c}1a;border-color:${c.c}55">${I[c.ic]||I.dot}</div><div class="scr-t">${c.n}</div><div class="scr-d">${c.d}</div><div class="scr-pill" style="color:${c.c};border-color:${c.c}66">${c.pill}</div></div>`;}).join("")+`<div class="scr-card card" style="--c:#F5C542" onclick="openResearch()"><div class="scr-ic" style="color:#F5C542;background:#F5C5421a;border-color:#F5C54255">${I.compass||I.dot}</div><div class="scr-t">Grabit Screen</div><div class="scr-d">Filtrera bolag — kurs, volym, tema</div><div class="scr-pill" style="color:#F5C542;border-color:#F5C54266">40 bolag</div></div>`;
   const hero=`<div class="theme-hero" onclick="go('marknad')" style="background-image:linear-gradient(100deg,#0A0A0B 34%,rgba(10,10,11,.55) 58%,rgba(10,10,11,.1) 100%),url('${IMGS.rocket}')"><div class="th-k">HETASTA TEMAN JUST NU</div><div class="th-h">Space &amp; Defense</div><div class="th-s">Stark momentum · Flera breakout-setups</div><div class="th-pill">3 TOPPSETUPS</div></div>`;
   return `<div class="sect"><h2>Populära screeners</h2></div>
     <div class="scr-grid">${scr}</div>
