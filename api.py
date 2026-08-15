@@ -1246,6 +1246,23 @@ def _fh_market_cap(ticker):
     _FH_CACHE[k] = mc
     return mc
 
+def _fh_shares_out(ticker):
+    """Utestående aktier i miljoner (Finnhub profile2). OBS: detta är
+    SHARES OUTSTANDING, inte free float — insynsägda och låsta aktier ingår.
+    Vi kallar det därför aldrig "float" i gränssnittet."""
+    k = ("shrs", ticker)
+    if k in _FH_CACHE:
+        return _FH_CACHE[k]
+    j = _finnhub("/stock/profile2", {"symbol": ticker}) or {}
+    v = j.get("shareOutstanding")
+    try:
+        v = float(v) if v not in (None, "") else None
+    except Exception:
+        v = None
+    _FH_CACHE[k] = v
+    return v
+
+
 def _fh_profile(ticker):
     """Finnhub profile2 (gratis, exakt per ticker): namn, bransch, land. Auktoritativ identitet."""
     k = ("prof", ticker)
@@ -4442,6 +4459,105 @@ def topop():
     out = _opp_of(best)
     out["tier"] = best.get("tier")
     return {"pick": out, "regim": reg}
+
+
+# =====================================================================
+#  GRABIT EARLY  ·  tidig fas i småbolag
+#  Detekterar den ANATOMI som brukar föregå stora rörelser i småbolag:
+#  litet bolag · få utestående aktier · volymexplosion mot 90-dagarssnittet
+#  · pris som lyfter från 52-veckorsbotten.
+#
+#  ÄRLIGHET — läs innan detta marknadsförs:
+#   · Detta DETEKTERAR ovanlig aktivitet. Det FÖRUTSÄGER ingenting.
+#   · Baskvoten är brutal: de flesta bolag med den här profilen faller
+#     kraftigt. Träffarna är få och förlusterna många. Vi lovar aldrig
+#     annat, och vi kallar det aldrig en "1000%-detektor".
+#   · Vi har INTE tillförlitlig data på free float eller short interest
+#     (kräver betald källa). Vi använder shares outstanding och säger det
+#     rakt ut — vi hittar aldrig på siffror vi inte har.
+#   · Intäktsinflektion ingår inte heller; fundamentaldata på gratisnivån
+#     räcker inte för att göra det korrekt.
+# =====================================================================
+_EARLY_MAX_MCAP = float(os.environ.get("EARLY_MAX_MCAP_MUSD", "300"))    # miljoner USD
+_EARLY_MAX_SHARES = float(os.environ.get("EARLY_MAX_SHARES_M", "50"))    # miljoner aktier
+_EARLY_MIN_VOL90 = float(os.environ.get("EARLY_MIN_VOL90", "3.0"))       # x 90-dagarssnittet
+
+
+def _vol_ratio_90(df):
+    """Senaste dagens volym mot 90-dagarssnittet."""
+    try:
+        v = df["Volume"].dropna()
+        if len(v) < 95:
+            return None
+        avg = float(v.iloc[-91:-1].mean())
+        return (float(v.iloc[-1]) / avg) if avg > 0 else None
+    except Exception:
+        return None
+
+
+@cached(1800)
+def _early_scan():
+    rows = scan_universe(None) or []
+    # Förfilter på det vi redan har (billigt) — bara USA, undvik mega-caps.
+    pre = []
+    for r in rows:
+        if _market_of(r.get("ticker", "")) != "US":
+            continue
+        rng = float(r.get("rng_pos") or 100)          # 0 = 52v-botten, 100 = toppen
+        rv = float(r.get("rank_rel_vol", r.get("rel_vol")) or 0)
+        r20 = float(r.get("ret_20") or 0)
+        # Lyfter från botten-halvan, med volym och positiv 20-dagarsfart.
+        if rng <= 55 and rv >= 1.8 and r20 > 0:
+            pre.append((rv, r))
+    pre.sort(key=lambda x: -x[0])
+    pre = [r for _, r in pre[:30]]                     # bara topp-30 kostar API-anrop
+
+    out = []
+    for r in pre:
+        tk = r["ticker"]
+        try:
+            mcap = _fh_market_cap(tk)
+            if mcap is None or float(mcap) > _EARLY_MAX_MCAP:
+                continue
+            shares = _fh_shares_out(tk)
+            if shares is not None and float(shares) > _EARLY_MAX_SHARES:
+                continue
+            df = _fetch_daily(tk)
+            v90 = _vol_ratio_90(df) if df is not None else None
+            if v90 is None or v90 < _EARLY_MIN_VOL90:
+                continue
+        except Exception:
+            continue
+        out.append({
+            "ticker": tk, "name": (_fh_profile(tk) or {}).get("name") or tk,
+            "price": r.get("last"), "mcap_musd": round(float(mcap)),
+            "shares_m": round(float(shares), 1) if shares is not None else None,
+            "vol90": round(v90, 1),
+            "rng_pos": round(float(r.get("rng_pos") or 0)),
+            "ret_20": round(float(r.get("ret_20") or 0), 1),
+            "score10": r.get("score10"), "label": r.get("label", ""),
+        })
+    out.sort(key=lambda x: -x["vol90"])
+    return out[:8]
+
+
+@app.get("/api/early")
+def early(token: str = ""):
+    """Tidig fas-screener. PRO-låst innehåll, men antalet träffar är öppet."""
+    rows = _early_scan()
+    try:
+        from billing_web import verify_token
+        is_pro = verify_token(token) is not None
+    except Exception:
+        is_pro = False
+    return {"rader": (rows if is_pro else rows[:1]), "total": len(rows),
+            "locked": (not is_pro),
+            "krav": {"mcap_max_musd": _EARLY_MAX_MCAP,
+                     "shares_max_m": _EARLY_MAX_SHARES,
+                     "vol90_min": _EARLY_MIN_VOL90},
+            # Redovisa öppet vad vi INTE mäter — annars ser screenern mer
+            # allvetande ut än den är.
+            "saknas": ["free float", "short interest", "intäktsinflektion"]}
 
 
 # =====================================================================
