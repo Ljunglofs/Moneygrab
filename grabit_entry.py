@@ -204,6 +204,8 @@ def _robber_status():
     except Exception:
         _lage = "normal"; _minscore = Config.MIN_SCORE; _confmin = Config.CONF_MIN_SEND
     out["regler"] = {"tickers": Config.TICKERS,
+                     "motor": getattr(Config, "ENGINE", "v1"),
+                     "v2_troskel": getattr(Config, "MIN_CONF_V2", None),
                      "lage": _lage,
                      "min_score_av_7": _minscore,
                      "conf_min_for_larm": _confmin,
