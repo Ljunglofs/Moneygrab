@@ -64,6 +64,11 @@ class Config:
     # #4 Trendlinje-entries: studs på stigande stöd / fallande motstånd + brott
     #    igenom linjen. Ger en confluence-poäng och höjer confidence.
     USE_TRENDLINE    = os.environ.get("ROBBER_TRENDLINE", "1") != "0"
+    # #0 MOTOR: "v2" = ombyggda Quant Core-motorn (robber_engine.py):
+    #    MarketState -> EN viktad 0-100-score -> EN tröskel. Sessionsnivåer
+    #    (Asien/London) + sweep-reclaim + delta-proxy. "v1" = gamla motorn.
+    ENGINE           = os.environ.get("ROBBER_ENGINE", "v2")
+    MIN_CONF_V2      = int(os.environ.get("ROBBER_MIN_CONF_V2", "70"))
     # #5 Natt/Asien-fönstret (22:00-08:00 SE) HANDLAS INTE — straffet -15
     #    räckte inte, signalerna därifrån var dåliga. Hårt stopp i stället.
     BLOCK_CHOP       = os.environ.get("ROBBER_BLOCK_CHOP", "1") != "0"
@@ -469,7 +474,59 @@ def _entry_guards(ticker, side, df, price, atr):
     return None
 
 
+def _build_signal_v2(ticker, df, bias):
+    """Quant Core-vägen: robber_engine bygger MarketState + poängsätter.
+    Behåller v1:s statefulla skydd (chase-guard, SL-cooldown) och
+    nivåsnappning — det är beprövat och delas mellan motorerna."""
+    import robber_engine as ENG
+    from zoneinfo import ZoneInfo
+    now_se = datetime.now(ZoneInfo(Config.LOCAL_TZ))
+    st = ENG.build_state(df, bias, now_se)
+    setup = ENG.analyze(st, Config.MIN_CONF_V2)
+    if not setup:
+        if st.block:
+            STATUS["blocked_last"] = "%s %s: %s" % (
+                datetime.now(timezone.utc).strftime("%H:%M"), ticker, st.block)
+        return None
+    side, price, atr = setup.direction, setup.entry, st.atr
+
+    block = _entry_guards(ticker, side, df, price, atr)
+    if block:
+        STATUS["blocked_last"] = "%s %s %s: %s" % (
+            datetime.now(timezone.utc).strftime("%H:%M"), side, ticker, block)
+        print("[guard] %s %s: %s" % (side, ticker, block))
+        return None
+
+    stop = setup.stop_loss
+    risk = abs(price - stop)
+    if risk <= 0:
+        return None
+    targets, tp_labels = _snap_targets([setup.tp1, setup.tp2], price, stop, side,
+                                       _tp_levels(df, price))
+    shares = math.floor((Config.ACCOUNT_SIZE * Config.RISK_PCT) / risk)
+    namn = {"SWEEP_RECLAIM": "Sweep + Reclaim", "VWAP_TREND": "VWAP Trend",
+            "MOMENTUM": "Momentum"}.get(setup.setup_type, setup.setup_type)
+    return {
+        "ticker": ticker, "side": side,
+        "score": int(round(setup.confidence / 100 * 7)), "max_score": 7,
+        "price": price, "atr": round(atr, 2), "stop": stop,
+        "risk_per_share": round(risk, 2), "targets": targets, "tp_labels": tp_labels,
+        "shares": shares, "bias": bias, "reasons": setup.reasons,
+        "tl_kind": None, "momo": bool(st.vol_spike and setup.confidence >= Config.MOMO_CONF),
+        "vwap_lvl": round(float(st.vwap), 2) if st.vwap else None,
+        "bar_time": df.index[-1].isoformat(),
+        "engine": "v2", "confidence": int(setup.confidence),
+        "setup": namn, "groups": setup.groups,
+        "components": {"setup_type": setup.setup_type, "session": setup.session,
+                       "delta_proxy": round(st.delta_proxy, 2),
+                       "vwap_slope_pct": round(st.vwap_slope_pct, 3),
+                       "sweep": st.sweep_long or st.sweep_short or ""},
+    }
+
+
 def build_signal(ticker, df, bias):
+    if Config.ENGINE == "v2":
+        return _build_signal_v2(ticker, df, bias)
     cur, prev = df.iloc[-1], df.iloc[-2]
     price = round(float(cur.Close), 2)
     atr   = float(cur.atr)
@@ -1234,6 +1291,7 @@ def open_trade(sig, sent):
         "id": tid, "ticker": sig["ticker"], "side": sig["side"],
         "entry": sig["price"], "sl": sig["stop"], "targets": sig["targets"],
         "confidence": sig.get("confidence"), "score7": sig.get("score"),
+        "setup": sig.get("setup", ""), "engine": sig.get("engine", "v1"),
         "killzone": sig.get("killzone", ""), "bias": sig.get("bias"),
         "sent": bool(sent),
         "opened_ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -1375,6 +1433,27 @@ def stats_text():
             ss = _summarize(rws)
             if ss:
                 out.append(f"{kz}: {ss['n']}st \u00b7 {ss['wr']:.0f}% \u00b7 {ss['totR']:+.1f}R")
+    # Expectancy \u2014 det \u00e4rliga m\u00e5ttet: TP/SL/BE-frekvens + snitt-R per trade,
+    # totalt och per setup-typ. Det \u00e4r s\u00e5 vi ser VILKA setups som b\u00e4r.
+    try:
+        import robber_engine as _ENG
+        ex = _ENG.expectancy(rows)
+        if ex:
+            out.append("\u2500" * 5)
+            out.append("\U0001F4C8 <b>Expectancy</b>: <b>%+.2fR</b>/trade  \u00b7  "
+                       "TP %.0f%% \u00b7 SL %.0f%% \u00b7 BE %.0f%%"
+                       % (ex["expectancy_r"], ex["tp_rate"], ex["sl_rate"], ex["be_rate"]))
+            per = defaultdict(list)
+            for r in rows:
+                if r.get("setup"):
+                    per[r["setup"]].append(r)
+            for name, rws in sorted(per.items(), key=lambda x: -len(x[1])):
+                e2 = _ENG.expectancy(rws)
+                if e2 and e2["n"] >= 3:      # under 3 s\u00e4ger siffran inget
+                    out.append(f"  {name}: {e2['n']}st \u00b7 {e2['win_rate']:.0f}% \u00b7 "
+                               f"{e2['expectancy_r']:+.2f}R/trade")
+    except Exception as _ee:
+        print("expectancy-fel:", _ee)
     return "\n".join(out)
 
 
@@ -1624,7 +1703,14 @@ def scan_once():
             bias = htf_bias(htf)
             sig = build_signal(ticker, mtf, bias)
             if sig:
-                conf, comps, groups = compute_confidence(mtf, bias, sig["side"])
+                if sig.get("engine") == "v2":
+                    # Quant Core: motorn har redan EN samlad confidence + gates
+                    # (session/chop hanteras i motorn) — ingen dubbelräkning.
+                    conf = int(sig["confidence"])
+                    comps = sig.get("components") or {}
+                    groups = sig.get("groups") or {}
+                else:
+                    conf, comps, groups = compute_confidence(mtf, bias, sig["side"])
                 kz_delta, kz_label = killzone_adjust(datetime.now(ZoneInfo(Config.LOCAL_TZ)))
                 # #5 Natt/Asien-chop HANDLAS INTE — hårt stopp, inte bara -15.
                 if Config.BLOCK_CHOP and kz_label == "lågvolym/chop":
@@ -1633,10 +1719,11 @@ def scan_once():
                     print("[guard] %s %s: chop-fönster — signal släppt" % (sig["side"], ticker))
                     sig = None
                 else:
-                    conf = max(0, min(100, conf + kz_delta))
+                    if sig.get("engine") != "v2":      # v2:s conf är redan sessionsmedveten
+                        conf = max(0, min(100, conf + kz_delta))
                     sig["confidence"] = conf; sig["groups"] = groups; sig["components"] = comps
-                    sig["setup"] = _primary_setup(comps)
-                    sig["killzone"] = kz_label; sig["kz_delta"] = kz_delta
+                    sig["setup"] = sig.get("setup") or _primary_setup(comps)
+                    sig["killzone"] = kz_label; sig["kz_delta"] = (0 if sig.get("engine") == "v2" else kz_delta)
 
             if sig:
                 try:
@@ -1729,13 +1816,19 @@ def scan_now(send: bool = False) -> dict:
             row["krav_score"] = cur_min_score()
             sig = build_signal(ticker, mtf, bias)
             if sig:
-                conf, comps, groups = compute_confidence(mtf, bias, sig["side"])
+                if sig.get("engine") == "v2":
+                    conf = int(sig["confidence"])
+                    comps = sig.get("components") or {}
+                    groups = sig.get("groups") or {}
+                else:
+                    conf, comps, groups = compute_confidence(mtf, bias, sig["side"])
                 kz_delta, kz_label = killzone_adjust(datetime.now(ZoneInfo(Config.LOCAL_TZ)))
                 # #5 chop-fönstret: visa setupen i diagnostiken men skicka aldrig larm
                 chop_block = Config.BLOCK_CHOP and kz_label == "lågvolym/chop"
-                conf = max(0, min(100, conf + kz_delta))
+                if sig.get("engine") != "v2":
+                    conf = max(0, min(100, conf + kz_delta))
                 sig["confidence"] = conf; sig["groups"] = groups; sig["components"] = comps
-                sig["setup"] = _primary_setup(comps)
+                sig["setup"] = sig.get("setup") or _primary_setup(comps)
                 sig["killzone"] = kz_label; sig["kz_delta"] = kz_delta
                 would = conf >= cur_conf_min_send() and not chop_block
                 fresh = age <= Config.BAR_MINUTES * 3
