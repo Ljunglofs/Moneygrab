@@ -474,6 +474,40 @@ def _entry_guards(ticker, side, df, price, atr):
     return None
 
 
+_V2_WATCH = {"LONG": 0.0, "SHORT": 0.0}
+
+
+def _v2_watch_notify(ticker, st):
+    """BEVAKA-notis: ett läge som klarat ALLA hårda gates men ligger 55–69 i
+    confidence. Tydligt märkt EJ TRADE — inga nivåer, ingen ledger-post.
+    Hårt strypt: max 1 per sida och timme, bara i larmfönstret.
+    Av/på via ROBBER_WATCH_NOTIF (default på)."""
+    if os.environ.get("ROBBER_WATCH_NOTIF", "1") == "0":
+        return
+    try:
+        import robber_engine as ENG
+        if st.near_conf < ENG.WATCH_LEVEL or not st.near_dir:
+            return
+        now = time.time()
+        if now - _V2_WATCH.get(st.near_dir, 0.0) < 3600:
+            return
+        from zoneinfo import ZoneInfo
+        h = datetime.now(ZoneInfo(Config.LOCAL_TZ)).hour
+        if not (6 <= h < 22):
+            return
+        _V2_WATCH[st.near_dir] = now
+        STATUS["watch_last"] = "%s %s %s conf %d" % (
+            datetime.now(timezone.utc).strftime("%H:%M"), st.near_dir, ticker, st.near_conf)
+        pil = "\U0001F4C8" if st.near_dir == "LONG" else "\U0001F4C9"
+        send_telegram(
+            "\U0001F440 <b>BEVAKA</b> · ej trade\n"
+            f"{pil} {st.near_dir} US100 börjar ta form — conf <b>{st.near_conf}</b>/{Config.MIN_CONF_V2}\n"
+            + ("· " + "\n· ".join(st.near_reasons[:3]) if st.near_reasons else "")
+            + "\nInga nivåer förrän tröskeln nås.")
+    except Exception as e:
+        print("[watch] fel:", e)
+
+
 def _build_signal_v2(ticker, df, bias):
     """Quant Core-vägen: robber_engine bygger MarketState + poängsätter.
     Behåller v1:s statefulla skydd (chase-guard, SL-cooldown) och
@@ -487,6 +521,7 @@ def _build_signal_v2(ticker, df, bias):
         if st.block:
             STATUS["blocked_last"] = "%s %s: %s" % (
                 datetime.now(timezone.utc).strftime("%H:%M"), ticker, st.block)
+        _v2_watch_notify(ticker, st)
         return None
     side, price, atr = setup.direction, setup.entry, st.atr
 

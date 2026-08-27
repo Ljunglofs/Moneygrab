@@ -90,6 +90,9 @@ class MarketState:
 
     rsi: float = 50.0
     block: str = ""                  # sätts av gates — varför inget läge finns
+    near_conf: int = 0               # bästa läge som klarade gates men föll på tröskeln
+    near_dir: str = ""
+    near_reasons: list = field(default_factory=list)
 
 
 @dataclass
@@ -365,6 +368,8 @@ def analyze(st: MarketState, min_confidence: int = MIN_CONFIDENCE) -> Optional[S
         conf, reasons, groups = _score(st, direction)
         if conf < min_confidence:
             st.block = "%s: conf %d under tröskeln %d" % (direction, conf, min_confidence)
+            if conf > st.near_conf:      # nästan-läge: klarade ALLA gates, föll på poängen
+                st.near_conf, st.near_dir, st.near_reasons = int(conf), direction, reasons
             continue
         if best is None or conf > best.confidence:
             sl, tp1, tp2 = _levels(st, direction)
