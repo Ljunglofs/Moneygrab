@@ -3,6 +3,8 @@
 // Versionshanterad här i repot. Klistra in i TradingView Pine Editor -> Save -> Add to chart.
 //
 // Ändringslogg (senaste):
+//  · Developing POC/POV (pågående session, live), Wick Size Filter för
+//    rejections, ATR-guard PÅ som default med 1.5 ("Skip Big Momentum").
 //  · Node Breach: Node Strength- och tryckfilter (CVD @POC) som signalkrav,
 //    plus Node Context-panel med live-status för aktiva noden.
 //  · Naked POC ritas som NOD vid priset med riktningspil (som video-referensen):
@@ -83,8 +85,8 @@ maxNaked  = input.int(1, "Max antal naked POC", minval=1, maxval=20, group=gN)
 sigMode   = input.string("Rejection", "Signaltyp", options=["Rejection", "Breakout"], group=gN, tooltip="Rejection: pil FÖRST NÄR noden försvarats — priset stack in i noden och stängde tillbaka. Pilen pekar dit priset studsade. Breakout: pil när priset accepterats bortom noden (efter X stängningar). Inga pilar vid själva touchen längre — bara bekräftade utfall.")
 accBars   = input.int(2, "Acceptans: stängningar bortom POC", minval=1, maxval=10, group=gN, tooltip="Stänger priset bortom noden så här många bars i rad = ACC och noden pensioneras. Stänger det tillbaka = REJ och noden förblir naken.")
 marginPct = input.float(0.0, "±Margin-tolerans (% av pris)", minval=0, step=0.01, group=gN)
-useAtrG   = input.bool(false, "ATR momentum-guard", group=gN, tooltip="Skippa signal när baren är en blow-through (range > multipel × ATR14).")
-atrMult   = input.float(2.5, "ATR-guard: max range ×ATR", minval=1, step=0.1, group=gN)
+useAtrG   = input.bool(true, "ATR momentum-guard (Skip Big Momentum)", group=gN, tooltip="Skippa signal när baren är en blow-through (range > multipel × ATR14).")
+atrMult   = input.float(1.5, "ATR-guard: max range ×ATR", minval=1, step=0.1, group=gN)
 trendFilt = input.bool(false, "Trendfilter (EMA-molnets riktning)", group=gN, tooltip="Endast pil upp i uptrend / pil ner i downtrend. Använder Trendmolnets EMA snabb/långsam.")
 sigSessOn = input.bool(false, "Sessionsfilter för signaler", group=gN)
 sigSess   = input.session("0800-2200", "Signal-session", group=gN)
@@ -99,6 +101,10 @@ colPOV    = input.color(color.new(#b2b5be, 35), "POV-linje", group=gN)
 nsMin     = input.float(0, "Min node strength % för signal (0 = av)", minval=0, maxval=30, step=0.5, group=gN, tooltip="Nodens andel av profilens totala volym. Tunna noder ger svaga rejections — kräv t.ex. 3–5% för att bara handla tjocka noder.")
 cvdFilt   = input.bool(false, "Tryckfilter (CVD @POC)", group=gN, tooltip="Pil upp kräver köpövervikt i noden, pil ner säljövervikt. Använder buy/sell-splitten som redan räknas per nod.")
 cvdMin    = input.float(55, "Min tryck-övervikt %", minval=50, maxval=80, group=gN)
+wickFilt  = input.bool(false, "Wick Size Filter (rejections)", group=gN, tooltip="Kräv att rejection-baren har en riktig VEKE genom noden — minst X% av barens range. En rejection utan veke är ofta bara en paus, inte en avvisning.")
+wickMin   = input.float(25, "Min veke (% av range)", minval=5, maxval=80, group=gN)
+showDev   = input.bool(false, "Developing POC/POV (pågående session)", group=gN, tooltip="Ritar den PÅGÅENDE sessionens POC och POV live vid priset. Nivåerna flyttar sig medan profilen byggs och låses först vid sessionsslut — bra för att se vart dagens värde är på väg.")
+colDev    = input.color(color.new(#ffc400, 45), "Developing-färg", group=gN)
 showCtx   = input.bool(true, "Node Context-panel", group=gN, tooltip="Live-status för senaste nakna POC:n — pris, node strength, tryck, VWAP-distans, laddning/ålder och guards. Som OutsiderEdges Node Context.")
 showDash  = input.bool(true, "Dashboard", group=gN)
 
@@ -573,7 +579,9 @@ if barstate.isconfirmed and array.size(pocLines) > 0
             else
                 pocRejBar := true
                 bool arrowUpR = st == -1
-                bool okR = (not trendFilt or (arrowUpR ? bullBias : not bullBias)) and armedOk and ageOk and cdOk and not blowThrough and inSigSess and not fired and nsOk and (not cvdFilt or na(cvdHere) or (arrowUpR ? cvdHere >= cvdMin : cvdHere <= 100 - cvdMin))
+                float wickPctR = bRng > 0 ? (arrowUpR ? math.min(open, close) - low : high - math.max(open, close)) / bRng * 100 : 0.0
+                bool  wickOkR  = not wickFilt or wickPctR >= wickMin
+                bool okR = (not trendFilt or (arrowUpR ? bullBias : not bullBias)) and armedOk and ageOk and cdOk and not blowThrough and inSigSess and not fired and nsOk and (not cvdFilt or na(cvdHere) or (arrowUpR ? cvdHere >= cvdMin : cvdHere <= 100 - cvdMin)) and wickOkR
                 if sigMode == "Rejection" and okR
                     fired := true
                     lastSigBar := bar_index
@@ -655,6 +663,74 @@ if barstate.islast and showCtx
         table.cell(ctxTbl, 1, 5, (armOkC ? "Laddad" : "Väntar resa") + " · " + (ageOkC ? "OK" : str.tostring(minAge - ageC) + " bars kvar"), text_color=armOkC and ageOkC ? cOk : cMut, text_size=size.tiny, text_halign=text.align_right)
         table.cell(ctxTbl, 0, 6, "ATR-guard · Cooldown", text_color=cMut, text_size=size.tiny, text_halign=text.align_left)
         table.cell(ctxTbl, 1, 6, (useAtrG ? (blowThrough ? "BLOCK" : "OK") : "Av") + " · " + (cdOkC ? "OK" : "Vilar"), text_color=(not useAtrG or not blowThrough) and cdOkC ? cOk : cNo, text_size=size.tiny, text_halign=text.align_right)
+
+// ════════════════════ DEVELOPING POC / POV (pågående session, live) ════════════════════
+var line  devPocLn = na
+var label devPocLb = na
+var line  devPovLn = na
+var label devPovLb = na
+if barstate.islast
+    if not na(devPocLn)
+        line.delete(devPocLn)
+        devPocLn := na
+    if not na(devPocLb)
+        label.delete(devPocLb)
+        devPocLb := na
+    if not na(devPovLn)
+        line.delete(devPovLn)
+        devPovLn := na
+    if not na(devPovLb)
+        label.delete(devPovLb)
+        devPovLb := na
+    if showDev and array.size(bVol) > 5 and not na(sHi) and sHi > sLo
+        float devStep = (sHi - sLo) / rows
+        devBk = array.new_float(rows, 0.0)
+        for i2 = 0 to array.size(bVol) - 1
+            float dLo = array.get(bLo, i2)
+            float dHi = array.get(bHi, i2)
+            float dV  = array.get(bVol, i2)
+            int dI0 = math.max(0, math.min(rows - 1, int(math.floor((dLo - sLo) / devStep))))
+            int dI1 = math.max(0, math.min(rows - 1, int(math.floor((dHi - sLo) / devStep))))
+            int dSp = dI1 - dI0 + 1
+            for j2 = dI0 to dI1
+                array.set(devBk, j2, array.get(devBk, j2) + dV / dSp)
+        int devPocI = 0
+        float devMax = 0.0
+        float devTot = 0.0
+        for j2 = 0 to rows - 1
+            float dvv = array.get(devBk, j2)
+            devTot += dvv
+            if dvv > devMax
+                devMax := dvv
+                devPocI := j2
+        float devVa = array.get(devBk, devPocI)
+        int devUp = devPocI + 1
+        int devDn = devPocI - 1
+        while devVa < devTot * vaPct and (devUp < rows or devDn >= 0)
+            float dvU = devUp < rows ? array.get(devBk, devUp) : -1.0
+            float dvD = devDn >= 0   ? array.get(devBk, devDn) : -1.0
+            if dvU >= dvD
+                devVa += dvU
+                devUp += 1
+            else
+                devVa += dvD
+                devDn -= 1
+        int devVahI = math.min(rows - 1, devUp - 1)
+        int devValI = math.max(0, devDn + 1)
+        float devPoc = sLo + (devPocI + 0.5) * devStep
+        devPocLn := line.new(bar_index - 4, devPoc, bar_index + ibExt, devPoc, color=colDev, style=line.style_dashed, width=2)
+        devPocLb := label.new(bar_index + ibExt, devPoc, "dPOC", style=label.style_label_left, color=color.new(color.black, 100), textcolor=colDev, size=size.tiny, tooltip="Developing POC (pågående session)  " + str.tostring(devPoc, format.mintick))
+        int devPovI = -1
+        float devPovV = 1.0e20
+        for j2 = devValI to devVahI
+            float dvp = array.get(devBk, j2)
+            if j2 != devPocI and dvp > 0 and dvp < devPovV
+                devPovV := dvp
+                devPovI := j2
+        if devPovI >= 0
+            float devPov = sLo + (devPovI + 0.5) * devStep
+            devPovLn := line.new(bar_index - 4, devPov, bar_index + ibExt, devPov, color=colDev, style=line.style_dotted, width=1)
+            devPovLb := label.new(bar_index + ibExt, devPov, "dPOV", style=label.style_label_left, color=color.new(color.black, 100), textcolor=color.new(colDev, 25), size=size.tiny, tooltip="Developing POV / LVN (pågående session)  " + str.tostring(devPov, format.mintick))
 
 // ════════════════════ SWING-PROFILER (pivot-till-pivot, som OutsiderEdge) ════════════════════
 gW = "Swing-profiler (pivot)"
@@ -826,7 +902,9 @@ if barstate.isconfirmed and array.size(swP) > 0
             else
                 swRejBar := true
                 bool rUp = st == -1
-                bool okR = (not trendFilt or (rUp ? bullBias : not bullBias)) and aOk and swAgeOk and swCdOk and not blowThrough and inSigSess and not swFired
+                float wickPctS = bRng > 0 ? (rUp ? math.min(open, close) - low : high - math.max(open, close)) / bRng * 100 : 0.0
+                bool  wickOkS  = not wickFilt or wickPctS >= wickMin
+                bool okR = (not trendFilt or (rUp ? bullBias : not bullBias)) and aOk and swAgeOk and swCdOk and not blowThrough and inSigSess and not swFired and wickOkS
                 if sigMode == "Rejection" and okR
                     swFired := true
                     lastSigBar := bar_index
