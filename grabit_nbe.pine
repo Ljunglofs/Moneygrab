@@ -3,6 +3,8 @@
 // Versionshanterad här i repot. Klistra in i TradingView Pine Editor -> Save -> Add to chart.
 //
 // Ändringslogg (senaste):
+//  · Node Breach: Node Strength- och tryckfilter (CVD @POC) som signalkrav,
+//    plus Node Context-panel med live-status för aktiva noden.
 //  · Naked POC ritas som NOD vid priset med riktningspil (som video-referensen):
 //    POC ▲ (cyan) när noden ligger UNDER priset = stöd/long-kontext,
 //    POC ▼ (röd) när noden ligger ÖVER priset = motstånd/short-kontext.
@@ -94,6 +96,10 @@ nodeTips  = input.bool(false, "Node Context Tooltip vid POC", group=gN, tooltip=
 colPOC    = input.color(color.new(#ffc400, 0), "POC-linje", group=gN)
 showPOV   = input.bool(true, "Naked POV (LVN i Value Area)", group=gN)
 colPOV    = input.color(color.new(#b2b5be, 35), "POV-linje", group=gN)
+nsMin     = input.float(0, "Min node strength % för signal (0 = av)", minval=0, maxval=30, step=0.5, group=gN, tooltip="Nodens andel av profilens totala volym. Tunna noder ger svaga rejections — kräv t.ex. 3–5% för att bara handla tjocka noder.")
+cvdFilt   = input.bool(false, "Tryckfilter (CVD @POC)", group=gN, tooltip="Pil upp kräver köpövervikt i noden, pil ner säljövervikt. Använder buy/sell-splitten som redan räknas per nod.")
+cvdMin    = input.float(55, "Min tryck-övervikt %", minval=50, maxval=80, group=gN)
+showCtx   = input.bool(true, "Node Context-panel", group=gN, tooltip="Live-status för senaste nakna POC:n — pris, node strength, tryck, VWAP-distans, laddning/ålder och guards. Som OutsiderEdges Node Context.")
 showDash  = input.bool(true, "Dashboard", group=gN)
 
 // Trendmoln
@@ -322,6 +328,8 @@ var array<int>   pocState  = array.new_int()    //  0 naken · 1 utmanad underif
 var array<int>   pocCount  = array.new_int()
 var array<int>   pocArm    = array.new_int()    //  0 = ej laddad · 1 = priset har rest bort, signal tillåten
 var array<int>   pocBorn   = array.new_int()    //  bar då noden skapades
+var array<float> pocNS    = array.new_float()   //  node strength % per naken POC
+var array<float> pocCVD   = array.new_float()   //  köpandel % i noden
 var array<line>  povLines  = array.new_line()
 var array<float> povPrices = array.new_float()
 var array<int>   povArm    = array.new_int()
@@ -422,6 +430,8 @@ buildProfile() =>
             array.push(pocCount, 0)
             array.push(pocArm, 0)
             array.push(pocBorn, bar_index)
+            array.push(pocNS, retNS)
+            array.push(pocCVD, retPocB)
             while array.size(pocLines) > maxNaked
                 line.delete(array.shift(pocLines))
                 array.shift(pocPrices)
@@ -429,6 +439,8 @@ buildProfile() =>
                 array.shift(pocCount)
                 array.shift(pocArm)
                 array.shift(pocBorn)
+                array.shift(pocNS)
+                array.shift(pocCVD)
             if nodeTips
                 string tip = "POC " + str.tostring(pocPrice, format.mintick) +
                      "\nNode strength " + str.tostring(retNS, "#.#") + "% av profilen" +
@@ -523,6 +535,9 @@ if barstate.isconfirmed and array.size(pocLines) > 0
         bool armedOk = not distFilt or array.get(pocArm, i) == 1
         bool ageOk = bar_index - array.get(pocBorn, i) >= minAge
         bool cdOk  = bar_index - lastSigBar >= sigCd
+        float nsHere  = array.size(pocNS)  > i ? array.get(pocNS, i)  : na
+        float cvdHere = array.size(pocCVD) > i ? array.get(pocCVD, i) : na
+        bool  nsOk    = nsMin <= 0 or na(nsHere) or nsHere >= nsMin
         if st == 0
             if high >= p - m and low <= p + m
                 pocBreachBar := true
@@ -537,7 +552,7 @@ if barstate.isconfirmed and array.size(pocLines) > 0
                 if c >= accBars
                     pocAccBar := true
                     bool arrowUpA = st == 1
-                    bool okA = (not trendFilt or (arrowUpA ? bullBias : not bullBias)) and armedOk and ageOk and cdOk and not blowThrough and inSigSess and not fired
+                    bool okA = (not trendFilt or (arrowUpA ? bullBias : not bullBias)) and armedOk and ageOk and cdOk and not blowThrough and inSigSess and not fired and nsOk and (not cvdFilt or na(cvdHere) or (arrowUpA ? cvdHere >= cvdMin : cvdHere <= 100 - cvdMin))
                     if sigMode == "Breakout" and okA
                         fired := true
                         lastSigBar := bar_index
@@ -551,10 +566,14 @@ if barstate.isconfirmed and array.size(pocLines) > 0
                     array.remove(pocCount, i)
                     array.remove(pocArm, i)
                     array.remove(pocBorn, i)
+                    if array.size(pocNS) > i
+                        array.remove(pocNS, i)
+                    if array.size(pocCVD) > i
+                        array.remove(pocCVD, i)
             else
                 pocRejBar := true
                 bool arrowUpR = st == -1
-                bool okR = (not trendFilt or (arrowUpR ? bullBias : not bullBias)) and armedOk and ageOk and cdOk and not blowThrough and inSigSess and not fired
+                bool okR = (not trendFilt or (arrowUpR ? bullBias : not bullBias)) and armedOk and ageOk and cdOk and not blowThrough and inSigSess and not fired and nsOk and (not cvdFilt or na(cvdHere) or (arrowUpR ? cvdHere >= cvdMin : cvdHere <= 100 - cvdMin))
                 if sigMode == "Rejection" and okR
                     fired := true
                     lastSigBar := bar_index
@@ -604,6 +623,38 @@ if barstate.islast
             color ncol = nodeBelow ? color.new(#00e5ff, 0) : color.new(#f23645, 0)
             array.push(pocNodeLns, line.new(bar_index - 4, pp, bar_index + ibExt, pp, color=colPOC, width=2))
             array.push(pocNodeLbs, label.new(bar_index + ibExt, pp, nodeBelow ? "POC ▲" : "POC ▼", style = nodeBelow ? label.style_label_up : label.style_label_down, color=color.new(color.black, 100), textcolor=ncol, size=size.small, tooltip="Naked POC  " + str.tostring(pp, format.mintick) + (nodeBelow ? "\nNod under priset — stöd (long-kontext)" : "\nNod över priset — motstånd (short-kontext)")))
+
+// ════════════════════ NODE CONTEXT-PANEL (live-status för aktiva noden) ════════════════════
+var table ctxTbl = table.new(position.bottom_left, 2, 7, bgcolor=color.new(color.black, 25), border_width=1, border_color=color.new(color.gray, 70))
+if barstate.islast and showCtx
+    int nN = array.size(pocPrices)
+    color cOk  = color.new(#00e5ff, 0)
+    color cNo  = color.new(#f23645, 0)
+    color cMut = color.new(color.gray, 20)
+    table.cell(ctxTbl, 0, 0, "Node Context", text_color=color.new(#ffc400, 0), text_size=size.tiny, text_halign=text.align_left)
+    table.cell(ctxTbl, 1, 0, nN > 0 ? "AKTIV" : "INGEN NOD", text_color=nN > 0 ? cOk : cMut, text_size=size.tiny, text_halign=text.align_right)
+    if nN > 0
+        float pCtx = array.get(pocPrices, nN - 1)
+        float nsC  = array.size(pocNS)  >= nN ? array.get(pocNS, nN - 1)  : na
+        float cvC  = array.size(pocCVD) >= nN ? array.get(pocCVD, nN - 1) : na
+        int   armC = array.get(pocArm, nN - 1)
+        int   ageC = bar_index - array.get(pocBorn, nN - 1)
+        bool nsOkC  = nsMin <= 0 or na(nsC) or nsC >= nsMin
+        bool armOkC = not distFilt or armC == 1
+        bool ageOkC = ageC >= minAge
+        bool cdOkC  = bar_index - lastSigBar >= sigCd
+        table.cell(ctxTbl, 0, 1, "POC Price", text_color=cMut, text_size=size.tiny, text_halign=text.align_left)
+        table.cell(ctxTbl, 1, 1, str.tostring(pCtx, format.mintick), text_color=color.white, text_size=size.tiny, text_halign=text.align_right)
+        table.cell(ctxTbl, 0, 2, "Node Strength", text_color=cMut, text_size=size.tiny, text_halign=text.align_left)
+        table.cell(ctxTbl, 1, 2, (na(nsC) ? "–" : str.tostring(nsC, "#.#") + "%") + (nsOkC ? "  OK" : "  LÅG"), text_color=nsOkC ? cOk : cNo, text_size=size.tiny, text_halign=text.align_right)
+        table.cell(ctxTbl, 0, 3, "Buy/Sell @nod", text_color=cMut, text_size=size.tiny, text_halign=text.align_left)
+        table.cell(ctxTbl, 1, 3, na(cvC) ? "–" : "B" + str.tostring(cvC, "#") + "/S" + str.tostring(100 - cvC, "#"), text_color=na(cvC) or cvC >= 50 ? cOk : cNo, text_size=size.tiny, text_halign=text.align_right)
+        table.cell(ctxTbl, 0, 4, "VWAP-dist", text_color=cMut, text_size=size.tiny, text_halign=text.align_left)
+        table.cell(ctxTbl, 1, 4, na(vwap) ? "–" : str.tostring(100 * (pCtx - vwap) / vwap, "#.##") + "%", text_color=color.white, text_size=size.tiny, text_halign=text.align_right)
+        table.cell(ctxTbl, 0, 5, "Laddning · Ålder", text_color=cMut, text_size=size.tiny, text_halign=text.align_left)
+        table.cell(ctxTbl, 1, 5, (armOkC ? "Laddad" : "Väntar resa") + " · " + (ageOkC ? "OK" : str.tostring(minAge - ageC) + " bars kvar"), text_color=armOkC and ageOkC ? cOk : cMut, text_size=size.tiny, text_halign=text.align_right)
+        table.cell(ctxTbl, 0, 6, "ATR-guard · Cooldown", text_color=cMut, text_size=size.tiny, text_halign=text.align_left)
+        table.cell(ctxTbl, 1, 6, (useAtrG ? (blowThrough ? "BLOCK" : "OK") : "Av") + " · " + (cdOkC ? "OK" : "Vilar"), text_color=(not useAtrG or not blowThrough) and cdOkC ? cOk : cNo, text_size=size.tiny, text_halign=text.align_right)
 
 // ════════════════════ SWING-PROFILER (pivot-till-pivot, som OutsiderEdge) ════════════════════
 gW = "Swing-profiler (pivot)"
