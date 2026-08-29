@@ -41,13 +41,14 @@ SWEEP_LOOKBACK = 6           # barer bakåt för sweep-reclaim
 DELTA_BARS     = 12          # fönster för delta-proxyn
 
 WEIGHTS = {                  # summa 100 — EN skala, inga sidosystem
-    "vwap_slope": 15,        # VWAP lutar åt håll­et (flack VWAP ger 0)
-    "delta":      15,        # CLV×volym-proxy trycker åt hållet
-    "structure":  15,        # HH/HL (long) resp. LL/LH (short) på swingar
-    "sweep":      20,        # sessionsnivå sveptes och återtogs — bästa signalen
-    "volume":     15,        # rel_vol ≥ 1.3 (10) + spike ≥ 1.8 (5)
-    "htf_bias":   10,        # 1h-trenden håller med
+    "vwap_slope": 13,        # VWAP lutar åt håll­et (flack VWAP ger 0)
+    "delta":      13,        # CLV×volym-proxy trycker åt hållet
+    "structure":  14,        # HH/HL (long) resp. LL/LH (short) på swingar
+    "sweep":      18,        # sessionsnivå sveptes och återtogs — bästa signalen
+    "volume":     14,        # rel_vol ≥ 1.3 (9) + spike ≥ 1.8 (5)
+    "htf_bias":    8,        # 1h-trenden håller med
     "rsi":        10,        # momentum-zon (50–70 long / 30–50 short)
+    "poc":        10,        # rätt sida om dagens volym-nod: long ÖVER POC, short UNDER
 }
 
 
@@ -65,6 +66,9 @@ class MarketState:
     vwap: Optional[float] = None
     vwap_slope_pct: float = 0.0      # % per ~30 min
     above_vwap: bool = False
+
+    poc: Optional[float] = None      # dagens volym-nod (Point of Control)
+    above_poc: bool = False
 
     asia_high: Optional[float] = None
     asia_low: Optional[float] = None
@@ -149,6 +153,32 @@ def _anchored_vwap(df: pd.DataFrame, hours_se, session: str):
         return vw, float(vw[-1])
     except Exception:
         return None, None
+
+
+def _volume_profile_poc(df: pd.DataFrame, bins: int = 40) -> Optional[float]:
+    """POC (Point of Control) — prisnivån med mest handlad volym. Varje bars
+    volym fördelas jämnt över de prisbinnar som barens High–Low täcker.
+    Approximation ur candledata (riktig profil kräver tick) — men det är
+    riktiga volymer, inget påhittat."""
+    try:
+        H = df["High"].to_numpy(float)
+        L = df["Low"].to_numpy(float)
+        V = df["Volume"].to_numpy(float)
+        lo, hi = float(np.min(L)), float(np.max(H))
+        if not (np.isfinite(lo) and np.isfinite(hi)) or hi <= lo:
+            return None
+        edges = np.linspace(lo, hi, bins + 1)
+        vol = np.zeros(bins)
+        for h, l, v in zip(H, L, V):
+            if v <= 0:
+                v = 1.0
+            i0 = max(0, min(bins - 1, int(np.searchsorted(edges, l, side="right") - 1)))
+            i1 = max(i0 + 1, min(bins, int(np.searchsorted(edges, h, side="left"))))
+            vol[i0:i1] += v / (i1 - i0)
+        k = int(np.argmax(vol))
+        return float((edges[k] + edges[k + 1]) / 2.0)
+    except Exception:
+        return None
 
 
 def _delta_proxy(df: pd.DataFrame, bars: int = DELTA_BARS) -> float:
@@ -240,6 +270,11 @@ def build_state(df: pd.DataFrame, bias: str, now_local) -> MarketState:
             st.vwap_slope_pct = (float(vw_ser[-1]) - float(vw_ser[-7])) / st.price * 100.0
     st.above_vwap = bool(st.vwap is not None and st.price > st.vwap)
 
+    # Dagens volym-nod (POC). Tunn dag -> falla tillbaka på senaste ~RTH-längden.
+    prof = d_today if len(d_today) >= 12 else df.tail(78)
+    st.poc = _volume_profile_poc(prof)
+    st.above_poc = bool(st.poc is not None and st.price > st.poc)
+
     st.delta_proxy = _delta_proxy(df)
 
     H = df["High"].to_numpy(float)[-40:]
@@ -315,9 +350,18 @@ def _score(st: MarketState, direction: str):
         s += W["sweep"]; reasons.append("Sweep-reclaim av %s" % sweep)
     groups["Sweep-reclaim"] = bool(sweep)
 
+    # POC-regeln (volymprofil): long ÖVER noden, short UNDER — noden agerar
+    # stöd resp. motstånd. Ingen POC-data => inga poäng, aldrig gissning.
+    poc_ok = (st.poc is not None) and (st.above_poc if direction == "LONG"
+                                       else not st.above_poc)
+    if poc_ok:
+        s += W["poc"]; reasons.append("%s POC (%.0f)"
+                                      % ("Över" if direction == "LONG" else "Under", st.poc))
+    groups["POC-sida"] = poc_ok
+
     vol_pts = 0
     if st.rel_vol >= 1.3:
-        vol_pts += 10
+        vol_pts += 9
     if st.vol_spike:
         vol_pts += 5
     if vol_pts:
