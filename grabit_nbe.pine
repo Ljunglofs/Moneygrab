@@ -1051,3 +1051,97 @@ barcolor(paintBars ? (close >= open ? colCup : colCdn) : na)
 var table wm = table.new(position.bottom_right, 1, 1)
 if barstate.islast
     table.cell(wm, 0, 0, "GRABIT", text_color=color.new(color.gray, 60), text_size=size.small)
+
+// ════════════════════ TRADE-MOTOR (paper) — SL/TP-visuals + statistik ════════════════════
+// OutsiderEdge-stilen: varje signal öppnar en PAPPERSTRADE som ritas med
+// TP-zon (cyan) och SL-zon (röd) + räknas i statistiktabellen. Exekverar
+// inget — ren visualisering och ärlig bokföring direkt på charten.
+// ÄRLIG RÄKNING: träffar priset BÅDE SL och TP i samma bar bokförs SL —
+// aldrig den optimistiska tolkningen.
+gT = "Trade-motor (paper)"
+teOn    = input.bool(true,  "Aktivera trade-motorn", group=gT, tooltip="Öppnar en papperstrade på varje signal (en åt gången), ritar SL/TP-boxar och räknar win rate + summa R. Exekverar ingenting.")
+teSrc   = input.string("Båda", "Signalkälla", options=["POC", "Swing", "Båda"], group=gT)
+teSLa   = input.float(1.2, "Stop Loss (×ATR14)", minval=0.3, step=0.1, group=gT)
+teTPr   = input.float(2.0, "Take Profit (R)", minval=0.5, step=0.25, group=gT, tooltip="TP i R-multiplar av stoppen. 2.0 = vinsten är dubbla risken.")
+teBoxes = input.bool(true, "Trade Visuals (SL/TP-boxar)", group=gT)
+teHist  = input.int(30, "Trade History (max ritade trades)", minval=5, maxval=100, group=gT)
+teStats = input.bool(true, "Statistik-tabell", group=gT)
+colTP   = input.color(color.new(#00e5ff, 84), "TP-zon", group=gT)
+colSL   = input.color(color.new(#f23645, 84), "SL-zon", group=gT)
+
+var bool  teOpen = false
+var int   teDir  = 0
+var float teEnt  = na
+var float teSL   = na
+var float teTP   = na
+var int   teBar  = na
+var int   teWins = 0
+var int   teLoss = 0
+var float teSumR = 0.0
+var array<box> teBx = array.new<box>()
+
+teKill(int nMax) =>
+    while array.size(teBx) > nMax
+        box.delete(array.shift(teBx))
+
+bool sigUp = (teSrc != "Swing" and pocUpBar) or (teSrc != "POC" and swBrUp)
+bool sigDn = (teSrc != "Swing" and pocDnBar) or (teSrc != "POC" and swBrDn)
+
+bool teTpHit = false
+bool teSlHit = false
+if teOn and barstate.isconfirmed
+    // 1) Stäng öppen trade — SL FÖRST vid krock (ärlig bokföring)
+    if teOpen
+        bool hitSL = teDir == 1 ? low <= teSL : high >= teSL
+        bool hitTP = teDir == 1 ? high >= teTP : low <= teTP
+        if hitSL
+            teLoss += 1
+            teSumR -= 1.0
+            teSlHit := true
+        else if hitTP
+            teWins += 1
+            teSumR += teTPr
+            teTpHit := true
+        if hitSL or hitTP
+            if teBoxes
+                array.push(teBx, box.new(teBar, teDir == 1 ? teTP : teEnt, bar_index, teDir == 1 ? teEnt : teTP, border_color=na, bgcolor=colTP))
+                array.push(teBx, box.new(teBar, teDir == 1 ? teEnt : teSL, bar_index, teDir == 1 ? teSL : teEnt, border_color=na, bgcolor=colSL))
+                teKill(teHist * 2)
+            teOpen := false
+    // 2) Öppna ny trade på signal (entry = signalbarens stängning)
+    if not teOpen and (sigUp or sigDn)
+        teDir  := sigUp ? 1 : -1
+        teEnt  := close
+        teSL   := sigUp ? close - teSLa * atrF : close + teSLa * atrF
+        teTP   := sigUp ? close + teSLa * atrF * teTPr : close - teSLa * atrF * teTPr
+        teBar  := bar_index
+        teOpen := true
+
+// Levande boxar för den öppna traden (uppdateras varje bar, raderas vid stängning)
+var box teLiveTp = na
+var box teLiveSl = na
+if barstate.islast
+    if not na(teLiveTp)
+        box.delete(teLiveTp)
+        teLiveTp := na
+    if not na(teLiveSl)
+        box.delete(teLiveSl)
+        teLiveSl := na
+    if teOn and teBoxes and teOpen
+        teLiveTp := box.new(teBar, teDir == 1 ? teTP : teEnt, bar_index + 2, teDir == 1 ? teEnt : teTP, border_color=color.new(#00e5ff, 55), bgcolor=colTP)
+        teLiveSl := box.new(teBar, teDir == 1 ? teEnt : teSL, bar_index + 2, teDir == 1 ? teSL : teEnt, border_color=color.new(#f23645, 55), bgcolor=colSL)
+
+var table teTbl = table.new(position.top_left, 2, 4, bgcolor=color.new(color.black, 25), border_width=1, border_color=color.new(color.gray, 70))
+if barstate.islast and teOn and teStats
+    int teN = teWins + teLoss
+    table.cell(teTbl, 0, 0, "Trades", text_color=color.new(color.gray, 20), text_size=size.tiny, text_halign=text.align_left)
+    table.cell(teTbl, 1, 0, str.tostring(teN) + (teOpen ? " (+1 öppen)" : ""), text_color=color.white, text_size=size.tiny, text_halign=text.align_right)
+    table.cell(teTbl, 0, 1, "Win rate", text_color=color.new(color.gray, 20), text_size=size.tiny, text_halign=text.align_left)
+    table.cell(teTbl, 1, 1, teN > 0 ? str.tostring(100.0 * teWins / teN, "#.#") + "%" : "–", text_color=teN > 0 and teWins * 2 >= teN ? color.new(#00e5ff, 0) : color.white, text_size=size.tiny, text_halign=text.align_right)
+    table.cell(teTbl, 0, 2, "Summa R", text_color=color.new(color.gray, 20), text_size=size.tiny, text_halign=text.align_left)
+    table.cell(teTbl, 1, 2, str.tostring(teSumR, "#.##") + "R", text_color=teSumR >= 0 ? color.new(#00e5ff, 0) : color.new(#f23645, 0), text_size=size.tiny, text_halign=text.align_right)
+    table.cell(teTbl, 0, 3, "Snitt R", text_color=color.new(color.gray, 20), text_size=size.tiny, text_halign=text.align_left)
+    table.cell(teTbl, 1, 3, teN > 0 ? str.tostring(teSumR / teN, "#.##") + "R" : "–", text_color=teN > 0 and teSumR >= 0 ? color.new(#00e5ff, 0) : color.white, text_size=size.tiny, text_halign=text.align_right)
+
+alertcondition(teTpHit, "Trade TP", "Papperstrade stängd på TP")
+alertcondition(teSlHit, "Trade SL", "Papperstrade stängd på SL")
