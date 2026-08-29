@@ -3,6 +3,8 @@
 // Versionshanterad här i repot. Klistra in i TradingView Pine Editor -> Save -> Add to chart.
 //
 // Ändringslogg (senaste):
+//  · FIX: kompilerfel "Undeclared identifier swP" — Trade Checklist-blocket
+//    flyttat till efter swing-profilern (deklaration före användning).
 //  · Nod-förlängning 'N retester' (som OutsiderEdges Until N Retests) och
 //    ANEF-guard (rekonstruktion av Adaptive Node Efficiency som filter).
 //  · Instrument-preset (Auto/MNQ/GULD): guld flyttar NY-sessionen till
@@ -731,71 +733,6 @@ if barstate.islast and showCtx
         table.cell(ctxTbl, 0, 6, "ATR-guard · Cooldown", text_color=cMut, text_size=size.tiny, text_halign=text.align_left)
         table.cell(ctxTbl, 1, 6, (useAtrG ? (blowThrough ? "BLOCK" : "OK") : "Av") + " · " + (cdOkC ? "OK" : "Vilar"), text_color=(not useAtrG or not blowThrough) and cdOkC ? cOk : cNo, text_size=size.tiny, text_halign=text.align_right)
 
-// ════════════════════ TRADE CHECKLIST (7 punkter, live) ════════════════════
-f_nearAbove(array<float> arr, float ref) =>
-    float best = na
-    if array.size(arr) > 0
-        for q = 0 to array.size(arr) - 1
-            float v = array.get(arr, q)
-            if v > ref and (na(best) or v < best)
-                best := v
-    best
-
-f_nearBelow(array<float> arr, float ref) =>
-    float best = na
-    if array.size(arr) > 0
-        for q = 0 to array.size(arr) - 1
-            float v = array.get(arr, q)
-            if v < ref and (na(best) or v > best)
-                best := v
-    best
-
-var table chkTbl = table.new(position.middle_left, 2, 8, bgcolor=color.new(color.black, 25), border_width=1, border_color=color.new(color.gray, 70))
-if barstate.islast and showChk
-    color kOk  = color.new(#00e5ff, 0)
-    color kNo  = color.new(#f23645, 0)
-    color kMut = color.new(color.gray, 20)
-    color kWrn = color.new(#ffc400, 0)
-    int nPocC = array.size(pocPrices)
-    int nSwC  = array.size(swP)
-    float pAct = nPocC > 0 ? array.get(pocPrices, nPocC - 1) : na
-    string vaTxt = na(lastVahP) or na(lastValP) ? "–" : close > lastVahP ? "Över value" : close < lastValP ? "Under value" : "Inside value"
-    color  vaCol = na(lastVahP) or na(lastValP) ? kMut : close > lastVahP ? kOk : close < lastValP ? kNo : kWrn
-    float povA = f_nearAbove(povPrices, close)
-    float povB = f_nearBelow(povPrices, close)
-    float povD = na(povA) and na(povB) ? na : na(povA) ? close - povB : na(povB) ? povA - close : math.min(povA - close, close - povB)
-    bool povNear = not na(povD) and povD < atrF
-    float nextUp = f_nearAbove(pocPrices, close)
-    float cU1 = f_nearAbove(povPrices, close)
-    float cU2 = f_nearAbove(swP, close)
-    if not na(cU1) and (na(nextUp) or cU1 < nextUp)
-        nextUp := cU1
-    if not na(cU2) and (na(nextUp) or cU2 < nextUp)
-        nextUp := cU2
-    float nextDn = f_nearBelow(pocPrices, close)
-    float cD1 = f_nearBelow(povPrices, close)
-    float cD2 = f_nearBelow(swP, close)
-    if not na(cD1) and (na(nextDn) or cD1 > nextDn)
-        nextDn := cD1
-    if not na(cD2) and (na(nextDn) or cD2 > nextDn)
-        nextDn := cD2
-    table.cell(chkTbl, 0, 0, "Trade Checklist", text_color=color.new(#ffc400, 0), text_size=size.tiny, text_halign=text.align_left)
-    table.cell(chkTbl, 1, 0, "före entry", text_color=kMut, text_size=size.tiny, text_halign=text.align_right)
-    table.cell(chkTbl, 0, 1, "1  Aktiv nod", text_color=kMut, text_size=size.tiny, text_halign=text.align_left)
-    table.cell(chkTbl, 1, 1, (nPocC > 0 ? "Session-POC" : "ingen") + (nSwC > 0 ? " · " + str.tostring(nSwC) + " swing" : ""), text_color=nPocC > 0 ? color.white : kMut, text_size=size.tiny, text_halign=text.align_right)
-    table.cell(chkTbl, 0, 2, "2  POC-läge", text_color=kMut, text_size=size.tiny, text_halign=text.align_left)
-    table.cell(chkTbl, 1, 2, na(pAct) ? "–" : pAct > close ? "Över priset · motstånd" : "Under priset · stöd", text_color=na(pAct) ? kMut : pAct > close ? kNo : kOk, text_size=size.tiny, text_halign=text.align_right)
-    table.cell(chkTbl, 0, 3, "3  Value (dVAH/dVAL)", text_color=kMut, text_size=size.tiny, text_halign=text.align_left)
-    table.cell(chkTbl, 1, 3, vaTxt, text_color=vaCol, text_size=size.tiny, text_halign=text.align_right)
-    table.cell(chkTbl, 0, 4, "4  LVN-närhet", text_color=kMut, text_size=size.tiny, text_halign=text.align_left)
-    table.cell(chkTbl, 1, 4, na(povD) ? "–" : (povNear ? "NÄRA · " : "Fritt · ") + str.tostring(povD, format.mintick) + " p", text_color=na(povD) ? kMut : povNear ? kWrn : kOk, text_size=size.tiny, text_halign=text.align_right)
-    table.cell(chkTbl, 0, 5, "5  Trend", text_color=kMut, text_size=size.tiny, text_halign=text.align_left)
-    table.cell(chkTbl, 1, 5, bullBias ? "Bull · undvik forcerade shorts" : "Bear · undvik forcerade longs", text_color=bullBias ? kOk : kNo, text_size=size.tiny, text_halign=text.align_right)
-    table.cell(chkTbl, 0, 6, "6  Nästa nod ↑ / ↓", text_color=kMut, text_size=size.tiny, text_halign=text.align_left)
-    table.cell(chkTbl, 1, 6, (na(nextUp) ? "–" : str.tostring(nextUp, format.mintick)) + "  /  " + (na(nextDn) ? "–" : str.tostring(nextDn, format.mintick)), text_color=color.white, text_size=size.tiny, text_halign=text.align_right)
-    table.cell(chkTbl, 0, 7, "7  Invalidation", text_color=kMut, text_size=size.tiny, text_halign=text.align_left)
-    table.cell(chkTbl, 1, 7, na(pAct) ? "–" : "Acceptans " + str.tostring(accBars) + " st. bortom " + str.tostring(pAct, format.mintick), text_color=kMut, text_size=size.tiny, text_halign=text.align_right)
-
 // ════════════════════ DEVELOPING POC / POV (pågående session, live) ════════════════════
 var line  devPocLn = na
 var label devPocLb = na
@@ -1051,6 +988,71 @@ if barstate.isconfirmed and array.size(swP) > 0
                 array.set(swSt, j, 0)
                 array.set(swC, j, 0)
                 array.set(swA, j, 0)
+
+// ════════════════════ TRADE CHECKLIST (7 punkter, live) ════════════════════
+f_nearAbove(array<float> arr, float ref) =>
+    float best = na
+    if array.size(arr) > 0
+        for q = 0 to array.size(arr) - 1
+            float v = array.get(arr, q)
+            if v > ref and (na(best) or v < best)
+                best := v
+    best
+
+f_nearBelow(array<float> arr, float ref) =>
+    float best = na
+    if array.size(arr) > 0
+        for q = 0 to array.size(arr) - 1
+            float v = array.get(arr, q)
+            if v < ref and (na(best) or v > best)
+                best := v
+    best
+
+var table chkTbl = table.new(position.middle_left, 2, 8, bgcolor=color.new(color.black, 25), border_width=1, border_color=color.new(color.gray, 70))
+if barstate.islast and showChk
+    color kOk  = color.new(#00e5ff, 0)
+    color kNo  = color.new(#f23645, 0)
+    color kMut = color.new(color.gray, 20)
+    color kWrn = color.new(#ffc400, 0)
+    int nPocC = array.size(pocPrices)
+    int nSwC  = array.size(swP)
+    float pAct = nPocC > 0 ? array.get(pocPrices, nPocC - 1) : na
+    string vaTxt = na(lastVahP) or na(lastValP) ? "–" : close > lastVahP ? "Över value" : close < lastValP ? "Under value" : "Inside value"
+    color  vaCol = na(lastVahP) or na(lastValP) ? kMut : close > lastVahP ? kOk : close < lastValP ? kNo : kWrn
+    float povA = f_nearAbove(povPrices, close)
+    float povB = f_nearBelow(povPrices, close)
+    float povD = na(povA) and na(povB) ? na : na(povA) ? close - povB : na(povB) ? povA - close : math.min(povA - close, close - povB)
+    bool povNear = not na(povD) and povD < atrF
+    float nextUp = f_nearAbove(pocPrices, close)
+    float cU1 = f_nearAbove(povPrices, close)
+    float cU2 = f_nearAbove(swP, close)
+    if not na(cU1) and (na(nextUp) or cU1 < nextUp)
+        nextUp := cU1
+    if not na(cU2) and (na(nextUp) or cU2 < nextUp)
+        nextUp := cU2
+    float nextDn = f_nearBelow(pocPrices, close)
+    float cD1 = f_nearBelow(povPrices, close)
+    float cD2 = f_nearBelow(swP, close)
+    if not na(cD1) and (na(nextDn) or cD1 > nextDn)
+        nextDn := cD1
+    if not na(cD2) and (na(nextDn) or cD2 > nextDn)
+        nextDn := cD2
+    table.cell(chkTbl, 0, 0, "Trade Checklist", text_color=color.new(#ffc400, 0), text_size=size.tiny, text_halign=text.align_left)
+    table.cell(chkTbl, 1, 0, "före entry", text_color=kMut, text_size=size.tiny, text_halign=text.align_right)
+    table.cell(chkTbl, 0, 1, "1  Aktiv nod", text_color=kMut, text_size=size.tiny, text_halign=text.align_left)
+    table.cell(chkTbl, 1, 1, (nPocC > 0 ? "Session-POC" : "ingen") + (nSwC > 0 ? " · " + str.tostring(nSwC) + " swing" : ""), text_color=nPocC > 0 ? color.white : kMut, text_size=size.tiny, text_halign=text.align_right)
+    table.cell(chkTbl, 0, 2, "2  POC-läge", text_color=kMut, text_size=size.tiny, text_halign=text.align_left)
+    table.cell(chkTbl, 1, 2, na(pAct) ? "–" : pAct > close ? "Över priset · motstånd" : "Under priset · stöd", text_color=na(pAct) ? kMut : pAct > close ? kNo : kOk, text_size=size.tiny, text_halign=text.align_right)
+    table.cell(chkTbl, 0, 3, "3  Value (dVAH/dVAL)", text_color=kMut, text_size=size.tiny, text_halign=text.align_left)
+    table.cell(chkTbl, 1, 3, vaTxt, text_color=vaCol, text_size=size.tiny, text_halign=text.align_right)
+    table.cell(chkTbl, 0, 4, "4  LVN-närhet", text_color=kMut, text_size=size.tiny, text_halign=text.align_left)
+    table.cell(chkTbl, 1, 4, na(povD) ? "–" : (povNear ? "NÄRA · " : "Fritt · ") + str.tostring(povD, format.mintick) + " p", text_color=na(povD) ? kMut : povNear ? kWrn : kOk, text_size=size.tiny, text_halign=text.align_right)
+    table.cell(chkTbl, 0, 5, "5  Trend", text_color=kMut, text_size=size.tiny, text_halign=text.align_left)
+    table.cell(chkTbl, 1, 5, bullBias ? "Bull · undvik forcerade shorts" : "Bear · undvik forcerade longs", text_color=bullBias ? kOk : kNo, text_size=size.tiny, text_halign=text.align_right)
+    table.cell(chkTbl, 0, 6, "6  Nästa nod ↑ / ↓", text_color=kMut, text_size=size.tiny, text_halign=text.align_left)
+    table.cell(chkTbl, 1, 6, (na(nextUp) ? "–" : str.tostring(nextUp, format.mintick)) + "  /  " + (na(nextDn) ? "–" : str.tostring(nextDn, format.mintick)), text_color=color.white, text_size=size.tiny, text_halign=text.align_right)
+    table.cell(chkTbl, 0, 7, "7  Invalidation", text_color=kMut, text_size=size.tiny, text_halign=text.align_left)
+    table.cell(chkTbl, 1, 7, na(pAct) ? "–" : "Acceptans " + str.tostring(accBars) + " st. bortom " + str.tostring(pAct, format.mintick), text_color=kMut, text_size=size.tiny, text_halign=text.align_right)
 
 // ════════════════════ ORDER BLOCKS (volymgraderade) ════════════════════
 gO = "Order Blocks"
