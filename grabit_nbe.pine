@@ -1,0 +1,1053 @@
+//@version=6
+// GRABIT NBE — vwap - note breaker with IB / volume
+// Versionshanterad här i repot. Klistra in i TradingView Pine Editor -> Save -> Add to chart.
+//
+// Ändringslogg (senaste):
+//  · Naked POC ritas som NOD vid priset med riktningspil (som video-referensen):
+//    POC ▲ (cyan) när noden ligger UNDER priset = stöd/long-kontext,
+//    POC ▼ (röd) när noden ligger ÖVER priset = motstånd/short-kontext.
+//    Gamla helchartslinjen finns kvar som stil-val ("Hel linje").
+//  · IB-breakout-trianglarna och POV-diamanten borttagna från charten
+//    (alerts finns kvar för den som vill ha dem).
+//  · ⬥ Node-tooltip default AV.
+indicator("vwap - note breaker with IB / volume - by Grabit", "Grabit NBE", overlay=true, max_boxes_count=500, max_lines_count=500, max_labels_count=500, max_bars_back=2000)
+
+// ════════════════════ INPUTS ════════════════════
+// VWAP
+gV = "VWAP"
+showVwap  = input.bool(true, "Visa VWAP", group=gV)
+showB1    = input.bool(true, "Band ±1 SD", group=gV)
+showB2    = input.bool(false, "Band ±2 SD", group=gV)
+fillBand  = input.bool(false, "Fyllnad mellan band", group=gV)
+colVwap   = input.color(color.new(#00e5ff, 0), "VWAP-färg", group=gV)
+colBand   = input.color(color.new(#00e5ff, 92), "Bandfyllnad", group=gV)
+
+// Volume Profile
+gP = "Volume Profile"
+profMode  = input.string("Höger sida", "Läge", options=["Höger sida", "I sessionerna"], group=gP)
+res       = input.timeframe("D",  "Profilperiod (session)", group=gP)
+rows      = input.int(100, "Rader per profil", minval=20, maxval=150, group=gP)
+vaPct     = input.float(70, "Value Area %", minval=50, maxval=95, group=gP) / 100
+lookback  = input.int(240, "Bars i högerprofil", minval=50, maxval=1000, group=gP)
+offBars   = input.int(25,  "Avstånd från priset (bars)", minval=2, maxval=100, group=gP)
+profWbars = input.int(30,  "Profilbredd (bars, högerläge)", minval=10, maxval=100, group=gP)
+widthPct  = input.float(18, "Profilbredd % (sessionsläge)", minval=5, maxval=60, group=gP) / 100
+showProf  = input.bool(true,  "Visa profil", group=gP)
+showVA    = input.bool(true,  "VAH/VAL-linjer", group=gP)
+colProf   = input.color(color.new(#4b5568, 45), "Bars", group=gP)
+colVAbar  = input.color(color.new(#7f8ca6, 32), "Bars i Value Area", group=gP)
+colPOCbar = input.color(color.new(#ffc400, 12), "POC-bar", group=gP)
+colVA     = input.color(color.new(#00e5ff, 55), "VAH/VAL-linjer", group=gP)
+
+// Sessioner
+gS = "Sessioner (svensk tid som standard)"
+tzS       = input.string("Europe/Stockholm", "Tidszon", options=["Europe/Stockholm", "Europe/London", "America/New_York", "UTC"], group=gS)
+showAsia  = input.bool(true, "Asien", inline="a", group=gS)
+asiaSess  = input.session("0100-0900", "", inline="a", group=gS)
+colAsia   = input.color(color.new(#9d6bff, 0), "", inline="a", group=gS)
+showLdn   = input.bool(true, "London", inline="l", group=gS)
+ldnSess   = input.session("0900-1730", "", inline="l", group=gS)
+colLdn    = input.color(color.new(#2979ff, 0), "", inline="l", group=gS)
+showNy    = input.bool(true, "New York", inline="n", group=gS)
+nySess    = input.session("1530-2200", "", inline="n", group=gS)
+colNy     = input.color(color.new(#00e5ff, 0), "", inline="n", group=gS)
+sessLines = input.bool(false, "Sessionslinjer (av = endast text)", group=gS)
+sessTransp= input.int(35, "Tona ner linjer (0 = full färg, 90 = nästan osynlig)", minval=0, maxval=90, group=gS)
+openLbls  = input.bool(true, "Label vid varje öppning", group=gS)
+
+// Initial Balance
+gI = "Initial Balance"
+showIB    = input.bool(true, "Visa IB", group=gI)
+ibAnchor  = input.string("New York", "IB räknas från öppning", options=["New York", "London", "Asien"], group=gI)
+ibMin     = input.int(60, "IB-längd (minuter)", minval=15, maxval=240, group=gI)
+ibExt     = input.int(8, "Stubb-längd (bars ut från priset)", minval=3, maxval=30, group=gI)
+showIBx   = input.bool(true, "Extensioner (Mid, x2)", group=gI)
+ibLabels  = input.bool(true, "IB-breakout (endast alerts, inga ikoner)", group=gI)
+colIB     = input.color(color.new(#ffffff, 55), "IB-färg", group=gI)
+
+// PDH / PDL
+gD2 = "PDH / PDL (gardagens high/low)"
+showPD    = input.bool(true, "Visa PDH/PDL", group=gD2)
+showPrevVA= input.bool(true, "dVAH/dVAL (gårdagens value area)", group=gD2, tooltip="Gårdagens sessions-VAH/VAL — nivåerna resten av marknaden tradar. Räknas av samma motor som nakna POC:n.")
+colPD     = input.color(color.new(#e0e0e0, 30), "Färg", group=gD2)
+var float lastVahP = na
+var float lastValP = na
+
+// Node Breach
+gN = "Node Breach"
+nakedPOC  = input.bool(true,  "Naked POC tills breach", group=gN)
+pocStyle  = input.string("Nod (kort)", "Naked POC-stil", options=["Nod (kort)", "Hel linje", "Osynlig"], group=gN, tooltip="Nod (kort): POC visas som kort nod vid priset med riktningspil — ▲ när noden ligger UNDER priset (stöd/long-kontext), ▼ när den ligger ÖVER (motstånd/short-kontext). Hel linje: klassisk naken POC-linje över charten. Osynlig: motorn och alerts jobbar utan att rita.")
+maxNaked  = input.int(1, "Max antal naked POC", minval=1, maxval=20, group=gN)
+sigMode   = input.string("Rejection", "Signaltyp", options=["Rejection", "Breakout"], group=gN, tooltip="Rejection: pil FÖRST NÄR noden försvarats — priset stack in i noden och stängde tillbaka. Pilen pekar dit priset studsade. Breakout: pil när priset accepterats bortom noden (efter X stängningar). Inga pilar vid själva touchen längre — bara bekräftade utfall.")
+accBars   = input.int(2, "Acceptans: stängningar bortom POC", minval=1, maxval=10, group=gN, tooltip="Stänger priset bortom noden så här många bars i rad = ACC och noden pensioneras. Stänger det tillbaka = REJ och noden förblir naken.")
+marginPct = input.float(0.0, "±Margin-tolerans (% av pris)", minval=0, step=0.01, group=gN)
+useAtrG   = input.bool(false, "ATR momentum-guard", group=gN, tooltip="Skippa signal när baren är en blow-through (range > multipel × ATR14).")
+atrMult   = input.float(2.5, "ATR-guard: max range ×ATR", minval=1, step=0.1, group=gN)
+trendFilt = input.bool(false, "Trendfilter (EMA-molnets riktning)", group=gN, tooltip="Endast pil upp i uptrend / pil ner i downtrend. Använder Trendmolnets EMA snabb/långsam.")
+sigSessOn = input.bool(false, "Sessionsfilter för signaler", group=gN)
+sigSess   = input.session("0800-2200", "Signal-session", group=gN)
+distFilt  = input.bool(true, "Avståndsfilter (kräv resa till noden)", group=gN, tooltip="Signal bara när priset först varit minst X×ATR14 ifrån noden och sedan kommer tillbaka. Filtrerar bort brus när noden ligger mitt i rangen.")
+distAtr   = input.float(2.5, "Min avstånd innan touch (×ATR)", minval=0.5, step=0.1, group=gN)
+minAge    = input.int(12, "Min nod-ålder innan signal (bars)", minval=0, maxval=100, group=gN, tooltip="Färska noder ligger nära priset per definition. Låt dem åldras innan de får signalera.")
+sigCd     = input.int(10, "Cooldown mellan signaler (bars)", minval=0, maxval=100, group=gN, tooltip="Minsta antal bars mellan två signaler, delas av alla motorer. Stoppar spam.")
+nodeTips  = input.bool(false, "Node Context Tooltip vid POC", group=gN, tooltip="Liten diamant vid varje naken POC — håll/tryck för POC-pris, node strength, CVD-split, VWAP-distans.")
+colPOC    = input.color(color.new(#ffc400, 0), "POC-linje", group=gN)
+showPOV   = input.bool(true, "Naked POV (LVN i Value Area)", group=gN)
+colPOV    = input.color(color.new(#b2b5be, 35), "POV-linje", group=gN)
+showDash  = input.bool(true, "Dashboard", group=gN)
+
+// Trendmoln
+gC = "Trendmoln"
+showCloud = input.bool(false, "Visa moln", group=gC)
+fLen      = input.int(50,  "EMA snabb", group=gC)
+sLen      = input.int(100, "EMA långsam", group=gC)
+colBull   = input.color(color.new(#00e5ff, 92), "Moln upp", group=gC)
+colBear   = input.color(color.new(#ff2e88, 92), "Moln ned", group=gC)
+
+// Candles
+gB = "Candles"
+paintBars = input.bool(true, "Färga candles i temat", group=gB)
+colCup    = input.color(color.new(#00e5ff, 0), "Upp", group=gB)
+colCdn    = input.color(color.new(#f23645, 0), "Ned", group=gB)
+
+// HTF-nivåer
+gH = "HTF-nivåer"
+showHTF   = input.bool(true, "Visa HTF-candle bakom profilen", group=gH)
+htfTf     = input.timeframe("240", "Timeframe", group=gH, tooltip="Färgen styrs av senast STÄNGDA HTF-candlen: cyan = bullish, röd = bearish.")
+showHTFp  = input.bool(true, "Range-box (streckad)", group=gH)
+htfLbls   = input.bool(true, "Visa HTF-etiketter", group=gH)
+colHTF    = input.color(color.new(#ff6ba9, 0), "Färg", group=gH)
+
+// Extremkanal
+gK = "Extremkanal"
+showCh    = input.bool(false, "Visa kanal", group=gK)
+chLen     = input.int(240, "Lookback (bars)", minval=20, maxval=1000, group=gK)
+fillCh    = input.bool(false, "Fyllnad", group=gK)
+colCh     = input.color(color.new(#2aa8b8, 62), "Kanalfärg", group=gK)
+colChFill = input.color(color.new(#2aa8b8, 96), "Fyllnadsfärg", group=gK)
+
+newSess = timeframe.change(res)
+
+// Nedtonade sessionsfärger
+cAsia = color.new(colAsia, math.min(95, color.t(colAsia) + sessTransp))
+cLdn  = color.new(colLdn,  math.min(95, color.t(colLdn)  + sessTransp))
+cNy   = color.new(colNy,   math.min(95, color.t(colNy)   + sessTransp))
+
+// Buy/sell-split per bar (för CVD) + ATR
+float bRng  = high - low
+float buyVb = bRng > 0 ? volume * (close - low) / bRng : volume * 0.5
+float atrF  = ta.atr(14)
+
+// Intrabar-data för TV-exakta profiler: volymen fördelas där den faktiskt handlades
+string ltfRes = timeframe.in_seconds(timeframe.period) >= 3600 ? "5" : "1"
+[ltfH, ltfL, ltfV, ltfC] = request.security_lower_tf(syminfo.tickerid, ltfRes, [high, low, volume, close])
+
+// ════════════════════ VWAP ════════════════════
+var float cumPV  = 0.0
+var float cumV   = 0.0
+var float cumPV2 = 0.0
+if newSess
+    cumPV  := 0.0
+    cumV   := 0.0
+    cumPV2 := 0.0
+src = hlc3
+cumPV  += src * volume
+cumV   += volume
+cumPV2 += src * src * volume
+vwap = cumV > 0 ? cumPV / cumV : na
+sd   = cumV > 0 ? math.sqrt(math.max(cumPV2 / cumV - vwap * vwap, 0)) : na
+
+plot(showVwap ? vwap : na, "VWAP", color=colVwap, linewidth=3)
+u1 = plot(showVwap and showB1 ? vwap + sd : na, "+1 SD", color=color.new(colVwap, 55))
+l1 = plot(showVwap and showB1 ? vwap - sd : na, "-1 SD", color=color.new(colVwap, 55))
+u2 = plot(showVwap and showB2 ? vwap + 2 * sd : na, "+2 SD", color=color.new(colVwap, 40))
+l2 = plot(showVwap and showB2 ? vwap - 2 * sd : na, "-2 SD", color=color.new(colVwap, 40))
+fill(u1, l1, color=showVwap and showB1 and fillBand ? colBand : na)
+fill(u2, l2, color=showVwap and showB2 and fillBand and not showB1 ? colBand : na)
+
+// ════════════════════ SESSIONER ════════════════════
+sessTrack(string sessStr) =>
+    bool inS = timeframe.isintraday and not na(time(timeframe.period, sessStr, tzS))
+    bool newS = inS and not inS[1]
+    var float h = na
+    var float l = na
+    var int hB = na
+    var int lB = na
+    if newS
+        h := high
+        l := low
+        hB := bar_index
+        lB := bar_index
+    else if inS
+        if high > h
+            h := high
+            hB := bar_index
+        if low < l
+            l := low
+            lB := bar_index
+    [inS, newS, h, l, hB, lB]
+
+[aIn, aNew, aHi, aLo, aHiB, aLoB] = sessTrack(asiaSess)
+[lIn, lNew, lHi, lLo, lHiB, lLoB] = sessTrack(ldnSess)
+[nIn, nNew, nHi, nLo, nHiB, nLoB] = sessTrack(nySess)
+
+plot(showAsia and sessLines and not aNew ? aHi : na, "Asia High", color=cAsia, style=plot.style_linebr)
+plot(showAsia and sessLines and not aNew ? aLo : na, "Asia Low",  color=cAsia, style=plot.style_linebr)
+plot(showLdn  and sessLines and not lNew ? lHi : na, "London High", color=cLdn, style=plot.style_linebr)
+plot(showLdn  and sessLines and not lNew ? lLo : na, "London Low",  color=cLdn, style=plot.style_linebr)
+plot(showNy   and sessLines and not nNew ? nHi : na, "NY High", color=cNy, style=plot.style_linebr)
+plot(showNy   and sessLines and not nNew ? nLo : na, "NY Low",  color=cNy, style=plot.style_linebr)
+
+var array<label> sessLbls = array.new_label()
+if barstate.islast
+    while array.size(sessLbls) > 0
+        label.delete(array.pop(sessLbls))
+    if showAsia and not na(aHi)
+        array.push(sessLbls, label.new(aHiB, aHi, "Asia High", style=label.style_label_down, color=color.new(color.black, 100), textcolor=color.new(colAsia, 0), size=size.small))
+        array.push(sessLbls, label.new(aLoB, aLo, "Asia Low", style=label.style_label_up, color=color.new(color.black, 100), textcolor=color.new(colAsia, 0), size=size.small))
+    if showLdn and not na(lHi)
+        array.push(sessLbls, label.new(lHiB, lHi, "London High", style=label.style_label_down, color=color.new(color.black, 100), textcolor=color.new(colLdn, 0), size=size.small))
+        array.push(sessLbls, label.new(lLoB, lLo, "London Low", style=label.style_label_up, color=color.new(color.black, 100), textcolor=color.new(colLdn, 0), size=size.small))
+    if showNy and not na(nHi)
+        array.push(sessLbls, label.new(nHiB, nHi, "NY High", style=label.style_label_down, color=color.new(color.black, 100), textcolor=color.new(colNy, 0), size=size.small))
+        array.push(sessLbls, label.new(nLoB, nLo, "NY Low", style=label.style_label_up, color=color.new(color.black, 100), textcolor=color.new(colNy, 0), size=size.small))
+
+if openLbls and showAsia and aNew
+    label.new(bar_index, high, "ASIA", style=label.style_label_down, color=color.new(color.black, 100), textcolor=cAsia, size=size.tiny)
+if openLbls and showLdn and lNew
+    label.new(bar_index, high, "LDN", style=label.style_label_down, color=color.new(color.black, 100), textcolor=cLdn, size=size.tiny)
+if openLbls and showNy and nNew
+    label.new(bar_index, high, "NY", style=label.style_label_down, color=color.new(color.black, 100), textcolor=cNy, size=size.tiny)
+
+// ════════════════════ INITIAL BALANCE ════════════════════
+anchorNew = ibAnchor == "New York" ? nNew : ibAnchor == "London" ? lNew : aNew
+anchorIn  = ibAnchor == "New York" ? nIn  : ibAnchor == "London" ? lIn  : aIn
+
+var float ibHi = na
+var float ibLo = na
+var bool  ibDone = false
+var bool  ibUp   = false
+var bool  ibDn   = false
+var int   ibT0 = na
+
+if anchorNew
+    ibT0   := time
+    ibHi   := high
+    ibLo   := low
+    ibDone := false
+    ibUp   := false
+    ibDn   := false
+
+inIB = not na(ibT0) and (time - ibT0) < ibMin * 60 * 1000 and anchorIn
+if inIB
+    ibHi := math.max(ibHi, high)
+    ibLo := math.min(ibLo, low)
+else if not na(ibT0) and (time - ibT0) >= ibMin * 60 * 1000
+    ibDone := true
+
+var array<line>  ibLns = array.new_line()
+var array<label> ibLbs = array.new_label()
+if barstate.islast
+    while array.size(ibLns) > 0
+        line.delete(array.pop(ibLns))
+    while array.size(ibLbs) > 0
+        label.delete(array.pop(ibLbs))
+    if showIB and ibDone and anchorIn
+        int ibX1 = bar_index + 3
+        int ibX2 = bar_index + math.max(8, offBars - 2)
+        array.push(ibLns, line.new(ibX1, ibHi, ibX2, ibHi, color=colIB, width=1))
+        array.push(ibLns, line.new(ibX1, ibLo, ibX2, ibLo, color=colIB, width=1))
+        array.push(ibLbs, label.new(ibX1, ibHi, "IB High  " + str.tostring(ibHi, format.mintick), style=label.style_label_left, color=color.new(color.black, 100), textcolor=color.new(colIB, 0), size=size.small))
+        array.push(ibLbs, label.new(ibX1, ibLo, "IB Low  " + str.tostring(ibLo, format.mintick), style=label.style_label_left, color=color.new(color.black, 100), textcolor=color.new(colIB, 0), size=size.small))
+        if showIBx
+            float ibR = ibHi - ibLo
+            float ibM = (ibHi + ibLo) / 2
+            float ibH1 = ibHi + ibR / 2
+            float ibL1 = ibLo - ibR / 2
+            float ibH2 = ibHi + ibR
+            float ibL2 = ibLo - ibR
+            array.push(ibLns, line.new(ibX1, ibM, ibX2, ibM, color=colIB, style=line.style_dotted))
+            array.push(ibLns, line.new(ibX1, ibH1, ibX2, ibH1, color=colIB, style=line.style_dotted))
+            array.push(ibLns, line.new(ibX1, ibL1, ibX2, ibL1, color=colIB, style=line.style_dotted))
+            array.push(ibLns, line.new(ibX1, ibH2, ibX2, ibH2, color=colIB, style=line.style_dotted))
+            array.push(ibLns, line.new(ibX1, ibL2, ibX2, ibL2, color=colIB, style=line.style_dotted))
+            array.push(ibLbs, label.new(ibX1, ibM, "IB Mid", style=label.style_label_left, color=color.new(color.black, 100), textcolor=color.new(colIB, 0), size=size.tiny))
+            array.push(ibLbs, label.new(ibX1, ibH1, "IB High x1", style=label.style_label_left, color=color.new(color.black, 100), textcolor=color.new(colIB, 0), size=size.tiny))
+            array.push(ibLbs, label.new(ibX1, ibL1, "IB Low x1", style=label.style_label_left, color=color.new(color.black, 100), textcolor=color.new(colIB, 0), size=size.tiny))
+            array.push(ibLbs, label.new(ibX1, ibH2, "IB High x2", style=label.style_label_left, color=color.new(color.black, 100), textcolor=color.new(colIB, 0), size=size.tiny))
+            array.push(ibLbs, label.new(ibX1, ibL2, "IB Low x2", style=label.style_label_left, color=color.new(color.black, 100), textcolor=color.new(colIB, 0), size=size.tiny))
+
+// PDH/PDL som korta stubbar vid priset
+[pdh, pdl] = request.security(syminfo.tickerid, "D", [high[1], low[1]], lookahead=barmerge.lookahead_on)
+var array<line>  pdLns = array.new_line()
+var array<label> pdLbs = array.new_label()
+if barstate.islast
+    while array.size(pdLns) > 0
+        line.delete(array.pop(pdLns))
+    while array.size(pdLbs) > 0
+        label.delete(array.pop(pdLbs))
+    if showPD
+        array.push(pdLns, line.new(bar_index - 4, pdh, bar_index + ibExt, pdh, color=colPD, width=1))
+        array.push(pdLns, line.new(bar_index - 4, pdl, bar_index + ibExt, pdl, color=colPD, width=1))
+        array.push(pdLbs, label.new(bar_index - 5, pdh, "PDH  " + str.tostring(pdh, format.mintick), style=label.style_label_right, color=color.new(color.black, 100), textcolor=color.new(colPD, 0), size=size.tiny))
+        array.push(pdLbs, label.new(bar_index - 5, pdl, "PDL  " + str.tostring(pdl, format.mintick), style=label.style_label_right, color=color.new(color.black, 100), textcolor=color.new(colPD, 0), size=size.tiny))
+    if showPrevVA and not na(lastVahP)
+        array.push(pdLns, line.new(bar_index - 4, lastVahP, bar_index + ibExt, lastVahP, color=colVA, style=line.style_dotted, width=2))
+        array.push(pdLns, line.new(bar_index - 4, lastValP, bar_index + ibExt, lastValP, color=colVA, style=line.style_dotted, width=2))
+        array.push(pdLbs, label.new(bar_index - 5, lastVahP, "dVAH  " + str.tostring(lastVahP, format.mintick), style=label.style_label_right, color=color.new(color.black, 100), textcolor=colVA, size=size.tiny))
+        array.push(pdLbs, label.new(bar_index - 5, lastValP, "dVAL  " + str.tostring(lastValP, format.mintick), style=label.style_label_right, color=color.new(color.black, 100), textcolor=colVA, size=size.tiny))
+
+bool ibUpBar = false
+bool ibDnBar = false
+if showIB and ibLabels and ibDone and anchorIn and barstate.isconfirmed
+    if close > ibHi and not ibUp
+        ibUp := true
+        ibUpBar := true
+    if close < ibLo and not ibDn
+        ibDn := true
+        ibDnBar := true
+// IB-breakout-ikonerna borttagna — händelserna driver enbart alerts numera.
+
+// ════════════════════ VOLUME PROFILE (sessionsdata + node breach) ════════════════════
+var array<float> bHi  = array.new_float()
+var array<float> bLo  = array.new_float()
+var array<float> bVol = array.new_float()
+var array<float> bBuy = array.new_float()
+var int   sessStart = na
+var float sHi = na
+var float sLo = na
+var array<line>  pocLines  = array.new_line()
+var array<float> pocPrices = array.new_float()
+var array<int>   pocState  = array.new_int()    //  0 naken · 1 utmanad underifrån · -1 ovanifrån
+var array<int>   pocCount  = array.new_int()
+var array<int>   pocArm    = array.new_int()    //  0 = ej laddad · 1 = priset har rest bort, signal tillåten
+var array<int>   pocBorn   = array.new_int()    //  bar då noden skapades
+var array<line>  povLines  = array.new_line()
+var array<float> povPrices = array.new_float()
+var array<int>   povArm    = array.new_int()
+var int lastSigBar = -9999
+bool pocFullLine = pocStyle == "Hel linje"
+
+// Dashboard-minne från senast stängda profil
+var float lastNS    = na
+var float lastPocB  = na
+var float lastProfB = na
+var float lastPocP  = na
+
+buildProfile() =>
+    float retNS = na
+    float retPocB = na
+    float retProfB = na
+    float retPocP = na
+    float retVahP = na
+    float retValP = na
+    int n = array.size(bVol)
+    if n > 0 and not na(sHi) and sHi > sLo
+        float step = (sHi - sLo) / rows
+        buckets = array.new_float(rows, 0.0)
+        dbuck   = array.new_float(rows, 0.0)
+        float totBuy = 0.0
+        float totAll = 0.0
+        for i = 0 to n - 1
+            hi = array.get(bHi, i)
+            lo = array.get(bLo, i)
+            v  = array.get(bVol, i)
+            bv = array.get(bBuy, i)
+            iLo = math.max(0, math.min(rows - 1, int(math.floor((lo - sLo) / step))))
+            iHi = math.max(0, math.min(rows - 1, int(math.floor((hi - sLo) / step))))
+            span = iHi - iLo + 1
+            for j = iLo to iHi
+                array.set(buckets, j, array.get(buckets, j) + v / span)
+                array.set(dbuck,   j, array.get(dbuck,   j) + (2 * bv - v) / span)
+            totBuy += bv
+            totAll += v
+        int pocIdx = 0
+        float maxV = 0.0
+        float totV = 0.0
+        for j = 0 to rows - 1
+            bvv = array.get(buckets, j)
+            totV += bvv
+            if bvv > maxV
+                maxV := bvv
+                pocIdx := j
+        float vaVol = array.get(buckets, pocIdx)
+        int up = pocIdx + 1
+        int dn = pocIdx - 1
+        while vaVol < totV * vaPct and (up < rows or dn >= 0)
+            float vUp = up < rows ? array.get(buckets, up) : -1.0
+            float vDn = dn >= 0   ? array.get(buckets, dn) : -1.0
+            if vUp >= vDn
+                vaVol += vUp
+                up += 1
+            else
+                vaVol += vDn
+                dn -= 1
+        int vahIdx = math.min(rows - 1, up - 1)
+        int valIdx = math.max(0, dn + 1)
+        retVahP := sLo + (vahIdx + 1) * step
+        retValP := sLo + valIdx * step
+        int sessLen = bar_index - sessStart
+        float maxW = math.max(3, sessLen * widthPct)
+        // Bars i sessionen – bara i sessionsläget
+        if showProf and profMode == "I sessionerna" and maxV > 0
+            float pad = step * 0.14
+            for j = 0 to rows - 1
+                bvv = array.get(buckets, j)
+                if bvv > 0
+                    int w = int(math.max(1, math.round(bvv / maxV * maxW)))
+                    float y1 = sLo + j * step + pad
+                    float y2 = sLo + (j + 1) * step - pad
+                    bool inVA = j >= valIdx and j <= vahIdx
+                    color c = j == pocIdx ? colPOCbar : inVA ? colVAbar : colProf
+                    box.new(sessStart, y2, sessStart + w, y1, border_color=na, bgcolor=c)
+        if showVA and profMode == "I sessionerna"
+            float vah  = sLo + (vahIdx + 1) * step
+            float valp = sLo + valIdx * step
+            line.new(sessStart, vah, bar_index, vah, color=colVA, width=1)
+            line.new(sessStart, valp, bar_index, valp, color=colVA, width=1)
+        // Node-mått: styrka + CVD
+        float pocPrice = sLo + (pocIdx + 0.5) * step
+        float pocVv  = array.get(buckets, pocIdx)
+        float pocDl  = array.get(dbuck, pocIdx)
+        retNS    := totV > 0 ? 100 * pocVv / totV : na
+        retPocB  := pocVv > 0 ? 100 * (pocVv + pocDl) / (2 * pocVv) : na
+        retProfB := totAll > 0 ? 100 * totBuy / totAll : na
+        retPocP  := pocPrice
+        // Naked POC – startar vid sessionsslut, bara framåt
+        if nakedPOC
+            ln = line.new(bar_index, pocPrice, bar_index + 1, pocPrice, color=pocFullLine ? colPOC : color.new(colPOC, 100), width=2)
+            array.push(pocLines, ln)
+            array.push(pocPrices, pocPrice)
+            array.push(pocState, 0)
+            array.push(pocCount, 0)
+            array.push(pocArm, 0)
+            array.push(pocBorn, bar_index)
+            while array.size(pocLines) > maxNaked
+                line.delete(array.shift(pocLines))
+                array.shift(pocPrices)
+                array.shift(pocState)
+                array.shift(pocCount)
+                array.shift(pocArm)
+                array.shift(pocBorn)
+            if nodeTips
+                string tip = "POC " + str.tostring(pocPrice, format.mintick) +
+                     "\nNode strength " + str.tostring(retNS, "#.#") + "% av profilen" +
+                     "\nCVD @POC  B" + str.tostring(retPocB, "#") + "% / S" + str.tostring(100 - retPocB, "#") + "%" +
+                     "\nProfil  B" + str.tostring(retProfB, "#") + "% / S" + str.tostring(100 - retProfB, "#") + "%" +
+                     "\nVWAP-dist " + str.tostring(na(vwap) ? 0 : 100 * (pocPrice - vwap) / vwap, "#.##") + "%"
+                label.new(bar_index, pocPrice, "⬥", style=label.style_label_left, color=color.new(color.black, 100), textcolor=colPOC, size=size.small, tooltip=tip)
+        // POV – LVN inuti Value Area (tunn nod dar rotationer/rejections ofta bildas)
+        if showPOV
+            int povIdx = -1
+            float minV = na
+            for j = valIdx to vahIdx
+                float bvp = array.get(buckets, j)
+                if j != pocIdx and bvp > 0 and (na(minV) or bvp < minV)
+                    minV := bvp
+                    povIdx := j
+            if povIdx >= 0
+                float povPrice = sLo + (povIdx + 0.5) * step
+                lnp = line.new(bar_index, povPrice, bar_index + 1, povPrice, color=colPOV, style=line.style_dotted, width=2)
+                array.push(povLines, lnp)
+                array.push(povPrices, povPrice)
+                array.push(povArm, 0)
+                while array.size(povLines) > maxNaked
+                    line.delete(array.shift(povLines))
+                    array.shift(povPrices)
+                    array.shift(povArm)
+    [retNS, retPocB, retProfB, retPocP, retVahP, retValP]
+
+if newSess and not na(sessStart)
+    [nsX, pbX, fbX, ppX, vhX, vlX] = buildProfile()
+    lastNS    := nsX
+    lastPocB  := pbX
+    lastProfB := fbX
+    lastPocP  := ppX
+    lastVahP  := vhX
+    lastValP  := vlX
+
+if newSess
+    array.clear(bHi)
+    array.clear(bLo)
+    array.clear(bVol)
+    array.clear(bBuy)
+    sessStart := bar_index
+    sHi := high
+    sLo := low
+
+int nLtf = array.size(ltfV)
+if nLtf > 0
+    for k = 0 to nLtf - 1
+        float hK = array.get(ltfH, k)
+        float lK = array.get(ltfL, k)
+        float vK = array.get(ltfV, k)
+        float cK = array.get(ltfC, k)
+        float rK = hK - lK
+        array.push(bHi, hK)
+        array.push(bLo, lK)
+        array.push(bVol, vK)
+        array.push(bBuy, rK > 0 ? vK * (cK - lK) / rK : vK * 0.5)
+else
+    array.push(bHi, high)
+    array.push(bLo, low)
+    array.push(bVol, volume)
+    array.push(bBuy, buyVb)
+sHi := na(sHi) ? high : math.max(sHi, high)
+sLo := na(sLo) ? low  : math.min(sLo, low)
+
+// ════════════════════ NODE BREACH-MOTOR ════════════════════
+// Filter
+efT = ta.ema(close, fLen)
+esT = ta.ema(close, sLen)
+bool bullBias = efT >= esT
+bool inSigSess = not sigSessOn or not na(time(timeframe.period, sigSess, tzS))
+bool blowThrough = useAtrG and bRng > atrMult * atrF
+
+bool pocBreachBar = false
+bool pocUpBar = false
+bool pocDnBar = false
+bool pocAccBar = false
+bool pocRejBar = false
+if barstate.isconfirmed and array.size(pocLines) > 0
+    bool fired = false
+    for i = array.size(pocLines) - 1 to 0
+        ln = array.get(pocLines, i)
+        p  = array.get(pocPrices, i)
+        st = array.get(pocState, i)
+        if st == 0 and pocFullLine
+            line.set_x2(ln, bar_index)
+        float m = p * marginPct / 100.0
+        // Ladda noden: priset måste först resa minst distAtr×ATR bort
+        if array.get(pocArm, i) == 0 and math.abs(close - p) > distAtr * atrF
+            array.set(pocArm, i, 1)
+        bool armedOk = not distFilt or array.get(pocArm, i) == 1
+        bool ageOk = bar_index - array.get(pocBorn, i) >= minAge
+        bool cdOk  = bar_index - lastSigBar >= sigCd
+        if st == 0
+            if high >= p - m and low <= p + m
+                pocBreachBar := true
+                bool nodeAbove = p > close[1]
+                array.set(pocState, i, nodeAbove ? -1 : 1)
+                array.set(pocCount, i, (nodeAbove ? close < p : close > p) ? 1 : 0)
+        else
+            bool beyond = st == 1 ? close > p : close < p
+            if beyond
+                int c = array.get(pocCount, i) + 1
+                array.set(pocCount, i, c)
+                if c >= accBars
+                    pocAccBar := true
+                    bool arrowUpA = st == 1
+                    bool okA = (not trendFilt or (arrowUpA ? bullBias : not bullBias)) and armedOk and ageOk and cdOk and not blowThrough and inSigSess and not fired
+                    if sigMode == "Breakout" and okA
+                        fired := true
+                        lastSigBar := bar_index
+                        if arrowUpA
+                            pocUpBar := true
+                        else
+                            pocDnBar := true
+                    array.remove(pocLines, i)
+                    array.remove(pocPrices, i)
+                    array.remove(pocState, i)
+                    array.remove(pocCount, i)
+                    array.remove(pocArm, i)
+                    array.remove(pocBorn, i)
+            else
+                pocRejBar := true
+                bool arrowUpR = st == -1
+                bool okR = (not trendFilt or (arrowUpR ? bullBias : not bullBias)) and armedOk and ageOk and cdOk and not blowThrough and inSigSess and not fired
+                if sigMode == "Rejection" and okR
+                    fired := true
+                    lastSigBar := bar_index
+                    if arrowUpR
+                        pocUpBar := true
+                    else
+                        pocDnBar := true
+                array.set(pocState, i, 0)
+                array.set(pocCount, i, 0)
+                array.set(pocArm, i, 0)
+
+bool povHitBar = false
+if barstate.isconfirmed and array.size(povLines) > 0
+    for i = array.size(povLines) - 1 to 0
+        lnp = array.get(povLines, i)
+        pp  = array.get(povPrices, i)
+        line.set_x2(lnp, bar_index)
+        if array.get(povArm, i) == 0 and math.abs(close - pp) > distAtr * atrF
+            array.set(povArm, i, 1)
+        bool povArmedOk = not distFilt or array.get(povArm, i) == 1
+        if high >= pp and low <= pp
+            if povArmedOk and bar_index - lastSigBar >= sigCd and not blowThrough and inSigSess
+                povHitBar := true
+                lastSigBar := bar_index
+            array.remove(povLines, i)
+            array.remove(povPrices, i)
+            array.remove(povArm, i)
+// POV-diamanten borttagen — POV-touch driver enbart alerts numera.
+plotshape(pocUpBar, "POC breach upp", style=shape.triangleup, location=location.belowbar, color=color.new(#00e5ff, 0), text="POC", textcolor=color.new(#00e5ff, 0), size=size.tiny)
+plotshape(pocDnBar, "POC breach ned", style=shape.triangledown, location=location.abovebar, color=color.new(#f23645, 0), text="POC", textcolor=color.new(#f23645, 0), size=size.tiny)
+
+// ════════════════════ POC-NOD VID PRISET (video-stil) ════════════════════
+// Naken POC visas som kort nod bredvid priset i stället för en linje över
+// hela charten. Pilen ger kontexten: nod UNDER priset = stöd (long-kontext,
+// cyan ▲) · nod ÖVER priset = motstånd (short-kontext, röd ▼).
+var array<line>  pocNodeLns = array.new_line()
+var array<label> pocNodeLbs = array.new_label()
+if barstate.islast
+    while array.size(pocNodeLns) > 0
+        line.delete(array.pop(pocNodeLns))
+    while array.size(pocNodeLbs) > 0
+        label.delete(array.pop(pocNodeLbs))
+    if nakedPOC and pocStyle == "Nod (kort)" and array.size(pocPrices) > 0
+        for i = 0 to array.size(pocPrices) - 1
+            float pp = array.get(pocPrices, i)
+            bool nodeBelow = pp < close
+            color ncol = nodeBelow ? color.new(#00e5ff, 0) : color.new(#f23645, 0)
+            array.push(pocNodeLns, line.new(bar_index - 4, pp, bar_index + ibExt, pp, color=colPOC, width=2))
+            array.push(pocNodeLbs, label.new(bar_index + ibExt, pp, nodeBelow ? "POC ▲" : "POC ▼", style = nodeBelow ? label.style_label_up : label.style_label_down, color=color.new(color.black, 100), textcolor=ncol, size=size.small, tooltip="Naked POC  " + str.tostring(pp, format.mintick) + (nodeBelow ? "\nNod under priset — stöd (long-kontext)" : "\nNod över priset — motstånd (short-kontext)")))
+
+// ════════════════════ SWING-PROFILER (pivot-till-pivot, som OutsiderEdge) ════════════════════
+gW = "Swing-profiler (pivot)"
+swOn     = input.bool(true, "Aktivera swing-profiler", group=gW)
+swPivLen = input.int(15, "Pivot-längd", minval=3, group=gW)
+swRows   = input.int(20, "Rader per swing-profil", minval=8, maxval=40, group=gW)
+swVaIn   = input.float(70, "Value Area %", minval=50, maxval=95, group=gW)
+swShow   = input.bool(false, "Rita stängda profiler", group=gW, tooltip="Av = ren chart, motorn jobbar i bakgrunden och lämnar bara nakna POC/PoV-linjer + signaler.")
+swPovSig = input.bool(true, "PoV-nivåer & signaler", group=gW)
+swSigLbl = input.bool(false, "Visa breach-etiketter (▲/▼)", group=gW, tooltip="Av = inga POC/PoV-pilar på charten. Breach-logiken och alerts jobbar kvar i bakgrunden.")
+swShowLn = input.bool(false, "Visa swing-nivålinjer (gula)", group=gW, tooltip="Av = de gula POC/PoV-segmenten ritas inte. Breach-motorn och alerts använder nivåerna ändå.")
+swMaxLvl = input.int(4, "Max aktiva swing-nivåer", minval=2, maxval=40, group=gW)
+
+swProfile(int offA, int offB, int nR, float vaF) =>
+    float hi = -1.0e20
+    float lo =  1.0e20
+    for i = offB to offA
+        hi := math.max(hi, high[i])
+        lo := math.min(lo, low[i])
+    float stp = (hi - lo) / nR
+    volA = array.new_float(nR, 0.0)
+    dltA = array.new_float(nR, 0.0)
+    float totV = 0.0
+    if stp > 0
+        for i = offB to offA
+            int r0 = math.max(0, math.min(nR - 1, math.floor((low[i]  - lo) / stp)))
+            int r1 = math.max(0, math.min(nR - 1, math.floor((high[i] - lo) / stp)))
+            int span = r1 - r0 + 1
+            float bv = nz(buyVb[i]) / span
+            float sv = (nz(volume[i]) - nz(buyVb[i])) / span
+            for r = r0 to r1
+                array.set(volA, r, array.get(volA, r) + bv + sv)
+                array.set(dltA, r, array.get(dltA, r) + bv - sv)
+            totV += nz(volume[i])
+    int poc = 0
+    float pocV = 0.0
+    for r = 0 to nR - 1
+        if array.get(volA, r) > pocV
+            pocV := array.get(volA, r)
+            poc  := r
+    float vaTgt = totV * vaF
+    float vaVol = pocV
+    int vaU = poc
+    int vaD = poc
+    int itG = 0
+    while vaVol < vaTgt and (vaU < nR - 1 or vaD > 0) and itG < nR * 3
+        itG += 1
+        float vu = vaU < nR - 1 ? array.get(volA, vaU + 1) : -1.0
+        float vd = vaD > 0      ? array.get(volA, vaD - 1) : -1.0
+        if vu < 0 and vd < 0
+            break
+        if vu >= vd
+            vaU += 1
+            vaVol += vu
+        else
+            vaD -= 1
+            vaVol += vd
+    int pov = -1
+    float povV = 1.0e20
+    for r = vaD to vaU
+        if r != poc and array.get(volA, r) < povV
+            povV := array.get(volA, r)
+            pov  := r
+    [lo, stp, volA, dltA, poc, pocV, vaU, vaD, pov]
+
+var int swSegStart = 0
+float swPh = ta.pivothigh(swPivLen, swPivLen)
+float swPl = ta.pivotlow(swPivLen, swPivLen)
+bool swCloseSeg = swOn and (not na(swPh) or not na(swPl)) and (bar_index - swPivLen) > swSegStart + 3
+
+var array<float> swP  = array.new<float>()
+var array<line>  swL  = array.new<line>()
+var array<int>   swSt = array.new<int>()   //  0 naken · 1 utmanad underifrån · -1 ovanifrån
+var array<int>   swC  = array.new<int>()
+var array<int>   swT  = array.new<int>()   //  1 = POC · 2 = PoV
+var array<int>   swA  = array.new<int>()   //  laddning (avståndsfilter)
+var array<int>   swB  = array.new<int>()   //  bar då nivån skapades
+
+swReg(float price, line ln, int typ) =>
+    array.push(swP, price)
+    array.push(swL, ln)
+    array.push(swSt, 0)
+    array.push(swC, 0)
+    array.push(swT, typ)
+    array.push(swA, 0)
+    array.push(swB, bar_index)
+    if array.size(swP) > swMaxLvl
+        line.delete(array.shift(swL))
+        array.shift(swP)
+        array.shift(swSt)
+        array.shift(swC)
+        array.shift(swT)
+        array.shift(swA)
+        array.shift(swB)
+
+if swCloseSeg
+    int offA = math.min(bar_index - swSegStart, 900)
+    int offB = swPivLen
+    [lo, stp, volA, dltA, poc, pocV, vaU, vaD, pov] = swProfile(offA, offB, swRows, swVaIn / 100)
+    if stp > 0 and pocV > 0
+        int x1 = bar_index - offA
+        int x2 = bar_index - offB
+        int segLen = math.max(1, x2 - x1)
+        if swShow
+            for r = 0 to swRows - 1
+                int w = math.max(1, math.round(segLen * array.get(volA, r) / pocV))
+                box.new(x1, lo + (r + 1) * stp, x1 + w, lo + r * stp, border_color=na,
+                     bgcolor = r == poc ? color.new(colPOC, 60) : array.get(dltA, r) >= 0 ? color.new(#00e5ff, 88) : color.new(#f23645, 88))
+            line.new(x1, lo + (vaU + 1) * stp, x2, lo + (vaU + 1) * stp, color=colVA, style=line.style_dotted)
+            line.new(x1, lo + vaD * stp, x2, lo + vaD * stp, color=colVA, style=line.style_dotted)
+        float swPocP = lo + (poc + 0.5) * stp
+        swReg(swPocP, line.new(x2, swPocP, bar_index, swPocP, color=swShowLn ? colPOC : color.new(colPOC, 100), width=2), 1)
+        if swPovSig and pov >= 0
+            float swPovP = lo + (pov + 0.5) * stp
+            swReg(swPovP, line.new(x2, swPovP, bar_index, swPovP, color=swShowLn ? colPOV : color.new(colPOV, 100), style=line.style_dotted), 2)
+    swSegStart := bar_index - swPivLen
+
+bool swBrUp = false
+bool swBrDn = false
+bool swAccBar = false
+bool swRejBar = false
+if barstate.isconfirmed and array.size(swP) > 0
+    bool swFired = false
+    for j = array.size(swP) - 1 to 0
+        float p  = array.get(swP, j)
+        line  ln = array.get(swL, j)
+        int   st = array.get(swSt, j)
+        int   tp = array.get(swT, j)
+        if st == 0
+            line.set_x2(ln, bar_index)
+        if array.get(swA, j) == 0 and math.abs(close - p) > distAtr * atrF
+            array.set(swA, j, 1)
+        bool aOk = not distFilt or array.get(swA, j) == 1
+        bool swAgeOk = bar_index - array.get(swB, j) >= minAge
+        bool swCdOk  = bar_index - lastSigBar >= sigCd
+        float m = p * marginPct / 100.0
+        string nm = tp == 1 ? "POC" : "PoV"
+        if st == 0
+            if high >= p - m and low <= p + m
+                bool fromBelow = close[1] < p
+                array.set(swSt, j, fromBelow ? 1 : -1)
+                array.set(swC, j, (fromBelow ? close > p : close < p) ? 1 : 0)
+        else
+            bool beyond = st == 1 ? close > p : close < p
+            if beyond
+                int cN = array.get(swC, j) + 1
+                array.set(swC, j, cN)
+                if cN >= accBars
+                    swAccBar := true
+                    bool aUp = st == 1
+                    bool okA = (not trendFilt or (aUp ? bullBias : not bullBias)) and aOk and swAgeOk and swCdOk and not blowThrough and inSigSess and not swFired
+                    if sigMode == "Breakout" and okA
+                        swFired := true
+                        lastSigBar := bar_index
+                        if swSigLbl
+                            label.new(bar_index, p, nm + (aUp ? " ▲" : " ▼"),
+                                 style = aUp ? label.style_label_up : label.style_label_down,
+                                 color = tp == 2 ? color.new(#e91e63, 15) : aUp ? color.new(#00e5ff, 15) : color.new(#f23645, 15),
+                                 textcolor = color.white, size = size.small)
+                        swBrUp := swBrUp or aUp
+                        swBrDn := swBrDn or not aUp
+                    array.remove(swP, j)
+                    array.remove(swL, j)
+                    array.remove(swSt, j)
+                    array.remove(swC, j)
+                    array.remove(swT, j)
+                    array.remove(swA, j)
+                    array.remove(swB, j)
+            else
+                swRejBar := true
+                bool rUp = st == -1
+                bool okR = (not trendFilt or (rUp ? bullBias : not bullBias)) and aOk and swAgeOk and swCdOk and not blowThrough and inSigSess and not swFired
+                if sigMode == "Rejection" and okR
+                    swFired := true
+                    lastSigBar := bar_index
+                    if swSigLbl
+                        label.new(bar_index, p, nm + (rUp ? " ▲" : " ▼"),
+                             style = rUp ? label.style_label_up : label.style_label_down,
+                             color = tp == 2 ? color.new(#e91e63, 15) : rUp ? color.new(#00e5ff, 15) : color.new(#f23645, 15),
+                             textcolor = color.white, size = size.small)
+                    swBrUp := swBrUp or rUp
+                    swBrDn := swBrDn or not rUp
+                array.set(swSt, j, 0)
+                array.set(swC, j, 0)
+                array.set(swA, j, 0)
+
+// ════════════════════ ORDER BLOCKS (volymgraderade) ════════════════════
+gO = "Order Blocks"
+obOn    = input.bool(true, "Visa order blocks", group=gO)
+obMult  = input.float(1.2, "Displacement-krav (×ATR)", minval=0.5, step=0.1, group=gO, tooltip="Hur stor impulscandlen måste vara relativt ATR14 för att lämna ett order block bakom sig.")
+obMaxN  = input.int(6, "Max aktiva blocks", minval=2, maxval=20, group=gO)
+obTransp= input.int(40, "Tona ner (0 = full färg, 90 = nästan osynlig)", minval=0, maxval=90, group=gO)
+obTxt   = input.bool(true, "Visa text i blocken", group=gO)
+colObUp = input.color(color.new(#00e5ff, 84), "Bull OB", group=gO)
+colObDn = input.color(color.new(#ff2e88, 84), "Bear OB", group=gO)
+color obUpEff  = color.new(colObUp, math.min(97, color.t(colObUp) + obTransp))
+color obDnEff  = color.new(colObDn, math.min(97, color.t(colObDn) + obTransp))
+color obUpTxtC = color.new(#00e5ff, math.min(90, 25 + obTransp))
+color obDnTxtC = color.new(#ff2e88, math.min(90, 25 + obTransp))
+
+var array<box>   obBx  = array.new<box>()
+var array<int>   obDir = array.new<int>()
+var array<float> obTop = array.new<float>()
+var array<float> obBot = array.new<float>()
+
+float volAvg = ta.sma(volume, 20)
+
+f_volTxt(float v) =>
+    v >= 1.0e6 ? str.tostring(v / 1.0e6, "#.##") + "M" : v >= 1.0e3 ? str.tostring(v / 1.0e3, "#.##") + "K" : str.tostring(v, "#")
+
+// Sammansatt styrka 0–10:
+//  Volym (0–3)        impuls+OB-candle vs 20-barssnitt
+//  Displacement (0–3) hur långt över ATR-kravet impulsen gick
+//  Konviktion (0–2)   impulsens body/range — fullbody = beslutsamhet
+//  Delta (0–2)        hur ensidig impulsen var (köp- eller säljledd)
+f_obScore(bool isBull, float vSum) =>
+    float body = math.abs(close - open)
+    float volSc  = math.min(3.0, math.max(0.0, vSum / math.max(volAvg, 1.0) - 1.0))
+    float dispSc = math.min(3.0, math.max(0.0, (body / math.max(atrF, syminfo.mintick) - obMult) * 1.67))
+    float bodySc = math.min(2.0, math.max(0.0, (body / math.max(bRng, syminfo.mintick) - 0.5) * 4.0))
+    float buyPct = bRng > 0 ? (close - low) / bRng : 0.5
+    float dltSc  = math.min(2.0, math.max(0.0, ((isBull ? buyPct : 1.0 - buyPct) - 0.5) * 6.67))
+    volSc + dispSc + bodySc + dltSc
+
+f_gradeS(float sc) =>
+    sc >= 7.5 ? " +++" : sc >= 5.5 ? " ++" : sc >= 3.5 ? " +" : ""
+
+bool obTouchBar = false
+if obOn and barstate.isconfirmed
+    // Underhåll: förläng, upptäck touch, ta bort mitigerade
+    if array.size(obBx) > 0
+        for j = array.size(obBx) - 1 to 0
+            box b = array.get(obBx, j)
+            int d = array.get(obDir, j)
+            float t = array.get(obTop, j)
+            float bo = array.get(obBot, j)
+            box.set_right(b, bar_index)
+            bool insideNow  = high >= bo and low <= t
+            bool insidePrev = high[1] >= bo and low[1] <= t
+            if insideNow and not insidePrev
+                obTouchBar := true
+            bool dead = d == 1 ? close < bo : close > t
+            if dead
+                box.delete(b)
+                array.remove(obBx, j)
+                array.remove(obDir, j)
+                array.remove(obTop, j)
+                array.remove(obBot, j)
+    // Nya blocks: stor impulscandle efter motsatt candle
+    bool bigUp = close > open and (close - open) > obMult * atrF and close[1] < open[1] and close > high[1]
+    bool bigDn = close < open and (open - close) > obMult * atrF and close[1] > open[1] and close < low[1]
+    if bigUp or bigDn
+        int dirNew = bigUp ? 1 : -1
+        float tNew = high[1]
+        float bNew = low[1]
+        bool clash = false
+        if array.size(obBx) > 0
+            for j = 0 to array.size(obBx) - 1
+                if array.get(obDir, j) == dirNew and not (tNew < array.get(obBot, j) or bNew > array.get(obTop, j))
+                    clash := true
+        if not clash
+            float vSum = volume + volume[1]
+            float obSc = f_obScore(bigUp, vSum)
+            string txt = obTxt ? (bigUp ? "BULL OB" : "BEAR OB") + f_gradeS(obSc) + "  " + str.tostring(obSc, "#.#") + "/10\n" + f_volTxt(vSum) : ""
+            box nb = box.new(bar_index - 1, tNew, bar_index, bNew, border_color = na,
+                 bgcolor = bigUp ? obUpEff : obDnEff, text = txt,
+                 text_color = bigUp ? obUpTxtC : obDnTxtC, text_size = size.tiny,
+                 text_halign = text.align_right, text_valign = text.align_center)
+            array.push(obBx, nb)
+            array.push(obDir, dirNew)
+            array.push(obTop, tNew)
+            array.push(obBot, bNew)
+            if array.size(obBx) > obMaxN
+                box.delete(array.shift(obBx))
+                array.shift(obDir)
+                array.shift(obTop)
+                array.shift(obBot)
+
+// ════════════════════ HTF CLOSE-CANDLE (till höger om profilen) ════════════════════
+[pO2, pH2, pL2, pC2] = request.security(syminfo.tickerid, htfTf, [open[1], high[1], low[1], close[1]], lookahead=barmerge.lookahead_on)
+var array<line>  htfLns = array.new_line()
+var array<box>   htfBxs = array.new_box()
+var array<label> htfLbs = array.new_label()
+if barstate.islast
+    while array.size(htfLns) > 0
+        line.delete(array.pop(htfLns))
+    while array.size(htfBxs) > 0
+        box.delete(array.pop(htfBxs))
+    while array.size(htfLbs) > 0
+        label.delete(array.pop(htfLbs))
+    if showHTF
+        string tfTxt = htfTf == "60" ? "1H" : htfTf == "120" ? "2H" : htfTf == "240" ? "4H" : htfTf == "D" ? "1D" : htfTf
+        // Senast STÄNGDA HTF-candlen · cyan = bullish, röd = bearish
+        color cc = pC2 >= pO2 ? color.new(#00e5ff, 0) : color.new(#f23645, 0)
+        int xC0 = bar_index + offBars + profWbars + 6
+        int xC1 = xC0 + 4
+        int xCm = (xC0 + xC1) / 2
+        if showHTFp
+            array.push(htfBxs, box.new(xC0 - 2, pH2, xC1 + 2, pL2, border_color=color.new(cc, 72), border_style=line.style_dashed, bgcolor=color.new(cc, 98)))
+        array.push(htfLns, line.new(xCm, pH2, xCm, pL2, color=color.new(cc, 55), width=1))
+        array.push(htfBxs, box.new(xC0, math.max(pO2, pC2), xC1, math.min(pO2, pC2), border_color=color.new(cc, 45), bgcolor=color.new(cc, 70)))
+        if htfLbls
+            array.push(htfLbs, label.new(xCm, pH2, tfTxt + " Close", style=label.style_label_down, color=color.new(color.black, 100), textcolor=color.new(cc, 35), size=size.tiny))
+            array.push(htfLbs, label.new(xC1 + 2, pH2, "High: " + str.tostring(pH2, format.mintick), style=label.style_label_left, color=color.new(color.black, 100), textcolor=color.new(color.white, 55), size=size.tiny))
+            array.push(htfLbs, label.new(xC1 + 2, pL2, "Low: " + str.tostring(pL2, format.mintick), style=label.style_label_left, color=color.new(color.black, 100), textcolor=color.new(color.white, 55), size=size.tiny))
+
+// ════════════════════ HÖGERPROFIL (störfri, vid sidan av priset) ════════════════════
+var array<box> rBoxes = array.new_box()
+var array<line> rLines = array.new_line()
+var array<label> rLabels = array.new_label()
+if showProf and profMode == "Höger sida" and barstate.islast
+    while array.size(rBoxes) > 0
+        box.delete(array.pop(rBoxes))
+    while array.size(rLines) > 0
+        line.delete(array.pop(rLines))
+    while array.size(rLabels) > 0
+        label.delete(array.pop(rLabels))
+    int N = math.min(lookback, bar_index + 1)
+    float hh = high
+    float ll = low
+    for i = 0 to N - 1
+        hh := math.max(hh, high[i])
+        ll := math.min(ll, low[i])
+    if hh > ll
+        float step = (hh - ll) / rows
+        buckets = array.new_float(rows, 0.0)
+        for i = 0 to N - 1
+            hA = ltfH[i]
+            lA = ltfL[i]
+            vA = ltfV[i]
+            int nK = array.size(vA)
+            if nK > 0
+                for k = 0 to nK - 1
+                    float hK = array.get(hA, k)
+                    float lK = array.get(lA, k)
+                    float vK = array.get(vA, k)
+                    int kLo = math.max(0, math.min(rows - 1, int(math.floor((lK - ll) / step))))
+                    int kHi = math.max(0, math.min(rows - 1, int(math.floor((hK - ll) / step))))
+                    int kSpan = kHi - kLo + 1
+                    for j = kLo to kHi
+                        array.set(buckets, j, array.get(buckets, j) + vK / kSpan)
+            else
+                iLo = math.max(0, math.min(rows - 1, int(math.floor((low[i] - ll) / step))))
+                iHi = math.max(0, math.min(rows - 1, int(math.floor((high[i] - ll) / step))))
+                span = iHi - iLo + 1
+                for j = iLo to iHi
+                    array.set(buckets, j, array.get(buckets, j) + volume[i] / span)
+        int pocIdx = 0
+        float maxV = 0.0
+        float totV = 0.0
+        for j = 0 to rows - 1
+            bv = array.get(buckets, j)
+            totV += bv
+            if bv > maxV
+                maxV := bv
+                pocIdx := j
+        float vaVol = array.get(buckets, pocIdx)
+        int up = pocIdx + 1
+        int dn = pocIdx - 1
+        while vaVol < totV * vaPct and (up < rows or dn >= 0)
+            float vUp = up < rows ? array.get(buckets, up) : -1.0
+            float vDn = dn >= 0   ? array.get(buckets, dn) : -1.0
+            if vUp >= vDn
+                vaVol += vUp
+                up += 1
+            else
+                vaVol += vDn
+                dn -= 1
+        int vahIdx = math.min(rows - 1, up - 1)
+        int valIdx = math.max(0, dn + 1)
+        float pad = step * 0.30
+        int x0 = bar_index + offBars
+        for j = 0 to rows - 1
+            bv = array.get(buckets, j)
+            if bv > 0
+                int w = int(math.max(1, math.round(bv / maxV * profWbars)))
+                float y1 = ll + j * step + pad
+                float y2 = ll + (j + 1) * step - pad
+                bool inVA = j >= valIdx and j <= vahIdx
+                color c = j == pocIdx ? colPOCbar : inVA ? colVAbar : colProf
+                array.push(rBoxes, box.new(x0 + profWbars - w, y2, x0 + profWbars, y1, border_color=na, bgcolor=c))
+        // POC / VAH / VAL med etiketter
+        float pocP = ll + (pocIdx + 0.5) * step
+        float vahP = ll + (vahIdx + 1) * step
+        float valP = ll + valIdx * step
+        int xE = x0 + profWbars
+        array.push(rLines, line.new(x0, pocP, xE, pocP, color=colPOC, width=3))
+        array.push(rLines, line.new(x0, vahP, xE, vahP, color=colVA, style=line.style_dotted, width=2))
+        array.push(rLines, line.new(x0, valP, xE, valP, color=colVA, style=line.style_dotted, width=2))
+        array.push(rLines, line.new(x0, hh, xE, hh, color=color.new(color.gray, 40), style=line.style_dotted))
+        array.push(rLines, line.new(x0, ll, xE, ll, color=color.new(color.gray, 40), style=line.style_dotted))
+        array.push(rLabels, label.new(xE + 1, pocP, "POC", style=label.style_label_left, color=color.new(color.black, 100), textcolor=colPOC, size=size.small))
+        array.push(rLabels, label.new(xE + 1, vahP, "VAH", style=label.style_label_left, color=color.new(color.black, 100), textcolor=colVA, size=size.small))
+        array.push(rLabels, label.new(xE + 1, valP, "VAL", style=label.style_label_left, color=color.new(color.black, 100), textcolor=colVA, size=size.small))
+        array.push(rLabels, label.new(xE + 1, hh, "HIGH", style=label.style_label_left, color=color.new(color.black, 100), textcolor=color.new(color.gray, 20), size=size.tiny))
+        array.push(rLabels, label.new(xE + 1, ll, "LOW", style=label.style_label_left, color=color.new(color.black, 100), textcolor=color.new(color.gray, 20), size=size.tiny))
+
+// ════════════════════ TRENDMOLN ════════════════════
+c1 = plot(showCloud ? efT : na, "EMA snabb", color=color.new(color.gray, 100))
+c2 = plot(showCloud ? esT : na, "EMA långsam", color=color.new(color.gray, 100))
+fill(c1, c2, color=showCloud ? (bullBias ? colBull : colBear) : na)
+
+// ════════════════════ HTF HIGH/LOW ════════════════════
+
+// Extremkanal (hogsta/lagsta over lookback, exkl. aktuell bar)
+chU = ta.highest(high[1], chLen)
+chL = ta.lowest(low[1], chLen)
+pChU = plot(showCh ? chU : na, "Kanal ovre", color=colCh, style=plot.style_stepline)
+pChL = plot(showCh ? chL : na, "Kanal undre", color=colCh, style=plot.style_stepline)
+fill(pChU, pChL, color=showCh and fillCh ? colChFill : na)
+
+// ════════════════════ DASHBOARD ════════════════════
+var table dash = table.new(position.top_right, 2, 6, bgcolor=color.new(color.black, 25), border_width=1, border_color=color.new(color.gray, 70))
+if barstate.islast and showDash
+    table.cell(dash, 0, 0, "Node strength", text_color=color.new(color.gray, 20), text_size=size.tiny, text_halign=text.align_left)
+    table.cell(dash, 1, 0, na(lastNS) ? "–" : str.tostring(lastNS, "#.#") + "%", text_color=color.white, text_size=size.tiny, text_halign=text.align_right)
+    table.cell(dash, 0, 1, "CVD @POC", text_color=color.new(color.gray, 20), text_size=size.tiny, text_halign=text.align_left)
+    table.cell(dash, 1, 1, na(lastPocB) ? "–" : "B" + str.tostring(lastPocB, "#") + "/S" + str.tostring(100 - lastPocB, "#"), text_color=na(lastPocB) or lastPocB >= 50 ? color.new(#00e5ff, 0) : color.new(#f23645, 0), text_size=size.tiny, text_halign=text.align_right)
+    table.cell(dash, 0, 2, "Profil B/S", text_color=color.new(color.gray, 20), text_size=size.tiny, text_halign=text.align_left)
+    table.cell(dash, 1, 2, na(lastProfB) ? "–" : str.tostring(lastProfB, "#") + "/" + str.tostring(100 - lastProfB, "#"), text_color=na(lastProfB) or lastProfB >= 50 ? color.new(#00e5ff, 0) : color.new(#f23645, 0), text_size=size.tiny, text_halign=text.align_right)
+    table.cell(dash, 0, 3, "VWAP-dist", text_color=color.new(color.gray, 20), text_size=size.tiny, text_halign=text.align_left)
+    table.cell(dash, 1, 3, na(vwap) ? "–" : str.tostring(100 * (close - vwap) / vwap, "#.##") + "%", text_color=close >= vwap ? color.new(#00e5ff, 0) : color.new(#f23645, 0), text_size=size.tiny, text_halign=text.align_right)
+    table.cell(dash, 0, 4, "Nakna POC", text_color=color.new(color.gray, 20), text_size=size.tiny, text_halign=text.align_left)
+    table.cell(dash, 1, 4, str.tostring(array.size(pocLines)), text_color=color.white, text_size=size.tiny, text_halign=text.align_right)
+    table.cell(dash, 0, 5, "Trend", text_color=color.new(color.gray, 20), text_size=size.tiny, text_halign=text.align_left)
+    table.cell(dash, 1, 5, bullBias ? "Bull" : "Bear", text_color=bullBias ? color.new(#00e5ff, 0) : color.new(#f23645, 0), text_size=size.tiny, text_halign=text.align_right)
+
+// ════════════════════ ALERTS ════════════════════
+alertcondition(pocBreachBar, "POC breach", "Naked POC har tagits ut")
+alertcondition(pocAccBar, "POC acceptans", "Pris accepterat bortom naked POC")
+alertcondition(pocRejBar, "POC rejection", "POC-utmaning avvisad")
+alertcondition(povHitBar, "POV touch", "Tunn nod (POV) traffad")
+alertcondition(swBrUp, "Swing breach ▲", "Swing-POC/PoV utmanas underifrån")
+alertcondition(swBrDn, "Swing breach ▼", "Swing-POC/PoV utmanas ovanifrån")
+alertcondition(swAccBar, "Swing acceptans", "Pris accepterat bortom swing-nivå")
+alertcondition(swRejBar, "Swing rejection", "Swing-nivå-utmaning avvisad")
+alertcondition(obTouchBar, "Order Block touch", "Priset har gått in i ett aktivt order block")
+alertcondition(ibUpBar, "IB breakout upp", "Stängning över IB High")
+alertcondition(ibDnBar, "IB breakout ned", "Stängning under IB Low")
+
+// ==================== CANDLE-FARGER ====================
+barcolor(paintBars ? (close >= open ? colCup : colCdn) : na)
+
+// ==================== VATTENSTAMPEL ====================
+var table wm = table.new(position.bottom_right, 1, 1)
+if barstate.islast
+    table.cell(wm, 0, 0, "GRABIT", text_color=color.new(color.gray, 60), text_size=size.small)
