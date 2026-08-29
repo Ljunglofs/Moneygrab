@@ -3,6 +3,9 @@
 // Versionshanterad här i repot. Klistra in i TradingView Pine Editor -> Save -> Add to chart.
 //
 // Ändringslogg (senaste):
+//  · Instrument-preset (Auto/MNQ/GULD): guld flyttar NY-sessionen till
+//    COMEX-fönstret 14:20–19:30 SE — IB och profil följer med. Varning i
+//    vattenstämpeln om symbolen saknar volymdata (kör futures, inte CFD).
 //  · Trade Checklist-panel: 7-punkterslistan ifylld live ur datan.
 //  · Developing POC/POV (pågående session, live), Wick Size Filter för
 //    rejections, ATR-guard PÅ som default med 1.5 ("Skip Big Momentum").
@@ -18,6 +21,10 @@
 indicator("vwap - note breaker with IB / volume - by Grabit", "Grabit NBE", overlay=true, max_boxes_count=500, max_lines_count=500, max_labels_count=500, max_bars_back=2000)
 
 // ════════════════════ INPUTS ════════════════════
+// Instrument
+gX = "Instrument"
+presetSel = input.string("Auto", "Preset", options=["Auto", "MNQ/NQ", "GULD (GC/MGC)", "Av"], group=gX, tooltip="Auto känner igen NQ/MNQ och GC/MGC/XAU på tickern. GULD flyttar NY-sessionen till COMEX-pitfönstret (14:20–19:30 svensk tid) där guldets likviditet ligger — IB, sessionsnivåer och NY-profilen följer med automatiskt. Övriga parametrar är ATR-normaliserade och skalar själva mellan instrument.")
+
 // VWAP
 gV = "VWAP"
 showVwap  = input.bool(true, "Visa VWAP", group=gV)
@@ -142,6 +149,11 @@ colChFill = input.color(color.new(#2aa8b8, 96), "Fyllnadsfärg", group=gK)
 
 newSess = timeframe.change(res)
 
+// Instrument-preset: guld lever på COMEX-fönstret, inte aktieöppningen.
+bool isGoldSym = syminfo.root == "GC" or syminfo.root == "MGC" or str.contains(syminfo.ticker, "XAU")
+bool useGold   = presetSel == "GULD (GC/MGC)" or (presetSel == "Auto" and isGoldSym)
+string nySessEff = useGold ? "1420-1930" : nySess
+
 // Nedtonade sessionsfärger
 cAsia = color.new(colAsia, math.min(95, color.t(colAsia) + sessTransp))
 cLdn  = color.new(colLdn,  math.min(95, color.t(colLdn)  + sessTransp))
@@ -151,6 +163,7 @@ cNy   = color.new(colNy,   math.min(95, color.t(colNy)   + sessTransp))
 float bRng  = high - low
 float buyVb = bRng > 0 ? volume * (close - low) / bRng : volume * 0.5
 float atrF  = ta.atr(14)
+float cumVolAll = ta.cum(nz(volume))   // == 0 hela vägen -> symbolen saknar volymdata
 
 // Intrabar-data för TV-exakta profiler: volymen fördelas där den faktiskt handlades
 string ltfRes = timeframe.in_seconds(timeframe.period) >= 3600 ? "5" : "1"
@@ -203,7 +216,7 @@ sessTrack(string sessStr) =>
 
 [aIn, aNew, aHi, aLo, aHiB, aLoB] = sessTrack(asiaSess)
 [lIn, lNew, lHi, lLo, lHiB, lLoB] = sessTrack(ldnSess)
-[nIn, nNew, nHi, nLo, nHiB, nLoB] = sessTrack(nySess)
+[nIn, nNew, nHi, nLo, nHiB, nLoB] = sessTrack(nySessEff)
 
 plot(showAsia and sessLines and not aNew ? aHi : na, "Asia High", color=cAsia, style=plot.style_linebr)
 plot(showAsia and sessLines and not aNew ? aLo : na, "Asia Low",  color=cAsia, style=plot.style_linebr)
@@ -1246,7 +1259,8 @@ barcolor(paintBars ? (close >= open ? colCup : colCdn) : na)
 // ==================== VATTENSTAMPEL ====================
 var table wm = table.new(position.bottom_right, 1, 1)
 if barstate.islast
-    table.cell(wm, 0, 0, "GRABIT", text_color=color.new(color.gray, 60), text_size=size.small)
+    bool noVol = cumVolAll == 0
+    table.cell(wm, 0, 0, noVol ? "GRABIT — INGEN VOLYMDATA · byt till futures (MNQ1!/MGC1!)" : "GRABIT", text_color=noVol ? color.new(#f23645, 0) : color.new(color.gray, 60), text_size=size.small)
 
 // ════════════════════ TRADE-MOTOR (paper) — SL/TP-visuals + statistik ════════════════════
 // OutsiderEdge-stilen: varje signal öppnar en PAPPERSTRADE som ritas med
