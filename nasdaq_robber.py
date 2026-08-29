@@ -559,7 +559,25 @@ def _build_signal_v2(ticker, df, bias):
     }
 
 
+def _completed_bars(df):
+    """yfinance's sista 5m-bar är nästan alltid den PÅGÅENDE baren. Att gata
+    volym på en halvfärdig bar blockerade i praktiken varje signal ("låg
+    volym" hela dagen — en halv bar har alltid en bråkdel av snittvolymen).
+    Beslut fattas därför BARA på stängda candles."""
+    try:
+        last = df.index[-1]
+        age = (pd.Timestamp.now(tz=last.tz) - last).total_seconds()
+        if age < Config.BAR_MINUTES * 60 - 5:
+            return df.iloc[:-1]
+    except Exception:
+        pass
+    return df
+
+
 def build_signal(ticker, df, bias):
+    df = _completed_bars(df)
+    if df is None or len(df) < 30:
+        return None
     if Config.ENGINE == "v2":
         return _build_signal_v2(ticker, df, bias)
     cur, prev = df.iloc[-1], df.iloc[-2]
