@@ -106,8 +106,8 @@ wickFilt  = input.bool(false, "Wick Size Filter (rejections)", group=gN, tooltip
 wickMin   = input.float(25, "Min veke (% av range)", minval=5, maxval=80, group=gN)
 showDev   = input.bool(false, "Developing POC/POV (pågående session)", group=gN, tooltip="Ritar den PÅGÅENDE sessionens POC och POV live vid priset. Nivåerna flyttar sig medan profilen byggs och låses först vid sessionsslut — bra för att se vart dagens värde är på väg.")
 colDev    = input.color(color.new(#ffc400, 45), "Developing-färg", group=gN)
-showCtx   = input.bool(true, "Node Context-panel", group=gN, tooltip="Live-status för senaste nakna POC:n — pris, node strength, tryck, VWAP-distans, laddning/ålder och guards. Som OutsiderEdges Node Context.")
-showChk   = input.bool(true, "Trade Checklist-panel", group=gN, tooltip="7-punkterschecklistan live: aktiv nod, POC-läge, value-position, LVN-närhet, trend, nästa nod (target) och invalidering — ifylld ur datan i realtid.")
+showCtx   = input.bool(false, "Node Context-panel", group=gN, tooltip="Live-status för senaste nakna POC:n — pris, node strength, tryck, VWAP-distans, laddning/ålder och guards. Som OutsiderEdges Node Context.")
+showChk   = input.bool(false, "Trade Checklist-panel", group=gN, tooltip="7-punkterschecklistan live: aktiv nod, POC-läge, value-position, LVN-närhet, trend, nästa nod (target) och invalidering — ifylld ur datan i realtid.")
 showDash  = input.bool(true, "Dashboard", group=gN)
 
 // Trendmoln
@@ -1261,7 +1261,7 @@ teSLa   = input.float(1.2, "Stop Loss (×ATR14)", minval=0.3, step=0.1, group=gT
 teTPr   = input.float(2.0, "Take Profit (R)", minval=0.5, step=0.25, group=gT, tooltip="TP i R-multiplar av stoppen. 2.0 = vinsten är dubbla risken.")
 teBoxes = input.bool(true, "Trade Visuals (SL/TP-boxar)", group=gT)
 teHist  = input.int(30, "Trade History (max ritade trades)", minval=5, maxval=100, group=gT)
-teStats = input.bool(true, "Statistik-tabell", group=gT)
+teStats = input.bool(false, "Statistik-tabell", group=gT)
 colTP   = input.color(color.new(#00e5ff, 84), "TP-zon", group=gT)
 colSL   = input.color(color.new(#f23645, 84), "SL-zon", group=gT)
 
