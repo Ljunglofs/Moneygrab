@@ -3,6 +3,8 @@
 // Versionshanterad här i repot. Klistra in i TradingView Pine Editor -> Save -> Add to chart.
 //
 // Ändringslogg (senaste):
+//  · Nod-förlängning 'N retester' (som OutsiderEdges Until N Retests) och
+//    ANEF-guard (rekonstruktion av Adaptive Node Efficiency som filter).
 //  · Instrument-preset (Auto/MNQ/GULD): guld flyttar NY-sessionen till
 //    COMEX-fönstret 14:20–19:30 SE — IB och profil följer med. Varning i
 //    vattenstämpeln om symbolen saknar volymdata (kör futures, inte CFD).
@@ -111,6 +113,8 @@ cvdFilt   = input.bool(false, "Tryckfilter (CVD @POC)", group=gN, tooltip="Pil u
 cvdMin    = input.float(55, "Min tryck-övervikt %", minval=50, maxval=80, group=gN)
 wickFilt  = input.bool(false, "Wick Size Filter (rejections)", group=gN, tooltip="Kräv att rejection-baren har en riktig VEKE genom noden — minst X% av barens range. En rejection utan veke är ofta bara en paus, inte en avvisning.")
 wickMin   = input.float(25, "Min veke (% av range)", minval=5, maxval=80, group=gN)
+extMode   = input.string("Tills breach", "Nod-förlängning", options=["Tills breach", "N retester"], group=gN, tooltip="Tills breach: noden lever tills priset ACCEPTERAS bortom den. N retester: noden pensioneras efter N försvarade retester — som OutsiderEdges Until N Retests.")
+extN      = input.int(3, "N retester innan pension", minval=1, maxval=10, group=gN)
 showDev   = input.bool(false, "Developing POC/POV (pågående session)", group=gN, tooltip="Ritar den PÅGÅENDE sessionens POC och POV live vid priset. Nivåerna flyttar sig medan profilen byggs och låses först vid sessionsslut — bra för att se vart dagens värde är på väg.")
 colDev    = input.color(color.new(#ffc400, 45), "Developing-färg", group=gN)
 showCtx   = input.bool(false, "Node Context-panel", group=gN, tooltip="Live-status för senaste nakna POC:n — pris, node strength, tryck, VWAP-distans, laddning/ålder och guards. Som OutsiderEdges Node Context.")
@@ -351,6 +355,7 @@ var array<int>   pocArm    = array.new_int()    //  0 = ej laddad · 1 = priset 
 var array<int>   pocBorn   = array.new_int()    //  bar då noden skapades
 var array<float> pocNS    = array.new_float()   //  node strength % per naken POC
 var array<float> pocCVD   = array.new_float()   //  köpandel % i noden
+var array<int>   pocTouch = array.new_int()     //  försvarade retester per nod
 var array<line>  povLines  = array.new_line()
 var array<float> povPrices = array.new_float()
 var array<int>   povArm    = array.new_int()
@@ -453,6 +458,7 @@ buildProfile() =>
             array.push(pocBorn, bar_index)
             array.push(pocNS, retNS)
             array.push(pocCVD, retPocB)
+            array.push(pocTouch, 0)
             while array.size(pocLines) > maxNaked
                 line.delete(array.shift(pocLines))
                 array.shift(pocPrices)
@@ -462,6 +468,7 @@ buildProfile() =>
                 array.shift(pocBorn)
                 array.shift(pocNS)
                 array.shift(pocCVD)
+                array.shift(pocTouch)
             if nodeTips
                 string tip = "POC " + str.tostring(pocPrice, format.mintick) +
                      "\nNode strength " + str.tostring(retNS, "#.#") + "% av profilen" +
@@ -536,6 +543,31 @@ bool bullBias = efT >= esT
 bool inSigSess = not sigSessOn or not na(time(timeframe.period, sigSess, tzS))
 bool blowThrough = useAtrG and bRng > atrMult * atrF
 
+// ─── ANEF · Adaptive Node Efficiency (REKONSTRUKTION av OutsiderEdges beskrivning:
+//     pris-effektivitet × VWAP-nära "effektiv volym" × imbalance-proxy, dämpad av
+//     volatilitet och Z-normaliserad. Deras exakta formel är stängd — kalibrera zonen.) ───
+gA = "ANEF (Adaptive Node Efficiency)"
+anefOn   = input.bool(false, "ANEF-guard (blockera rejections mot effektiv impuls)", group=gA, tooltip="Pil UPP blockeras när marknaden är i EFFEKTIV nedåtimpuls (score under −zon), pil NER blockeras i effektiv uppåtimpuls. Idé: en rejection mot en effektiv breakout förlorar oftast.")
+anefPw   = input.int(20, "Price Window", minval=5, maxval=200, group=gA)
+anefVl   = input.int(100, "Volume/Norm Lookback", minval=20, maxval=500, group=gA)
+anefKl   = input.int(100, "Volatility Lookback", minval=20, maxval=500, group=gA)
+anefCap  = input.float(2.0, "Imbalance Cap", minval=1, step=0.5, group=gA)
+anefZon  = input.float(4.6, "Efficient Zone (±)", minval=0.5, step=0.1, group=gA)
+float anefProx = 1.0 / (1.0 + math.abs(close - nz(vwap, close)) / math.max(atrF, syminfo.mintick))
+float anefEff  = nz(volume) * anefProx
+float anefEavg = ta.sma(anefEff, anefVl)
+float anefEfac = anefEavg > 0 ? anefEff / anefEavg : 1.0
+float anefImbR = ta.sma(2 * buyVb - nz(volume), 14) / math.max(ta.sma(nz(volume), 14), 1.0)
+float anefImb  = math.max(-anefCap, math.min(anefCap, 1.0 + anefImbR))
+float anefPc   = (close - close[anefPw]) / math.max(close[anefPw], syminfo.mintick)
+float anefStd  = ta.stdev(close / close[1] - 1, anefKl)
+float anefRaw  = anefStd > 0 ? anefPc / (anefStd * math.sqrt(anefPw)) * anefEfac * anefImb : 0.0
+float anefM    = ta.sma(anefRaw, anefVl)
+float anefS    = ta.stdev(anefRaw, anefVl)
+float anef     = anefS > 0 ? (anefRaw - anefM) / anefS : 0.0
+alertcondition(ta.crossover(anef, anefZon), "ANEF effektiv ↑", "Effektiv uppåtimpuls — ANEF över zonen")
+alertcondition(ta.crossunder(anef, -anefZon), "ANEF effektiv ↓", "Effektiv nedåtimpuls — ANEF under zonen")
+
 bool pocBreachBar = false
 bool pocUpBar = false
 bool pocDnBar = false
@@ -591,12 +623,15 @@ if barstate.isconfirmed and array.size(pocLines) > 0
                         array.remove(pocNS, i)
                     if array.size(pocCVD) > i
                         array.remove(pocCVD, i)
+                    if array.size(pocTouch) > i
+                        array.remove(pocTouch, i)
             else
                 pocRejBar := true
                 bool arrowUpR = st == -1
                 float wickPctR = bRng > 0 ? (arrowUpR ? math.min(open, close) - low : high - math.max(open, close)) / bRng * 100 : 0.0
                 bool  wickOkR  = not wickFilt or wickPctR >= wickMin
-                bool okR = (not trendFilt or (arrowUpR ? bullBias : not bullBias)) and armedOk and ageOk and cdOk and not blowThrough and inSigSess and not fired and nsOk and (not cvdFilt or na(cvdHere) or (arrowUpR ? cvdHere >= cvdMin : cvdHere <= 100 - cvdMin)) and wickOkR
+                bool  anefOkR  = not anefOn or (arrowUpR ? anef > -anefZon : anef < anefZon)
+                bool okR = (not trendFilt or (arrowUpR ? bullBias : not bullBias)) and armedOk and ageOk and cdOk and not blowThrough and inSigSess and not fired and nsOk and (not cvdFilt or na(cvdHere) or (arrowUpR ? cvdHere >= cvdMin : cvdHere <= 100 - cvdMin)) and wickOkR and anefOkR
                 if sigMode == "Rejection" and okR
                     fired := true
                     lastSigBar := bar_index
@@ -604,9 +639,26 @@ if barstate.isconfirmed and array.size(pocLines) > 0
                         pocUpBar := true
                     else
                         pocDnBar := true
-                array.set(pocState, i, 0)
-                array.set(pocCount, i, 0)
-                array.set(pocArm, i, 0)
+                int tcR = (array.size(pocTouch) > i ? array.get(pocTouch, i) : 0) + 1
+                if array.size(pocTouch) > i
+                    array.set(pocTouch, i, tcR)
+                if extMode == "N retester" and tcR >= extN
+                    array.remove(pocLines, i)
+                    array.remove(pocPrices, i)
+                    array.remove(pocState, i)
+                    array.remove(pocCount, i)
+                    array.remove(pocArm, i)
+                    array.remove(pocBorn, i)
+                    if array.size(pocNS) > i
+                        array.remove(pocNS, i)
+                    if array.size(pocCVD) > i
+                        array.remove(pocCVD, i)
+                    if array.size(pocTouch) > i
+                        array.remove(pocTouch, i)
+                else
+                    array.set(pocState, i, 0)
+                    array.set(pocCount, i, 0)
+                    array.set(pocArm, i, 0)
 
 bool povHitBar = false
 if barstate.isconfirmed and array.size(povLines) > 0
@@ -984,7 +1036,8 @@ if barstate.isconfirmed and array.size(swP) > 0
                 bool rUp = st == -1
                 float wickPctS = bRng > 0 ? (rUp ? math.min(open, close) - low : high - math.max(open, close)) / bRng * 100 : 0.0
                 bool  wickOkS  = not wickFilt or wickPctS >= wickMin
-                bool okR = (not trendFilt or (rUp ? bullBias : not bullBias)) and aOk and swAgeOk and swCdOk and not blowThrough and inSigSess and not swFired and wickOkS
+                bool  anefOkS  = not anefOn or (rUp ? anef > -anefZon : anef < anefZon)
+                bool okR = (not trendFilt or (rUp ? bullBias : not bullBias)) and aOk and swAgeOk and swCdOk and not blowThrough and inSigSess and not swFired and wickOkS and anefOkS
                 if sigMode == "Rejection" and okR
                     swFired := true
                     lastSigBar := bar_index
