@@ -3,6 +3,9 @@
 // Versionshanterad här i repot. Klistra in i TradingView Pine Editor -> Save -> Add to chart.
 //
 // Ändringslogg (senaste):
+//  · Signalerna PÅ som default: swing-motorns ▲/▼-etiketter ritas nu (var
+//    avstängda!), avståndsfilter 2.5→1.5×ATR, min nod-ålder 12→6 bars,
+//    cooldown 10→5 bars. Motorn jobbade i bakgrunden utan att rita något.
 //  · FIX: POC-motorns riktning var spegelvänd (state-konventionen) — noder
 //    pensionerades efter två vanliga stängningar och Rejection-läget kunde
 //    nästan aldrig avfyra. Nu identisk logik som swing-motorn: försvarad nod
@@ -107,9 +110,9 @@ trendFilt = input.bool(false, "Trendfilter (EMA-molnets riktning)", group=gN, to
 sigSessOn = input.bool(false, "Sessionsfilter för signaler", group=gN)
 sigSess   = input.session("0800-2200", "Signal-session", group=gN)
 distFilt  = input.bool(true, "Avståndsfilter (kräv resa till noden)", group=gN, tooltip="Signal bara när priset först varit minst X×ATR14 ifrån noden och sedan kommer tillbaka. Filtrerar bort brus när noden ligger mitt i rangen.")
-distAtr   = input.float(2.5, "Min avstånd innan touch (×ATR)", minval=0.5, step=0.1, group=gN)
-minAge    = input.int(12, "Min nod-ålder innan signal (bars)", minval=0, maxval=100, group=gN, tooltip="Färska noder ligger nära priset per definition. Låt dem åldras innan de får signalera.")
-sigCd     = input.int(10, "Cooldown mellan signaler (bars)", minval=0, maxval=100, group=gN, tooltip="Minsta antal bars mellan två signaler, delas av alla motorer. Stoppar spam.")
+distAtr   = input.float(1.5, "Min avstånd innan touch (×ATR)", minval=0.5, step=0.1, group=gN)
+minAge    = input.int(6, "Min nod-ålder innan signal (bars)", minval=0, maxval=100, group=gN, tooltip="Färska noder ligger nära priset per definition. Låt dem åldras innan de får signalera.")
+sigCd     = input.int(5, "Cooldown mellan signaler (bars)", minval=0, maxval=100, group=gN, tooltip="Minsta antal bars mellan två signaler, delas av alla motorer. Stoppar spam.")
 nodeTips  = input.bool(false, "Node Context Tooltip vid POC", group=gN, tooltip="Liten diamant vid varje naken POC — håll/tryck för POC-pris, node strength, CVD-split, VWAP-distans.")
 colPOC    = input.color(color.new(#ffc400, 0), "POC-linje", group=gN)
 showPOV   = input.bool(true, "Naked POV (LVN i Value Area)", group=gN)
@@ -813,7 +816,7 @@ swRows   = input.int(20, "Rader per swing-profil", minval=8, maxval=40, group=gW
 swVaIn   = input.float(70, "Value Area %", minval=50, maxval=95, group=gW)
 swShow   = input.bool(false, "Rita stängda profiler", group=gW, tooltip="Av = ren chart, motorn jobbar i bakgrunden och lämnar bara nakna POC/PoV-linjer + signaler.")
 swPovSig = input.bool(true, "PoV-nivåer & signaler", group=gW)
-swSigLbl = input.bool(false, "Visa breach-etiketter (▲/▼)", group=gW, tooltip="Av = inga POC/PoV-pilar på charten. Breach-logiken och alerts jobbar kvar i bakgrunden.")
+swSigLbl = input.bool(true, "Visa breach-etiketter (▲/▼)", group=gW, tooltip="Av = inga POC/PoV-pilar på charten. Breach-logiken och alerts jobbar kvar i bakgrunden.")
 swShowLn = input.bool(false, "Visa swing-nivålinjer (gula)", group=gW, tooltip="Av = de gula POC/PoV-segmenten ritas inte. Breach-motorn och alerts använder nivåerna ändå.")
 swMaxLvl = input.int(4, "Max aktiva swing-nivåer", minval=2, maxval=40, group=gW)
 
