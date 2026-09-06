@@ -65,15 +65,6 @@ f_market() =>
 string src = useSrc ? (f_market() == "GC" ? srcGC : srcNQ) : ""
 
 // ── Utseende per typ ───────────────────────────────────────────────────────
-f_isCore(string k) =>
-    k == "res" or k == "sup" or k == "flip" or k == "hgex" or k == "mpain" or k == "emh" or k == "eml"
-
-f_show(string k) =>
-    if preset == "Nyckelnivåer" and not f_isCore(k)
-        false
-    else
-        f_show_family(k)
-
 f_show_family(string k) =>
     switch k
         "res"   => showWalls
@@ -94,6 +85,15 @@ f_show_family(string k) =>
         "opu"   => showOpen
         "opd"   => showOpen
         => true
+
+f_isCore(string k) =>
+    k == "res" or k == "sup" or k == "flip" or k == "hgex" or k == "mpain" or k == "emh" or k == "eml"
+
+f_show(string k) =>
+    if preset == "Nyckelnivåer" and not f_isCore(k)
+        false
+    else
+        f_show_family(k)
 
 f_col(string k) =>
     switch k
