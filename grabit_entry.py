@@ -35,6 +35,15 @@ try:
 except Exception as e:
     print(f"TradingView-bryggan kunde inte monteras (grabit kör vidare): {e}")
 
+# 2c) GRABIT DESK: NQ/GC-intraday. Tar emot 1m-barer från TradingView (/desk/bar),
+#     räknar nivåer/VWAP/profil/CVD/gamma och larmar setups. Se DESK.md.
+try:
+    from desk import mount as _desk_mount
+    _desk_mount(app)
+    print("DESK monterad: POST /desk/bar, /desk/status")
+except Exception as e:
+    print(f"DESK kunde inte monteras (grabit kör vidare): {e}")
+
 # 3) TESTENDPOINT — avfyra ett skarpt formaterat (men fejkat) Telegram-larm
 #    på begäran. Ligger på tvåsegments-väg så api.py:s catch-all /{fname}
 #    inte slukar den. Öppna i mobilen:

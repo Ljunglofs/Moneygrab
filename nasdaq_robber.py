@@ -1733,13 +1733,25 @@ def command_listener():
                 if not Config.STATS_ANY_CHAT and chat_id != str(Config.CHAT_ID):
                     continue
                 cmd = text.split()[0].lower().split("@")[0]
+                # DESK (NQ/GC intraday): /desk /levels /gex /plan /risk /pnl /paus /kör
+                try:
+                    import desk as _desk
+                    _reply = _desk.handle_command(cmd, text)
+                except Exception as _e:
+                    _reply = None
+                    print("desk-kommando fel:", _e)
+                if _reply:
+                    send_telegram(_reply, chat_id)
+                    continue
                 if cmd in ("/stats", "/statistik"):
                     send_telegram(stats_text(), chat_id)
                 elif cmd == "/open":
                     send_telegram(_open_text(), chat_id)
                 elif cmd in ("/start", "/help"):
                     send_telegram("\U0001F916 <b>NASDAQ ROBBER</b>\nKommandon:\n"
-                                  "/stats \u2013 tr\u00e4ffprocent &amp; R\n/open \u2013 \u00f6ppna trades", chat_id)
+                                  "/stats \u2013 tr\u00e4ffprocent &amp; R\n/open \u2013 \u00f6ppna trades\n\n"
+                                  "\U0001F3E6 <b>DESK</b> (NQ/GC)\n/desk \u2013 status \u00b7 /levels nq|gc \u00b7 /gex nq|gc\n"
+                                  "/plan nq|gc \u00b7 /risk \u00b7 /pnl -120 \u00b7 /paus \u00b7 /k\u00f6r", chat_id)
         except Exception as e:
             print("command-listener fel:", e)
             time.sleep(5)

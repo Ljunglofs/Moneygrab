@@ -6,3 +6,8 @@ ai_text_cache.json
 push_watch_state.json
 robber_mode.txt
 tv_signals.jsonl
+desk_bars_NQ.jsonl
+desk_bars_GC.jsonl
+desk_state.json
+desk_setups.jsonl
+desk_gex.json
