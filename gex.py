@@ -128,16 +128,25 @@ def gex_from_chain(spot, rows, now=None):
             return (a + b) / 2
         return float(r.get("last") or 0) or None
     em = iv_atm = None
+    em_src = None
     if nr:
         atm = min({float(r["strike"]) for r in nr}, key=lambda k: abs(k - spot))
         c = [r for r in nr if r["type"] == "C" and float(r["strike"]) == atm]
         pu = [r for r in nr if r["type"] == "P" and float(r["strike"]) == atm]
         if c and pu:
-            cm, pm = _mid(c[0]), _mid(pu[0])
-            if cm and pm:
-                em = cm + pm                       # ATM-straddle ≈ marknadens förväntade rörelse till expiry
             ivs = [float(r.get("iv") or 0) for r in (c[0], pu[0]) if 0.01 < float(r.get("iv") or 0) < 5]
             iv_atm = sum(ivs) / len(ivs) if ivs else None
+            T_near = _years_to(near, now)
+            # 1σ till expiry ur ATM-IV — robust även när Yahoo saknar bid/ask (helger, kvällar)
+            if iv_atm:
+                em = spot * iv_atm * math.sqrt(T_near); em_src = "iv"
+            # Levande straddle (bid OCH ask > 0 på båda benen) får ersätta, om den är rimlig.
+            live = all(float(r.get("bid") or 0) > 0 and float(r.get("ask") or 0) > 0 for r in (c[0], pu[0]))
+            if live:
+                straddle = _mid(c[0]) + _mid(pu[0])
+                em_str = 0.85 * straddle            # 1σ ≈ 0,85 × ATM-straddle
+                if em is None or 0.5 * em <= em_str <= 1.5 * em:
+                    em = em_str; em_src = "straddle"
     iv_1d = spot * iv_atm * math.sqrt(1 / 252) if iv_atm else None
 
     return {
@@ -147,7 +156,9 @@ def gex_from_chain(spot, rows, now=None):
         "n_strikes": len(strikes),
         "hgex": hgex, "gpos": gpos, "gneg": gneg,
         "near_expiry": near, "call_wall_0": cw0, "put_wall_0": pw0,
-        "max_pain": mpain, "em_straddle": em, "iv_atm": iv_atm, "iv_1d": iv_1d,
+        "max_pain": mpain, "em_straddle": em, "em_src": em_src, "iv_atm": iv_atm, "iv_1d": iv_1d,
+        # Flip långt från spot = putdominerad kedja (typiskt QQQ) -> regimen är osäker
+        "flip_uncertain": bool(zero is not None and abs(zero / spot - 1) > 0.02),
     }
 
 
@@ -221,6 +232,7 @@ def to_futures(levels, fut_price, etf_price):
         "call_wall_0": sc(levels.get("call_wall_0")), "put_wall_0": sc(levels.get("put_wall_0")),
         "max_pain": sc(levels.get("max_pain")), "em": sc(levels.get("em_straddle")),
         "iv_1d": sc(levels.get("iv_1d")), "near_expiry": levels.get("near_expiry"),
+        "em_src": levels.get("em_src"), "flip_uncertain": levels.get("flip_uncertain", False),
     }
 
 
@@ -270,6 +282,8 @@ def gex_text(inst, g):
              f"Regim: <b>{lv['regime']}</b> (netto {bn:+.2f} mdr USD/1 %) — "
              + ("dealers dämpar: fade kanterna, mean reversion" if lv["net_gex"] > 0
                 else "dealers förstärker: trendläge, bredare stopp")]
+    if f and f.get("flip_uncertain"):
+        lines.append("⚠ Flip ligger >2 % från priset — putdominerad kedja, läs regimen med skepsis.")
     if f:
         lines.append(f"Call wall: <b>{f['call_wall']}</b> · Put wall: <b>{f['put_wall']}</b>"
                      + (f" · Zero gamma: <b>{f['zero_gamma']}</b>" if f["zero_gamma"] else ""))

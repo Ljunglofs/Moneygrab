@@ -74,7 +74,8 @@ def run(inst):
             "ratio": f["ratio"], "regime": f["regime"], "expiries": g["expiries"],
             "call_wall": f["call_wall"], "put_wall": f["put_wall"], "zero_gamma": f["zero_gamma"],
             "hgex": f.get("hgex"), "call_wall_0dte": f.get("call_wall_0"), "put_wall_0dte": f.get("put_wall_0"),
-            "max_pain": f.get("max_pain"), "expected_move": f.get("em"), "iv_1d": f.get("iv_1d"),
+            "max_pain": f.get("max_pain"), "expected_move": f.get("em"), "em_src": f.get("em_src"),
+            "iv_1d": f.get("iv_1d"), "flip_uncertain": f.get("flip_uncertain"),
             "open": open_px, "atr_daily": atr, "string": s}
 
 
@@ -93,7 +94,9 @@ def main(argv):
             continue
         print(f"{r['inst']}  ·  {r['underlying']} {r['etf_spot']:.2f} × {r['ratio']} = {r['fut_price']:.2f}  ·  gamma {r['regime']}")
         print(f"Call wall {r['call_wall']}  ·  Put wall {r['put_wall']}  ·  Flip {r['zero_gamma']}  ·  HGEX {r['hgex']}")
-        print(f"0DTE: call {r['call_wall_0dte']} / put {r['put_wall_0dte']}  ·  Max pain {r['max_pain']}  ·  EM ±{r['expected_move']}  ·  IV 1D ±{r['iv_1d']}")
+        print(f"0DTE: call {r['call_wall_0dte']} / put {r['put_wall_0dte']}  ·  Max pain {r['max_pain']}  ·  EM ±{r['expected_move']} ({r['em_src']})  ·  IV 1D ±{r['iv_1d']}")
+        if r.get("flip_uncertain"):
+            print("VARNING: Gamma Flip ligger >2 % från priset. Putdominerad optionskedja — regimen (positiv/negativ gamma) är osäker. Lita på väggar, EM och IV-range.")
         print(f"Öppning {r['open']}  ·  ATR dag {r['atr_daily'] and round(r['atr_daily'], 2)}  ·  expiries {', '.join(r['expiries'][:4])}")
         print("-" * 78)
         print("Klistra in i indikatorn (fältet " + ("NQ" if r["inst"] == "NQ" else "GC") + " — levels string):")
