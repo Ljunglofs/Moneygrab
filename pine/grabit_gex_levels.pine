@@ -1,8 +1,7 @@
 // GRABIT GEX Levels · NQ/MNQ & GC/MGC
 // ---------------------------------------------------------------------------
-// Ritar GEX-nivåerna från GRABIT DESK (/tvgex i Telegram eller /desk/gexstring)
-// plus live-nivåer som TradingView kan räkna själv: sessions-VWAP ±1σ/±2σ,
-// PDH/PDL/PDC och overnight high/low.
+// Ritar GEX-nivåerna från GRABIT-räknaren (python gex_cli.py, /tvgex i Telegram
+// eller /desk/gexstring). Bara GEX — inga andra nivåer.
 //
 // SÅ HÄR:
 //  1. Pine Editor -> klistra in -> Add to chart (fungerar på NQ1!, MNQ1!, GC1!, MGC1!).
@@ -35,11 +34,6 @@ bool showGamma = input.bool(true, "Max Pain · G+ · G−", group = G_FAM, inlin
 bool showEM    = input.bool(true, "Expected Move · IV-range", group = G_FAM, inline = "f2")
 bool showOpen  = input.bool(true, "Öppning + ATR-grid", group = G_FAM, inline = "f3")
 
-const string G_LIVE = "Live-nivåer (räknas i TradingView)"
-bool showVwap = input.bool(true, "Sessions-VWAP ±1σ ±2σ", group = G_LIVE, inline = "l1")
-bool showPD   = input.bool(true, "PDH / PDL / PDC", group = G_LIVE, inline = "l1")
-bool showON   = input.bool(true, "Overnight high/low", group = G_LIVE, inline = "l2")
-
 const string G_STYLE = "Utseende"
 bool   showLbl  = input.bool(true, "Etiketter", group = G_STYLE, inline = "s1")
 bool   lblPrice = input.bool(true, "Pris i etikett", group = G_STYLE, inline = "s1")
@@ -54,8 +48,6 @@ color cSup  = input.color(#EF5350, "Put Wall",   group = "Färger", inline = "c1
 color cFlip = input.color(#F0B90B, "Flip/HGEX",  group = "Färger", inline = "c2")
 color cEM   = input.color(#E8E6E1, "EM/IV",      group = "Färger", inline = "c2")
 color cOpen = input.color(#F0B90B, "Open/ATR",   group = "Färger", inline = "c3")
-color cVwap = input.color(#FFD54F, "VWAP",       group = "Färger", inline = "c3")
-color cPD   = input.color(#90A4AE, "PD/ON",      group = "Färger", inline = "c4")
 
 // ── Marknad ────────────────────────────────────────────────────────────────
 f_market() =>
@@ -157,39 +149,6 @@ if barstate.islast and src != parsedSrc
                     array.push(aT, str.trim(array.get(f, 1)))
                     array.push(aK, str.trim(array.get(f, 2)))
 
-// ── Live-nivåer ────────────────────────────────────────────────────────────
-// Sessions-VWAP (återställs vid ny handelsdag; CME-dagen börjar 18:00 ET)
-bool newDay = timeframe.change("1D")
-[vwapM, vwapU1, vwapL1] = ta.vwap(hlc3, newDay, 1)
-[vwapM2, vwapU2, vwapL2] = ta.vwap(hlc3, newDay, 2)
-
-// Föregående dag (RTH-baserat via dagsbaren)
-float pdh = request.security(syminfo.tickerid, "D", high[1], lookahead = barmerge.lookahead_on)
-float pdl = request.security(syminfo.tickerid, "D", low[1],  lookahead = barmerge.lookahead_on)
-float pdc = request.security(syminfo.tickerid, "D", close[1], lookahead = barmerge.lookahead_on)
-
-// Overnight: från sessionsstart (18:00 ET) till 09:30 ET, låses när RTH börjar
-bool inRTH = not na(time(timeframe.period, "0930-1600", "America/New_York"))
-var float onH = na
-var float onL = na
-var float onHfix = na
-var float onLfix = na
-if newDay
-    onH := high
-    onL := low
-else if not inRTH
-    onH := na(onH) ? high : math.max(onH, high)
-    onL := na(onL) ? low : math.min(onL, low)
-if inRTH and not inRTH[1]
-    onHfix := onH
-    onLfix := onL
-
-plot(showVwap ? vwapM : na, "VWAP", color = cVwap, linewidth = 2)
-plot(showVwap ? vwapU1 : na, "VWAP +1σ", color = color.new(cVwap, 55))
-plot(showVwap ? vwapL1 : na, "VWAP −1σ", color = color.new(cVwap, 55))
-plot(showVwap ? vwapU2 : na, "VWAP +2σ", color = color.new(cVwap, 75), style = plot.style_circles)
-plot(showVwap ? vwapL2 : na, "VWAP −2σ", color = color.new(cVwap, 75), style = plot.style_circles)
-
 // ── Rita ───────────────────────────────────────────────────────────────────
 var array<line>  lns = array.new<line>()
 var array<label> lbs = array.new<label>()
@@ -208,20 +167,11 @@ if barstate.islast
     for lb in lbs
         label.delete(lb)
     array.clear(lbs)
-    // GEX-nivåer från strängen
     if array.size(aP) > 0
         for i = 0 to array.size(aP) - 1
             string k = array.get(aK, i)
             if f_show(k)
                 f_draw(array.get(aP, i), array.get(aT, i), f_col(k), f_width(k), f_style(k))
-    // Live-nivåer
-    if showPD
-        f_draw(pdh, "PDH", cPD, 1, line.style_dashed)
-        f_draw(pdl, "PDL", cPD, 1, line.style_dashed)
-        f_draw(pdc, "PDC", color.new(cPD, 40), 1, line.style_dotted)
-    if showON
-        f_draw(inRTH ? onHfix : onH, "ONH", color.new(cPD, 20), 1, line.style_dotted)
-        f_draw(inRTH ? onLfix : onL, "ONL", color.new(cPD, 20), 1, line.style_dotted)
 
 // ── HUD ────────────────────────────────────────────────────────────────────
 var table hud = table.new(position.top_right, 3, 4, bgcolor = color.new(#131316, 15), border_width = 1, border_color = #222228)
