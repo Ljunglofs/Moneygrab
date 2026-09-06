@@ -1,0 +1,267 @@
+// GRABIT GEX Levels · NQ/MNQ & GC/MGC
+// ---------------------------------------------------------------------------
+// Ritar GEX-nivåerna från GRABIT DESK (/tvgex i Telegram eller /desk/gexstring)
+// plus live-nivåer som TradingView kan räkna själv: sessions-VWAP ±1σ/±2σ,
+// PDH/PDL/PDC och overnight high/low.
+//
+// SÅ HÄR:
+//  1. Pine Editor -> klistra in -> Add to chart (fungerar på NQ1!, MNQ1!, GC1!, MGC1!).
+//  2. Skriv /tvgex all i Telegram (eller öppna /desk/gexstring?inst=all).
+//  3. Inställningar -> klistra in NQ-strängen i "NQ — levels string" och
+//     GC-strängen i "GC — levels string". Market = Auto väljer rätt efter grafen.
+//  4. Valfritt: skapa ett larm på indikatorn ("Any alert() function call") så du
+//     får notis när priset korsar Call/Put Wall, 0DTE-väggar, Flip eller HGEX.
+//
+// Strängformat: pris,etikett,typ;pris,etikett,typ;...
+// Typer: res sup res0 sup0 flip hgex mpain gpos gneg emh eml emb ivh ivl opo opu opd
+// ---------------------------------------------------------------------------
+//@version=6
+indicator("GRABIT GEX Levels", overlay = true, max_lines_count = 500, max_labels_count = 500)
+
+// ── Inmatning ──────────────────────────────────────────────────────────────
+const string G_SRC = "GEX-strängar (från /tvgex)"
+string market = input.string("Auto", "Market", options = ["Auto", "NQ", "GC"], group = G_SRC,
+     tooltip = "Auto: NQ/MNQ/NDX/US100 -> NQ-strängen, GC/MGC/XAU -> GC-strängen.")
+string srcNQ  = input.string("", "NQ — levels string", group = G_SRC)
+string srcGC  = input.string("", "GC — levels string", group = G_SRC)
+bool   useSrc = input.bool(true, "Visa GEX-nivåer", group = G_SRC)
+float  pxOff  = input.float(0.0, "Prisjustering (punkter)", step = 0.25, group = G_SRC,
+     tooltip = "0 normalt. Använd bara om din feed (t.ex. CFD) ligger systematiskt bredvid futurespriset.")
+
+const string G_FAM = "Familjer"
+bool showWalls = input.bool(true, "Call/Put Wall + 0DTE", group = G_FAM, inline = "f1")
+bool showFlip  = input.bool(true, "Gamma Flip · HGEX", group = G_FAM, inline = "f1")
+bool showGamma = input.bool(true, "Max Pain · G+ · G−", group = G_FAM, inline = "f2")
+bool showEM    = input.bool(true, "Expected Move · IV-range", group = G_FAM, inline = "f2")
+bool showOpen  = input.bool(true, "Öppning + ATR-grid", group = G_FAM, inline = "f3")
+
+const string G_LIVE = "Live-nivåer (räknas i TradingView)"
+bool showVwap = input.bool(true, "Sessions-VWAP ±1σ ±2σ", group = G_LIVE, inline = "l1")
+bool showPD   = input.bool(true, "PDH / PDL / PDC", group = G_LIVE, inline = "l1")
+bool showON   = input.bool(true, "Overnight high/low", group = G_LIVE, inline = "l2")
+
+const string G_STYLE = "Utseende"
+bool   showLbl  = input.bool(true, "Etiketter", group = G_STYLE, inline = "s1")
+bool   lblPrice = input.bool(true, "Pris i etikett", group = G_STYLE, inline = "s1")
+string lblSize  = input.string("Small", "Textstorlek", options = ["Tiny", "Small", "Normal", "Large"], group = G_STYLE, inline = "s2")
+int    lblOff   = input.int(6, "Etikett-offset (barer)", minval = 0, maxval = 100, group = G_STYLE, inline = "s2")
+bool   extendBoth = input.bool(true, "Förläng linjer åt båda håll", group = G_STYLE)
+bool   showHud  = input.bool(true, "HUD (närmaste nivå över/under)", group = G_STYLE)
+bool   useAlerts = input.bool(true, "Larm vid korsning av väggar/flip/HGEX", group = G_STYLE)
+
+color cRes  = input.color(#26A69A, "Call Wall",  group = "Färger", inline = "c1")
+color cSup  = input.color(#EF5350, "Put Wall",   group = "Färger", inline = "c1")
+color cFlip = input.color(#F0B90B, "Flip/HGEX",  group = "Färger", inline = "c2")
+color cEM   = input.color(#E8E6E1, "EM/IV",      group = "Färger", inline = "c2")
+color cOpen = input.color(#F0B90B, "Open/ATR",   group = "Färger", inline = "c3")
+color cVwap = input.color(#FFD54F, "VWAP",       group = "Färger", inline = "c3")
+color cPD   = input.color(#90A4AE, "PD/ON",      group = "Färger", inline = "c4")
+
+// ── Marknad ────────────────────────────────────────────────────────────────
+f_market() =>
+    string m = market
+    if m == "Auto"
+        string s = str.upper(syminfo.root + " " + syminfo.ticker)
+        m := str.contains(s, "GC") or str.contains(s, "XAU") or str.contains(s, "GOLD") ? "GC" : "NQ"
+    m
+
+string src = useSrc ? (f_market() == "GC" ? srcGC : srcNQ) : ""
+
+// ── Utseende per typ ───────────────────────────────────────────────────────
+f_show(string k) =>
+    switch k
+        "res"   => showWalls
+        "sup"   => showWalls
+        "res0"  => showWalls
+        "sup0"  => showWalls
+        "flip"  => showFlip
+        "hgex"  => showFlip
+        "mpain" => showGamma
+        "gpos"  => showGamma
+        "gneg"  => showGamma
+        "emh"   => showEM
+        "eml"   => showEM
+        "emb"   => showEM
+        "ivh"   => showEM
+        "ivl"   => showEM
+        "opo"   => showOpen
+        "opu"   => showOpen
+        "opd"   => showOpen
+        => true
+
+f_col(string k) =>
+    switch k
+        "res"   => cRes
+        "res0"  => cRes
+        "sup"   => cSup
+        "sup0"  => cSup
+        "flip"  => cFlip
+        "hgex"  => cFlip
+        "mpain" => color.new(cFlip, 45)
+        "gpos"  => color.new(cRes, 55)
+        "gneg"  => color.new(cSup, 55)
+        "emh"   => cEM
+        "eml"   => cEM
+        "emb"   => color.new(cEM, 60)
+        "ivh"   => color.new(cEM, 45)
+        "ivl"   => color.new(cEM, 45)
+        "opo"   => cOpen
+        "opu"   => color.new(cSup, 55)
+        "opd"   => color.new(cRes, 55)
+        => color.new(#7A7A85, 30)
+
+f_width(string k) =>
+    switch k
+        "res"  => 2
+        "sup"  => 2
+        "hgex" => 2
+        => 1
+
+f_style(string k) =>
+    switch k
+        "res"   => line.style_solid
+        "sup"   => line.style_solid
+        "res0"  => line.style_dashed
+        "sup0"  => line.style_dashed
+        "flip"  => line.style_dashed
+        "hgex"  => line.style_solid
+        "gpos"  => line.style_solid
+        "gneg"  => line.style_solid
+        => line.style_dotted
+
+f_isKey(string k) =>
+    k == "res" or k == "sup" or k == "res0" or k == "sup0" or k == "flip" or k == "hgex"
+
+f_size() =>
+    lblSize == "Tiny" ? size.tiny : lblSize == "Normal" ? size.normal : lblSize == "Large" ? size.large : size.small
+
+// ── Parsa strängen en gång ─────────────────────────────────────────────────
+var array<float>  aP = array.new<float>()
+var array<string> aT = array.new<string>()
+var array<string> aK = array.new<string>()
+var string parsedSrc = ""
+
+if barstate.islast and src != parsedSrc
+    array.clear(aP)
+    array.clear(aT)
+    array.clear(aK)
+    parsedSrc := src
+    if str.length(src) > 0
+        array<string> rows = str.split(src, ";")
+        for r in rows
+            array<string> f = str.split(r, ",")
+            if array.size(f) == 3
+                float p = str.tonumber(str.trim(array.get(f, 0)))
+                if not na(p)
+                    array.push(aP, p + pxOff)
+                    array.push(aT, str.trim(array.get(f, 1)))
+                    array.push(aK, str.trim(array.get(f, 2)))
+
+// ── Live-nivåer ────────────────────────────────────────────────────────────
+// Sessions-VWAP (återställs vid ny handelsdag; CME-dagen börjar 18:00 ET)
+bool newDay = timeframe.change("1D")
+[vwapM, vwapU1, vwapL1] = ta.vwap(hlc3, newDay, 1)
+[vwapM2, vwapU2, vwapL2] = ta.vwap(hlc3, newDay, 2)
+
+// Föregående dag (RTH-baserat via dagsbaren)
+float pdh = request.security(syminfo.tickerid, "D", high[1], lookahead = barmerge.lookahead_on)
+float pdl = request.security(syminfo.tickerid, "D", low[1],  lookahead = barmerge.lookahead_on)
+float pdc = request.security(syminfo.tickerid, "D", close[1], lookahead = barmerge.lookahead_on)
+
+// Overnight: från sessionsstart (18:00 ET) till 09:30 ET, låses när RTH börjar
+bool inRTH = not na(time(timeframe.period, "0930-1600", "America/New_York"))
+var float onH = na
+var float onL = na
+var float onHfix = na
+var float onLfix = na
+if newDay
+    onH := high
+    onL := low
+else if not inRTH
+    onH := na(onH) ? high : math.max(onH, high)
+    onL := na(onL) ? low : math.min(onL, low)
+if inRTH and not inRTH[1]
+    onHfix := onH
+    onLfix := onL
+
+plot(showVwap ? vwapM : na, "VWAP", color = cVwap, linewidth = 2)
+plot(showVwap ? vwapU1 : na, "VWAP +1σ", color = color.new(cVwap, 55))
+plot(showVwap ? vwapL1 : na, "VWAP −1σ", color = color.new(cVwap, 55))
+plot(showVwap ? vwapU2 : na, "VWAP +2σ", color = color.new(cVwap, 75), style = plot.style_circles)
+plot(showVwap ? vwapL2 : na, "VWAP −2σ", color = color.new(cVwap, 75), style = plot.style_circles)
+
+// ── Rita ───────────────────────────────────────────────────────────────────
+var array<line>  lns = array.new<line>()
+var array<label> lbs = array.new<label>()
+
+f_draw(float p, string tag, color c, int w, string st) =>
+    if not na(p)
+        array.push(lns, line.new(bar_index - 1, p, bar_index, p, extend = extendBoth ? extend.both : extend.right, color = c, width = w, style = st))
+        if showLbl
+            string txt = lblPrice ? tag + "  " + str.tostring(p, format.mintick) : tag
+            array.push(lbs, label.new(bar_index + lblOff, p, txt, style = label.style_label_left, color = color.new(color.black, 100), textcolor = c, size = f_size(), textalign = text.align_left))
+
+if barstate.islast
+    for l in lns
+        line.delete(l)
+    array.clear(lns)
+    for lb in lbs
+        label.delete(lb)
+    array.clear(lbs)
+    // GEX-nivåer från strängen
+    if array.size(aP) > 0
+        for i = 0 to array.size(aP) - 1
+            string k = array.get(aK, i)
+            if f_show(k)
+                f_draw(array.get(aP, i), array.get(aT, i), f_col(k), f_width(k), f_style(k))
+    // Live-nivåer
+    if showPD
+        f_draw(pdh, "PDH", cPD, 1, line.style_dashed)
+        f_draw(pdl, "PDL", cPD, 1, line.style_dashed)
+        f_draw(pdc, "PDC", color.new(cPD, 40), 1, line.style_dotted)
+    if showON
+        f_draw(inRTH ? onHfix : onH, "ONH", color.new(cPD, 20), 1, line.style_dotted)
+        f_draw(inRTH ? onLfix : onL, "ONL", color.new(cPD, 20), 1, line.style_dotted)
+
+// ── HUD ────────────────────────────────────────────────────────────────────
+var table hud = table.new(position.top_right, 3, 4, bgcolor = color.new(#131316, 15), border_width = 1, border_color = #222228)
+if barstate.islast
+    table.clear(hud, 0, 0, 2, 3)
+    if showHud and array.size(aP) > 0
+        float bestUp = na
+        float bestDn = na
+        string upT = ""
+        string dnT = ""
+        for i = 0 to array.size(aP) - 1
+            float lv = array.get(aP, i)
+            if f_show(array.get(aK, i))
+                if lv >= close and (na(bestUp) or lv < bestUp)
+                    bestUp := lv
+                    upT := array.get(aT, i)
+                if lv <= close and (na(bestDn) or lv > bestDn)
+                    bestDn := lv
+                    dnT := array.get(aT, i)
+        table.cell(hud, 0, 0, "GRABIT GEX · " + f_market(), text_color = cFlip, text_size = size.small, bgcolor = color.new(cFlip, 90))
+        table.cell(hud, 1, 0, "", bgcolor = color.new(cFlip, 90))
+        table.cell(hud, 2, 0, "", bgcolor = color.new(cFlip, 90))
+        table.cell(hud, 0, 1, "NIVÅ", text_color = #7A7A85, text_size = size.tiny)
+        table.cell(hud, 1, 1, "PRIS", text_color = #7A7A85, text_size = size.tiny)
+        table.cell(hud, 2, 1, "AVSTÅND", text_color = #7A7A85, text_size = size.tiny)
+        if not na(bestUp)
+            table.cell(hud, 0, 2, "▲ " + upT, text_color = cRes, text_size = size.small, bgcolor = color.new(cRes, 90))
+            table.cell(hud, 1, 2, str.tostring(bestUp, format.mintick), text_color = #E8E6E1, text_size = size.small, bgcolor = color.new(cRes, 90))
+            table.cell(hud, 2, 2, "+" + str.tostring(bestUp - close, "#.##"), text_color = #7A7A85, text_size = size.small, bgcolor = color.new(cRes, 90))
+        if not na(bestDn)
+            table.cell(hud, 0, 3, "▼ " + dnT, text_color = cSup, text_size = size.small, bgcolor = color.new(cSup, 90))
+            table.cell(hud, 1, 3, str.tostring(bestDn, format.mintick), text_color = #E8E6E1, text_size = size.small, bgcolor = color.new(cSup, 90))
+            table.cell(hud, 2, 3, str.tostring(bestDn - close, "#.##"), text_color = #7A7A85, text_size = size.small, bgcolor = color.new(cSup, 90))
+
+// ── Larm ───────────────────────────────────────────────────────────────────
+if useAlerts and barstate.isconfirmed and array.size(aP) > 0
+    for i = 0 to array.size(aP) - 1
+        if f_isKey(array.get(aK, i))
+            float lv = array.get(aP, i)
+            bool up = close[1] < lv and close >= lv
+            bool dn = close[1] > lv and close <= lv
+            if up or dn
+                alert("GRABIT GEX · " + f_market() + " korsade " + array.get(aT, i) + " @ " + str.tostring(lv, format.mintick) + (up ? " ▲" : " ▼"), alert.freq_once_per_bar)

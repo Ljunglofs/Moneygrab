@@ -134,7 +134,10 @@ Hämta strängen:
 - HTTP: `/desk/gexstring?inst=NQ` (ren text), `/desk/gexstring?inst=all` (JSON med båda).
 - Automatiskt: desken postar båda strängarna i Telegram runt 09:10 ET varje vardag, när första baren efter den tiden kommer in. Stäng av med `DESK_MORNING_GEX=0`.
 
-Klistra in i indikatorns fält "NQ — levels string" respektive "GOLD GC — levels string".
+Indikatorn finns i repot: `pine/grabit_gex_levels.pine`. Klistra in den i Pine Editor, lägg till på grafen och
+klistra in strängarna i fälten "NQ — levels string" och "GC — levels string". Den ritar dessutom sessions-VWAP
+med ±1σ/±2σ, PDH/PDL/PDC och overnight high/low live, har HUD med närmaste nivå över/under och larm vid korsning
+av väggar, flip och HGEX.
 
 ## 6. Telegram-kommandon
 
