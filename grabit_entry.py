@@ -25,6 +25,16 @@ except Exception as e:
     # Roboten får ALDRIG hindra grabit från att starta.
     print(f"Robber kunde inte starta (grabit kör vidare): {e}")
 
+# 2b) TradingView-bryggan: /tv/webhook tar emot TradingView-larm och skickar
+#     dem vidare till Telegram/Discord/push + appens signalflöde (/tv/signals).
+#     Kräver env TV_WEBHOOK_SECRET. Se TRADINGVIEW.md.
+try:
+    from tradingview_bridge import mount as _tv_mount
+    _tv_mount(app)
+    print("TradingView-bryggan monterad: POST /tv/webhook")
+except Exception as e:
+    print(f"TradingView-bryggan kunde inte monteras (grabit kör vidare): {e}")
+
 # 3) TESTENDPOINT — avfyra ett skarpt formaterat (men fejkat) Telegram-larm
 #    på begäran. Ligger på tvåsegments-väg så api.py:s catch-all /{fname}
 #    inte slukar den. Öppna i mobilen:
