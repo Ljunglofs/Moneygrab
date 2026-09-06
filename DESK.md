@@ -105,6 +105,37 @@ Risken på nästa trade halveras när halva budgeten är borta.
 **Du rapporterar resultatet själv** eftersom propkontot inte har API:
 `/pnl -120` efter en förlust, `/pnl 240` efter en vinst. Det räknar även upp antalet trades.
 
+## 5b. GEX-nivåer till TradingView-indikatorn "GEX Daily Levels"
+
+Indikatorn ritar nivåer från en sträng i formatet `pris,etikett,typ;…`. Beräkningsmotorn i
+`gex.py` tar fram alla typer den förstår och `desk.py` levererar strängen färdig att klistra in.
+Samma nivåer gäller NQ och MNQ (samma pris). GC och MGC likaså.
+
+| Typ | Nivå | Så räknas den |
+|---|---|---|
+| `res` / `sup` | Call Wall / Put Wall | strike med störst positiv resp. negativ dealer-GEX över de 4 närmaste expiries |
+| `res0` / `sup0` | 0DTE-väggar | samma sak, bara närmaste expiry |
+| `flip` | Gamma Flip | spotnivå där nettoprofilen byter tecken (över: dämpning, under: trend) |
+| `hgex` | HGEX | strike med störst absolut gamma, dagens magnet |
+| `mpain` | Max Pain | strike där optionsinnehavarnas totala värde är minst, närmaste expiry |
+| `gpos` / `gneg` | G+ / G− | näst största positiva resp. negativa gammastrikes |
+| `emh` / `eml` | Expected Move | pris ± ATM-straddle (call + put mid) för närmaste expiry |
+| `emb` | EM-band | ± 50 % av expected move |
+| `ivh` / `ivl` | 1D min/max | pris ± spot × ATM-IV × √(1/252) |
+| `opo` / `opu` / `opd` | Öppning + ATR-grid | dagens RTH-öppning ur feeden, ± 0,5 och 1,0 dags-ATR |
+
+Källa är QQQ-optioner för NQ och GLD-optioner för GC, hämtade från Yahoo, skalade med
+live-kvoten futures/ETF. Open interest uppdateras en gång per dygn, så strängen är stabil
+under dagen; expected move och IV läses från aktuella premier.
+
+Hämta strängen:
+
+- Telegram: `/tvgex nq`, `/tvgex gc` eller `/tvgex all`. Svaret är ett kodblock, tryck för att kopiera.
+- HTTP: `/desk/gexstring?inst=NQ` (ren text), `/desk/gexstring?inst=all` (JSON med båda).
+- Automatiskt: desken postar båda strängarna i Telegram runt 09:10 ET varje vardag, när första baren efter den tiden kommer in. Stäng av med `DESK_MORNING_GEX=0`.
+
+Klistra in i indikatorns fält "NQ — levels string" respektive "GOLD GC — levels string".
+
 ## 6. Telegram-kommandon
 
 | Kommando | Gör |
@@ -112,6 +143,7 @@ Risken på nästa trade halveras när halva budgeten är borta.
 | `/desk` | status: spärr, P&L, budget, datafärskhet |
 | `/levels nq` eller `/levels gc` | alla nivåer just nu |
 | `/gex nq` | gamma-nivåer och regim |
+| `/tvgex nq`, `/tvgex all` | sträng till TradingView-indikatorn GEX Daily Levels |
 | `/plan nq` | kör motorn nu och visar bästa setupen även under tröskeln |
 | `/risk` | aktiva regler och gränser |
 | `/pnl -120` | rapportera resultat. `/pnl set 0` nollställer |

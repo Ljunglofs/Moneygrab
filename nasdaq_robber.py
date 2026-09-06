@@ -1751,6 +1751,7 @@ def command_listener():
                     send_telegram("\U0001F916 <b>NASDAQ ROBBER</b>\nKommandon:\n"
                                   "/stats \u2013 tr\u00e4ffprocent &amp; R\n/open \u2013 \u00f6ppna trades\n\n"
                                   "\U0001F3E6 <b>DESK</b> (NQ/GC)\n/desk \u2013 status \u00b7 /levels nq|gc \u00b7 /gex nq|gc\n"
+                                  "/tvgex nq|gc|all \u2013 GEX-str\u00e4ng till TradingView\n"
                                   "/plan nq|gc \u00b7 /risk \u00b7 /pnl -120 \u00b7 /paus \u00b7 /k\u00f6r", chat_id)
         except Exception as e:
             print("command-listener fel:", e)

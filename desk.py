@@ -19,6 +19,7 @@ Endpoints (monteras av grabit_entry.py via mount(app))
     GET  /desk/status
     GET  /desk/levels?inst=NQ
     GET  /desk/gex?inst=NQ
+    GET  /desk/gexstring?inst=NQ|GC|all           sträng till TradingView-indikatorn "GEX Daily Levels"
     GET  /desk/plan?inst=NQ[&send=1&key=ADMIN]   kör motorn nu
     GET  /desk/setups?limit=30
     GET  /desk/pnl?key=ADMIN&add=-120 | &set=0    rapportera dagens P&L (för budgeten)
@@ -26,7 +27,7 @@ Endpoints (monteras av grabit_entry.py via mount(app))
     GET  /desk/bootstrap?key=ADMIN                hämta 5 dagars 1m-historik från Yahoo
 
 Telegram-kommandon (via nasdaq_robber.command_listener -> handle_command)
-    /desk  /levels [nq|gc]  /gex [nq|gc]  /plan [nq|gc]  /risk  /pnl -120  /paus  /kör
+    /desk  /levels [nq|gc]  /gex [nq|gc]  /tvgex [nq|gc|all]  /plan [nq|gc]  /risk  /pnl -120  /paus  /kör
 
 Env
     DESK_MIN_CONF        lägsta confidence för att larma (default 68)
@@ -609,6 +610,97 @@ def find_setups(L):
     return out
 
 
+# ================================================================== GEX-sträng till TradingView
+_ATR_D = {}   # inst -> {"t": epoch, "atr": float}
+
+
+def daily_open(inst):
+    """Dagens RTH-öppning (09:30 ET) om den finns, annars sessionsöppningen (18:00 ET)."""
+    with _lock:
+        bars = list(BARS[inst])
+    if not bars:
+        return None
+    D = tdate(bars[-1]["t"])
+    sess = [b for b in bars if tdate(b["t"]) == D]
+    rth = [b for b in sess if 570 <= _hm(b["t"]) < 960]
+    if rth:
+        return rth[0]["o"]
+    return sess[0]["o"] if sess else None
+
+
+def atr_daily(inst, n=14):
+    """Dags-ATR: Yahoo dagsbarer (cache 6 h), annars dagsintervall ur egna barer."""
+    c = _ATR_D.get(inst)
+    if c and time.time() - c["t"] < 6 * 3600:
+        return c["atr"]
+    atr = None
+    try:
+        import yfinance as yf
+        df = yf.download(YF_SYMBOL[inst], period="2mo", interval="1d", progress=False,
+                         auto_adjust=False, threads=False)
+        if df is not None and len(df) > n:
+            if hasattr(df.columns, "levels"):
+                df.columns = df.columns.get_level_values(0)
+            df.columns = [str(x).title() for x in df.columns]
+            rows = [{"h": float(r["High"]), "l": float(r["Low"]), "c": float(r["Close"])} for _, r in df.iterrows()]
+            atr = _atr(rows, n)
+    except Exception:
+        atr = None
+    if not atr:
+        with _lock:
+            bars = list(BARS[inst])
+        days = {}
+        for b in bars:
+            d = days.setdefault(tdate(b["t"]), {"h": b["h"], "l": b["l"], "c": b["c"]})
+            d["h"] = max(d["h"], b["h"]); d["l"] = min(d["l"], b["l"]); d["c"] = b["c"]
+        rows = [days[k] for k in sorted(days)]
+        atr = _atr(rows, n) if len(rows) >= 2 else None
+    if atr:
+        _ATR_D[inst] = {"t": time.time(), "atr": atr}
+    return atr
+
+
+def gex_string(inst):
+    """Strängen till Pine-indikatorn 'GEX Daily Levels' (pris,etikett,typ;...)."""
+    import gex as GX
+    L = analyze(inst)
+    price = L["price"] if L else None
+    if not price:
+        with _lock:
+            price = BARS[inst][-1]["c"] if BARS[inst] else None
+    g = GX.get_gex(inst, fut_price=price)
+    if not g or not g.get("futures"):
+        return ""
+    return GX.levels_string(inst, g, open_price=daily_open(inst), atr_daily=atr_daily(inst),
+                            today=datetime.now(ET).date())
+
+
+def gex_string_text(inst):
+    s = gex_string(inst)
+    if not s:
+        return f"GEX {inst}: ingen data att bygga sträng av (Yahoo nåddes inte och ingen cache)."
+    n = s.count(";") + 1
+    return (f"\U0001F4CB <b>GEX Daily Levels · {inst}</b> ({n} nivåer)\n"
+            f"Klistra in i indikatorns fält \u201c{inst if inst == 'NQ' else 'GOLD GC'} \u2014 levels string\u201d:\n"
+            f"<pre>{s}</pre>")
+
+
+def _maybe_morning_gex():
+    """Postar GEX-strängarna för NQ och GC en gång per dag runt 09:10 ET (första bar efter)."""
+    st = _load_state()
+    now = datetime.now(ET)
+    if now.weekday() >= 5 or now.hour * 60 + now.minute < 550:
+        return
+    if st.get("gex_posted") == st.get("date"):
+        return
+    st["gex_posted"] = st.get("date"); _save_state()
+    for inst in INSTRUMENTS:
+        try:
+            _notify(gex_string_text(inst))
+        except Exception as e:
+            STATUS["last_error"] = f"morgon-gex {inst}: {e}"
+
+
 # ================================================================== text
 def _fmt(v, nd=2):
     return "—" if v is None else f"{v:.{nd}f}"
@@ -799,6 +891,11 @@ def handle_command(cmd, text):
         if not s:
             return f"Ingen setup i {inst} just nu.\n\n" + levels_text(L)
         return plan_text(s[0], None if ok else why) + (f"\n\n<i>Alternativ: {s[1]['side']} {s[1]['name']} ({s[1]['conf']})</i>" if len(s) > 1 else "")
+    if cmd in ("/tvgex", "/gexstring", "/gexsträng", "/gexstrang"):
+        parts = text.split()
+        if len(parts) > 1 and parts[1].lower() in ("all", "alla", "båda", "bada"):
+            return gex_string_text("NQ") + "\n\n" + gex_string_text("GC")
+        return gex_string_text(_inst_arg(text))
     if cmd in ("/risk", "/regler"):
         return PR.rules_text() + "\n\n" + status_text()
     if cmd == "/pnl":
@@ -824,6 +921,7 @@ def handle_command(cmd, text):
 
 
 HELP_TEXT = ("\U0001F3E6 <b>DESK</b>\n/desk – status · /levels nq|gc – nivåer · /gex nq|gc – gamma\n"
+             "/tvgex nq|gc|all – sträng till TradingView-indikatorn\n"
              "/plan nq|gc – setup nu · /risk – regler · /pnl -120 – rapportera resultat\n/paus · /kör")
 
 
@@ -883,6 +981,11 @@ def mount(app):
                 alerted = maybe_alert(inst)
             except Exception as e:
                 STATUS["last_error"] = f"alert: {type(e).__name__}: {e}"
+            if os.environ.get("DESK_MORNING_GEX", "1") == "1":
+                try:
+                    _maybe_morning_gex()
+                except Exception as e:
+                    STATUS["last_error"] = f"morgon-gex: {e}"
         return {"ok": True, "inst": inst, "bars": len(BARS[inst]),
                 "alert": (f"{alerted['side']} {alerted['name']} {alerted['conf']}" if alerted else None)}
 
@@ -913,6 +1016,19 @@ def mount(app):
         inst = inst.upper(); L = analyze(inst)
         g = GX.get_gex(inst, fut_price=L["price"] if L else None, force=bool(force))
         return {"ok": bool(g), "gex": g, "text": GX.gex_text(inst, g)}
+
+    @app.get("/desk/gexstring")
+    def desk_gexstring(inst: str = "NQ"):
+        """Strängen till TradingView-indikatorn 'GEX Daily Levels'. inst=NQ|GC|all."""
+        from fastapi.responses import PlainTextResponse
+        inst = inst.upper()
+        inst = {"MNQ": "NQ", "MGC": "GC"}.get(inst, inst)     # micros = samma pris, samma nivåer
+        if inst == "ALL":
+            return {"ok": True, "NQ": gex_string("NQ"), "GC": gex_string("GC"),
+                    "format": "pris,etikett,typ;...  (res sup res0 sup0 flip hgex mpain gpos gneg emh eml emb ivh ivl opo opu opd)"}
+        if inst not in INSTRUMENTS:
+            raise HTTPException(400, "inst måste vara NQ, GC eller all")
+        return PlainTextResponse(gex_string(inst))
 
     @app.get("/desk/plan")
     def desk_plan(inst: str = "NQ", send: int = 0, key: str = ""):
