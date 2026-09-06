@@ -28,6 +28,8 @@ float  pxOff  = input.float(0.0, "Prisjustering (punkter)", step = 0.25, group =
      tooltip = "0 normalt. Använd bara om din feed (t.ex. CFD) ligger systematiskt bredvid futurespriset.")
 
 const string G_FAM = "Familjer"
+string preset = input.string("Nyckelnivåer", "Förval", options = ["Nyckelnivåer", "Alla"], group = G_FAM,
+     tooltip = "Nyckelnivåer: Call Wall, Put Wall, Gamma Flip, HGEX, Max Pain och EM±. Alla: även 0DTE, G+/G−, EM-band, IV-range och ATR-grid.")
 bool showWalls = input.bool(true, "Call/Put Wall + 0DTE", group = G_FAM, inline = "f1")
 bool showFlip  = input.bool(true, "Gamma Flip · HGEX", group = G_FAM, inline = "f1")
 bool showGamma = input.bool(true, "Max Pain · G+ · G−", group = G_FAM, inline = "f2")
@@ -38,13 +40,16 @@ const string G_STYLE = "Utseende"
 bool   showLbl  = input.bool(true, "Etiketter", group = G_STYLE, inline = "s1")
 bool   lblPrice = input.bool(true, "Pris i etikett", group = G_STYLE, inline = "s1")
 string lblSize  = input.string("Small", "Textstorlek", options = ["Tiny", "Small", "Normal", "Large"], group = G_STYLE, inline = "s2")
+string keySize  = input.string("Large", "Väggar/Flip", options = ["Small", "Normal", "Large", "Huge"], group = G_STYLE, inline = "s2",
+     tooltip = "Textstorlek för Call Wall, Put Wall och Gamma Flip. Fet stil.")
+int    keyWidth = input.int(3, "Linjebredd väggar", minval = 1, maxval = 5, group = G_STYLE)
 int    lblOff   = input.int(6, "Etikett-offset (barer)", minval = 0, maxval = 100, group = G_STYLE, inline = "s2")
 bool   extendBoth = input.bool(true, "Förläng linjer åt båda håll", group = G_STYLE)
 bool   showHud  = input.bool(true, "HUD (närmaste nivå över/under)", group = G_STYLE)
 bool   useAlerts = input.bool(true, "Larm vid korsning av väggar/flip/HGEX", group = G_STYLE)
 
-color cRes  = input.color(#26A69A, "Call Wall",  group = "Färger", inline = "c1")
-color cSup  = input.color(#EF5350, "Put Wall",   group = "Färger", inline = "c1")
+color cRes  = input.color(#EF5350, "Call Wall",  group = "Färger", inline = "c1")   // röd: tak / bearish
+color cSup  = input.color(#AB47BC, "Put Wall",   group = "Färger", inline = "c1")   // lila: golv
 color cFlip = input.color(#F0B90B, "Flip/HGEX",  group = "Färger", inline = "c2")
 color cEM   = input.color(#E8E6E1, "EM/IV",      group = "Färger", inline = "c2")
 color cOpen = input.color(#F0B90B, "Open/ATR",   group = "Färger", inline = "c3")
@@ -60,7 +65,16 @@ f_market() =>
 string src = useSrc ? (f_market() == "GC" ? srcGC : srcNQ) : ""
 
 // ── Utseende per typ ───────────────────────────────────────────────────────
+f_isCore(string k) =>
+    k == "res" or k == "sup" or k == "flip" or k == "hgex" or k == "mpain" or k == "emh" or k == "eml"
+
 f_show(string k) =>
+    if preset == "Nyckelnivåer" and not f_isCore(k)
+        false
+    else
+        f_show_family(k)
+
+f_show_family(string k) =>
     switch k
         "res"   => showWalls
         "sup"   => showWalls
@@ -90,22 +104,23 @@ f_col(string k) =>
         "flip"  => cFlip
         "hgex"  => cFlip
         "mpain" => color.new(cFlip, 45)
-        "gpos"  => color.new(cRes, 55)
-        "gneg"  => color.new(cSup, 55)
+        "gpos"  => color.new(#26A69A, 55)
+        "gneg"  => color.new(#EF5350, 55)
         "emh"   => cEM
         "eml"   => cEM
         "emb"   => color.new(cEM, 60)
         "ivh"   => color.new(cEM, 45)
         "ivl"   => color.new(cEM, 45)
         "opo"   => cOpen
-        "opu"   => color.new(cSup, 55)
-        "opd"   => color.new(cRes, 55)
+        "opu"   => color.new(#EF5350, 60)
+        "opd"   => color.new(#26A69A, 60)
         => color.new(#7A7A85, 30)
 
 f_width(string k) =>
     switch k
-        "res"  => 2
-        "sup"  => 2
+        "res"  => keyWidth
+        "sup"  => keyWidth
+        "flip" => math.max(1, keyWidth - 1)
         "hgex" => 2
         => 1
 
@@ -124,8 +139,14 @@ f_style(string k) =>
 f_isKey(string k) =>
     k == "res" or k == "sup" or k == "res0" or k == "sup0" or k == "flip" or k == "hgex"
 
-f_size() =>
-    lblSize == "Tiny" ? size.tiny : lblSize == "Normal" ? size.normal : lblSize == "Large" ? size.large : size.small
+f_sz(string s) =>
+    s == "Tiny" ? size.tiny : s == "Normal" ? size.normal : s == "Large" ? size.large : s == "Huge" ? size.huge : size.small
+
+f_isWall(string k) =>
+    k == "res" or k == "sup" or k == "flip"
+
+f_size(string k) =>
+    f_isWall(k) ? f_sz(keySize) : f_sz(lblSize)
 
 // ── Parsa strängen en gång ─────────────────────────────────────────────────
 var array<float>  aP = array.new<float>()
@@ -153,12 +174,12 @@ if barstate.islast and src != parsedSrc
 var array<line>  lns = array.new<line>()
 var array<label> lbs = array.new<label>()
 
-f_draw(float p, string tag, color c, int w, string st) =>
+f_draw(float p, string tag, string k, color c, int w, string st) =>
     if not na(p)
         array.push(lns, line.new(bar_index - 1, p, bar_index, p, extend = extendBoth ? extend.both : extend.right, color = c, width = w, style = st))
         if showLbl
             string txt = lblPrice ? tag + "  " + str.tostring(p, format.mintick) : tag
-            array.push(lbs, label.new(bar_index + lblOff, p, txt, style = label.style_label_left, color = color.new(color.black, 100), textcolor = c, size = f_size(), textalign = text.align_left))
+            array.push(lbs, label.new(bar_index + lblOff, p, txt, style = label.style_label_left, color = color.new(color.black, 100), textcolor = c, size = f_size(k), textalign = text.align_left, text_formatting = f_isWall(k) ? text.format_bold : text.format_none))
 
 if barstate.islast
     for l in lns
@@ -171,7 +192,7 @@ if barstate.islast
         for i = 0 to array.size(aP) - 1
             string k = array.get(aK, i)
             if f_show(k)
-                f_draw(array.get(aP, i), array.get(aT, i), f_col(k), f_width(k), f_style(k))
+                f_draw(array.get(aP, i), array.get(aT, i), k, f_col(k), f_width(k), f_style(k))
 
 // ── HUD ────────────────────────────────────────────────────────────────────
 var table hud = table.new(position.top_right, 3, 4, bgcolor = color.new(#131316, 15), border_width = 1, border_color = #222228)
@@ -198,13 +219,13 @@ if barstate.islast
         table.cell(hud, 1, 1, "PRIS", text_color = #7A7A85, text_size = size.tiny)
         table.cell(hud, 2, 1, "AVSTÅND", text_color = #7A7A85, text_size = size.tiny)
         if not na(bestUp)
-            table.cell(hud, 0, 2, "▲ " + upT, text_color = cRes, text_size = size.small, bgcolor = color.new(cRes, 90))
-            table.cell(hud, 1, 2, str.tostring(bestUp, format.mintick), text_color = #E8E6E1, text_size = size.small, bgcolor = color.new(cRes, 90))
-            table.cell(hud, 2, 2, "+" + str.tostring(bestUp - close, "#.##"), text_color = #7A7A85, text_size = size.small, bgcolor = color.new(cRes, 90))
+            table.cell(hud, 0, 2, "▲ " + upT, text_color = cRes, text_size = size.normal, bgcolor = color.new(cRes, 90), text_formatting = text.format_bold)
+            table.cell(hud, 1, 2, str.tostring(bestUp, format.mintick), text_color = #E8E6E1, text_size = size.normal, bgcolor = color.new(cRes, 90))
+            table.cell(hud, 2, 2, "+" + str.tostring(bestUp - close, "#.##"), text_color = #7A7A85, text_size = size.normal, bgcolor = color.new(cRes, 90))
         if not na(bestDn)
-            table.cell(hud, 0, 3, "▼ " + dnT, text_color = cSup, text_size = size.small, bgcolor = color.new(cSup, 90))
-            table.cell(hud, 1, 3, str.tostring(bestDn, format.mintick), text_color = #E8E6E1, text_size = size.small, bgcolor = color.new(cSup, 90))
-            table.cell(hud, 2, 3, str.tostring(bestDn - close, "#.##"), text_color = #7A7A85, text_size = size.small, bgcolor = color.new(cSup, 90))
+            table.cell(hud, 0, 3, "▼ " + dnT, text_color = cSup, text_size = size.normal, bgcolor = color.new(cSup, 90), text_formatting = text.format_bold)
+            table.cell(hud, 1, 3, str.tostring(bestDn, format.mintick), text_color = #E8E6E1, text_size = size.normal, bgcolor = color.new(cSup, 90))
+            table.cell(hud, 2, 3, str.tostring(bestDn - close, "#.##"), text_color = #7A7A85, text_size = size.normal, bgcolor = color.new(cSup, 90))
 
 // ── Larm ───────────────────────────────────────────────────────────────────
 if useAlerts and barstate.isconfirmed and array.size(aP) > 0
