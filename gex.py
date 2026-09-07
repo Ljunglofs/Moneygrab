@@ -346,3 +346,10 @@ def levels_string(inst, g, open_price=None, atr_daily=None, today=None):
                 add(open_price + m * atr_daily, f"O +{m:g} ATR", "opu")
                 add(open_price - m * atr_daily, f"O -{m:g} ATR", "opd")
     return ";".join(parts)
+
+
+if __name__ == "__main__":
+    # python gex.py [nq|gc] -> samma utskrift som gex_cli.py
+    import sys
+    from gex_cli import main as _cli_main
+    _cli_main(sys.argv[1:])
