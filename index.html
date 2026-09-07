@@ -1199,7 +1199,7 @@ else _i18nBoot();
   <div class="legal">GRABIT tillhandahåller teknisk analys och information — inte finansiell rådgivning. Handel med värdepapper innebär risk och kan leda till förluster. Historisk avkastning är ingen garanti för framtida resultat.</div>
   </section>
 
-  <section class="screen" id="s-signal"><div class="sigfilter" id="sigfilter"><button class="sigchip on" data-k="allt" onclick="setSig('allt')">Allt</button><button class="sigchip" data-k="setup" onclick="setSig('setup')">Setups</button><button class="sigchip" data-k="insider" onclick="setSig('insider')">Insiders</button><button class="sigchip" data-k="nyhet" onclick="setSig('nyhet')">Nyheter</button></div><div class="card feed" id="feed2" style="margin-top:8px"></div><div class="legal">GRABIT tillhandahåller teknisk analys och information — inte finansiell rådgivning. Handel med värdepapper innebär risk och kan leda till förluster. Historisk avkastning är ingen garanti för framtida resultat.</div>
+  <section class="screen" id="s-signal"><div class="sigfilter" id="sigfilter"><button class="sigchip on" data-k="allt" onclick="setSig('allt')">Allt</button><button class="sigchip" data-k="setup" onclick="setSig('setup')">Setups</button><button class="sigchip" data-k="insider" onclick="setSig('insider')">Insiders</button><button class="sigchip" data-k="nyhet" onclick="setSig('nyhet')">Nyheter</button><button class="sigchip" data-k="tv" onclick="setSig('tv')">TradingView</button></div><div class="card feed" id="feed2" style="margin-top:8px"></div><div class="legal">GRABIT tillhandahåller teknisk analys och information — inte finansiell rådgivning. Handel med värdepapper innebär risk och kan leda till förluster. Historisk avkastning är ingen garanti för framtida resultat.</div>
   </section>
   <section class="screen" id="s-daytrade"><div class="dt-head" id="dt-head"></div><div class="dt-list" id="dtlist"></div><div class="legal">GRABIT tillhandahåller teknisk analys och information — inte finansiell rådgivning. Handel med värdepapper innebär risk och kan leda till förluster. Historisk avkastning är ingen garanti för framtida resultat.</div>
   </section>
@@ -3055,6 +3055,7 @@ function _sigCard(f){var nm=(typeof NAMES!=="undefined"&&NAMES[f.tkr])||f.tkr;
 function _newsCard(t){return `<div class="sig sigf newsf" style="border-color:#22d3ee55"><div class="sig-c"><div class="sig-time">Marknadsnyhet</div><div class="sig-sub" style="color:#dfe7ee;font-weight:600">${t}</div></div></div>`;}
 function applySigFilter(){var box=document.getElementById("feed2");if(!box)return;
   if(SIGFILTER==="insider"){loadInsiderFlow();return;}
+  if(SIGFILTER==="tv"){loadTvSignals();return;}
   var S=window.__SIG||{feed:[],news:[],allHTML:""};
   var feed=S.feed||[],news=S.news||[];
   var SET={flame:1,trend:1,pulse:1,dot:1};var html="";
@@ -3066,6 +3067,64 @@ function applySigFilter(){var box=document.getElementById("feed2");if(!box)retur
     html=tn+mn;}
   if(!html)html=`<div class="sig-empty">Inga signaler i den här kategorin just nu.</div>`;
   box.innerHTML=html;}
+
+/* ===== TRADINGVIEW-SIGNALER (dina TradingView-larm via /tv/webhook) ===== */
+var _TV={t:0,rows:null,configured:false};
+function _tvSideInfo(side){var EN=(window.GRABIT_LANG==="en");
+  if(side==="LONG")return{c:"#2ecc71",lbl:EN?"LONG · buy signal":"LONG · köpsignal",i:"trend"};
+  if(side==="SHORT")return{c:"#FF3B30",lbl:EN?"SHORT · sell signal":"SHORT · säljsignal",i:"flame"};
+  if(side==="EXIT")return{c:"#F5C542",lbl:"EXIT · stäng/ta hem",i:"dot"};
+  return{c:"#22d3ee",lbl:EN?"ALERT · watch":"LARM · bevaka",i:"bell"};}
+function _tvWhen(ts){try{var d=new Date(ts);var diff=(Date.now()-d.getTime())/60000;var EN=(window.GRABIT_LANG==="en");
+  if(diff<1)return EN?"just now":"just nu";if(diff<60)return Math.round(diff)+(EN?" min ago":" min sedan");
+  if(diff<36*60)return Math.round(diff/60)+(EN?" h ago":" h sedan");
+  return d.toLocaleDateString(EN?"en-GB":"sv-SE",{day:"numeric",month:"short"})+" "+d.toLocaleTimeString(EN?"en-GB":"sv-SE",{hour:"2-digit",minute:"2-digit"});}catch(e){return ts||"";}}
+function _tvCard(r){var EN=(window.GRABIT_LANG==="en");var si=_tvSideInfo(r.side);
+  var nm=(typeof NAMES!=="undefined"&&r.tkr&&NAMES[r.tkr])||r.tkr||r.tv_symbol||"TradingView";
+  var ic=(typeof I!=="undefined"&&(I[si.i]||I.dot))||"";
+  var bits=[];
+  if(r.price!=null)bits.push((EN?"Price ":"Pris ")+r.price);
+  if(r.stop!=null)bits.push("SL "+r.stop);
+  if(r.target!=null)bits.push("TP "+r.target);
+  if(r.interval)bits.push(/^\d+$/.test(r.interval)?r.interval+"m":r.interval);
+  if(r.strategy)bits.push(r.strategy);
+  var esc=function(x){return String(x==null?"":x).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});};
+  var click=r.tkr&&!/^(US100|XAU)$/.test(r.tkr)?' onclick="openStock(\''+esc(r.tkr)+'\')"':"";
+  return '<div class="sig sigf tvsig" style="border-color:'+si.c+'55"'+click+'><div class="sig-c">'
+    +'<div class="sig-time">'+_tvWhen(r.ts)+' · '+esc(nm)+' · <span class="tv-src">TradingView</span></div>'
+    +'<div class="sig-h" style="color:'+si.c+'"><span class="fic">'+ic+'</span>'+si.lbl+'</div>'
+    +(bits.length?'<div class="sig-sub">'+esc(bits.join(" · "))+'</div>':"")
+    +(r.note?'<div class="sig-sub tv-note">'+esc(r.note)+'</div>':"")
+    +'</div></div>';}
+function _tvGuide(configured){var EN=(window.GRABIT_LANG==="en");
+  var base=(CONFIG.API_BASE||"").replace(/\/$/,"")||"https://DIN-API.onrender.com";
+  var url=base+"/tv/webhook?key=DIN_HEMLIGHET";
+  var msg='{"ticker":"{{ticker}}","exchange":"{{exchange}}","action":"buy","price":{{close}},"interval":"{{interval}}","note":"Ditt meddelande"}';
+  var esc=function(x){return String(x).replace(/[&<>]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;"}[c];});};
+  return '<div class="tv-setup">'
+    +'<b>'+(EN?"Connect TradingView":"Koppla TradingView")+'</b>'
+    +'<p>'+(EN?"Your TradingView alerts land here, in Telegram/Discord and as push — as soon as an alert fires.":"Dina TradingView-larm hamnar här, i Telegram/Discord och som push — direkt när larmet går.")+'</p>'
+    +(configured?"":'<p class="tv-warn">'+(EN?"The server has no TV_WEBHOOK_SECRET yet — add it in Render → Environment.":"Servern saknar TV_WEBHOOK_SECRET ännu — lägg till den i Render → Environment.")+'</p>')
+    +'<ol>'
+    +'<li>'+(EN?"In TradingView: create an alert (Pro plan or higher is required for webhooks).":"I TradingView: skapa ett larm (Pro-plan eller högre krävs för webhooks).")+'</li>'
+    +'<li>'+(EN?"Notifications → tick <b>Webhook URL</b> and paste:":"Notiser → bocka i <b>Webhook URL</b> och klistra in:")+'<code>'+esc(url)+'</code></li>'
+    +'<li>'+(EN?"Message → paste (edit action/note as you like):":"Message → klistra in (ändra action/note som du vill):")+'<code>'+esc(msg)+'</code></li>'
+    +'</ol>'
+    +'<p class="tv-fine">'+(EN?"action: buy / sell / close / alert. Plain text works too. Full guide in TRADINGVIEW.md.":"action: buy / sell / close / alert. Ren text funkar också. Hela guiden finns i TRADINGVIEW.md.")+'</p>'
+    +'</div>';}
+async function loadTvSignals(force){var box=document.getElementById("feed2");if(!box)return;var EN=(window.GRABIT_LANG==="en");
+  if(!CONFIG.API_BASE){box.innerHTML=_tvGuide(false);return;}
+  if(!force&&_TV.rows&&Date.now()-_TV.t<30000){_tvRender(box);return;}
+  if(!_TV.rows)box.innerHTML='<div class="sig-empty">'+(EN?"Loading TradingView signals…":"Hämtar TradingView-signaler…")+'</div>';
+  try{var r=await fetch(CONFIG.API_BASE.replace(/\/$/,"")+"/tv/signals?limit=40",{cache:"no-store"});var j=await r.json();
+    if(j&&j.ok){_TV.rows=j.signals||[];_TV.configured=!!j.configured;_TV.t=Date.now();}
+    else if(!_TV.rows)_TV.rows=[];
+  }catch(e){if(!_TV.rows)_TV.rows=[];}
+  if(SIGFILTER==="tv")_tvRender(box);}
+function _tvRender(box){var rows=_TV.rows||[];var html=rows.map(_tvCard).join("");
+  if(!html)html=_tvGuide(_TV.configured);else html+='<div class="tv-foot">'+_tvGuide(_TV.configured)+'</div>';
+  box.innerHTML=html;}
+setInterval(function(){if(SIGFILTER==="tv"&&document.getElementById("s-signal")&&document.getElementById("s-signal").classList.contains("on"))loadTvSignals(true);},60000);
 
 /* ===== INSIDER FLOW (politiker + VD/insider + confluence) ===== */
 var IFLOWFILTER="allt";
@@ -3277,6 +3336,17 @@ async function loadPolyInsiders(force){
 .sig.sigf .sig-sub{font-size:12.5px!important;line-height:1.45!important;color:#aeb8c2!important}
 .sig.sigf.newsf .sig-sub{font-size:13px!important;color:#dfe7ee!important}
 .sig-empty{padding:26px 14px!important;text-align:center!important;color:var(--mut,#8b97a3)!important;font-size:13px!important;border:1px dashed rgba(255,255,255,.10)!important;border-radius:14px!important}
+.tv-src{color:#22d3ee;font-weight:800}
+.tvsig .tv-note{color:#e6ecf3;font-style:italic}
+.tv-setup{padding:16px 15px;border:1px dashed rgba(34,211,238,.35);border-radius:14px;background:linear-gradient(180deg,#0C0C0D,#070708);font-size:13px;color:#cdd5e1;line-height:1.5}
+.tv-setup b{color:#eaf2f8;font-size:14px;letter-spacing:.06em;text-transform:uppercase}
+.tv-setup p{margin:8px 0 0}
+.tv-setup ol{margin:10px 0 0;padding-left:20px}
+.tv-setup li{margin:6px 0}
+.tv-setup code{display:block;margin-top:6px;padding:8px 10px;border-radius:9px;background:#050506;border:1px solid rgba(255,255,255,.08);color:#F5C542;font-size:11.5px;word-break:break-all;white-space:pre-wrap;user-select:all;-webkit-user-select:all}
+.tv-setup .tv-warn{color:#FF9F0A;font-weight:700}
+.tv-setup .tv-fine{color:var(--mut,#8b97a3);font-size:12px}
+.tv-foot{margin-top:14px}
 .fgcard{background:#0C0C0D!important;border:1px solid rgba(255,255,255,.08)!important;border-radius:18px!important;padding:16px 16px 14px!important;margin:4px 0 0!important;box-shadow:none!important}
 .fgcard .fg-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
 .fgcard .fg-lbl{font-weight:800!important;font-size:11px!important;letter-spacing:.1em!important;text-transform:uppercase!important;color:var(--mut,#8b97a3)!important}

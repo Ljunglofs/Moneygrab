@@ -1,0 +1,53 @@
+# GEX Daily Levels — räknar dagens nivåer för NQ och GC, skickar till Telegram
+# och sparar strängarna i levels/ så de går att öppna i telefonen.
+#
+# Schema: vardagar 11:05 UTC = 13:05 svensk sommartid (12:05 vintertid).
+# OBS: schemalagda jobb körs bara från repots default-branch (main).
+# "Run workflow" (workflow_dispatch) fungerar från vilken branch som helst,
+# även från GitHub-appen i telefonen.
+#
+# Secrets (Settings -> Secrets and variables -> Actions):
+#   TELEGRAM_TOKEN  samma bot som roboten
+#   CHAT_ID         din chat
+name: GEX Daily Levels
+
+on:
+  schedule:
+    - cron: "5 11 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: gex-daily
+  cancel-in-progress: false
+
+jobs:
+  levels:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Installera beroenden
+        run: pip install -q yfinance pandas numpy requests
+
+      - name: Räkna nivåer och skicka till Telegram
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+        run: python gex_notify.py
+
+      - name: Spara strängarna i repot (levels/)
+        run: |
+          git config user.name "gex-bot"
+          git config user.email "gex-bot@users.noreply.github.com"
+          git add levels/
+          git diff --cached --quiet && echo "inga ändringar" || git commit -m "GEX levels $(date -u +%Y-%m-%d)"
+          git push

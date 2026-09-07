@@ -1,0 +1,46 @@
+// GRABIT Feed · skickar varje 1-minutsbar + CVD + VWAP till GRABIT DESK.
+//
+// INSTALLATION (en gång per instrument, NQ1! och GC1!):
+//  1. Öppna ett 1-minutsdiagram på CME_MINI:NQ1! (eller COMEX:GC1!).
+//     Kräver CME-realtidsdata i TradingView, annars är allt 10 min fördröjt.
+//  2. Pine Editor -> klistra in detta -> "Add to chart".
+//  3. Klocksymbolen -> Create Alert:
+//       Condition:  GRABIT Feed  ->  "Any alert() function call"
+//       Options:    (styrs av scriptet: fyrar vid barstängning)
+//       Expiration: Open-ended  (kräver Premium; annars förnya var månad)
+//       Notifications -> Webhook URL:
+//           https://grabit-api-80dh.onrender.com/desk/bar?key=DIN_TV_WEBHOOK_SECRET
+//       Message: lämna tom — scriptet bygger JSON-meddelandet själv.
+//  4. Spara. Kontrollera med /desk/status att "bars_received" tickar.
+//
+// Ett larm per instrument räcker. ~1 440 anrop/dygn/instrument.
+//@version=6
+indicator("GRABIT Feed", overlay=true)
+
+// --- CVD: TradingViews volymdelta, ankrat till handelsdagen (CME: 18:00 ET) ---
+// lowerTimeframe "1" på ett 1m-diagram = deltan räknas på 1m-barerna själva.
+// Sätt "1S" (sekunder) för finare delta om din plan har sekundsdata.
+lowerTf = input.string("1", "Lower timeframe för volymdelta", options=["1S", "5S", "10S", "15S", "30S", "1"])
+[cvdOpen, cvdHigh, cvdLow, cvdClose] = ta.requestVolumeDelta(lowerTf, "1D")
+
+// --- Sessions-VWAP (återställs vid ny handelsdag) ---
+[vwapVal, vwapUp, vwapDn] = ta.vwap(hlc3, timeframe.change("1D"), 1)
+
+plot(vwapVal, "VWAP", color=color.new(color.yellow, 0))
+plot(vwapUp, "VWAP +1σ", color=color.new(color.yellow, 70))
+plot(vwapDn, "VWAP −1σ", color=color.new(color.yellow, 70))
+
+// --- Skicka vid varje barstängning ---
+msg = '{"sym":"' + syminfo.ticker + '",' +
+      '"tf":"' + timeframe.period + '",' +
+      '"t":"' + str.format_time(time, "yyyy-MM-dd'T'HH:mm:ss", "UTC") + 'Z",' +
+      '"o":' + str.tostring(open) + ',' +
+      '"h":' + str.tostring(high) + ',' +
+      '"l":' + str.tostring(low) + ',' +
+      '"c":' + str.tostring(close) + ',' +
+      '"v":' + str.tostring(volume) + ',' +
+      '"cvd":' + str.tostring(cvdClose) + ',' +
+      '"vwap":' + str.tostring(vwapVal) + '}'
+
+if barstate.isconfirmed
+    alert(msg, alert.freq_once_per_bar_close)
