@@ -132,7 +132,7 @@ Hämta strängen:
 
 - Telegram: `/tvgex nq`, `/tvgex gc` eller `/tvgex all`. Svaret är ett kodblock, tryck för att kopiera.
 - HTTP: `/desk/gexstring?inst=NQ` (ren text), `/desk/gexstring?inst=all` (JSON med båda).
-- Automatiskt: desken postar båda strängarna i Telegram runt 09:10 ET varje vardag, när första baren efter den tiden kommer in. Stäng av med `DESK_MORNING_GEX=0`.
+- Automatiskt via GitHub Actions: vardagar 08:00 (London-uppsättning, EM/öppning centrerade på nattens pris) och 13:05 svensk tid (USA-uppsättning med dagens open interest). Desken på Render postar dessutom runt 09:10 ET om den kör; stäng av med `DESK_MORNING_GEX=0`.
 
 Indikatorn finns i repot: `pine/grabit_gex_levels.pine`. Klistra in den i Pine Editor, lägg till på grafen och
 klistra in strängarna i fälten "NQ — levels string" och "GC — levels string". Den ritar bara GEX-nivåerna, har HUD med närmaste nivå över/under och larm vid korsning av väggar, flip och HGEX.
