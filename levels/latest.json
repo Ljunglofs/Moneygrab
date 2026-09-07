@@ -1,5 +1,5 @@
 {
-  "generated": "2026-09-07T09:52:30+02:00",
+  "generated": "2026-09-07T10:02:17+02:00",
   "levels": [
     {
       "inst": "NQ",
@@ -16,18 +16,18 @@
       ],
       "call_wall": 30725.51,
       "put_wall": 29221.47,
-      "zero_gamma": 30739.87,
+      "zero_gamma": 30739.96,
       "hgex": 29221.47,
       "call_wall_0dte": 30295.79,
       "put_wall_0dte": 29221.47,
       "max_pain": 30725.51,
-      "expected_move": 681.63,
+      "expected_move": 680.09,
       "em_src": "iv",
       "iv_1d": 668.64,
       "flip_uncertain": true,
       "open": 29535.25,
       "atr_daily": 378.0,
-      "string": "30725.5,Call Wall,res;29221.5,Put Wall,sup;30295.75,Call Wall 09-08,res0;30739.75,Gamma Flip,flip;30725.5,Max Pain 09-08,mpain;30940.5,G+ 1,gpos;30983.25,G+ 2,gpos;29866,G- 1,gneg;30081,G- 2,gneg;30247,EM+,emh;28883.5,EM-,eml;29906,EM +50%,emb;29224.5,EM -50%,emb;30234,1D High IV,ivh;28896.5,1D Low IV,ivl;29535.25,Open,opo;29724.25,O +0.5 ATR,opu;29346.25,O -0.5 ATR,opd;29913.25,O +1 ATR,opu;29157.25,O -1 ATR,opd"
+      "string": "30725.5,Call Wall,res;29221.5,Put Wall,sup;30295.75,Call Wall 09-08,res0;30740,Gamma Flip,flip;30725.5,Max Pain 09-08,mpain;30940.5,G+ 1,gpos;30983.25,G+ 2,gpos;29866,G- 1,gneg;30081,G- 2,gneg;30245.25,EM+,emh;28885.25,EM-,eml;29905.25,EM +50%,emb;29225.25,EM -50%,emb;30234,1D High IV,ivh;28896.5,1D Low IV,ivl;29535.25,Open,opo;29724.25,O +0.5 ATR,opu;29346.25,O -0.5 ATR,opd;29913.25,O +1 ATR,opu;29157.25,O -1 ATR,opd"
     },
     {
       "inst": "GC",
@@ -44,7 +44,7 @@
       ],
       "call_wall": 4694.97,
       "put_wall": 4422.01,
-      "zero_gamma": 4417.13,
+      "zero_gamma": 4417.23,
       "hgex": 4694.97,
       "call_wall_0dte": 4542.11,
       "put_wall_0dte": 4411.09,
@@ -55,7 +55,7 @@
       "flip_uncertain": false,
       "open": 4466.5,
       "atr_daily": 82.79289899553571,
-      "string": "4695,Call Wall,res;4422,Put Wall,sup;4542.1,Call Wall 09-08,res0;4411.1,Put Wall 09-08,sup0;4417.1,Gamma Flip,flip;4476.6,Max Pain 09-08,mpain;4542.1,G+ 1,gpos;4640.4,G+ 2,gpos;4367.4,G- 1,gneg;4411.1,G- 2,gneg;4533.1,EM+,emh;4420.1,EM-,eml;4504.8,EM +50%,emb;4448.4,EM -50%,emb;4543.6,1D High IV,ivh;4409.6,1D Low IV,ivl;4466.5,Open,opo;4507.9,O +0.5 ATR,opu;4425.1,O -0.5 ATR,opd;4549.3,O +1 ATR,opu;4383.7,O -1 ATR,opd"
+      "string": "4695,Call Wall,res;4422,Put Wall,sup;4542.1,Call Wall 09-08,res0;4411.1,Put Wall 09-08,sup0;4417.2,Gamma Flip,flip;4476.6,Max Pain 09-08,mpain;4542.1,G+ 1,gpos;4640.4,G+ 2,gpos;4367.4,G- 1,gneg;4411.1,G- 2,gneg;4533.1,EM+,emh;4420.1,EM-,eml;4504.8,EM +50%,emb;4448.4,EM -50%,emb;4543.6,1D High IV,ivh;4409.6,1D Low IV,ivl;4466.5,Open,opo;4507.9,O +0.5 ATR,opu;4425.1,O -0.5 ATR,opd;4549.3,O +1 ATR,opu;4383.7,O -1 ATR,opd"
     }
   ]
 }
