@@ -5,6 +5,8 @@
 #   06:00 = 08:00 svensk sommartid -> London-uppsättning: samma väggar (OI ändras
 #           bara efter USA-stängning) men EM-band och öppningsgrid centrerade på nattens pris.
 #   11:05 = 13:05 svensk sommartid -> USA-uppsättning med dagens uppdaterade open interest.
+#   06:30 / 11:35 = reservkörningar. GitHubs schemaläggare kan försena eller tappa
+#   körningar; reserven skickar bara om ingen uppsättning gått ut senaste 50 min.
 # (Vintertid: en timme tidigare svensk tid.)
 # OBS: schemalagda jobb körs bara från repots default-branch (main).
 # "Run workflow" (workflow_dispatch) fungerar från vilken branch som helst,
@@ -18,7 +20,9 @@ name: GEX Daily Levels
 on:
   schedule:
     - cron: "0 6 * * 1-5"    # London 08:00 CEST
+    - cron: "30 6 * * 1-5"   # reserv (skickar bara om 08:00 inte gick)
     - cron: "5 11 * * 1-5"   # USA   13:05 CEST
+    - cron: "35 11 * * 1-5"  # reserv (skickar bara om 13:05 inte gick)
   workflow_dispatch:
 
 permissions:
@@ -47,6 +51,10 @@ jobs:
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
+          # Schemalagda körningar hoppar över om en uppsättning gått ut senaste 50 min
+          # (så reservkörningen inte dubblerar). Manuell "Run workflow" kör alltid.
+          GEX_SKIP_IF_FRESHER_MIN: ${{ github.event_name == 'schedule' && '50' || '0' }}
+          GEX_FORCE: ${{ github.event_name == 'workflow_dispatch' && '1' || '0' }}
         run: python gex_notify.py
 
       - name: Spara strängarna i repot (levels/)

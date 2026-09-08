@@ -68,8 +68,27 @@ def write_files(results):
                   f, indent=2, ensure_ascii=False)
 
 
+def _recent_run_minutes():
+    """Minuter sedan senaste lyckade körning (levels/latest.json), eller None."""
+    try:
+        with open(os.path.join(OUT_DIR, "latest.json"), encoding="utf-8") as f:
+            gen = json.load(f).get("generated")
+        dt = datetime.fromisoformat(gen)
+        return (datetime.now(STO) - dt).total_seconds() / 60
+    except Exception:
+        return None
+
+
 def main(argv):
     insts = [a.upper() for a in argv if a.upper() in ("NQ", "GC")] or ["NQ", "GC"]
+    # Reservkörningar (schema 30 min efter ordinarie): hoppa över om en färsk
+    # uppsättning redan skickats. GEX_FORCE=1 (manuell körning) kör alltid.
+    skip_if_min = float(os.environ.get("GEX_SKIP_IF_FRESHER_MIN", "0") or 0)
+    if skip_if_min > 0 and os.environ.get("GEX_FORCE", "") != "1":
+        age = _recent_run_minutes()
+        if age is not None and age < skip_if_min:
+            print(f"Senaste uppsättningen är {age:.0f} min gammal (< {skip_if_min:.0f}) — reservkörning hoppar över.")
+            return 0
     results = [CLI.run(i) for i in insts]
     write_files(results)
     msg = build_message(results)
