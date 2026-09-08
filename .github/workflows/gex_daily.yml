@@ -44,7 +44,25 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Jämför källorna och skriver ut allt i loggen. Skickar ingenting.
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Installera beroenden
+        run: pip install -q yfinance pandas numpy requests
+      - name: Spotpriser och kvoter från båda källorna
+        run: python gex_check.py
+
   levels:
+    # Manuell körning från en testbranch kör bara diagnosen ovan — inget
+    # hamnar i Telegram förrän koden ligger på main.
+    if: github.event_name == 'schedule' || github.ref_name == 'main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
