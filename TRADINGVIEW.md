@@ -88,3 +88,23 @@ Identisk signal inom 60 sekunder räknas som dubblett och skickas inte igen
 | Larmet syns i appen men inte i Telegram | `TELEGRAM_TOKEN`/`CHAT_ID` saknas — kolla `/api/robber/test`. |
 | Ingen push | Ingen bevakar aktien (`watchlist`-läge) eller VAPID-nycklar saknas. Testa `"push":"all"`. |
 | Signalerna försvinner vid omdeploy | `DATA_DIR` pekar inte på Persistent Disk. |
+
+## GRABIT Delta · CVD (`pine/grabit_delta_cvd.pine`)
+
+Volymdelta och kumulativ delta i egen panel, som filter till GEX-nivåerna:
+väggen säger var priset möter motstånd, deltat säger om någon orkar dit.
+
+Varje bar delas i intrabarer (5-sekunders på en 5-minutersgraf, ställbart).
+Intrabaren räknas som köp om den stängde upp och sälj om den stängde ner, och
+volymen får det tecknet. Summan är barens delta, summan över dagen är CVD.
+Samma metod som TradingViews egen volymdelta — en approximation av bid/ask,
+inte licensierad orderflow, men nära på NQ och GC.
+
+- CVD ritas som ljus: kroppen är barens delta, nivån är dagens ackumulerade.
+- Signallinjen (EMA 21) plus riktning ger raden ÖVERTAG: KÖPARE, SÄLJARE eller JÄMNT.
+- Divergenser markeras: ny topp i priset utan ny topp i CVD = "Säljare absorberar",
+  ny botten utan ny botten i CVD = "Köpare absorberar". Båda kan larma.
+- Statusrutan visar också vilken intrabar-upplösning som faktiskt användes. Står
+  det "saknas" hittade TradingView ingen intrabar-data så långt bakåt, och baren
+  klassas grovt på sin egen stängning — då är siffran ungefärlig.
+- CVD nollställs per dag som förval; Session (RTH), Vecka eller Aldrig går att välja.
