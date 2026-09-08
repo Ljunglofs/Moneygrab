@@ -1,12 +1,12 @@
 {
-  "generated": "2026-09-08T09:37:42+02:00",
+  "generated": "2026-09-08T12:18:36+02:00",
   "levels": [
     {
       "inst": "NQ",
-      "fut_price": 29620.5,
+      "fut_price": 29586.25,
       "underlying": "QQQ",
       "etf_spot": 688.0,
-      "ratio": 43.0531,
+      "ratio": 43.0033,
       "regime": "positiv",
       "expiries": [
         "2026-09-08",
@@ -14,27 +14,27 @@
         "2026-09-10",
         "2026-09-11"
       ],
-      "call_wall": 28716.39,
-      "put_wall": 39178.28,
+      "call_wall": 28683.18,
+      "put_wall": 39132.98,
       "zero_gamma": null,
-      "hgex": 28716.39,
-      "call_wall_0dte": 28716.39,
-      "put_wall_0dte": 39178.28,
-      "max_pain": 24540.24,
+      "hgex": 28683.18,
+      "call_wall_0dte": 28683.18,
+      "put_wall_0dte": 39132.98,
+      "max_pain": 24511.86,
       "expected_move": null,
       "em_src": null,
       "iv_1d": null,
       "flip_uncertain": false,
       "open": 29535.25,
-      "atr_daily": 384.19642857142856,
-      "string": "28716.5,Call Wall,res;39178.25,Put Wall,sup;24540.25,Max Pain 09-11,mpain;24540.25,G+ 1,gpos;27338.75,G+ 2,gpos;29535.25,Open,opo;29727.25,O +0.5 ATR,opu;29343.25,O -0.5 ATR,opd;29919.5,O +1 ATR,opu;29151,O -1 ATR,opd"
+      "atr_daily": 387.57142857142856,
+      "string": "28683.25,Call Wall,res;39133,Put Wall,sup;24511.75,Max Pain 09-11,mpain;24511.75,G+ 1,gpos;27307,G+ 2,gpos;29535.25,Open,opo;29729,O +0.5 ATR,opu;29341.5,O -0.5 ATR,opd;29922.75,O +1 ATR,opu;29147.75,O -1 ATR,opd"
     },
     {
       "inst": "GC",
-      "fut_price": 4448.0,
+      "fut_price": 4441.5,
       "underlying": "GLD",
       "etf_spot": 410.0,
-      "ratio": 10.8488,
+      "ratio": 10.8329,
       "regime": "positiv",
       "expiries": [
         "2026-09-08",
@@ -42,20 +42,20 @@
         "2026-09-10",
         "2026-09-11"
       ],
-      "call_wall": 3862.17,
-      "put_wall": 3840.47,
+      "call_wall": 3856.52,
+      "put_wall": 3834.86,
       "zero_gamma": null,
-      "hgex": 3862.17,
-      "call_wall_0dte": 3862.17,
-      "put_wall_0dte": 3840.47,
-      "max_pain": 3840.47,
+      "hgex": 3856.52,
+      "call_wall_0dte": 3856.52,
+      "put_wall_0dte": 3834.86,
+      "max_pain": 3834.86,
       "expected_move": null,
       "em_src": null,
       "iv_1d": null,
       "flip_uncertain": false,
       "open": 4466.5,
       "atr_daily": 83.58572823660714,
-      "string": "3862.2,Call Wall,res;3840.5,Put Wall,sup;3840.5,Max Pain 09-11,mpain;3840.5,G+ 1,gpos;4466.5,Open,opo;4508.3,O +0.5 ATR,opu;4424.7,O -0.5 ATR,opd;4550.1,O +1 ATR,opu;4382.9,O -1 ATR,opd"
+      "string": "3856.5,Call Wall,res;3834.9,Put Wall,sup;3834.9,Max Pain 09-11,mpain;3834.9,G+ 1,gpos;4466.5,Open,opo;4508.3,O +0.5 ATR,opu;4424.7,O -0.5 ATR,opd;4550.1,O +1 ATR,opu;4382.9,O -1 ATR,opd"
     }
   ]
 }

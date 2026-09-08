@@ -1,1 +1,1 @@
-3862.2,Call Wall,res;3840.5,Put Wall,sup;3840.5,Max Pain 09-11,mpain;3840.5,G+ 1,gpos;4466.5,Open,opo;4508.3,O +0.5 ATR,opu;4424.7,O -0.5 ATR,opd;4550.1,O +1 ATR,opu;4382.9,O -1 ATR,opd
+3856.5,Call Wall,res;3834.9,Put Wall,sup;3834.9,Max Pain 09-11,mpain;3834.9,G+ 1,gpos;4466.5,Open,opo;4508.3,O +0.5 ATR,opu;4424.7,O -0.5 ATR,opd;4550.1,O +1 ATR,opu;4382.9,O -1 ATR,opd
