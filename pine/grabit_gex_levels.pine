@@ -11,7 +11,7 @@
 //  4. Valfritt: larm på indikatorn ("Any alert() function call") ger notis när
 //     priset korsar Call Wall, Put Wall, 0DTE-väggarna, Flip eller HGEX.
 //
-// LAYOUT: förvalet "Ren" visar tre linjer — Call Wall, Gamma Flip, Put Wall —
+// LAYOUT: förvalet "Ren" visar tre linjer — Call Wall, Zero Gamma, Put Wall —
 // med prispiller i högerkanten och en statusrad överst. "Nyckelnivåer" lägger
 // till HGEX, Max Pain och EM±, "Alla" resten (0DTE, G+/G−, IV-range, ATR-grid).
 //
@@ -123,25 +123,24 @@ f_style(string k) =>
         "gneg" => line.style_dashed
         => line.style_dotted
 
-// Kort kod i pillret — CW 29686 i stället för hela etiketten.
-// isSec = nivån är den valda andra väggen (närmast priset på sin sida).
+// Text i pillret. isSec = nivån är den valda andra väggen på sin sida.
 f_code(string k, string tag, bool isSec) =>
     switch k
-        "res"   => "CW"
-        "sup"   => "PW"
-        "res0"  => "CW 0DTE"
-        "sup0"  => "PW 0DTE"
-        "flip"  => "ZG"
+        "res"   => "Call Wall"
+        "sup"   => "Put Wall"
+        "res0"  => "Call Wall 0DTE"
+        "sup0"  => "Put Wall 0DTE"
+        "flip"  => "Zero Gamma"
         "hgex"  => "HGEX"
-        "mpain" => "MP"
-        "gpos"  => isSec ? "CW2" : str.replace_all(tag, " ", "")
-        "gneg"  => isSec ? "PW2" : str.replace_all(tag, " ", "")
+        "mpain" => "Max Pain"
+        "gpos"  => isSec ? "Call Wall 2" : str.replace_all(tag, " ", "")
+        "gneg"  => isSec ? "Put Wall 2" : str.replace_all(tag, " ", "")
         "emh"   => "EM+"
         "eml"   => "EM−"
-        "emb"   => "EM½"
+        "emb"   => "EM ½"
         "ivh"   => "IV+"
         "ivl"   => "IV−"
-        "opo"   => "OPEN"
+        "opo"   => "Open"
         "opu"   => "ATR+"
         "opd"   => "ATR−"
         => tag
@@ -255,11 +254,11 @@ if barstate.islast
         table.cell(hdr, 0, 0, und + " → " + f_market(), text_color = cSoft, text_size = size.small)
         table.cell(hdr, 1, 0, str.tostring(close, format.mintick), text_color = #E8E6E1,
              text_size = size.small, text_formatting = text.format_bold)
-        table.cell(hdr, 2, 0, na(cw) ? "C –" : "C " + str.tostring(cw, format.mintick),
+        table.cell(hdr, 2, 0, na(cw) ? "Call Wall –" : "Call Wall " + str.tostring(cw, format.mintick),
              text_color = cCall, text_size = size.small)
-        table.cell(hdr, 3, 0, na(zg) ? "Z –" : "Z " + str.tostring(zg, format.mintick),
+        table.cell(hdr, 3, 0, na(zg) ? "Zero Gamma –" : "Zero Gamma " + str.tostring(zg, format.mintick),
              text_color = cFlip, text_size = size.small)
-        table.cell(hdr, 4, 0, na(pw) ? "P –" : "P " + str.tostring(pw, format.mintick),
+        table.cell(hdr, 4, 0, na(pw) ? "Put Wall –" : "Put Wall " + str.tostring(pw, format.mintick),
              text_color = cPut, text_size = size.small)
         if hasZ
             table.cell(hdr, 5, 0, pos ? "POSITIV GAMMA" : "NEGATIV GAMMA",
