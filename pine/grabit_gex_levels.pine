@@ -11,7 +11,7 @@
 //  4. Valfritt: larm på indikatorn ("Any alert() function call") ger notis när
 //     priset korsar Call Wall, Put Wall, 0DTE-väggarna, Flip eller HGEX.
 //
-// LAYOUT: förvalet "Ren" visar tre linjer — Call Wall, Gamma Flip, Put Wall —
+// LAYOUT: förvalet "Ren" visar tre linjer — Call Wall, Zero Gamma, Put Wall —
 // med prispiller i högerkanten och en statusrad överst. "Nyckelnivåer" lägger
 // till HGEX, Max Pain och EM±, "Alla" resten (0DTE, G+/G−, IV-range, ATR-grid).
 //
@@ -35,7 +35,7 @@ const string G_VIEW = "Vy"
 string preset = input.string("Ren", "Nivåer", options = ["Ren", "Nyckelnivåer", "Alla"], group = G_VIEW,
      tooltip = "Ren: Call Wall, Gamma Flip, Put Wall. Nyckelnivåer: + HGEX, Max Pain, EM±. Alla: + 0DTE, G+/G−, IV-range och ATR-grid.")
 bool   showSec  = input.bool(true, "Andra väggen (CW2 / PW2)", group = G_VIEW,
-     tooltip = "Näst största gamma-strike över och under priset. Visas även i Ren-vyn.")
+     tooltip = "En extra nivå per håll: närmaste positiva gamma-strike ovanför priset (CW2) och närmaste negativa under (PW2). I vyn Alla visas i stället alla G+/G− med sina egna namn.")
 bool   showHdr  = input.bool(true, "Statusrad överst", group = G_VIEW)
 bool   showTags = input.bool(true, "Prispiller i högerkanten", group = G_VIEW)
 bool   showPx   = input.bool(true, "Piller för aktuellt pris", group = G_VIEW)
@@ -123,24 +123,24 @@ f_style(string k) =>
         "gneg" => line.style_dashed
         => line.style_dotted
 
-// Kort kod i pillret — CW 29331.70 i stället för hela etiketten.
-f_code(string k, string tag, int nPos, int nNeg) =>
+// Text i pillret. isSec = nivån är den valda andra väggen på sin sida.
+f_code(string k, string tag, bool isSec) =>
     switch k
-        "res"   => "CW"
-        "sup"   => "PW"
-        "res0"  => "CW 0DTE"
-        "sup0"  => "PW 0DTE"
-        "flip"  => "ZG"
+        "res"   => "Call Wall"
+        "sup"   => "Put Wall"
+        "res0"  => "Call Wall 0DTE"
+        "sup0"  => "Put Wall 0DTE"
+        "flip"  => "Zero Gamma"
         "hgex"  => "HGEX"
-        "mpain" => "MP"
-        "gpos"  => "CW" + str.tostring(nPos + 1)
-        "gneg"  => "PW" + str.tostring(nNeg + 1)
+        "mpain" => "Max Pain"
+        "gpos"  => isSec ? "Call Wall 2" : str.replace_all(tag, " ", "")
+        "gneg"  => isSec ? "Put Wall 2" : str.replace_all(tag, " ", "")
         "emh"   => "EM+"
         "eml"   => "EM−"
-        "emb"   => "EM½"
+        "emb"   => "EM ½"
         "ivh"   => "IV+"
         "ivl"   => "IV−"
-        "opo"   => "OPEN"
+        "opo"   => "Open"
         "opu"   => "ATR+"
         "opd"   => "ATR−"
         => tag
@@ -185,26 +185,44 @@ if barstate.islast
         label.delete(lb)
     array.clear(lbs)
 
-    int nPos = 0
-    int nNeg = 0
+    // Andra väggen: närmaste positiva gamma-strike ovanför priset och närmaste
+    // negativa under. G+/G− kommer sorterade efter gammastorlek, inte pris, så
+    // utan det här steget hamnar CW2 under CW1.
+    int secUp = -1
+    int secDn = -1
+    float upBest = na
+    float dnBest = na
+    if array.size(aP) > 0
+        for i = 0 to array.size(aP) - 1
+            string kk = array.get(aK, i)
+            float pp = array.get(aP, i)
+            if kk == "gpos" and pp > close and (na(upBest) or pp < upBest)
+                upBest := pp
+                secUp := i
+            if kk == "gneg" and pp < close and (na(dnBest) or pp > dnBest)
+                dnBest := pp
+                secDn := i
+
     if array.size(aP) > 0
         for i = 0 to array.size(aP) - 1
             string k = array.get(aK, i)
             float p = array.get(aP, i)
-            if f_show(k) and not na(p)
+            bool isSec = (k == "gpos" and i == secUp) or (k == "gneg" and i == secDn)
+            bool show = f_show(k)
+            if k == "gpos" or k == "gneg"
+                show := preset == "Alla" ? true : (showSec and isSec)
+            if show and not na(p)
                 color c = f_col(k)
                 array.push(lns, line.new(bar_index - 1, p, bar_index, p,
                      extend = extBoth ? extend.both : extend.right,
                      color = c, width = f_width(k), style = f_style(k)))
                 if showTags
-                    string code = f_code(k, array.get(aT, i), nPos, nNeg)
+                    string code = f_code(k, array.get(aT, i), isSec)
                     array.push(lbs, label.new(bar_index + tagOff, p,
                          code + "  " + str.tostring(p, format.mintick),
                          style = label.style_label_left, color = c, textcolor = cInk,
                          size = f_sz(tagSz), textalign = text.align_left,
                          text_formatting = f_bold(k)))
-                nPos += (k == "gpos" ? 1 : 0)
-                nNeg += (k == "gneg" ? 1 : 0)
 
     if showPx
         array.push(lbs, label.new(bar_index + tagOff, close,
@@ -236,11 +254,11 @@ if barstate.islast
         table.cell(hdr, 0, 0, und + " → " + f_market(), text_color = cSoft, text_size = size.small)
         table.cell(hdr, 1, 0, str.tostring(close, format.mintick), text_color = #E8E6E1,
              text_size = size.small, text_formatting = text.format_bold)
-        table.cell(hdr, 2, 0, na(cw) ? "C –" : "C " + str.tostring(cw, format.mintick),
+        table.cell(hdr, 2, 0, na(cw) ? "Call Wall –" : "Call Wall " + str.tostring(cw, format.mintick),
              text_color = cCall, text_size = size.small)
-        table.cell(hdr, 3, 0, na(zg) ? "Z –" : "Z " + str.tostring(zg, format.mintick),
+        table.cell(hdr, 3, 0, na(zg) ? "Zero Gamma –" : "Zero Gamma " + str.tostring(zg, format.mintick),
              text_color = cFlip, text_size = size.small)
-        table.cell(hdr, 4, 0, na(pw) ? "P –" : "P " + str.tostring(pw, format.mintick),
+        table.cell(hdr, 4, 0, na(pw) ? "Put Wall –" : "Put Wall " + str.tostring(pw, format.mintick),
              text_color = cPut, text_size = size.small)
         if hasZ
             table.cell(hdr, 5, 0, pos ? "POSITIV GAMMA" : "NEGATIV GAMMA",
