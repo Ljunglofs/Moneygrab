@@ -29,6 +29,7 @@ import gex_cli as CLI
 OUT_DIR = os.environ.get("GEX_OUT_DIR", "levels")
 STO = ZoneInfo("Europe/Stockholm")
 WINDOWS = ("london", "usa")
+MAX_FALLBACK_DAYS = int(os.environ.get("GEX_FALLBACK_DAYS", "4"))   # hur gamla reservnivåer som får skickas
 
 
 def _state_path():
@@ -78,12 +79,19 @@ def _esc(s):
     return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def build_message(results):
+def build_message(results, fallback=None):
     now = datetime.now(STO).strftime("%a %d %b %H:%M")
     parts = [f"\U0001F4CB <b>GEX Daily Levels</b> · {now}"]
     for r in results:
         if r.get("error"):
             parts.append(f"\n<b>{r['inst']}</b>: {_esc(r['error'])}")
+            old = (fallback or {}).get(r["inst"])
+            if usable_fallback(old):
+                stamp = str(old.get("_generated", ""))[:16].replace("T", " ")
+                parts.append(
+                    f"⚠ Reserv: senast dugliga nivåer ({stamp}). Väggarna bygger på open "
+                    f"interest och flyttar sig sällan över natten — EM-band och öppningsgrid "
+                    f"är däremot gamla.\n<pre>{_esc(old['string'])}</pre>")
             continue
         flag = " ⚠ flip osäker" if r.get("flip_uncertain") else ""
         def num(v, d=0):
@@ -117,12 +125,27 @@ def send_telegram(text):
 
 def _previous():
     """Senast sparade nivåer per instrument, så ett misslyckat försök inte
-    raderar det som gick att öppna i telefonen."""
+    raderar det som gick att öppna i telefonen. Varje post får datumet med sig."""
     try:
         with open(os.path.join(OUT_DIR, "latest.json"), encoding="utf-8") as f:
-            return {l["inst"]: l for l in json.load(f).get("levels", []) if l.get("inst")}
+            d = json.load(f)
+        gen = d.get("generated") or ""
+        return {l["inst"]: dict(l, _generated=l.get("_generated") or gen)
+                for l in d.get("levels", []) if l.get("inst")}
     except Exception:
         return {}
+
+
+def usable_fallback(old, max_days=MAX_FALLBACK_DAYS):
+    """Duger de sparade nivåerna som reserv? Open interest ändras en gång per
+    dygn, så gårdagens väggar är fortfarande vettiga — förra veckans är det inte."""
+    if not old or old.get("error") or not old.get("string"):
+        return False
+    try:
+        gen = datetime.fromisoformat(old["_generated"]).date()
+    except Exception:
+        return False
+    return 0 <= (datetime.now(STO).date() - gen).days <= max_days
 
 
 def write_files(results):
@@ -178,10 +201,11 @@ def main(argv):
         print(f"Fönstret {window} är redan skickat {today_str()} — hoppar över.")
         return 0
 
+    prev = _previous()
     results = [CLI.run(i) for i in dict.fromkeys(insts)]
     write_files(results)
     ok = all(not r.get("error") for r in results)
-    msg = build_message(results)
+    msg = build_message(results, fallback=prev)
     print(msg.replace("<b>", "").replace("</b>", "").replace("<pre>", "\n").replace("</pre>", ""))
     if ok or force or not tried_today:
         # lyckade nivåer skickas alltid, felmeddelande bara en gång per fönster och dag
