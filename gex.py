@@ -17,11 +17,18 @@ Modell (SpotGamma-stil, standardantagande dealers long calls / short puts):
                  under zero gamma: dealers förstärker (trend, bredare stopp)
 
 Open interest uppdateras en gång per dygn -> ingen realtidsdata behövs.
-Data via yfinance (gratis). Cache 30 min, senaste lyckade sparas på disk.
+
+Källor (GEX_SOURCE=auto|cboe|yahoo, auto är förval):
+  cboe   CBOE:s egen fördröjda kedja, ett anrop per underliggande, hela kedjan
+         med open interest, IV och greker. Ingen nyckel behövs.
+  yahoo  yfinance. Reserv — Yahoo svarar tidvis med open interest på bara en
+         handfull strikes, vilket ger nonsensväggar.
+Cache 30 min, senaste lyckade sparas på disk.
 """
 import json
 import math
 import os
+import re
 import time
 import threading
 from datetime import datetime, timezone
@@ -33,6 +40,11 @@ RISK_FREE = 0.04
 N_EXPIRIES = int(os.environ.get("GEX_EXPIRIES", "4"))    # närmaste expiries (0DTE + veckor + månad)
 
 UNDERLYING = {"NQ": "QQQ", "GC": "GLD"}
+SOURCE = os.environ.get("GEX_SOURCE", "auto").lower()
+CBOE_URL = "https://cdn.cboe.com/api/global/delayed_quotes/options/{}.json"
+MIN_OI_ROWS = int(os.environ.get("GEX_MIN_OI_ROWS", "40"))   # färre än så = halv kedja, prova nästa källa
+_OPT_RE = re.compile(r"(\d{6})([CP])(\d{8})$")
+SPOT_TOL = float(os.environ.get("GEX_SPOT_TOL", "0.01"))   # kedjans spot får avvika 1 % från referenskursen
 
 _lock = threading.Lock()
 _cache = {}      # inst -> {"t": epoch, "data": {...}}
@@ -172,11 +184,19 @@ def _fetch_chain(underlying, n_exp=N_EXPIRIES):
         pass
     exps = list(t.options or [])[:n_exp]
     rows = []
+    got = []          # expiries som faktiskt gav data — Yahoo tappar enstaka anrop
     for e in exps:
-        try:
-            ch = t.option_chain(e)
-        except Exception:
+        ch = None
+        for attempt in range(3):
+            try:
+                ch = t.option_chain(e)
+                break
+            except Exception as ex:
+                print(f"[gex] {underlying} {e}: {type(ex).__name__} — försök {attempt + 1}/3")
+                time.sleep(1.5 * (attempt + 1))
+        if ch is None:
             continue
+        got.append(e)
         def _n(v):
             try:
                 v = float(v)
@@ -192,7 +212,87 @@ def _fetch_chain(underlying, n_exp=N_EXPIRIES):
         # fallback: ATM ~ strike med högst total OI nära mitten
         ks = sorted({float(r["strike"]) for r in rows})
         spot = ks[len(ks) // 2]
-    return spot, rows, exps
+    return spot, rows, got
+
+
+def _fetch_chain_cboe(underlying, n_exp=N_EXPIRIES):
+    """CBOE:s fördröjda kedja. Symbolen är ROOT+YYMMDD+C/P+strike*1000."""
+    import requests
+    r = requests.get(CBOE_URL.format(underlying.upper()), timeout=30,
+                     headers={"User-Agent": "grabit-gex/1.0"})
+    r.raise_for_status()
+    d = r.json().get("data") or {}
+    spot = float(d.get("current_price") or 0) or None
+    today = datetime.now(timezone.utc).date().isoformat()
+    by_exp = {}
+    for o in d.get("options") or []:
+        m = _OPT_RE.search(o.get("option") or "")
+        if not m:
+            continue
+        ymd, typ, strike = m.group(1), m.group(2), int(m.group(3)) / 1000.0
+        exp = f"20{ymd[:2]}-{ymd[2:4]}-{ymd[4:]}"
+        if exp < today or strike <= 0:
+            continue
+        def _n(v):
+            try:
+                v = float(v)
+                return 0.0 if v != v else v
+            except (TypeError, ValueError):
+                return 0.0
+        by_exp.setdefault(exp, []).append(
+            {"strike": strike, "oi": _n(o.get("open_interest")), "iv": _n(o.get("iv")),
+             "type": typ, "expiry": exp, "bid": _n(o.get("bid")), "ask": _n(o.get("ask")),
+             "last": _n(o.get("last_trade_price"))})
+    exps = sorted(by_exp)[:n_exp]
+    return spot, [row for e in exps for row in by_exp[e]], exps
+
+
+def _fetch_any(underlying):
+    """Hämtar kedjan från första källan som ger något användbart.
+    Returnerar (spot, rows, expiries, källa)."""
+    order = {"cboe": ("cboe",), "yahoo": ("yahoo",)}.get(SOURCE, ("cboe", "yahoo"))
+    last = (None, [], [])
+    for src in order:
+        try:
+            spot, rows, exps = (_fetch_chain_cboe if src == "cboe" else _fetch_chain)(underlying)
+        except Exception as e:
+            print(f"[gex] {underlying}: {src} misslyckades — {type(e).__name__}: {e}")
+            continue
+        n_oi = sum(1 for r in rows if (r.get("oi") or 0) > 0)
+        print(f"[gex] {underlying}: {src} gav {len(rows)} rader, {n_oi} med OI, "
+              f"expiries {', '.join(exps[:4]) or '-'}")
+        if n_oi >= MIN_OI_ROWS:
+            return spot, rows, exps, src
+        if rows and not last[1]:
+            last = (spot, rows, exps)
+    # inget dög: lämna tillbaka det bästa vi ändå fick, sanity-kontrollen tar det
+    return last[0], last[1], last[2], "ingen"
+
+
+def _ref_spot(underlying):
+    """Oberoende ETF-kurs (senaste 5-minutersbaren) att stämma av kedjans spot mot.
+    Kedjans egen kurs kan vara dagar gammal — då hamnar både kvoten futures/ETF
+    och gammaprofilens centrering fel, och alla nivåer med dem."""
+    try:
+        import yfinance as yf
+        h = yf.Ticker(underlying).history(period="1d", interval="5m")
+        if h is not None and len(h):
+            return float(h["Close"].iloc[-1])
+    except Exception as e:
+        print(f"[gex] {underlying}: referenskurs misslyckades — {type(e).__name__}: {e}")
+    return None
+
+
+def _checked_spot(underlying, spot, src):
+    """Kedjans spot om den håller, annars referenskursen. (spot, varifrån)."""
+    ref = _ref_spot(underlying)
+    if spot and ref and abs(spot / ref - 1) > SPOT_TOL:
+        print(f"[gex] {underlying}: {src}-kursen {spot} avviker "
+              f"{abs(spot / ref - 1) * 100:.1f} % från senaste 5m-baren {ref} — använder baren")
+        return ref, "5m-bar"
+    if not spot:
+        return ref, "5m-bar"
+    return spot, src
 
 
 def _load_disk():
@@ -249,11 +349,12 @@ def get_gex(inst, fut_price=None, force=False):
         else:
             data = None
             try:
-                spot, rows, exps = _fetch_chain(und)
-                lv = gex_from_chain(spot, rows) if rows else None
+                spot, rows, exps, src = _fetch_any(und)
+                spot, spot_src = _checked_spot(und, spot, src)
+                lv = gex_from_chain(spot, rows) if (rows and spot) else None
                 if lv:
                     data = {"underlying": und, "expiries": exps, "updated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-                            "levels": lv, "stale": False}
+                            "levels": lv, "stale": False, "source": src, "spot_source": spot_src}
             except Exception as e:
                 print(f"[gex] {und}: {type(e).__name__}: {e}")
             if data:

@@ -124,7 +124,8 @@ Samma nivåer gäller NQ och MNQ (samma pris). GC och MGC likaså.
 | `ivh` / `ivl` | 1D min/max | pris ± spot × ATM-IV × √(1/252) |
 | `opo` / `opu` / `opd` | Öppning + ATR-grid | dagens RTH-öppning ur feeden, ± 0,5 och 1,0 dags-ATR |
 
-Källa är QQQ-optioner för NQ och GLD-optioner för GC, hämtade från Yahoo, skalade med
+Källa är QQQ-optioner för NQ och GLD-optioner för GC, hämtade från CBOE:s fördröjda kedja med
+yfinance som reserv (`GEX_SOURCE=auto|cboe|yahoo`), skalade med
 live-kvoten futures/ETF. Open interest uppdateras en gång per dygn, så strängen är stabil
 under dagen; expected move och IV läses från aktuella premier.
 
@@ -133,6 +134,9 @@ Hämta strängen:
 - Telegram: `/tvgex nq`, `/tvgex gc` eller `/tvgex all`. Svaret är ett kodblock, tryck för att kopiera.
 - HTTP: `/desk/gexstring?inst=NQ` (ren text), `/desk/gexstring?inst=all` (JSON med båda).
 - Automatiskt via GitHub Actions: vardagar 08:00 (London-uppsättning, EM/öppning centrerade på nattens pris) och 13:05 svensk tid (USA-uppsättning med dagens open interest). Desken på Render postar dessutom runt 09:10 ET om den kör; stäng av med `DESK_MORNING_GEX=0`.
+  - GitHub startar schemalagda jobb när det finns kapacitet — de kan bli timmar sena eller utebli. Därför startas varje fönster fem gånger (08:00/08:30/09:00/09:30/10:00 respektive 13:05/13:35/14:05/14:35/15:05 svensk sommartid). Första körningen som lyckas låser fönstret för dagen i `levels/sent.json`, resten hoppar över. Blir det fel kommer ett meddelande om varför, en gång per fönster, och nästa körning provar igen.
+  - Nivåerna sanity-testas innan de skickas (antal strikes, minst två expiries, närmaste expiry inom fem dagar, put wall under call wall, väggar inom 25 % av priset, IV/EM måste gå att räkna). En halv optionskedja från Yahoo ger alltså ett felmeddelande och ett nytt försök i stället för nonsensnivåer. Trösklarna kan ändras med `GEX_MIN_STRIKES`, `GEX_MAX_WALL_PCT`, `GEX_MAX_NEAR_DAYS`, `GEX_TRIES`, `GEX_RETRY_SLEEP`.
+  - Behöver du nivåerna direkt: kör workflowen manuellt (Actions -> GEX Daily Levels -> Run workflow, funkar från GitHub-appen i telefonen). Manuell körning skickar alltid och låser samtidigt fönstret så schemat inte dubblar.
 
 Indikatorn finns i repot: `pine/grabit_gex_levels.pine`. Klistra in den i Pine Editor, lägg till på grafen och
 klistra in strängarna i fälten "NQ — levels string" och "GC — levels string". Den ritar bara GEX-nivåerna, har HUD med närmaste nivå över/under och larm vid korsning av väggar, flip och HGEX.
