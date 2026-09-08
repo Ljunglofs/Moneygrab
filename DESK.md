@@ -139,7 +139,9 @@ Hämta strängen:
   - Behöver du nivåerna direkt: kör workflowen manuellt (Actions -> GEX Daily Levels -> Run workflow, funkar från GitHub-appen i telefonen). Manuell körning skickar alltid och låser samtidigt fönstret så schemat inte dubblar.
 
 Indikatorn finns i repot: `pine/grabit_gex_levels.pine`. Klistra in den i Pine Editor, lägg till på grafen och
-klistra in strängarna i fälten "NQ — levels string" och "GC — levels string". Den ritar bara GEX-nivåerna, har HUD med närmaste nivå över/under och larm vid korsning av väggar, flip och HGEX.
+klistra in strängarna i fälten "NQ — levels string" och "GC — levels string". Den ritar bara GEX-nivåerna.
+
+Förvalet "Ren" visar tre linjer — Call Wall, Gamma Flip och Put Wall — plus andra väggen (CW2/PW2), med korta prispiller i högerkanten och en statusrad överst: underliggande → instrument, pris, C/Z/P och om priset ligger över eller under flippen. "Nyckelnivåer" lägger till HGEX, Max Pain och EM±, "Alla" resten (0DTE-väggar, G+/G−, IV-range och ATR-grid). Färgtemat GRABIT har röd Call Wall och lila Put Wall, Klassisk har grön respektive röd. Larm går vid korsning av väggar, 0DTE-väggar, flip och HGEX.
 
 ## 6. Telegram-kommandon
 
