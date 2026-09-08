@@ -13,14 +13,24 @@ Data: QQQ/GLD-optioner + futurespris från Yahoo (10 min fördröjt — spelar i
 roll för dagsnivåer). Öppning och dags-ATR hämtas också från Yahoo.
 """
 import json
+import os
 import sys
-from datetime import datetime
+import time
+from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 import gex as GX
 
 ET = ZoneInfo("America/New_York")
 FUT = {"NQ": "NQ=F", "GC": "GC=F"}
+
+# Rimlighetskontroll: Yahoo svarar ibland med en halv kedja (rate-limit) — då blir
+# väggarna nonsens. Hellre "försök igen" än fel nivåer i Telegram.
+MIN_STRIKES = int(os.environ.get("GEX_MIN_STRIKES", "20"))
+MAX_WALL_PCT = float(os.environ.get("GEX_MAX_WALL_PCT", "0.25"))   # vägg får ligga max 25 % från priset
+MAX_NEAR_DAYS = int(os.environ.get("GEX_MAX_NEAR_DAYS", "5"))      # närmaste expiry max 5 dagar bort
+TRIES = int(os.environ.get("GEX_TRIES", "3"))
+RETRY_SLEEP = int(os.environ.get("GEX_RETRY_SLEEP", "20"))
 
 
 def _fut_price(inst):
@@ -62,21 +72,74 @@ def _open_and_atr(inst):
     return open_px, atr
 
 
-def run(inst):
+def sanity(g, fut, today=None):
+    """Ser kedjan rimlig ut? Returnerar felsträng, annars None."""
+    lv, f = g.get("levels") or {}, g.get("futures") or {}
+    today = today or datetime.now(ET).date()
+    if g.get("stale"):
+        return "bara gammal cache — Yahoo svarade inte"
+    n = lv.get("n_strikes") or 0
+    if n < MIN_STRIKES:
+        return f"tunn optionskedja ({n} strikes med OI) — Yahoo gav bara en del av kedjan"
+    if len(g.get("expiries") or []) < 2:
+        return "färre än två expiries hämtades — halv optionskedja från Yahoo"
+    near = f.get("near_expiry")
+    if not near:
+        return "ingen närmaste expiry i kedjan"
+    days = (date.fromisoformat(near) - today).days
+    if days > MAX_NEAR_DAYS:
+        return f"närmaste expiry är {near} ({days} dagar bort) — dagens expiries saknas i Yahoos svar"
+    cw, pw = f.get("call_wall"), f.get("put_wall")
+    if not cw or not pw:
+        return "call/put wall saknas"
+    if pw >= cw:
+        return f"put wall {pw} ligger över call wall {cw} — kedjan är trasig"
+    for name, px in (("call wall", cw), ("put wall", pw)):
+        if abs(px / fut - 1) > MAX_WALL_PCT:
+            return f"{name} {px} ligger {abs(px / fut - 1) * 100:.0f} % från priset {fut:.0f} — orimligt"
+    if not (f.get("iv_1d") or f.get("em")):
+        return "varken IV eller expected move gick att räkna — kedjan saknar priser"
+    return None
+
+
+def _once(inst):
     fut = _fut_price(inst)
+    if not fut:
+        return {"inst": inst, "error": "fick inget futurespris från Yahoo"}
     g = GX.get_gex(inst, fut_price=fut, force=True)
     if not g or not g.get("futures"):
-        return {"inst": inst, "error": "kunde inte hämta optionskedjan från Yahoo (rate-limit?) — försök igen om en minut"}
+        return {"inst": inst, "error": "kunde inte hämta optionskedjan från Yahoo (rate-limit?)"}
+    bad = sanity(g, fut)
+    if bad:
+        return {"inst": inst, "error": bad}
     open_px, atr = _open_and_atr(inst)
     s = GX.levels_string(inst, g, open_price=open_px, atr_daily=atr, today=datetime.now(ET).date())
     f = g["futures"]
     return {"inst": inst, "fut_price": fut, "underlying": g["underlying"], "etf_spot": g["levels"]["spot"],
             "ratio": f["ratio"], "regime": f["regime"], "expiries": g["expiries"],
+            "n_strikes": g["levels"].get("n_strikes"),
             "call_wall": f["call_wall"], "put_wall": f["put_wall"], "zero_gamma": f["zero_gamma"],
             "hgex": f.get("hgex"), "call_wall_0dte": f.get("call_wall_0"), "put_wall_0dte": f.get("put_wall_0"),
             "max_pain": f.get("max_pain"), "expected_move": f.get("em"), "em_src": f.get("em_src"),
             "iv_1d": f.get("iv_1d"), "flip_uncertain": f.get("flip_uncertain"),
             "open": open_px, "atr_daily": atr, "string": s}
+
+
+def run(inst, tries=TRIES):
+    """Hämtar nivåerna och gör om försöket om Yahoo skickar en trasig kedja."""
+    r = {}
+    for i in range(1, tries + 1):
+        try:
+            r = _once(inst)
+        except Exception as e:                       # nätverk/Yahoo-strul ska inte krascha jobbet
+            r = {"inst": inst, "error": f"{type(e).__name__}: {e}"[:180]}
+        if not r.get("error"):
+            return r
+        print(f"[gex] {inst}: {r['error']} (försök {i}/{tries})")
+        if i < tries:
+            time.sleep(RETRY_SLEEP)
+    r["error"] = f"{r.get('error', 'okänt fel')} — {tries} försök"
+    return r
 
 
 def main(argv):

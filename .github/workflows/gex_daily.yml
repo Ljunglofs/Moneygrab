@@ -1,14 +1,21 @@
 # GEX Daily Levels — räknar dagens nivåer för NQ och GC, skickar till Telegram
 # och sparar strängarna i levels/ så de går att öppna i telefonen.
 #
-# Schema (vardagar, UTC):
-#   06:00 = 08:00 svensk sommartid -> London-uppsättning: samma väggar (OI ändras
-#           bara efter USA-stängning) men EM-band och öppningsgrid centrerade på nattens pris.
-#   11:05 = 13:05 svensk sommartid -> USA-uppsättning med dagens uppdaterade open interest.
+# Två fönster per vardag (UTC):
+#   london (06:00 UTC = 08:00 svensk sommartid) -> samma väggar (OI ändras bara
+#           efter USA-stängning) men EM-band och öppningsgrid på nattens pris.
+#   usa    (11:05 UTC = 13:05 svensk sommartid) -> dagens uppdaterade open interest.
 # (Vintertid: en timme tidigare svensk tid.)
+#
+# GitHub startar schemalagda jobb först när det finns kapacitet — de kan bli
+# timmar sena eller helt utebli. Därför har varje fönster flera starttider.
+# Den första körningen som lyckas låser fönstret för dagen i levels/sent.json
+# (gex_notify.py --once), resten hoppar över direkt. Blir det fel skickas ett
+# felmeddelande en gång, sedan försöker följande körningar tyst igen.
+#
 # OBS: schemalagda jobb körs bara från repots default-branch (main).
 # "Run workflow" (workflow_dispatch) fungerar från vilken branch som helst,
-# även från GitHub-appen i telefonen.
+# även från GitHub-appen i telefonen, och skickar alltid (ignorerar låset).
 #
 # Secrets (Settings -> Secrets and variables -> Actions):
 #   TELEGRAM_TOKEN  samma bot som roboten
@@ -17,8 +24,16 @@ name: GEX Daily Levels
 
 on:
   schedule:
-    - cron: "0 6 * * 1-5"    # London 08:00 CEST
-    - cron: "5 11 * * 1-5"   # USA   13:05 CEST
+    - cron: "0 6 * * 1-5"     # London 08:00 CEST
+    - cron: "30 6 * * 1-5"    # retry om 06:00-jobbet aldrig startade
+    - cron: "0 7 * * 1-5"     # retry
+    - cron: "30 7 * * 1-5"    # retry
+    - cron: "0 8 * * 1-5"     # sista chansen för London-fönstret
+    - cron: "5 11 * * 1-5"    # USA 13:05 CEST
+    - cron: "35 11 * * 1-5"   # retry
+    - cron: "5 12 * * 1-5"    # retry
+    - cron: "35 12 * * 1-5"   # retry
+    - cron: "5 13 * * 1-5"    # sista chansen för USA-fönstret
   workflow_dispatch:
 
 permissions:
@@ -47,12 +62,45 @@ jobs:
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
-        run: python gex_notify.py
+          EVENT: ${{ github.event_name }}
+        run: |
+          # fönstret avgörs av när jobbet faktiskt kör, inte av vilken cron som startade det
+          if [ "$(date -u +%H)" -lt 10 ]; then W=london; else W=usa; fi
+          echo "Fönster: $W"
+          # manuell körning skickar alltid, men låser fönstret så schemat inte dubblar
+          [ "$EVENT" = "workflow_dispatch" ] && MODE=--force || MODE=--once
+          set +e
+          python gex_notify.py --window "$W" "$MODE" 2>&1 | tee /tmp/gex.log
+          rc=${PIPESTATUS[0]}
+          # gick något meddelande iväg behövs inget extra larm nedan
+          grep -q "Telegram: skickat" /tmp/gex.log && echo "notified=1" >> "$GITHUB_ENV"
+          exit $rc
 
       - name: Spara strängarna i repot (levels/)
+        if: always()
         run: |
           git config user.name "gex-bot"
           git config user.email "gex-bot@users.noreply.github.com"
           git add levels/
-          git diff --cached --quiet && echo "inga ändringar" || git commit -m "GEX levels $(date -u +%Y-%m-%d)"
+          git diff --cached --quiet && { echo "inga ändringar"; exit 0; }
+          git commit -m "GEX levels $(date -u +%Y-%m-%d)"
+          for i in 1 2 3; do
+            git push && exit 0
+            echo "push misslyckades — hämtar och försöker igen ($i)"
+            git pull --rebase origin "${GITHUB_REF_NAME}" || exit 1
+            sleep $((i * 5))
+          done
           git push
+
+      - name: Larma på Telegram om körningen sprack utan att hinna säga till
+        if: failure() && env.notified != '1'
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          [ -n "$TELEGRAM_TOKEN" ] && [ -n "$CHAT_ID" ] || exit 0
+          curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage" \
+            -d chat_id="$CHAT_ID" \
+            -d disable_web_page_preview=true \
+            --data-urlencode "text=⚠ GEX Daily Levels sprack — inga nivåer denna körning. Logg: ${RUN_URL}" >/dev/null

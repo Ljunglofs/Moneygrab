@@ -172,11 +172,19 @@ def _fetch_chain(underlying, n_exp=N_EXPIRIES):
         pass
     exps = list(t.options or [])[:n_exp]
     rows = []
+    got = []          # expiries som faktiskt gav data — Yahoo tappar enstaka anrop
     for e in exps:
-        try:
-            ch = t.option_chain(e)
-        except Exception:
+        ch = None
+        for attempt in range(3):
+            try:
+                ch = t.option_chain(e)
+                break
+            except Exception as ex:
+                print(f"[gex] {underlying} {e}: {type(ex).__name__} — försök {attempt + 1}/3")
+                time.sleep(1.5 * (attempt + 1))
+        if ch is None:
             continue
+        got.append(e)
         def _n(v):
             try:
                 v = float(v)
@@ -192,7 +200,7 @@ def _fetch_chain(underlying, n_exp=N_EXPIRIES):
         # fallback: ATM ~ strike med högst total OI nära mitten
         ks = sorted({float(r["strike"]) for r in rows})
         spot = ks[len(ks) // 2]
-    return spot, rows, exps
+    return spot, rows, got
 
 
 def _load_disk():
