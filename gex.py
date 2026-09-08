@@ -17,11 +17,18 @@ Modell (SpotGamma-stil, standardantagande dealers long calls / short puts):
                  under zero gamma: dealers förstärker (trend, bredare stopp)
 
 Open interest uppdateras en gång per dygn -> ingen realtidsdata behövs.
-Data via yfinance (gratis). Cache 30 min, senaste lyckade sparas på disk.
+
+Källor (GEX_SOURCE=auto|cboe|yahoo, auto är förval):
+  cboe   CBOE:s egen fördröjda kedja, ett anrop per underliggande, hela kedjan
+         med open interest, IV och greker. Ingen nyckel behövs.
+  yahoo  yfinance. Reserv — Yahoo svarar tidvis med open interest på bara en
+         handfull strikes, vilket ger nonsensväggar.
+Cache 30 min, senaste lyckade sparas på disk.
 """
 import json
 import math
 import os
+import re
 import time
 import threading
 from datetime import datetime, timezone
@@ -33,6 +40,10 @@ RISK_FREE = 0.04
 N_EXPIRIES = int(os.environ.get("GEX_EXPIRIES", "4"))    # närmaste expiries (0DTE + veckor + månad)
 
 UNDERLYING = {"NQ": "QQQ", "GC": "GLD"}
+SOURCE = os.environ.get("GEX_SOURCE", "auto").lower()
+CBOE_URL = "https://cdn.cboe.com/api/global/delayed_quotes/options/{}.json"
+MIN_OI_ROWS = int(os.environ.get("GEX_MIN_OI_ROWS", "40"))   # färre än så = halv kedja, prova nästa källa
+_OPT_RE = re.compile(r"(\d{6})([CP])(\d{8})$")
 
 _lock = threading.Lock()
 _cache = {}      # inst -> {"t": epoch, "data": {...}}
@@ -203,6 +214,60 @@ def _fetch_chain(underlying, n_exp=N_EXPIRIES):
     return spot, rows, got
 
 
+def _fetch_chain_cboe(underlying, n_exp=N_EXPIRIES):
+    """CBOE:s fördröjda kedja. Symbolen är ROOT+YYMMDD+C/P+strike*1000."""
+    import requests
+    r = requests.get(CBOE_URL.format(underlying.upper()), timeout=30,
+                     headers={"User-Agent": "grabit-gex/1.0"})
+    r.raise_for_status()
+    d = r.json().get("data") or {}
+    spot = float(d.get("current_price") or 0) or None
+    today = datetime.now(timezone.utc).date().isoformat()
+    by_exp = {}
+    for o in d.get("options") or []:
+        m = _OPT_RE.search(o.get("option") or "")
+        if not m:
+            continue
+        ymd, typ, strike = m.group(1), m.group(2), int(m.group(3)) / 1000.0
+        exp = f"20{ymd[:2]}-{ymd[2:4]}-{ymd[4:]}"
+        if exp < today or strike <= 0:
+            continue
+        def _n(v):
+            try:
+                v = float(v)
+                return 0.0 if v != v else v
+            except (TypeError, ValueError):
+                return 0.0
+        by_exp.setdefault(exp, []).append(
+            {"strike": strike, "oi": _n(o.get("open_interest")), "iv": _n(o.get("iv")),
+             "type": typ, "expiry": exp, "bid": _n(o.get("bid")), "ask": _n(o.get("ask")),
+             "last": _n(o.get("last_trade_price"))})
+    exps = sorted(by_exp)[:n_exp]
+    return spot, [row for e in exps for row in by_exp[e]], exps
+
+
+def _fetch_any(underlying):
+    """Hämtar kedjan från första källan som ger något användbart.
+    Returnerar (spot, rows, expiries, källa)."""
+    order = {"cboe": ("cboe",), "yahoo": ("yahoo",)}.get(SOURCE, ("cboe", "yahoo"))
+    last = (None, [], [])
+    for src in order:
+        try:
+            spot, rows, exps = (_fetch_chain_cboe if src == "cboe" else _fetch_chain)(underlying)
+        except Exception as e:
+            print(f"[gex] {underlying}: {src} misslyckades — {type(e).__name__}: {e}")
+            continue
+        n_oi = sum(1 for r in rows if (r.get("oi") or 0) > 0)
+        print(f"[gex] {underlying}: {src} gav {len(rows)} rader, {n_oi} med OI, "
+              f"expiries {', '.join(exps[:4]) or '-'}")
+        if n_oi >= MIN_OI_ROWS:
+            return spot, rows, exps, src
+        if rows and not last[1]:
+            last = (spot, rows, exps)
+    # inget dög: lämna tillbaka det bästa vi ändå fick, sanity-kontrollen tar det
+    return last[0], last[1], last[2], "ingen"
+
+
 def _load_disk():
     try:
         with open(CACHE_FILE, encoding="utf-8") as f:
@@ -257,11 +322,11 @@ def get_gex(inst, fut_price=None, force=False):
         else:
             data = None
             try:
-                spot, rows, exps = _fetch_chain(und)
+                spot, rows, exps, src = _fetch_any(und)
                 lv = gex_from_chain(spot, rows) if rows else None
                 if lv:
                     data = {"underlying": und, "expiries": exps, "updated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-                            "levels": lv, "stale": False}
+                            "levels": lv, "stale": False, "source": src}
             except Exception as e:
                 print(f"[gex] {und}: {type(e).__name__}: {e}")
             if data:

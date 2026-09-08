@@ -101,7 +101,8 @@ def build_message(results, fallback=None):
             return f"{v:.{d}f}".rstrip("0").rstrip(".") if d else f"{v:.0f}"
 
         parts.append(
-            f"\n<b>{r['inst']}</b> {r['fut_price']:.2f} · gamma {r['regime']}{flag}\n"
+            f"\n<b>{r['inst']}</b> {r['fut_price']:.2f} · gamma {r['regime']}{flag}"
+            + (f" · {r['source']}" if r.get("source") else "") + "\n"
             f"Call Wall <b>{num(r['call_wall'], 2)}</b> · Put Wall <b>{num(r['put_wall'], 2)}</b> · Flip {num(r['zero_gamma'], 2)}\n"
             f"EM ±{num(r['expected_move'])} · Max Pain {num(r['max_pain'], 2)} · HGEX {num(r['hgex'], 2)}\n"
             f"Fält: {'NQ' if r['inst'] == 'NQ' else 'GC'} — levels string ↓\n"

@@ -77,18 +77,18 @@ def sanity(g, fut, today=None):
     lv, f = g.get("levels") or {}, g.get("futures") or {}
     today = today or datetime.now(ET).date()
     if g.get("stale"):
-        return "bara gammal cache — Yahoo svarade inte"
+        return "bara gammal cache — ingen källa svarade"
     n = lv.get("n_strikes") or 0
     if n < MIN_STRIKES:
-        return f"tunn optionskedja ({n} strikes med OI) — Yahoo gav bara en del av kedjan"
+        return f"tunn optionskedja ({n} strikes med OI) — bara en del av kedjan kom fram"
     if len(g.get("expiries") or []) < 2:
-        return "färre än två expiries hämtades — halv optionskedja från Yahoo"
+        return "färre än två expiries hämtades — halv optionskedja"
     near = f.get("near_expiry")
     if not near:
         return "ingen närmaste expiry i kedjan"
     days = (date.fromisoformat(near) - today).days
     if days > MAX_NEAR_DAYS:
-        return f"närmaste expiry är {near} ({days} dagar bort) — dagens expiries saknas i Yahoos svar"
+        return f"närmaste expiry är {near} ({days} dagar bort) — dagens expiries saknas i svaret"
     cw, pw = f.get("call_wall"), f.get("put_wall")
     if not cw or not pw:
         return "call/put wall saknas"
@@ -111,12 +111,14 @@ def _once(inst):
         return {"inst": inst, "error": "kunde inte hämta optionskedjan från Yahoo (rate-limit?)"}
     bad = sanity(g, fut)
     if bad:
-        return {"inst": inst, "error": bad}
+        src = g.get("source")
+        return {"inst": inst, "error": f"{bad}{f' [källa: {src}]' if src else ''}"}
     open_px, atr = _open_and_atr(inst)
     s = GX.levels_string(inst, g, open_price=open_px, atr_daily=atr, today=datetime.now(ET).date())
     f = g["futures"]
     return {"inst": inst, "fut_price": fut, "underlying": g["underlying"], "etf_spot": g["levels"]["spot"],
             "ratio": f["ratio"], "regime": f["regime"], "expiries": g["expiries"],
+            "source": g.get("source"),
             "n_strikes": g["levels"].get("n_strikes"),
             "call_wall": f["call_wall"], "put_wall": f["put_wall"], "zero_gamma": f["zero_gamma"],
             "hgex": f.get("hgex"), "call_wall_0dte": f.get("call_wall_0"), "put_wall_0dte": f.get("put_wall_0"),
@@ -160,7 +162,7 @@ def main(argv):
         print(f"0DTE: call {r['call_wall_0dte']} / put {r['put_wall_0dte']}  ·  Max pain {r['max_pain']}  ·  EM ±{r['expected_move']} ({r['em_src']})  ·  IV 1D ±{r['iv_1d']}")
         if r.get("flip_uncertain"):
             print("VARNING: Gamma Flip ligger >2 % från priset. Putdominerad optionskedja — regimen (positiv/negativ gamma) är osäker. Lita på väggar, EM och IV-range.")
-        print(f"Öppning {r['open']}  ·  ATR dag {r['atr_daily'] and round(r['atr_daily'], 2)}  ·  expiries {', '.join(r['expiries'][:4])}")
+        print(f"Källa {r.get('source')}  ·  Öppning {r['open']}  ·  ATR dag {r['atr_daily'] and round(r['atr_daily'], 2)}  ·  expiries {', '.join(r['expiries'][:4])}")
         print("-" * 78)
         print("Klistra in i indikatorn (fältet " + ("NQ" if r["inst"] == "NQ" else "GC") + " — levels string):")
         print(r["string"])
