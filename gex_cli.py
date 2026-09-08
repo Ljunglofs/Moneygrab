@@ -29,6 +29,10 @@ FUT = {"NQ": "NQ=F", "GC": "GC=F"}
 MIN_STRIKES = int(os.environ.get("GEX_MIN_STRIKES", "20"))
 MAX_WALL_PCT = float(os.environ.get("GEX_MAX_WALL_PCT", "0.25"))   # vägg får ligga max 25 % från priset
 MAX_NEAR_DAYS = int(os.environ.get("GEX_MAX_NEAR_DAYS", "5"))      # närmaste expiry max 5 dagar bort
+# Kvoten futures/ETF är strukturell: NQ/QQQ ligger nära 41, GC/GLD nära 11 och
+# rör sig bara långsamt. Hamnar den utanför bandet är ETF-kursen fel, och då är
+# varenda nivå felskalad.
+RATIO_BAND = {"NQ": (39.0, 42.5), "GC": (10.5, 11.5)}
 TRIES = int(os.environ.get("GEX_TRIES", "3"))
 RETRY_SLEEP = int(os.environ.get("GEX_RETRY_SLEEP", "20"))
 
@@ -72,7 +76,7 @@ def _open_and_atr(inst):
     return open_px, atr
 
 
-def sanity(g, fut, today=None):
+def sanity(g, fut, inst=None, today=None):
     """Ser kedjan rimlig ut? Returnerar felsträng, annars None."""
     lv, f = g.get("levels") or {}, g.get("futures") or {}
     today = today or datetime.now(ET).date()
@@ -99,6 +103,10 @@ def sanity(g, fut, today=None):
             return f"{name} {px} ligger {abs(px / fut - 1) * 100:.0f} % från priset {fut:.0f} — orimligt"
     if not (f.get("iv_1d") or f.get("em")):
         return "varken IV eller expected move gick att räkna — kedjan saknar priser"
+    lo, hi = RATIO_BAND.get(inst, (0, 1e9))
+    if not (lo <= f.get("ratio", 0) <= hi):
+        return (f"kvoten {f.get('ratio')} ligger utanför {lo}-{hi} — ETF-kursen "
+                f"{lv.get('spot')} ser gammal ut, alla nivåer skulle bli felskalade")
     return None
 
 
@@ -109,7 +117,7 @@ def _once(inst):
     g = GX.get_gex(inst, fut_price=fut, force=True)
     if not g or not g.get("futures"):
         return {"inst": inst, "error": "kunde inte hämta optionskedjan från Yahoo (rate-limit?)"}
-    bad = sanity(g, fut)
+    bad = sanity(g, fut, inst)
     if bad:
         src = g.get("source")
         return {"inst": inst, "error": f"{bad}{f' [källa: {src}]' if src else ''}"}
@@ -118,7 +126,7 @@ def _once(inst):
     f = g["futures"]
     return {"inst": inst, "fut_price": fut, "underlying": g["underlying"], "etf_spot": g["levels"]["spot"],
             "ratio": f["ratio"], "regime": f["regime"], "expiries": g["expiries"],
-            "source": g.get("source"),
+            "source": g.get("source"), "spot_source": g.get("spot_source"),
             "n_strikes": g["levels"].get("n_strikes"),
             "call_wall": f["call_wall"], "put_wall": f["put_wall"], "zero_gamma": f["zero_gamma"],
             "hgex": f.get("hgex"), "call_wall_0dte": f.get("call_wall_0"), "put_wall_0dte": f.get("put_wall_0"),
