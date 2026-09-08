@@ -81,7 +81,10 @@ def main():
                   f"{r['n_strikes']} strikes · kvot {r['ratio']}")
             print(f"    i {etf}-termer: call {round(r['call_wall'] / r['ratio'], 2)} · "
                   f"put {round(r['put_wall'] / r['ratio'], 2)} · "
-                  f"flip {r['zero_gamma'] and round(r['zero_gamma'] / r['ratio'], 2)}")
+                  f"flip {r['zero_gamma'] and round(r['zero_gamma'] / r['ratio'], 2)}"
+                  f" · ETF-kurs från {r.get('spot_source')}")
+            print(f"    sträng ({inst} — levels string):")
+            print(f"    {r['string']}")
     print("=" * 78)
     return 0
 
