@@ -11,7 +11,7 @@ Körs av .github/workflows/gex_daily.yml varje vardag, eller lokalt:
 Utan TELEGRAM_TOKEN/CHAT_ID skrivs bara filerna.
 
 GitHub Actions startar schemalagda jobb när de har plats — ibland timmar sent.
-Därför körs jobbet flera gånger per fönster (london/usa) med:
+Därför körs jobbet flera gånger per fönster (london/usa/rth) med:
     python gex_notify.py --window london --once
 --once  = hoppa över körningen om fönstret redan skickats i dag (levels/sent.json).
 --force = skicka ändå (manuell körning) men lås fönstret så schemat inte dubblar.
@@ -28,7 +28,7 @@ import gex_cli as CLI
 
 OUT_DIR = os.environ.get("GEX_OUT_DIR", "levels")
 STO = ZoneInfo("Europe/Stockholm")
-WINDOWS = ("london", "usa")
+WINDOWS = ("london", "usa", "rth")
 MAX_FALLBACK_DAYS = int(os.environ.get("GEX_FALLBACK_DAYS", "4"))   # hur gamla reservnivåer som får skickas
 
 

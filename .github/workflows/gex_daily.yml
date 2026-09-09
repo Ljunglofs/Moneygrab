@@ -5,6 +5,11 @@
 #   london (06:00 UTC = 08:00 svensk sommartid) -> samma väggar (OI ändras bara
 #           efter USA-stängning) men EM-band och öppningsgrid på nattens pris.
 #   usa    (11:05 UTC = 13:05 svensk sommartid) -> dagens uppdaterade open interest.
+#   rth    (14:05 UTC = 16:05 svensk sommartid) -> en halvtimme efter USA-öppning.
+#           Enda körningen som ligger inom 09:30-16:00 ET, alltså den enda som
+#           kan mäta kvoten futures/ETF live och spara den i levels/ratio.json
+#           åt morgondagens morgonkörning. Ger också dagens öppningsnivåer och
+#           0DTE-väggar när de faktiskt betyder något.
 # (Vintertid: en timme tidigare svensk tid.)
 #
 # GitHub startar schemalagda jobb först när det finns kapacitet — de kan bli
@@ -34,6 +39,9 @@ on:
     - cron: "5 12 * * 1-5"    # retry
     - cron: "35 12 * * 1-5"   # retry
     - cron: "5 13 * * 1-5"    # sista chansen för USA-fönstret
+    - cron: "5 14 * * 1-5"    # RTH 16:05 CEST = 10:05 ET, en halvtimme efter USA-öppning
+    - cron: "35 14 * * 1-5"   # retry
+    - cron: "5 15 * * 1-5"    # sista chansen för RTH-fönstret
   workflow_dispatch:
 
 permissions:
@@ -87,7 +95,8 @@ jobs:
           # 06:00-08:00 och USA-cronerna 11:05-13:05, så en London-körning som
           # GitHub skjuter upp flera timmar räknas fortfarande som London i
           # stället för att låsa USA-fönstret i förtid.
-          if [ "$(date -u +%H)" -lt 11 ]; then W=london; else W=usa; fi
+          H=$(date -u +%H)
+          if [ "$H" -lt 11 ]; then W=london; elif [ "$H" -lt 14 ]; then W=usa; else W=rth; fi
           echo "Fönster: $W"
           # manuell körning skickar alltid, men låser fönstret så schemat inte dubblar
           [ "$EVENT" = "workflow_dispatch" ] && MODE=--force || MODE=--once
