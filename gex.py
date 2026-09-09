@@ -314,11 +314,14 @@ def _save_disk(all_data):
         print("[gex] kunde inte spara cache:", e)
 
 
-def to_futures(levels, fut_price, etf_price):
-    """Skala ETF-nivåer till futures med live-kvot."""
-    if not levels or not fut_price or not etf_price:
+def to_futures(levels, fut_price, etf_price, ratio=None):
+    """Skala ETF-nivåer till futures. ratio=None ger live-kvoten fut/etf.
+    Utanför USA-börsens öppettider är ETF-kursen gårdagens stängning, och då
+    ska en kvot uppmätt medan båda handlades skickas in i stället — annars
+    följer väggarna med nattens rörelse i stället för att ligga still."""
+    if not levels or not fut_price or not (etf_price or ratio):
         return None
-    r = fut_price / etf_price
+    r = ratio if ratio else fut_price / etf_price
     def sc(x):
         return round(x * r, 2) if x is not None else None
     return {
