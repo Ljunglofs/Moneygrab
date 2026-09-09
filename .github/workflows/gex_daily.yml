@@ -82,8 +82,12 @@ jobs:
           CHAT_ID: ${{ secrets.CHAT_ID }}
           EVENT: ${{ github.event_name }}
         run: |
-          # fönstret avgörs av när jobbet faktiskt kör, inte av vilken cron som startade det
-          if [ "$(date -u +%H)" -lt 10 ]; then W=london; else W=usa; fi
+          # Fönstret avgörs av när jobbet faktiskt kör, inte av vilken cron som
+          # startade det. Gränsen ligger på 11:00 UTC: London-cronerna går
+          # 06:00-08:00 och USA-cronerna 11:05-13:05, så en London-körning som
+          # GitHub skjuter upp flera timmar räknas fortfarande som London i
+          # stället för att låsa USA-fönstret i förtid.
+          if [ "$(date -u +%H)" -lt 11 ]; then W=london; else W=usa; fi
           echo "Fönster: $W"
           # manuell körning skickar alltid, men låser fönstret så schemat inte dubblar
           [ "$EVENT" = "workflow_dispatch" ] && MODE=--force || MODE=--once

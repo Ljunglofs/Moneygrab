@@ -5,8 +5,8 @@
     "at": "2026-09-09T08:16:39+02:00"
   },
   "usa": {
-    "day": "2026-09-09",
-    "ok": true,
-    "at": "2026-09-09T12:26:07+02:00"
+    "day": "1970-01-01",
+    "ok": false,
+    "at": "återställd: 12:26-körningen hörde till London-fönstret"
   }
 }
