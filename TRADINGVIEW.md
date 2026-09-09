@@ -110,3 +110,28 @@ inte licensierad orderflow, men nära på NQ och GC.
 - CVD nollställs per dag som förval; Session (RTH), Vecka eller Aldrig går att välja.
 - Auto använder minutupplösning. Sekundtidsramar (1S/5S/15S) ger finare delta men
   kräver TradingView Premium — utan Premium ger de körfelet RE10063.
+
+## GRABIT Breakout · strategy (`pine/grabit_breakout_strategy.pine`)
+
+Backtestbar version av den signaltyp som säljs som "Weakness Below X /
+Strength Above X": bryt en nivå, stop på andra sidan, tre mål med avskalning
+(en kontrakt per mål, tre totalt).
+
+Finns för att kunna mäta i stället för att tro. Vinstprocent på T1 säger
+nästan ingenting när T1 ligger närmare än stoppen — med stop 36 punkter och
+T1 16 punkter krävs 69 % träff bara för nollresultat, före courtage. Tabellen
+visar hur ofta T1, T2 och T3 nås, hur ofta stoppen tas utan att T1 nåtts, och
+vilken träffprocent som krävs för att gå jämnt ut. Resten läser du i Strategy
+Tester: nettoresultat, profit factor, max drawdown.
+
+- Nivå: bekräftad pivot eller högsta/lägsta de senaste N barerna.
+- Stop: ATR-multipel, fast punktantal eller motsatt struktur.
+- Mål i multiplar av risken (förval 0,5R / 1,0R / 1,5R), break even efter T1.
+- Filter, alla avstängda i förval utom tid: session, EMA-trend, GEX (long bara
+  över Gamma Flip, short bara under, och signaler för nära motsatt vägg
+  hoppas över) och volymdelta i signalens riktning.
+
+Innan ett resultat betyder något: sätt Commission och Slippage i Properties
+(NQ ligger kring 4-5 USD per round turn och minst en tick), kör Deep Backtest
+över några hundra affärer, och kontrollera i Bar Replay att signalen står kvar
+när baren stängt.
