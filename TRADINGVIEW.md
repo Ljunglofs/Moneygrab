@@ -94,7 +94,7 @@ Identisk signal inom 60 sekunder räknas som dubblett och skickas inte igen
 Volymdelta och kumulativ delta i egen panel, som filter till GEX-nivåerna:
 väggen säger var priset möter motstånd, deltat säger om någon orkar dit.
 
-Varje bar delas i intrabarer (5-sekunders på en 5-minutersgraf, ställbart).
+Varje bar delas i intrabarer (1-minuters på en 5-minutersgraf, ställbart).
 Intrabaren räknas som köp om den stängde upp och sälj om den stängde ner, och
 volymen får det tecknet. Summan är barens delta, summan över dagen är CVD.
 Samma metod som TradingViews egen volymdelta — en approximation av bid/ask,
@@ -108,3 +108,5 @@ inte licensierad orderflow, men nära på NQ och GC.
   det "saknas" hittade TradingView ingen intrabar-data så långt bakåt, och baren
   klassas grovt på sin egen stängning — då är siffran ungefärlig.
 - CVD nollställs per dag som förval; Session (RTH), Vecka eller Aldrig går att välja.
+- Auto använder minutupplösning. Sekundtidsramar (1S/5S/15S) ger finare delta men
+  kräver TradingView Premium — utan Premium ger de körfelet RE10063.

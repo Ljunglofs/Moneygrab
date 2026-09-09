@@ -4,12 +4,15 @@
 // priset, köpare eller säljare.
 //
 // SÅ HÄR RÄKNAS DET:
-//  Varje bar delas upp i intrabarer (t.ex. 5-sekunders på en 5-minutersgraf).
+//  Varje bar delas upp i intrabarer (1-minuters på en 5-minutersgraf).
 //  Varje intrabar klassas som köp om den stängde upp och sälj om den stängde
 //  ner, och dess volym får motsvarande tecken. Summan är barens delta, och
 //  summan över dagen är CVD. Det är samma metod som TradingViews egen
 //  volymdelta — en approximation av bid/ask-flöde, inte licensierad orderflow,
 //  men på NQ och GC ligger den mycket nära.
+//
+//  Sekundupplösning ger finare delta men kräver TradingView Premium — förvalet
+//  Auto använder därför minuter och fungerar på alla konton.
 //
 // SÅ HÄR ANVÄNDS DET:
 //  CVD-ljusen visar både nivå och riktning: kroppen är barens delta, nivån är
@@ -25,8 +28,8 @@ indicator("GRABIT Delta · CVD", overlay = false, format = format.volume, precis
 
 // ── Inmatning ──────────────────────────────────────────────────────────────
 const string G_CALC = "Beräkning"
-string ltfIn = input.string("Auto", "Intrabar-upplösning", options = ["Auto", "1S", "5S", "10S", "15S", "1", "5"], group = G_CALC,
-     tooltip = "Auto väljer efter grafens tidsram. Finare upplösning ger exaktare delta men TradingView begränsar hur många intrabarer som får hämtas — får du tomma barer bakåt, ta en grövre.")
+string ltfIn = input.string("Auto", "Intrabar-upplösning", options = ["Auto", "1", "5", "15", "1S", "5S", "15S"], group = G_CALC,
+     tooltip = "Auto väljer minutupplösning efter grafens tidsram och fungerar på alla konton. S-alternativen (sekunder) ger exaktare delta men kräver TradingView Premium — utan Premium ger de felet RE10063. Finare upplösning betyder också att TradingView orkar hämta färre barer bakåt.")
 string anchor = input.string("Dag", "Nollställ CVD", options = ["Dag", "Vecka", "Session (RTH)", "Aldrig"], group = G_CALC,
      tooltip = "Dag: CVD börjar om vid varje ny handelsdag. Session: vid RTH-öppning. Aldrig: löpande sedan grafens början.")
 int sigLen = input.int(21, "Signallinje (EMA)", minval = 2, maxval = 200, group = G_CALC)
@@ -47,8 +50,11 @@ color cSig  = input.color(#F0B90B, "Signallinje", group = "Färger", inline = "c
 // ── Intrabar-upplösning ────────────────────────────────────────────────────
 // Hålls som simple string hela vägen — request.security_lower_tf tar inte ett
 // värde som räknats fram per bar.
+// Auto håller sig till minuter: sekundtidsramar kräver TradingView Premium
+// (annars RE10063). På en 1-minutersgraf blir intrabaren baren själv, alltså
+// samma sak som att klassa hela baren — statusrutan visar det.
 int    chartSec = timeframe.in_seconds(timeframe.period)
-string ltfAuto  = chartSec <= 60 ? "1S" : chartSec <= 300 ? "5S" : chartSec <= 900 ? "15S" : chartSec <= 3600 ? "1" : "5"
+string ltfAuto  = chartSec <= 3600 ? "1" : chartSec <= 14400 ? "5" : "15"
 string LTF      = ltfIn == "Auto" ? ltfAuto : ltfIn
 
 [ltfO, ltfC, ltfV] = request.security_lower_tf(syminfo.tickerid, LTF, [open, close, volume])
