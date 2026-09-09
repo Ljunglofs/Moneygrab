@@ -102,7 +102,8 @@ def build_message(results, fallback=None):
 
         parts.append(
             f"\n<b>{r['inst']}</b> {r['fut_price']:.2f} · gamma {r['regime']}{flag}"
-            + (f" · {r['source']}" if r.get("source") else "") + "\n"
+            + (f" · {r['source']}" if r.get("source") else "")
+            + (" · kvot från RTH" if r.get("ratio_source", "live") != "live" else "") + "\n"
             f"Call Wall <b>{num(r['call_wall'], 2)}</b> · Put Wall <b>{num(r['put_wall'], 2)}</b> · Flip {num(r['zero_gamma'], 2)}\n"
             f"EM ±{num(r['expected_move'])} · Max Pain {num(r['max_pain'], 2)} · HGEX {num(r['hgex'], 2)}\n"
             f"Fält: {'NQ' if r['inst'] == 'NQ' else 'GC'} — levels string ↓\n"
@@ -149,8 +150,30 @@ def usable_fallback(old, max_days=MAX_FALLBACK_DAYS):
     return 0 <= (datetime.now(STO).date() - gen).days <= max_days
 
 
+def save_ratios(results):
+    """Sparar kvoten futures/ETF när den mätts med USA-börsen öppen. Morgon- och
+    nattkörningar använder den i stället för att räkna mot gårdagens ETF-stängning."""
+    path = os.path.join(OUT_DIR, "ratio.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            d = json.load(f) or {}
+    except Exception:
+        d = {}
+    changed = False
+    for r in results:
+        if r.get("error") or not r.get("ratio_rth") or not r.get("ratio"):
+            continue
+        d[r["inst"]] = {"ratio": round(float(r["ratio"]), 4), "at": r.get("ratio_at"),
+                        "etf": r.get("etf_spot"), "fut": r.get("fut_price")}
+        changed = True
+    if changed:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(d, f, indent=2, ensure_ascii=False)
+
+
 def write_files(results):
     os.makedirs(OUT_DIR, exist_ok=True)
+    save_ratios(results)
     prev = _previous()
     out = []
     for r in results:

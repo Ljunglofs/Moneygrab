@@ -36,6 +36,13 @@ RATIO_BAND = {"NQ": (39.0, 42.5), "GC": (10.5, 11.5)}
 TRIES = int(os.environ.get("GEX_TRIES", "3"))
 RETRY_SLEEP = int(os.environ.get("GEX_RETRY_SLEEP", "20"))
 
+# Kvoten futures/ETF ska mätas när båda handlas. ETF:en handlas bara 09:30-16:00
+# ET; utanför det är dess kurs gårdagens stängning medan futuren rört sig, och
+# en live-kvot skulle då flytta alla nivåer med nattens rörelse.
+OUT_DIR = os.environ.get("GEX_OUT_DIR", "levels")
+RATIO_MAX_DAYS = int(os.environ.get("GEX_RATIO_MAX_DAYS", "7"))
+RATIO_MIN_DIFF = float(os.environ.get("GEX_RATIO_MIN_DIFF", "0.001"))   # under 0,1 % spelar ingen roll
+
 
 def _fut_price(inst):
     import yfinance as yf
@@ -74,6 +81,30 @@ def _open_and_atr(inst):
     except Exception:
         pass
     return open_px, atr
+
+
+def rth_now(now=None):
+    """Är USA-börsen (och därmed ETF:en) öppen just nu?"""
+    now = now or datetime.now(ET)
+    if now.weekday() >= 5:
+        return False
+    minutes = now.hour * 60 + now.minute
+    return 9 * 60 + 30 <= minutes <= 16 * 60
+
+
+def stored_ratio(inst, max_days=RATIO_MAX_DAYS):
+    """Senast uppmätta kvot medan USA-börsen var öppen (levels/ratio.json)."""
+    try:
+        with open(os.path.join(OUT_DIR, "ratio.json"), encoding="utf-8") as f:
+            e = (json.load(f) or {}).get(inst) or {}
+        r = float(e["ratio"])
+        stamp = e["at"]
+        age = (datetime.now(ET) - datetime.fromisoformat(stamp)).days
+        if r > 0 and 0 <= age <= max_days:
+            return r, stamp
+    except Exception:
+        pass
+    return None, None
 
 
 def sanity(g, fut, inst=None, today=None):
@@ -116,7 +147,21 @@ def _once(inst):
         return {"inst": inst, "error": "fick inget futurespris från Yahoo"}
     g = GX.get_gex(inst, fut_price=fut, force=True)
     if not g or not g.get("futures"):
-        return {"inst": inst, "error": "kunde inte hämta optionskedjan från Yahoo (rate-limit?)"}
+        return {"inst": inst, "error": "kunde inte hämta optionskedjan (rate-limit?)"}
+
+    # Utanför USA-börsens öppettider: räkna om med den senast uppmätta kvoten.
+    is_rth = rth_now()
+    ratio_src = "live"
+    ratio_at = datetime.now(ET).isoformat(timespec="seconds")
+    if not is_rth:
+        prev, stamp = stored_ratio(inst)
+        live = g["futures"]["ratio"]
+        if prev and abs(live / prev - 1) > RATIO_MIN_DIFF:
+            g = dict(g)
+            g["futures"] = GX.to_futures(g["levels"], fut, g["levels"]["spot"], ratio=prev)
+            ratio_src = "senaste RTH " + str(stamp)[:16].replace("T", " ")
+            ratio_at = stamp
+
     bad = sanity(g, fut, inst)
     if bad:
         src = g.get("source")
@@ -127,6 +172,7 @@ def _once(inst):
     return {"inst": inst, "fut_price": fut, "underlying": g["underlying"], "etf_spot": g["levels"]["spot"],
             "ratio": f["ratio"], "regime": f["regime"], "expiries": g["expiries"],
             "source": g.get("source"), "spot_source": g.get("spot_source"),
+            "ratio_source": ratio_src, "ratio_rth": is_rth, "ratio_at": ratio_at,
             "n_strikes": g["levels"].get("n_strikes"),
             "call_wall": f["call_wall"], "put_wall": f["put_wall"], "zero_gamma": f["zero_gamma"],
             "hgex": f.get("hgex"), "call_wall_0dte": f.get("call_wall_0"), "put_wall_0dte": f.get("put_wall_0"),
@@ -170,7 +216,7 @@ def main(argv):
         print(f"0DTE: call {r['call_wall_0dte']} / put {r['put_wall_0dte']}  ·  Max pain {r['max_pain']}  ·  EM ±{r['expected_move']} ({r['em_src']})  ·  IV 1D ±{r['iv_1d']}")
         if r.get("flip_uncertain"):
             print("VARNING: Gamma Flip ligger >2 % från priset. Putdominerad optionskedja — regimen (positiv/negativ gamma) är osäker. Lita på väggar, EM och IV-range.")
-        print(f"Källa {r.get('source')}  ·  Öppning {r['open']}  ·  ATR dag {r['atr_daily'] and round(r['atr_daily'], 2)}  ·  expiries {', '.join(r['expiries'][:4])}")
+        print(f"Källa {r.get('source')}  ·  kvot {r.get('ratio_source')}  ·  Öppning {r['open']}  ·  ATR dag {r['atr_daily'] and round(r['atr_daily'], 2)}  ·  expiries {', '.join(r['expiries'][:4])}")
         print("-" * 78)
         print("Klistra in i indikatorn (fältet " + ("NQ" if r["inst"] == "NQ" else "GC") + " — levels string):")
         print(r["string"])
