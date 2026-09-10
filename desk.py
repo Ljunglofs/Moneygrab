@@ -51,6 +51,12 @@ from fastapi import HTTPException, Request
 import prop_rules as PR
 
 ET = ZoneInfo("America/New_York")
+STO = ZoneInfo("Europe/Stockholm")
+# Fönster i svensk tid, samma tre som GitHub-jobbet. Sista talet är hur länge
+# fönstret står öppet: startar desken om mitt på dagen (Render deployar om och
+# staten ligger på ett flyktigt filsystem) ska den inte hosta ur sig morgonens
+# meddelande på eftermiddagen.
+GEX_WINDOWS = (("london", 8, 0, 180), ("usa", 13, 5, 175), ("rth", 16, 5, 120))
 DATA_DIR = os.environ.get("DATA_DIR", ".")
 MAX_BARS = 3 * 1440 + 300
 INSTRUMENTS = ("NQ", "GC")
@@ -660,29 +666,73 @@ def atr_daily(inst, n=14):
     return atr
 
 
+def gex_result(inst):
+    """Nivåerna via gex_cli — samma väg som GitHub-jobbet, alltså med
+    rimlighetskontroll, källbyte CBOE/Yahoo, kurskontroll och RTH-kvot.
+    Tidigare gick desken direkt på gex.get_gex och kunde därför posta en halv
+    optionskedja eller nivåer skalade mot en gammal ETF-kurs."""
+    import gex_cli as CLI
+    try:
+        return CLI.run(inst)
+    except Exception as e:
+        return {"inst": inst, "error": f"{type(e).__name__}: {e}"}
+
+
 def gex_string(inst):
     """Strängen till Pine-indikatorn 'GEX Daily Levels' (pris,etikett,typ;...)."""
-    import gex as GX
-    L = analyze(inst)
-    price = L["price"] if L else None
-    if not price:
-        with _lock:
-            price = BARS[inst][-1]["c"] if BARS[inst] else None
-    g = GX.get_gex(inst, fut_price=price)
-    if not g or not g.get("futures"):
-        return ""
-    return GX.levels_string(inst, g, open_price=daily_open(inst), atr_daily=atr_daily(inst),
-                            today=datetime.now(ET).date())
+    r = gex_result(inst)
+    return "" if r.get("error") else r.get("string", "")
 
 
 def gex_string_text(inst):
-    s = gex_string(inst)
-    if not s:
-        return f"GEX {inst}: ingen data att bygga sträng av (Yahoo nåddes inte och ingen cache)."
+    r = gex_result(inst)
+    if r.get("error"):
+        return f"\U0001F4CB <b>GEX Daily Levels · {inst}</b>\nKunde inte räknas: {r['error']}"
+    s = r.get("string") or ""
     n = s.count(";") + 1
-    return (f"\U0001F4CB <b>GEX Daily Levels · {inst}</b> ({n} nivåer)\n"
+    src = r.get("source") or "?"
+    kvot = " · kvot från RTH" if r.get("ratio_source", "live") != "live" else ""
+    return (f"\U0001F4CB <b>GEX Daily Levels · {inst}</b> ({n} nivåer · {src}{kvot})\n"
+            f"Call Wall <b>{r['call_wall']}</b> · Put Wall <b>{r['put_wall']}</b> · Flip {r['zero_gamma']}\n"
             f"Klistra in i indikatorns fält \u201c{inst if inst == 'NQ' else 'GOLD GC'} \u2014 levels string\u201d:\n"
             f"<pre>{s}</pre>")
+
+
+def gex_due(now=None):
+    """Fönster som passerat i dag och ännu inte postats. Dagslåset ligger i
+    desk-staten, som nollställs vid varje ny handelsdag."""
+    now = now or datetime.now(STO)
+    if now.weekday() >= 5:
+        return []
+    st = _load_state()
+    mins = now.hour * 60 + now.minute
+    return [name for name, h, m, grace in GEX_WINDOWS
+            if h * 60 + m <= mins <= h * 60 + m + grace and st.get("gex_" + name) != st.get("date")]
+
+
+def post_gex_window(name):
+    """Postar båda instrumenten och låser fönstret för dagen."""
+    st = _load_state()
+    st["gex_" + name] = st.get("date")
+    _save_state()
+    for inst in INSTRUMENTS:
+        try:
+            _notify(gex_string_text(inst))
+        except Exception as e:
+            STATUS["last_error"] = f"gex {name} {inst}: {e}"
+
+
+def _gex_timer():
+    """Deskens egen klocka. GitHub startar inte alltid sina schemalagda jobb —
+    den 10 september kom ingen av morgonens fem croner igång — och desken kör
+    ändå dygnet runt på Render. Stäng av med DESK_GEX_TIMER=0."""
+    while True:
+        try:
+            for name in gex_due():
+                post_gex_window(name)
+        except Exception as e:
+            STATUS["last_error"] = f"gex-timer: {type(e).__name__}: {e}"
+        time.sleep(60)
 
 
 def _maybe_morning_gex():
@@ -929,6 +979,9 @@ HELP_TEXT = ("\U0001F3E6 <b>DESK</b>\n/desk – status · /levels nq|gc – niv�
 def mount(app):
     _load_bars()
     _auto_bootstrap()
+    if os.environ.get("DESK_GEX_TIMER", "1") == "1":
+        threading.Thread(target=_gex_timer, daemon=True, name="desk-gex-timer").start()
+        print("DESK: GEX-klockan igång (08:00, 13:05, 16:05 svensk tid)")
 
     def _secret_ok(key, payload):
         secret = os.environ.get("TV_WEBHOOK_SECRET", "").strip()
