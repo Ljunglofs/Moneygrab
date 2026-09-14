@@ -127,8 +127,11 @@ def sanity(g, fut, inst=None, today=None):
     cw, pw = f.get("call_wall"), f.get("put_wall")
     if not cw or not pw:
         return "call/put wall saknas"
-    if pw >= cw:
-        return f"put wall {pw} ligger över call wall {cw} — kedjan är trasig"
+    # Put wall över call wall är inte i sig fel: faller priset ur hela strukturen
+    # hamnar den tyngsta negativa striken ovanför den tyngsta positiva. Guld såg
+    # precis så ut den 14 september — GLD-strikes 400 och 405 med priset i 392.
+    # Den trasiga kedjan den 8 september fångas av avståndsregeln nedan i stället
+    # (put wall låg 32 % från priset).
     for name, px in (("call wall", cw), ("put wall", pw)):
         if abs(px / fut - 1) > MAX_WALL_PCT:
             return f"{name} {px} ligger {abs(px / fut - 1) * 100:.0f} % från priset {fut:.0f} — orimligt"
@@ -178,6 +181,7 @@ def _once(inst):
             "hgex": f.get("hgex"), "call_wall_0dte": f.get("call_wall_0"), "put_wall_0dte": f.get("put_wall_0"),
             "max_pain": f.get("max_pain"), "expected_move": f.get("em"), "em_src": f.get("em_src"),
             "iv_1d": f.get("iv_1d"), "flip_uncertain": f.get("flip_uncertain"),
+            "walls_inverted": bool(f.get("put_wall") and f.get("call_wall") and f["put_wall"] >= f["call_wall"]),
             "open": open_px, "atr_daily": atr, "string": s}
 
 
