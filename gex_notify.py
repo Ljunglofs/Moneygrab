@@ -94,6 +94,8 @@ def build_message(results, fallback=None):
                     f"är däremot gamla.\n<pre>{_esc(old['string'])}</pre>")
             continue
         flag = " ⚠ flip osäker" if r.get("flip_uncertain") else ""
+        if r.get("walls_inverted"):
+            flag += " ⚠ priset under båda väggarna"
         def num(v, d=0):
             """Tal utan efterhängande nollor, '–' när värdet saknas."""
             if v is None:
