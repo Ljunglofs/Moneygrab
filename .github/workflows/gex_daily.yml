@@ -43,6 +43,11 @@ on:
     - cron: "35 14 * * 1-5"   # retry
     - cron: "5 15 * * 1-5"    # sista chansen för RTH-fönstret
   workflow_dispatch:
+    inputs:
+      force:
+        description: "Skicka även om fönstret redan skickats i dag"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -89,6 +94,7 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
           EVENT: ${{ github.event_name }}
+          FORCE: ${{ inputs.force }}
         run: |
           # Fönstret avgörs av när jobbet faktiskt kör, inte av vilken cron som
           # startade det. Gränsen ligger på 11:00 UTC: London-cronerna går
@@ -98,8 +104,10 @@ jobs:
           H=$(date -u +%H)
           if [ "$H" -lt 11 ]; then W=london; elif [ "$H" -lt 14 ]; then W=usa; else W=rth; fi
           echo "Fönster: $W"
-          # manuell körning skickar alltid, men låser fönstret så schemat inte dubblar
-          [ "$EVENT" = "workflow_dispatch" ] && MODE=--force || MODE=--once
+          # Manuell körning följer samma dagslås som schemat, så en extern
+          # trigger kan köras utan att dubbla ett fönster som redan skickats.
+          # Kryssa i "force" när du vill ha ett meddelande oavsett.
+          if [ "$EVENT" = "workflow_dispatch" ] && [ "$FORCE" = "true" ]; then MODE=--force; else MODE=--once; fi
           set +e
           python gex_notify.py --window "$W" "$MODE" 2>&1 | tee /tmp/gex.log
           rc=${PIPESTATUS[0]}
