@@ -1,9 +1,9 @@
 {
-  "generated": "2026-09-14T13:08:06+02:00",
+  "generated": "2026-09-14T13:10:27+02:00",
   "levels": [
     {
       "inst": "NQ",
-      "fut_price": 28928.0,
+      "fut_price": 28917.5,
       "underlying": "QQQ",
       "etf_spot": 714.8499755859375,
       "ratio": 41.0858,
@@ -22,22 +22,23 @@
       "n_strikes": 172,
       "call_wall": 29499.6,
       "put_wall": 29335.26,
-      "zero_gamma": 29456.33,
+      "zero_gamma": 29456.29,
       "hgex": 29335.26,
       "call_wall_0dte": 29499.6,
       "put_wall_0dte": 29335.26,
       "max_pain": 29376.35,
-      "expected_move": 92.79,
+      "expected_move": 92.53,
       "em_src": "iv",
       "iv_1d": 183.63,
       "flip_uncertain": false,
+      "walls_inverted": false,
       "open": 28997.75,
       "atr_daily": 396.7142857142857,
-      "string": "29499.5,Call Wall,res;29335.25,Put Wall,sup;29456.25,Gamma Flip,flip;29376.25,Max Pain 0DTE,mpain;29581.75,G+ 1,gpos;29540.75,G+ 2,gpos;29171,G- 1,gneg;29376.25,G- 2,gneg;29020.75,EM+,emh;28835.25,EM-,eml;28974.5,EM +50%,emb;28881.5,EM -50%,emb;29111.75,1D High IV,ivh;28744.25,1D Low IV,ivl;28997.75,Open,opo;29196,O +0.5 ATR,opu;28799.5,O -0.5 ATR,opd;29394.5,O +1 ATR,opu;28601,O -1 ATR,opd"
+      "string": "29499.5,Call Wall,res;29335.25,Put Wall,sup;29456.25,Gamma Flip,flip;29376.25,Max Pain 0DTE,mpain;29581.75,G+ 1,gpos;29540.75,G+ 2,gpos;29171,G- 1,gneg;29376.25,G- 2,gneg;29010,EM+,emh;28825,EM-,eml;28963.75,EM +50%,emb;28871.25,EM -50%,emb;29101.25,1D High IV,ivh;28733.75,1D Low IV,ivl;28997.75,Open,opo;29196,O +0.5 ATR,opu;28799.5,O -0.5 ATR,opd;29394.5,O +1 ATR,opu;28601,O -1 ATR,opd"
     },
     {
       "inst": "GC",
-      "fut_price": 4318.7998046875,
+      "fut_price": 4333.7998046875,
       "underlying": "GLD",
       "etf_spot": 398.6000061035156,
       "ratio": 11.0114,
@@ -55,22 +56,20 @@
       "ratio_at": "2026-09-11T10:52:58-04:00",
       "n_strikes": 95,
       "call_wall": 4404.56,
-      "put_wall": 4349.5,
-      "zero_gamma": 4400.44,
-      "hgex": 4349.5,
+      "put_wall": 4459.62,
+      "zero_gamma": 4400.39,
+      "hgex": 4459.62,
       "call_wall_0dte": 4404.56,
       "put_wall_0dte": 4349.5,
       "max_pain": 4404.56,
-      "expected_move": 21.22,
+      "expected_move": 20.17,
       "em_src": "iv",
       "iv_1d": 40.04,
       "flip_uncertain": false,
+      "walls_inverted": true,
       "open": 4375.0,
       "atr_daily": 69.55716378348214,
-      "string": "4404.6,Call Wall,res;4349.5,Put Wall,sup;4400.4,Gamma Flip,flip;4404.6,Max Pain 0DTE,mpain;4470.6,G+ 1,gpos;4492.6,G+ 2,gpos;4459.6,G- 1,gneg;4382.5,G- 2,gneg;4340,EM+,emh;4297.6,EM-,eml;4329.4,EM +50%,emb;4308.2,EM -50%,emb;4358.8,1D High IV,ivh;4278.8,1D Low IV,ivl;4375,Open,opo;4409.8,O +0.5 ATR,opu;4340.2,O -0.5 ATR,opd;4444.6,O +1 ATR,opu;4305.4,O -1 ATR,opd",
-      "_generated": "2026-09-14T12:13:56+02:00",
-      "stale": true,
-      "last_error": "put wall 4459.62 ligger över call wall 4404.56 — kedjan är trasig [källa: cboe] — 3 försök"
+      "string": "4404.6,Call Wall,res;4459.6,Put Wall,sup;4349.5,Put Wall 0DTE,sup0;4400.4,Gamma Flip,flip;4404.6,Max Pain 0DTE,mpain;4470.6,G+ 1,gpos;4492.6,G+ 2,gpos;4349.5,G- 1,gneg;4382.5,G- 2,gneg;4354,EM+,emh;4313.6,EM-,eml;4343.9,EM +50%,emb;4323.7,EM -50%,emb;4373.8,1D High IV,ivh;4293.8,1D Low IV,ivl;4375,Open,opo;4409.8,O +0.5 ATR,opu;4340.2,O -0.5 ATR,opd;4444.6,O +1 ATR,opu;4305.4,O -1 ATR,opd"
     }
   ]
 }
