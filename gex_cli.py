@@ -35,7 +35,7 @@ MAX_NEAR_DAYS = int(os.environ.get("GEX_MAX_NEAR_DAYS", "5"))      # närmaste e
 RATIO_BAND = {"NQ": (39.0, 42.5), "GC": (10.5, 11.5)}
 # Index: futures = index + basis. Basisen är ränta minus utdelning fram till
 # förfall, alltså små tal — inte 1 % av priset.
-MAX_BASIS_PCT = float(os.environ.get("GEX_MAX_BASIS_PCT", "0.02"))
+MAX_BASIS_PCT = float(os.environ.get("GEX_MAX_BASIS_PCT", "0.01"))
 MIN_BASIS_DIFF = float(os.environ.get("GEX_MIN_BASIS_DIFF", "5"))   # punkter
 TRIES = int(os.environ.get("GEX_TRIES", "3"))
 RETRY_SLEEP = int(os.environ.get("GEX_RETRY_SLEEP", "20"))
