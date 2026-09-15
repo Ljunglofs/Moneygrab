@@ -177,7 +177,23 @@ def _once(inst):
         if index_mode:
             prev, stamp = stored_map(inst, "basis")
             live = g["futures"].get("basis")
-            if prev is not None and live is not None and abs(live - prev) > MIN_BASIS_DIFF:
+            if prev is None:
+                # Ingen basis uppmätt med index och futures öppna samtidigt ännu.
+                # Indexkursen är då gårdagens stängning medan futuren rört sig i
+                # natt, så basisen skulle svälja hela nattrörelsen. Ta ETF-vägen
+                # i stället tills en riktig basis finns.
+                alt = GX.get_gex(inst, fut_price=fut, force=True, prefer=GX.FALLBACK_UNDERLYING.get(inst))
+                if alt and alt.get("futures") and alt.get("mapping") != "basis":
+                    print(f"[gex] {inst}: ingen RTH-basis sparad — använder {alt.get('underlying')} tills vidare")
+                    g, index_mode, ratio_src = alt, False, "ingen RTH-basis, ETF-vägen"
+                    prev, stamp = stored_map(inst, "ratio")
+                    live = g["futures"]["ratio"]
+                    if prev and abs(live / prev - 1) > RATIO_MIN_DIFF:
+                        g = dict(g)
+                        g["futures"] = GX.to_futures(g["levels"], fut, g["levels"]["spot"], ratio=prev)
+                        ratio_src = "senaste RTH " + str(stamp)[:16].replace("T", " ")
+                        ratio_at = stamp
+            elif live is not None and abs(live - prev) > MIN_BASIS_DIFF:
                 g = dict(g)
                 g["futures"] = GX.to_futures(g["levels"], fut, g["levels"]["spot"], basis=prev)
                 ratio_src = "senaste RTH " + str(stamp)[:16].replace("T", " ")

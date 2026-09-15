@@ -358,7 +358,7 @@ def to_futures(levels, fut_price, etf_price, ratio=None, basis=None):
     }
 
 
-def get_gex(inst, fut_price=None, force=False):
+def get_gex(inst, fut_price=None, force=False, prefer=None):
     """Huvudingång. inst 'NQ'|'GC'. Returnerar dict med ETF-nivåer + futures-nivåer
     (om fut_price ges) eller None. Aldrig exception utåt."""
     und = UNDERLYING.get(inst)
@@ -366,9 +366,11 @@ def get_gex(inst, fut_price=None, force=False):
         return None
     cands = [und] + ([FALLBACK_UNDERLYING[inst]] if inst in FALLBACK_UNDERLYING
                      and FALLBACK_UNDERLYING[inst] != und else [])
+    if prefer and prefer in cands:
+        cands = [prefer] + [c for c in cands if c != prefer]
     with _lock:
         c = _cache.get(inst)
-        if c and not force and time.time() - c["t"] < CACHE_SEC:
+        if c and not force and not prefer and time.time() - c["t"] < CACHE_SEC:
             data = c["data"]
         else:
             data = None
