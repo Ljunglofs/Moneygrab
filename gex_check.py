@@ -124,10 +124,17 @@ def main():
             print(f"  nivåer via {src}: call wall {r['call_wall']} · put wall {r['put_wall']} · "
                   f"flip {r['zero_gamma']} · max pain {r['max_pain']} · EM {r['expected_move']} · "
                   f"{r['n_strikes']} strikes · kvot {r['ratio']}")
-            print(f"    i {etf}-termer: call {round(r['call_wall'] / r['ratio'], 2)} · "
-                  f"put {round(r['put_wall'] / r['ratio'], 2)} · "
-                  f"flip {r['zero_gamma'] and round(r['zero_gamma'] / r['ratio'], 2)}"
-                  f" · ETF-kurs från {r.get('spot_source')}")
+            if r.get("mapping") == "basis":
+                b = r.get("basis") or 0
+                print(f"    i {r.get('underlying')}-termer: call {round(r['call_wall'] - b, 1)} · "
+                      f"put {round(r['put_wall'] - b, 1)} · "
+                      f"flip {r['zero_gamma'] and round(r['zero_gamma'] - b, 1)}"
+                      f" · basis {b} · kurs från {r.get('spot_source')}")
+            else:
+                print(f"    i {etf}-termer: call {round(r['call_wall'] / r['ratio'], 2)} · "
+                      f"put {round(r['put_wall'] / r['ratio'], 2)} · "
+                      f"flip {r['zero_gamma'] and round(r['zero_gamma'] / r['ratio'], 2)}"
+                      f" · ETF-kurs från {r.get('spot_source')}")
             print(f"    sträng ({inst} — levels string):")
             print(f"    {r['string']}")
     print("=" * 78)

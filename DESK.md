@@ -124,8 +124,11 @@ Samma nivåer gäller NQ och MNQ (samma pris). GC och MGC likaså.
 | `ivh` / `ivl` | 1D min/max | pris ± spot × ATM-IV × √(1/252) |
 | `opo` / `opu` / `opd` | Öppning + ATR-grid | dagens RTH-öppning ur feeden, ± 0,5 och 1,0 dags-ATR |
 
-Källa är QQQ-optioner för NQ och GLD-optioner för GC, hämtade från CBOE:s fördröjda kedja med
-yfinance som reserv (`GEX_SOURCE=auto|cboe|yahoo`), skalade med
+Källa är NDX-indexoptioner för NQ och GLD-optioner för GC, hämtade från CBOE:s fördröjda kedja med
+yfinance som reserv (`GEX_SOURCE=auto|cboe|yahoo`). NDX är samma underliggande som NQ, så
+nivåerna översätts additivt med futuresbasisen NQ−NDX i stället för en ETF-kvot — strikes ligger
+var tionde punkt i stället för var 41:e, och ingen kvot kan bli fel. QQQ finns kvar som reserv
+(`GEX_NQ_SOURCE=qqq`). GC skalas fortfarande med
 live-kvoten futures/ETF. Open interest uppdateras en gång per dygn, så strängen är stabil
 under dagen; expected move och IV läses från aktuella premier.
 

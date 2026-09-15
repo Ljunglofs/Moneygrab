@@ -33,6 +33,10 @@ MAX_NEAR_DAYS = int(os.environ.get("GEX_MAX_NEAR_DAYS", "5"))      # närmaste e
 # rör sig bara långsamt. Hamnar den utanför bandet är ETF-kursen fel, och då är
 # varenda nivå felskalad.
 RATIO_BAND = {"NQ": (39.0, 42.5), "GC": (10.5, 11.5)}
+# Index: futures = index + basis. Basisen är ränta minus utdelning fram till
+# förfall, alltså små tal — inte 1 % av priset.
+MAX_BASIS_PCT = float(os.environ.get("GEX_MAX_BASIS_PCT", "0.02"))
+MIN_BASIS_DIFF = float(os.environ.get("GEX_MIN_BASIS_DIFF", "5"))   # punkter
 TRIES = int(os.environ.get("GEX_TRIES", "3"))
 RETRY_SLEEP = int(os.environ.get("GEX_RETRY_SLEEP", "20"))
 
@@ -92,19 +96,24 @@ def rth_now(now=None):
     return 9 * 60 + 30 <= minutes <= 16 * 60
 
 
-def stored_ratio(inst, max_days=RATIO_MAX_DAYS):
-    """Senast uppmätta kvot medan USA-börsen var öppen (levels/ratio.json)."""
+def stored_map(inst, key="ratio", max_days=RATIO_MAX_DAYS):
+    """Senast uppmätta kvot eller basis medan USA-börsen var öppen
+    (levels/ratio.json). key är "ratio" för ETF och "basis" för index."""
     try:
         with open(os.path.join(OUT_DIR, "ratio.json"), encoding="utf-8") as f:
             e = (json.load(f) or {}).get(inst) or {}
-        r = float(e["ratio"])
+        v = float(e[key])
         stamp = e["at"]
         age = (datetime.now(ET) - datetime.fromisoformat(stamp)).days
-        if r > 0 and 0 <= age <= max_days:
-            return r, stamp
+        if 0 <= age <= max_days and (key == "basis" or v > 0):
+            return v, stamp
     except Exception:
         pass
     return None, None
+
+
+def stored_ratio(inst, max_days=RATIO_MAX_DAYS):
+    return stored_map(inst, "ratio", max_days)
 
 
 def sanity(g, fut, inst=None, today=None):
@@ -137,10 +146,15 @@ def sanity(g, fut, inst=None, today=None):
             return f"{name} {px} ligger {abs(px / fut - 1) * 100:.0f} % från priset {fut:.0f} — orimligt"
     if not (f.get("iv_1d") or f.get("em")):
         return "varken IV eller expected move gick att räkna — kedjan saknar priser"
-    lo, hi = RATIO_BAND.get(inst, (0, 1e9))
-    if not (lo <= f.get("ratio", 0) <= hi):
-        return (f"kvoten {f.get('ratio')} ligger utanför {lo}-{hi} — ETF-kursen "
-                f"{lv.get('spot')} ser gammal ut, alla nivåer skulle bli felskalade")
+    if f.get("basis") is not None:
+        if abs(f["basis"]) > MAX_BASIS_PCT * fut:
+            return (f"basis {f['basis']} är {abs(f['basis']) / fut * 100:.1f} % av priset — "
+                    f"indexkursen {lv.get('spot')} ser gammal ut")
+    else:
+        lo, hi = RATIO_BAND.get(inst, (0, 1e9))
+        if not (lo <= f.get("ratio", 0) <= hi):
+            return (f"kvoten {f.get('ratio')} ligger utanför {lo}-{hi} — ETF-kursen "
+                    f"{lv.get('spot')} ser gammal ut, alla nivåer skulle bli felskalade")
     return None
 
 
@@ -152,18 +166,30 @@ def _once(inst):
     if not g or not g.get("futures"):
         return {"inst": inst, "error": "kunde inte hämta optionskedjan (rate-limit?)"}
 
-    # Utanför USA-börsens öppettider: räkna om med den senast uppmätta kvoten.
+    # Utanför USA-börsens öppettider är index- respektive ETF-kursen gårdagens
+    # stängning medan futuren rört sig. Räkna då om med den senast uppmätta
+    # kopplingen i stället: basis för index, kvot för ETF.
     is_rth = rth_now()
+    index_mode = g.get("mapping") == "basis"
     ratio_src = "live"
     ratio_at = datetime.now(ET).isoformat(timespec="seconds")
     if not is_rth:
-        prev, stamp = stored_ratio(inst)
-        live = g["futures"]["ratio"]
-        if prev and abs(live / prev - 1) > RATIO_MIN_DIFF:
-            g = dict(g)
-            g["futures"] = GX.to_futures(g["levels"], fut, g["levels"]["spot"], ratio=prev)
-            ratio_src = "senaste RTH " + str(stamp)[:16].replace("T", " ")
-            ratio_at = stamp
+        if index_mode:
+            prev, stamp = stored_map(inst, "basis")
+            live = g["futures"].get("basis")
+            if prev is not None and live is not None and abs(live - prev) > MIN_BASIS_DIFF:
+                g = dict(g)
+                g["futures"] = GX.to_futures(g["levels"], fut, g["levels"]["spot"], basis=prev)
+                ratio_src = "senaste RTH " + str(stamp)[:16].replace("T", " ")
+                ratio_at = stamp
+        else:
+            prev, stamp = stored_map(inst, "ratio")
+            live = g["futures"]["ratio"]
+            if prev and abs(live / prev - 1) > RATIO_MIN_DIFF:
+                g = dict(g)
+                g["futures"] = GX.to_futures(g["levels"], fut, g["levels"]["spot"], ratio=prev)
+                ratio_src = "senaste RTH " + str(stamp)[:16].replace("T", " ")
+                ratio_at = stamp
 
     bad = sanity(g, fut, inst)
     if bad:
@@ -175,6 +201,7 @@ def _once(inst):
     return {"inst": inst, "fut_price": fut, "underlying": g["underlying"], "etf_spot": g["levels"]["spot"],
             "ratio": f["ratio"], "regime": f["regime"], "expiries": g["expiries"],
             "source": g.get("source"), "spot_source": g.get("spot_source"),
+            "mapping": g.get("mapping", "ratio"), "basis": f.get("basis"),
             "ratio_source": ratio_src, "ratio_rth": is_rth, "ratio_at": ratio_at,
             "n_strikes": g["levels"].get("n_strikes"),
             "call_wall": f["call_wall"], "put_wall": f["put_wall"], "zero_gamma": f["zero_gamma"],
@@ -220,7 +247,9 @@ def main(argv):
         print(f"0DTE: call {r['call_wall_0dte']} / put {r['put_wall_0dte']}  ·  Max pain {r['max_pain']}  ·  EM ±{r['expected_move']} ({r['em_src']})  ·  IV 1D ±{r['iv_1d']}")
         if r.get("flip_uncertain"):
             print("VARNING: Gamma Flip ligger >2 % från priset. Putdominerad optionskedja — regimen (positiv/negativ gamma) är osäker. Lita på väggar, EM och IV-range.")
-        print(f"Källa {r.get('source')}  ·  kvot {r.get('ratio_source')}  ·  Öppning {r['open']}  ·  ATR dag {r['atr_daily'] and round(r['atr_daily'], 2)}  ·  expiries {', '.join(r['expiries'][:4])}")
+        print(f"Källa {r.get('source')} ({r.get('underlying')})  ·  "
+              f"{'basis ' + str(r.get('basis')) if r.get('mapping') == 'basis' else 'kvot ' + str(r.get('ratio'))}"
+              f" {r.get('ratio_source')}  ·  Öppning {r['open']}  ·  ATR dag {r['atr_daily'] and round(r['atr_daily'], 2)}  ·  expiries {', '.join(r['expiries'][:4])}")
         print("-" * 78)
         print("Klistra in i indikatorn (fältet " + ("NQ" if r["inst"] == "NQ" else "GC") + " — levels string):")
         print(r["string"])

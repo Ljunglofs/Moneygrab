@@ -39,7 +39,14 @@ CACHE_SEC = int(os.environ.get("GEX_CACHE_SEC", "1800"))
 RISK_FREE = 0.04
 N_EXPIRIES = int(os.environ.get("GEX_EXPIRIES", "4"))    # närmaste expiries (0DTE + veckor + månad)
 
-UNDERLYING = {"NQ": "QQQ", "GC": "GLD"}
+# NQ räknas på NDX-indexoptionerna: samma underliggande som futuren, strikes var
+# tionde punkt i stället för var 41:e, och ingen ETF-kvot som kan bli fel. QQQ
+# finns kvar som reserv (GEX_NQ_SOURCE=qqq tvingar fram den).
+NQ_SOURCE = os.environ.get("GEX_NQ_SOURCE", "ndx").lower()
+UNDERLYING = {"NQ": "_NDX" if NQ_SOURCE == "ndx" else "QQQ", "GC": "GLD"}
+FALLBACK_UNDERLYING = {"NQ": "QQQ"}
+INDEX_SYMS = {"_NDX", "_SPX", "_RUT"}          # index: futures = index + basis, ingen kvot
+REF_SYM = {"_NDX": "^NDX", "_SPX": "^SPX", "_RUT": "^RUT"}
 SOURCE = os.environ.get("GEX_SOURCE", "auto").lower()
 CBOE_URL = "https://cdn.cboe.com/api/global/delayed_quotes/options/{}.json"
 MIN_OI_ROWS = int(os.environ.get("GEX_MIN_OI_ROWS", "40"))   # färre än så = halv kedja, prova nästa källa
@@ -250,7 +257,8 @@ def _fetch_chain_cboe(underlying, n_exp=N_EXPIRIES):
 def _fetch_any(underlying):
     """Hämtar kedjan från första källan som ger något användbart.
     Returnerar (spot, rows, expiries, källa)."""
-    order = {"cboe": ("cboe",), "yahoo": ("yahoo",)}.get(SOURCE, ("cboe", "yahoo"))
+    # Indexkedjor finns bara hos CBOE — yfinance kan inte slå upp "_NDX".
+    order = ("cboe",) if is_index(underlying) else {"cboe": ("cboe",), "yahoo": ("yahoo",)}.get(SOURCE, ("cboe", "yahoo"))
     last = (None, [], [])
     for src in order:
         try:
@@ -269,13 +277,17 @@ def _fetch_any(underlying):
     return last[0], last[1], last[2], "ingen"
 
 
+def is_index(underlying):
+    return underlying in INDEX_SYMS
+
+
 def _ref_spot(underlying):
     """Oberoende ETF-kurs (senaste 5-minutersbaren) att stämma av kedjans spot mot.
     Kedjans egen kurs kan vara dagar gammal — då hamnar både kvoten futures/ETF
     och gammaprofilens centrering fel, och alla nivåer med dem."""
     try:
         import yfinance as yf
-        h = yf.Ticker(underlying).history(period="1d", interval="5m")
+        h = yf.Ticker(REF_SYM.get(underlying, underlying)).history(period="1d", interval="5m")
         if h is not None and len(h):
             return float(h["Close"].iloc[-1])
     except Exception as e:
@@ -314,18 +326,25 @@ def _save_disk(all_data):
         print("[gex] kunde inte spara cache:", e)
 
 
-def to_futures(levels, fut_price, etf_price, ratio=None):
+def to_futures(levels, fut_price, etf_price, ratio=None, basis=None):
     """Skala ETF-nivåer till futures. ratio=None ger live-kvoten fut/etf.
     Utanför USA-börsens öppettider är ETF-kursen gårdagens stängning, och då
     ska en kvot uppmätt medan båda handlades skickas in i stället — annars
     följer väggarna med nattens rörelse i stället för att ligga still."""
-    if not levels or not fut_price or not (etf_price or ratio):
+    if not levels or not fut_price or not (etf_price or ratio or basis is not None):
         return None
-    r = ratio if ratio else fut_price / etf_price
-    def sc(x):
-        return round(x * r, 2) if x is not None else None
+    # Index: futures = index + basis (additivt). ETF: futures = strike x kvot.
+    if basis is not None:
+        r = round(fut_price / etf_price, 4) if etf_price else None
+        def sc(x):
+            return round(x + basis, 2) if x is not None else None
+    else:
+        r = ratio if ratio else fut_price / etf_price
+        def sc(x):
+            return round(x * r, 2) if x is not None else None
     return {
-        "ratio": round(r, 4), "fut_price": fut_price, "etf_price": etf_price,
+        "ratio": (round(r, 4) if r else None), "basis": (round(basis, 2) if basis is not None else None),
+        "fut_price": fut_price, "etf_price": etf_price,
         "net_gex": levels["net_gex"], "regime": levels["regime"],
         "call_wall": sc(levels["call_wall"]), "put_wall": sc(levels["put_wall"]),
         "zero_gamma": sc(levels["zero_gamma"]),
@@ -345,21 +364,28 @@ def get_gex(inst, fut_price=None, force=False):
     und = UNDERLYING.get(inst)
     if not und:
         return None
+    cands = [und] + ([FALLBACK_UNDERLYING[inst]] if inst in FALLBACK_UNDERLYING
+                     and FALLBACK_UNDERLYING[inst] != und else [])
     with _lock:
         c = _cache.get(inst)
         if c and not force and time.time() - c["t"] < CACHE_SEC:
             data = c["data"]
         else:
             data = None
-            try:
-                spot, rows, exps, src = _fetch_any(und)
-                spot, spot_src = _checked_spot(und, spot, src)
-                lv = gex_from_chain(spot, rows) if (rows and spot) else None
-                if lv:
-                    data = {"underlying": und, "expiries": exps, "updated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-                            "levels": lv, "stale": False, "source": src, "spot_source": spot_src}
-            except Exception as e:
-                print(f"[gex] {und}: {type(e).__name__}: {e}")
+            for cand in cands:
+                try:
+                    spot, rows, exps, src = _fetch_any(cand)
+                    spot, spot_src = _checked_spot(cand, spot, src)
+                    lv = gex_from_chain(spot, rows) if (rows and spot) else None
+                    if lv:
+                        data = {"underlying": cand, "expiries": exps,
+                                "updated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                                "levels": lv, "stale": False, "source": src, "spot_source": spot_src,
+                                "mapping": "basis" if is_index(cand) else "ratio"}
+                        break
+                    print(f"[gex] {cand}: ingen nivåtabell — provar nästa underliggande")
+                except Exception as e:
+                    print(f"[gex] {cand}: {type(e).__name__}: {e}")
             if data:
                 _cache[inst] = {"t": time.time(), "data": data}
                 disk = _load_disk(); disk[inst] = data; _save_disk(disk)
@@ -372,7 +398,10 @@ def get_gex(inst, fut_price=None, force=False):
         return None
     out = dict(data)
     if fut_price:
-        out["futures"] = to_futures(data["levels"], fut_price, data["levels"]["spot"])
+        sp = data["levels"]["spot"]
+        out["futures"] = (to_futures(data["levels"], fut_price, sp, basis=fut_price - sp)
+                          if data.get("mapping") == "basis"
+                          else to_futures(data["levels"], fut_price, sp))
     return out
 
 
