@@ -234,13 +234,21 @@ def run(inst):
     top_neg = sorted(dg, key=lambda k: dg[k])[:5]
     print("  positiva: " + ", ".join(f"{k:.0f} {dg[k] / 1e9:+.2f}" for k in top_pos))
     print("  negativa: " + ", ".join(f"{k:.0f} {dg[k] / 1e9:+.2f}" for k in top_neg))
+    oi_c, oi_p = {}, {}
+    for r in rows:
+        if r["expiry"] not in set(sel):
+            continue
+        K = float(r["strike"]); v = float(r.get("oi") or 0)
+        (oi_c if r["type"] == "C" else oi_p)[K] = (oi_c if r["type"] == "C" else oi_p).get(K, 0.0) + v
     for want, name in ((t.get("call_wall"), "deras call wall"), (t.get("put_wall"), "deras put wall")):
         if want is None:
             continue
         k = min(dg, key=lambda x: abs(x - want))
         rank = sorted(dg, key=lambda x: -abs(dg[x])).index(k) + 1
         print(f"  {name} {want:.0f}: närmaste strike hos oss {k:.0f} med {dg[k] / 1e9:+.2f} mdr "
-              f"(plats {rank} i absolut storlek)")
+              f"(plats {rank} i absolut storlek, OI call {oi_c.get(k, 0):.0f} / put {oi_p.get(k, 0):.0f})")
+    for k in (top_pos[:1] + top_neg[:1]):
+        print(f"  vår egen vägg {k:.0f}: OI call {oi_c.get(k, 0):.0f} / put {oi_p.get(k, 0):.0f}")
 
     # 0DTE/närmaste expiry och max pain
     near = exps[0]

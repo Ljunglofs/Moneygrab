@@ -43,6 +43,7 @@ N_EXPIRIES = int(os.environ.get("GEX_EXPIRIES", "4"))    # närmaste expiries (0
 # hundratals punkter och kan vända regimen, trots att den dagshandel flippen
 # ska beskriva styrs av gamman som förfaller närmast.
 FLIP_EXPIRIES = int(os.environ.get("GEX_FLIP_EXPIRIES", "3"))
+NEAR_PCT = float(os.environ.get("GEX_NEAR_PCT", "0.05"))   # HGEX och G+/G- inom 5 % av priset
 
 # NQ räknas på NDX-indexoptionerna: samma underliggande som futuren, strikes var
 # tionde punkt i stället för var 41:e, och ingen ETF-kvot som kan bli fel. QQQ
@@ -145,10 +146,16 @@ def gex_from_chain(spot, rows, now=None):
     zero = _zero(near_legs, spot) or zero_all
     net_near = sum(near_strike.values())
 
-    top = sorted(strikes, key=lambda k: -abs(per_strike[k]))[:7]
+    # Stödnivåerna (HGEX, G+/G-) ska gå att handla på i dag. En strike 7 %
+    # under priset kan bära enorm gamma — NDX 27000 den 15 september — utan att
+    # betyda något för dagens rörelse, och på diagrammet blir den bara en linje
+    # långt utanför bild. Därför väljs de bland strikes inom NEAR_PCT av priset.
+    # Väggarna själva får ligga var som helst; de säger var strukturen tar slut.
+    near = [k for k in strikes if abs(k / spot - 1) <= NEAR_PCT] or strikes
+    top = sorted(near, key=lambda k: -abs(per_strike[k]))[:7]
     hgex = top[0] if top else None
-    gpos = [k for k in sorted(strikes, key=lambda k: -per_strike[k]) if per_strike[k] > 0 and k != call_wall][:3]
-    gneg = [k for k in sorted(strikes, key=lambda k: per_strike[k]) if per_strike[k] < 0 and k != put_wall][:3]
+    gpos = [k for k in sorted(near, key=lambda k: -per_strike[k]) if per_strike[k] > 0 and k != call_wall][:3]
+    gneg = [k for k in sorted(near, key=lambda k: per_strike[k]) if per_strike[k] < 0 and k != put_wall][:3]
 
     # --- Närmaste expiry: 0DTE-väggar, max pain, ATM-straddle (expected move), IV ---
     rows = list(rows)
