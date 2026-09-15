@@ -38,6 +38,11 @@ CACHE_FILE = os.path.join(DATA_DIR, "desk_gex.json")
 CACHE_SEC = int(os.environ.get("GEX_CACHE_SEC", "1800"))
 RISK_FREE = 0.04
 N_EXPIRIES = int(os.environ.get("GEX_EXPIRIES", "4"))    # närmaste expiries (0DTE + veckor + månad)
+# Flippen räknas på en kortare uppsättning än väggarna. Se kommentaren i
+# gex_from_chain: en kvartalsförfall tre dagar bort flyttar nollgammanivån
+# hundratals punkter och kan vända regimen, trots att den dagshandel flippen
+# ska beskriva styrs av gamman som förfaller närmast.
+FLIP_EXPIRIES = int(os.environ.get("GEX_FLIP_EXPIRIES", "3"))
 
 # NQ räknas på NDX-indexoptionerna: samma underliggande som futuren, strikes var
 # tionde punkt i stället för var 41:e, och ingen ETF-kvot som kan bli fel. QQQ
@@ -81,7 +86,10 @@ def gex_from_chain(spot, rows, now=None):
     """rows: iterable av dict(strike, oi, iv, type in {'C','P'}, expiry 'YYYY-MM-DD').
     Returnerar per-strike-tabell och nyckelnivåer (i UNDERLIGGANDES pris)."""
     per_strike = {}
+    near_strike = {}
     legs = []
+    # Flippen räknas bara på de närmaste expirierna (FLIP_EXPIRIES).
+    flip_exps = sorted({r["expiry"] for r in rows if float(r.get("oi") or 0) > 0})[:FLIP_EXPIRIES]
     for r in rows:
         K = float(r["strike"]); oi = float(r.get("oi") or 0)
         if oi <= 0 or K <= 0:
@@ -93,7 +101,9 @@ def gex_from_chain(spot, rows, now=None):
         sign = 1.0 if r["type"] == "C" else -1.0
         g = bs_gamma(spot, K, T, iv) * oi * 100 * spot * spot * 0.01 * sign
         per_strike[K] = per_strike.get(K, 0.0) + g
-        legs.append((K, oi, iv, T, sign))
+        legs.append((K, oi, iv, T, sign, r["expiry"]))
+        if r["expiry"] in flip_exps:
+            near_strike[K] = near_strike.get(K, 0.0) + g
     if not per_strike:
         return None
 
@@ -102,21 +112,36 @@ def gex_from_chain(spot, rows, now=None):
     call_wall = max(strikes, key=lambda k: per_strike[k])
     put_wall = min(strikes, key=lambda k: per_strike[k])
 
-    # Zero gamma: nettoprofil när spot flyttas ±10 %
-    def net_at(S):
-        return sum(bs_gamma(S, K, T, iv) * oi * 100 * S * S * 0.01 * sign
-                   for K, oi, iv, T, sign in legs)
-    grid = [spot * (0.90 + 0.005 * i) for i in range(41)]
-    vals = [net_at(S) for S in grid]
-    # Profilen kan korsa noll flera gånger. Ta den korsning som ligger närmast
-    # priset — annars kan flippen hamna långt under spot samtidigt som nettot
-    # vid spot är negativt, alltså en flipp som säger emot regimen.
-    zeros = []
-    for i in range(1, len(grid)):
-        a, b = vals[i - 1], vals[i]
-        if a < 0 <= b or a > 0 >= b:
-            zeros.append(grid[i - 1] + (grid[i] - grid[i - 1]) * (0 - a) / (b - a) if b != a else grid[i])
-    zero = min(zeros, key=lambda z: abs(z - spot)) if zeros else None
+    # Zero gamma: nettoprofil när spot flyttas ±10 %.
+    #
+    # Räknas på de närmaste expirierna, inte på hela uppsättningen. Den 15
+    # september låg kvartalsförfallet den 18:e som fjärde expiry, och att ta
+    # med det flyttade nollgamman 293 NDX-punkter nedåt — från strax ovanför
+    # priset till en bit under, alltså från negativ till positiv regim. Samma
+    # sak i guld (394,4 -> 388,0 i GLD). Med de tre närmaste expirierna hamnar
+    # flippen 80 punkter från betaltjänstens nivå på NQ och 2 dollar på guld,
+    # och regimen blir densamma som deras. Väggarna räknas fortfarande på hela
+    # uppsättningen — de träffar deras nivåer först när kvartalen är med.
+    def _zero(ls, S0):
+        def net_at(S):
+            return sum(bs_gamma(S, K, T, iv) * oi * 100 * S * S * 0.01 * sign
+                       for K, oi, iv, T, sign, _e in ls)
+        grid = [S0 * (0.90 + 0.005 * i) for i in range(41)]
+        vals = [net_at(S) for S in grid]
+        # Profilen kan korsa noll flera gånger. Ta den korsning som ligger närmast
+        # priset — annars kan flippen hamna långt under spot samtidigt som nettot
+        # vid spot är negativt, alltså en flipp som säger emot regimen.
+        zs = []
+        for i in range(1, len(grid)):
+            a, b = vals[i - 1], vals[i]
+            if a < 0 <= b or a > 0 >= b:
+                zs.append(grid[i - 1] + (grid[i] - grid[i - 1]) * (0 - a) / (b - a) if b != a else grid[i])
+        return min(zs, key=lambda z: abs(z - S0)) if zs else None
+
+    near_legs = [l for l in legs if l[5] in flip_exps]
+    zero = _zero(near_legs, spot) or _zero(legs, spot)
+    zero_all = _zero(legs, spot)
+    net_near = sum(near_strike.values())
 
     top = sorted(strikes, key=lambda k: -abs(per_strike[k]))[:7]
     hgex = top[0] if top else None
@@ -172,8 +197,13 @@ def gex_from_chain(spot, rows, now=None):
     iv_1d = spot * iv_atm * math.sqrt(1 / 252) if iv_atm else None
 
     return {
-        "spot": spot, "net_gex": net, "regime": "positiv" if net > 0 else "negativ",
+        # Regimen läses ur samma uppsättning som flippen, annars kan de säga
+        # emot varandra: nettot över hela kedjan kan vara positivt medan den
+        # gamma som faktiskt förfaller i veckan är negativ.
+        "spot": spot, "net_gex": net_near, "net_gex_all": net,
+        "regime": "positiv" if net_near > 0 else "negativ",
         "call_wall": call_wall, "put_wall": put_wall, "zero_gamma": zero,
+        "zero_gamma_all": zero_all, "flip_expiries": flip_exps,
         "top": [{"strike": k, "gex": per_strike[k]} for k in sorted(top)],
         "n_strikes": len(strikes),
         "hgex": hgex, "gpos": gpos, "gneg": gneg,
@@ -184,7 +214,7 @@ def gex_from_chain(spot, rows, now=None):
         # Normalt gäller: pris över flip = positiv gamma. I en putdominerad kedja
         # kan profilen vända tillbaka och bli negativ ovanför flippen. Då ljuger
         # tumregeln, och det ska synas i meddelandet.
-        "flip_inverted": bool(zero is not None and ((net < 0 and spot > zero) or (net > 0 and spot < zero))),
+        "flip_inverted": bool(zero is not None and ((net_near < 0 and spot > zero) or (net_near > 0 and spot < zero))),
     }
 
 
@@ -388,9 +418,11 @@ def to_futures(levels, fut_price, etf_price, ratio=None, basis=None):
     return {
         "ratio": (round(r, 4) if r else None), "basis": (round(basis, 2) if basis is not None else None),
         "fut_price": fut_price, "etf_price": etf_price,
-        "net_gex": levels["net_gex"], "regime": levels["regime"],
+        "net_gex": levels["net_gex"], "net_gex_all": levels.get("net_gex_all"),
+        "regime": levels["regime"],
         "call_wall": sc(levels["call_wall"]), "put_wall": sc(levels["put_wall"]),
-        "zero_gamma": sc(levels["zero_gamma"]),
+        "zero_gamma": sc(levels["zero_gamma"]), "zero_gamma_all": sc(levels.get("zero_gamma_all")),
+        "flip_expiries": levels.get("flip_expiries"),
         "top": [{"level": sc(t["strike"]), "strike": t["strike"], "gex": t["gex"]} for t in levels["top"]],
         "hgex": sc(levels.get("hgex")), "gpos": [sc(k) for k in levels.get("gpos", [])],
         "gneg": [sc(k) for k in levels.get("gneg", [])],
@@ -464,7 +496,7 @@ def gex_text(inst, g):
     name = {"NQ": "NQ (via QQQ)", "GC": "GC (via GLD)"}.get(inst, inst)
     bn = lv["net_gex"] / 1e9
     lines = [f"\U0001F9F2 <b>GAMMA · {name}</b>" + (" ⚠ gammal data" if g.get("stale") else ""),
-             f"Regim: <b>{lv['regime']}</b> (netto {bn:+.2f} mdr USD/1 %) — "
+             f"Regim: <b>{lv['regime']}</b> (netto {bn:+.2f} mdr USD/1 % i de närmaste expirierna) — "
              + ("dealers dämpar: fade kanterna, mean reversion" if lv["net_gex"] > 0
                 else "dealers förstärker: trendläge, bredare stopp")]
     if f and f.get("flip_uncertain"):
