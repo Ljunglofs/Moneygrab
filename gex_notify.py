@@ -96,6 +96,8 @@ def build_message(results, fallback=None):
         flag = " ⚠ flip osäker" if r.get("flip_uncertain") else ""
         if r.get("walls_inverted"):
             flag += " ⚠ priset under båda väggarna"
+        if r.get("flip_inverted"):
+            flag += " ⚠ flip omvänd — läs regimen, inte flippen"
         def num(v, d=0):
             """Tal utan efterhängande nollor, '–' när värdet saknas."""
             if v is None:

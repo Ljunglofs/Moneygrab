@@ -124,6 +124,12 @@ Samma nivåer gäller NQ och MNQ (samma pris). GC och MGC likaså.
 | `ivh` / `ivl` | 1D min/max | pris ± spot × ATM-IV × √(1/252) |
 | `opo` / `opu` / `opd` | Öppning + ATR-grid | dagens RTH-öppning ur feeden, ± 0,5 och 1,0 dags-ATR |
 
+Regimen (positiv eller negativ gamma) läses ur nettot vid priset, inte ur var priset står mot
+Gamma Flip. Tumregeln "över flippen = positiv gamma" gäller bara när profilen korsar noll en
+gång. I en putdominerad kedja kan nettot vända tillbaka och bli negativt ovanför flippen — då
+sätts flaggan "flip omvänd" i meddelandet, och det är regimraden som gäller. Flippen väljs som
+den nollkorsning som ligger närmast priset.
+
 Källa är NDX-indexoptioner för NQ och GLD-optioner för GC, hämtade från CBOE:s fördröjda kedja med
 yfinance som reserv (`GEX_SOURCE=auto|cboe|yahoo`). NDX är samma underliggande som NQ, så
 nivåerna översätts additivt med futuresbasisen NQ−NDX i stället för en ETF-kvot — strikes ligger
