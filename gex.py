@@ -314,6 +314,42 @@ def _checked_spot(underlying, spot, src):
     return spot, src
 
 
+def _mid_price(r):
+    b, a = float(r.get("bid") or 0), float(r.get("ask") or 0)
+    if b > 0 and a > 0:
+        return (a + b) / 2
+    return float(r.get("last") or 0) or None
+
+
+def forward_from_chain(rows, expiry, hint=None):
+    """Terminspriset kedjan själv prisar in, via put-call-paritet: F = K + C − P.
+
+    Index som NDX kvoteras inte alltid live i de fria flödena — den 15 september
+    stod kursen stilla på 29114 medan futuren gick 29390 -> 29426 mitt under
+    öppen handel, vilket gav en basis på 312 punkter i stället för ett fyrtiotal.
+    Optionerna vet bättre: står call och put lika vid en strike är den striken
+    terminspriset. Det kräver ingen indexkurs alls.
+    """
+    calls, puts = {}, {}
+    for r in rows:
+        if r.get("expiry") != expiry:
+            continue
+        m = _mid_price(r)
+        if not m:
+            continue
+        (calls if r["type"] == "C" else puts)[float(r["strike"])] = m
+    common = sorted(set(calls) & set(puts))
+    if hint:
+        common = sorted(common, key=lambda k: abs(k - hint))[:80]
+    if not common:
+        return None
+    # ATM = där call och put står närmast varandra. Medianen av de fem bästa
+    # tål en enskild skev kvot.
+    best = sorted(common, key=lambda k: abs(calls[k] - puts[k]))[:5]
+    fwds = sorted(k + calls[k] - puts[k] for k in best)
+    return fwds[len(fwds) // 2] if fwds else None
+
+
 def _load_disk():
     try:
         with open(CACHE_FILE, encoding="utf-8") as f:
@@ -386,6 +422,12 @@ def get_gex(inst, fut_price=None, force=False, prefer=None):
                 try:
                     spot, rows, exps, src = _fetch_any(cand)
                     spot, spot_src = _checked_spot(cand, spot, src)
+                    if is_index(cand) and exps and rows:
+                        fwd = forward_from_chain(rows, exps[0], hint=spot)
+                        if fwd and (not spot or abs(fwd / spot - 1) < 0.10):
+                            print(f"[gex] {cand}: terminspris ur put-call-paritet {fwd:.1f} "
+                                  f"(kvoterat index {spot})")
+                            spot, spot_src = fwd, "put-call-paritet"
                     lv = gex_from_chain(spot, rows) if (rows and spot) else None
                     if lv:
                         data = {"underlying": cand, "expiries": exps,
