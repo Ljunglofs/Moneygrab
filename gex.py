@@ -139,8 +139,10 @@ def gex_from_chain(spot, rows, now=None):
         return min(zs, key=lambda z: abs(z - S0)) if zs else None
 
     near_legs = [l for l in legs if l[5] in flip_exps]
-    zero = _zero(near_legs, spot) or _zero(legs, spot)
     zero_all = _zero(legs, spot)
+    # Korsar den korta profilen inte noll inom ±10 % faller vi tillbaka på hela
+    # kedjan hellre än att lämna flippen tom.
+    zero = _zero(near_legs, spot) or zero_all
     net_near = sum(near_strike.values())
 
     top = sorted(strikes, key=lambda k: -abs(per_strike[k]))[:7]

@@ -225,6 +225,23 @@ def run(inst):
     print(f"  netto-GEX vid spot: {net / 1e9:+.2f} mdr -> regim "
           f"{'positiv (flip UNDER pris)' if net > 0 else 'negativ (flip ÖVER pris)'}")
 
+    # Vilka strikes ligger närmast att bli vägg? En vägg som vinner med
+    # marginal är stabil; två jämnstora kandidater betyder att väggen kan
+    # hoppa mellan två strikes när open interest uppdateras, och då är det
+    # ingen motsägelse att två tjänster pekar på var sin.
+    print("\ntyngsta strikes (hela uppsättningen n=%d, mdr USD/1 %%):" % len(sel))
+    top_pos = sorted(dg, key=lambda k: -dg[k])[:5]
+    top_neg = sorted(dg, key=lambda k: dg[k])[:5]
+    print("  positiva: " + ", ".join(f"{k:.0f} {dg[k] / 1e9:+.2f}" for k in top_pos))
+    print("  negativa: " + ", ".join(f"{k:.0f} {dg[k] / 1e9:+.2f}" for k in top_neg))
+    for want, name in ((t.get("call_wall"), "deras call wall"), (t.get("put_wall"), "deras put wall")):
+        if want is None:
+            continue
+        k = min(dg, key=lambda x: abs(x - want))
+        rank = sorted(dg, key=lambda x: -abs(dg[x])).index(k) + 1
+        print(f"  {name} {want:.0f}: närmaste strike hos oss {k:.0f} med {dg[k] / 1e9:+.2f} mdr "
+              f"(plats {rank} i absolut storlek)")
+
     # 0DTE/närmaste expiry och max pain
     near = exps[0]
     legs0 = _legs(rows, spot, [near])
