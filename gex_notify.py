@@ -109,7 +109,13 @@ def build_message(results, fallback=None):
             + (f" · {r['source']}" if r.get("source") else "")
             + ((" · basis från RTH" if r.get("mapping") == "basis" else " · kvot från RTH")
                if r.get("ratio_source", "live") != "live" else "") + "\n"
-            f"Call Wall <b>{num(r['call_wall'], 2)}</b> · Put Wall <b>{num(r['put_wall'], 2)}</b> · Flip {num(r['zero_gamma'], 2)}\n"
+            f"Call Wall <b>{num(r['call_wall'], 2)}</b> · Put Wall <b>{num(r['put_wall'], 2)}</b> · Flip {num(r['zero_gamma'], 2)}"
+            # Flippen räknas på de närmaste expirierna. Skiljer sig hela kedjans
+            # flipp mer än en halv procent är det ett kvartals- eller månadsförfall
+            # som drar — värt att veta, för efter det förfallet hoppar nivån dit.
+            + (f" (hela kedjan {num(r['zero_gamma_all'], 2)})"
+               if r.get('zero_gamma_all') and r.get('zero_gamma')
+               and abs(r['zero_gamma_all'] - r['zero_gamma']) > 0.005 * r['fut_price'] else "") + "\n"
             f"EM ±{num(r['expected_move'])} · Max Pain {num(r['max_pain'], 2)} · HGEX {num(r['hgex'], 2)}\n"
             f"Fält: {'NQ' if r['inst'] == 'NQ' else 'GC'} — levels string ↓\n"
             f"<pre>{_esc(r['string'])}</pre>")

@@ -72,6 +72,23 @@ jobs:
       - name: Spotpriser och kvoter från båda källorna
         run: python gex_check.py
 
+  # Jämför vår räkning med en annan tjänsts nivåer, variant för variant.
+  # Körs bara manuellt och skickar ingenting.
+  lab:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Installera beroenden
+        run: pip install -q yfinance pandas numpy requests
+      - name: Varianter mot facit
+        run: python gex_lab.py
+
   levels:
     # Manuell körning från en testbranch kör bara diagnosen ovan — inget
     # hamnar i Telegram förrän koden ligger på main.

@@ -115,7 +115,7 @@ Samma nivåer gäller NQ och MNQ (samma pris). GC och MGC likaså.
 |---|---|---|
 | `res` / `sup` | Call Wall / Put Wall | strike med störst positiv resp. negativ dealer-GEX över de 4 närmaste expiries |
 | `res0` / `sup0` | 0DTE-väggar | samma sak, bara närmaste expiry |
-| `flip` | Gamma Flip | spotnivå där nettoprofilen byter tecken (över: dämpning, under: trend) |
+| `flip` | Gamma Flip | spotnivå där nettoprofilen byter tecken (över: dämpning, under: trend), räknad på de 3 närmaste expiries |
 | `hgex` | HGEX | strike med störst absolut gamma, dagens magnet |
 | `mpain` | Max Pain | strike där optionsinnehavarnas totala värde är minst, närmaste expiry |
 | `gpos` / `gneg` | G+ / G− | näst största positiva resp. negativa gammastrikes |
@@ -129,6 +129,15 @@ Gamma Flip. Tumregeln "över flippen = positiv gamma" gäller bara när profilen
 gång. I en putdominerad kedja kan nettot vända tillbaka och bli negativt ovanför flippen — då
 sätts flaggan "flip omvänd" i meddelandet, och det är regimraden som gäller. Flippen väljs som
 den nollkorsning som ligger närmast priset.
+
+Väggarna räknas på de fyra närmaste expiries, flippen och regimen på de tre närmaste
+(`GEX_EXPIRIES` respektive `GEX_FLIP_EXPIRIES`). Det är inte godtyckligt. Ett kvartalsförfall
+som ligger några dagar bort bär så mycket open interest att det drar nollgammanivån hundratals
+punkter — den 15 september 2026 flyttade förfallet den 18:e flippen 293 NDX-punkter nedåt, från
+strax ovanför priset till en bit under, alltså från negativ till positiv regim, medan den gamma
+som faktiskt förföll den veckan sa negativ. Väggarna behöver tvärtom ha kvartalen med: först då
+träffar de. Skiljer sig hela kedjans flipp mer än en halv procent visas den inom parentes i
+Telegram, för efter förfallet hoppar nivån dit.
 
 Källa är NDX-indexoptioner för NQ och GLD-optioner för GC, hämtade från CBOE:s fördröjda kedja med
 yfinance som reserv (`GEX_SOURCE=auto|cboe|yahoo`). NDX är samma underliggande som NQ, så
