@@ -35,7 +35,12 @@ MAX_NEAR_DAYS = int(os.environ.get("GEX_MAX_NEAR_DAYS", "5"))      # närmaste e
 RATIO_BAND = {"NQ": (39.0, 42.5), "GC": (10.5, 11.5)}
 # Index: futures = index + basis. Basisen är ränta minus utdelning fram till
 # förfall, alltså små tal — inte 1 % av priset.
-MAX_BASIS_PCT = float(os.environ.get("GEX_MAX_BASIS_PCT", "0.01"))
+# Kvartalskontraktet ligger ungefär 1 % över index (ränta minus utdelning under
+# tre månader), så en basis på 300 punkter är normal efter rullen. Är terminspriset
+# framräknat ur put-call-paritet är basisen validerad av konstruktionen och får
+# vara större; annars hålls den hårdare.
+MAX_BASIS_PCT = float(os.environ.get("GEX_MAX_BASIS_PCT", "0.03"))
+MAX_BASIS_PCT_UNVERIFIED = float(os.environ.get("GEX_MAX_BASIS_PCT_RAW", "0.015"))
 MIN_BASIS_DIFF = float(os.environ.get("GEX_MIN_BASIS_DIFF", "5"))   # punkter
 TRIES = int(os.environ.get("GEX_TRIES", "3"))
 RETRY_SLEEP = int(os.environ.get("GEX_RETRY_SLEEP", "20"))
@@ -147,9 +152,12 @@ def sanity(g, fut, inst=None, today=None):
     if not (f.get("iv_1d") or f.get("em")):
         return "varken IV eller expected move gick att räkna — kedjan saknar priser"
     if f.get("basis") is not None:
-        if abs(f["basis"]) > MAX_BASIS_PCT * fut:
-            return (f"basis {f['basis']} är {abs(f['basis']) / fut * 100:.1f} % av priset — "
-                    f"indexkursen {lv.get('spot')} ser gammal ut")
+        verified = g.get("spot_source") == "put-call-paritet"
+        cap = MAX_BASIS_PCT if verified else MAX_BASIS_PCT_UNVERIFIED
+        if abs(f["basis"]) > cap * fut:
+            return (f"basis {f['basis']} är {abs(f['basis']) / fut * 100:.1f} % av priset"
+                    + ("" if verified else " och terminspriset gick inte att bekräfta ur paritet")
+                    + f" — kontrollera {lv.get('spot')}")
     else:
         lo, hi = RATIO_BAND.get(inst, (0, 1e9))
         if not (lo <= f.get("ratio", 0) <= hi):
