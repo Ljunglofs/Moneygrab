@@ -64,6 +64,25 @@ def _tables(legs, spot):
     return dg, oi_t, rg
 
 
+def _sided(legs, spot):
+    """Dollar-gamma per strike, calls och puts var för sig (utan kvittning).
+    Flera tjänster definierar väggarna så: call wall = striken med störst
+    CALL-gamma, put wall = striken med störst PUT-gamma. Vår nettodefinition
+    kvittar sidorna mot varandra, vilket drar put wall uppåt mot priset när
+    samma strike har mycket av båda."""
+    c, p = {}, {}
+    for K, oi, iv, T, sign in legs:
+        g = gex.bs_gamma(spot, K, T, iv) * oi * 100 * spot * spot * 0.01
+        (c if sign > 0 else p)[K] = (c if sign > 0 else p).get(K, 0.0) + g
+    return c, p
+
+
+def _otm(legs, spot):
+    """Bara out-of-the-money: calls över priset, puts under."""
+    return [(K, oi, iv, T, sign) for K, oi, iv, T, sign in legs
+            if (sign > 0 and K >= spot) or (sign < 0 and K <= spot)]
+
+
 def _flip_shift(legs, spot, scale=True, pick="nearest"):
     """Nollgamma ur nettoprofilen när spot flyttas ±10 %."""
     def net_at(S):
@@ -167,9 +186,9 @@ def run(inst):
     print(f"facit: CW {t.get('call_wall')} · PW {t.get('put_wall')} · "
           f"flip {t.get('zero_gamma')} · max pain {t.get('max_pain')}\n")
 
-    hdr = (f"{'uppsättn':>9} {'CW γ':>9}{'Δ':>8} {'PW γ':>9}{'Δ':>8} "
-           f"{'flip skift':>11}{'Δ':>8} {'flip kum':>9}{'Δ':>8} "
-           f"{'CW OI':>8}{'Δ':>8} {'PW OI':>8}{'Δ':>8}")
+    hdr = (f"{'uppsättn':>9} | {'CW netto':>9}{'Δ':>8} {'PW netto':>9}{'Δ':>8} | "
+           f"{'CW call':>8}{'Δ':>8} {'PW put':>8}{'Δ':>8} | "
+           f"{'flip':>8}{'Δ':>8} {'flip OTM':>9}{'Δ':>8}")
     print(hdr); print("-" * len(hdr))
     for name, sel in _sets(exps, today):
         legs = _legs(rows, spot, sel)
@@ -177,39 +196,48 @@ def run(inst):
             continue
         dg, oi_t, rg = _tables(legs, spot)
         cw, pw = _walls(dg)
+        cs, ps = _sided(legs, spot)
+        cw_s = max(cs, key=cs.get) if cs else None
+        pw_s = max(ps, key=ps.get) if ps else None
         f_shift = _flip_shift(legs, spot)
-        f_cum = _flip_cum(dg)
-        cw_oi, pw_oi = _oi_walls(rows, sel)
-        print(f"{name:>9} {cw:9.1f}{_d(cw, t.get('call_wall'))} {pw:9.1f}{_d(pw, t.get('put_wall'))} "
-              f"{(f_shift or 0):11.1f}{_d(f_shift, t.get('zero_gamma'))} "
-              f"{(f_cum or 0):9.1f}{_d(f_cum, t.get('zero_gamma'))} "
-              f"{(cw_oi or 0):8.1f}{_d(cw_oi, t.get('call_wall'))} "
-              f"{(pw_oi or 0):8.1f}{_d(pw_oi, t.get('put_wall'))}")
+        f_otm = _flip_shift(_otm(legs, spot), spot)
+        print(f"{name:>9} | {cw:9.1f}{_d(cw, t.get('call_wall'))} {pw:9.1f}{_d(pw, t.get('put_wall'))} | "
+              f"{(cw_s or 0):8.1f}{_d(cw_s, t.get('call_wall'))} "
+              f"{(pw_s or 0):8.1f}{_d(pw_s, t.get('put_wall'))} | "
+              f"{(f_shift or 0):8.1f}{_d(f_shift, t.get('zero_gamma'))} "
+              f"{(f_otm or 0):9.1f}{_d(f_otm, t.get('zero_gamma'))}")
 
     # Flippvarianter på den uppsättning vi kör skarpt (N_EXPIRIES)
     sel = exps[:gex.N_EXPIRIES]
     legs = _legs(rows, spot, sel)
     dg, oi_t, rg = _tables(legs, spot)
-    print(f"\nflippvarianter (n={len(sel)}), facit {t.get('zero_gamma')}:")
-    for label, val in (
-            ("skift, närmast spot", _flip_shift(legs, spot)),
-            ("skift, lägsta korsning", _flip_shift(legs, spot, pick="lowest")),
-            ("skift, högsta korsning", _flip_shift(legs, spot, pick="highest")),
-            ("skift utan S²-vikt", _flip_shift(legs, spot, scale=False)),
-            ("kumulativ dollar-gamma", _flip_cum(dg)),
-            ("kumulativ rå gamma", _flip_cum(rg)),
-            ("kumulativ OI", _flip_cum(oi_t))):
+    print(f"\nflippvarianter, facit {t.get('zero_gamma')} (spot {spot:.1f}):")
+    rows_v = [("skift, n=1 (0DTE)", _flip_shift(_legs(rows, spot, exps[:1]), spot)),
+              ("skift, n=2", _flip_shift(_legs(rows, spot, exps[:2]), spot)),
+              ("skift, n=3", _flip_shift(_legs(rows, spot, exps[:3]), spot)),
+              (f"skift, n={len(sel)} (vår)", _flip_shift(legs, spot)),
+              ("skift, bara OTM", _flip_shift(_otm(legs, spot), spot)),
+              ("skift utan S²-vikt", _flip_shift(legs, spot, scale=False)),
+              ("kumulativ dollar-gamma", _flip_cum(dg))]
+    for label, val in rows_v:
         print(f"  {label:<24}{(val if val is not None else float('nan')):9.1f}{_d(val, t.get('zero_gamma'))}")
+    net = sum(dg.values())
+    print(f"  netto-GEX vid spot: {net / 1e9:+.2f} mdr -> regim "
+          f"{'positiv (flip UNDER pris)' if net > 0 else 'negativ (flip ÖVER pris)'}")
 
     # 0DTE/närmaste expiry och max pain
     near = exps[0]
     legs0 = _legs(rows, spot, [near])
     dg0, oi0, _ = _tables(legs0, spot)
     cw0, pw0 = _walls(dg0)
+    cs0, ps0 = _sided(legs0, spot)
+    cw0_s = max(cs0, key=cs0.get) if cs0 else None
+    pw0_s = max(ps0, key=ps0.get) if ps0 else None
     cwo0, pwo0 = _oi_walls(rows, [near])
     mp = _max_pain(rows, near)
     print(f"\nnärmaste expiry {near}:")
-    print(f"  CW γ {cw0:.1f}{_d(cw0, t.get('call_wall_0'))}   PW γ {pw0:.1f}{_d(pw0, t.get('put_wall_0'))}")
+    print(f"  CW netto {cw0:.1f}{_d(cw0, t.get('call_wall_0'))}   PW netto {pw0:.1f}{_d(pw0, t.get('put_wall_0'))}")
+    print(f"  CW call {cw0_s:.1f}{_d(cw0_s, t.get('call_wall_0'))}   PW put {pw0_s:.1f}{_d(pw0_s, t.get('put_wall_0'))}")
     print(f"  CW OI {cwo0:.1f}{_d(cwo0, t.get('call_wall_0'))}   PW OI {pwo0:.1f}{_d(pwo0, t.get('put_wall_0'))}")
     print(f"  max pain {mp:.1f}{_d(mp, t.get('max_pain'))}")
 
