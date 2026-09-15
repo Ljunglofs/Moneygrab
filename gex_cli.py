@@ -224,6 +224,7 @@ def _once(inst):
             "hgex": f.get("hgex"), "call_wall_0dte": f.get("call_wall_0"), "put_wall_0dte": f.get("put_wall_0"),
             "max_pain": f.get("max_pain"), "expected_move": f.get("em"), "em_src": f.get("em_src"),
             "iv_1d": f.get("iv_1d"), "flip_uncertain": f.get("flip_uncertain"),
+            "flip_inverted": f.get("flip_inverted"),
             "walls_inverted": bool(f.get("put_wall") and f.get("call_wall") and f["put_wall"] >= f["call_wall"]),
             "open": open_px, "atr_daily": atr, "string": s}
 

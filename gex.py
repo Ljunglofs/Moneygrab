@@ -108,12 +108,15 @@ def gex_from_chain(spot, rows, now=None):
                    for K, oi, iv, T, sign in legs)
     grid = [spot * (0.90 + 0.005 * i) for i in range(41)]
     vals = [net_at(S) for S in grid]
-    zero = None
+    # Profilen kan korsa noll flera gånger. Ta den korsning som ligger närmast
+    # priset — annars kan flippen hamna långt under spot samtidigt som nettot
+    # vid spot är negativt, alltså en flipp som säger emot regimen.
+    zeros = []
     for i in range(1, len(grid)):
-        if vals[i - 1] < 0 <= vals[i] or vals[i - 1] > 0 >= vals[i]:
-            a, b = vals[i - 1], vals[i]
-            zero = grid[i - 1] + (grid[i] - grid[i - 1]) * (0 - a) / (b - a) if b != a else grid[i]
-            break
+        a, b = vals[i - 1], vals[i]
+        if a < 0 <= b or a > 0 >= b:
+            zeros.append(grid[i - 1] + (grid[i] - grid[i - 1]) * (0 - a) / (b - a) if b != a else grid[i])
+    zero = min(zeros, key=lambda z: abs(z - spot)) if zeros else None
 
     top = sorted(strikes, key=lambda k: -abs(per_strike[k]))[:7]
     hgex = top[0] if top else None
@@ -178,6 +181,10 @@ def gex_from_chain(spot, rows, now=None):
         "max_pain": mpain, "em_straddle": em, "em_src": em_src, "iv_atm": iv_atm, "iv_1d": iv_1d,
         # Flip långt från spot = putdominerad kedja (typiskt QQQ) -> regimen är osäker
         "flip_uncertain": bool(zero is not None and abs(zero / spot - 1) > 0.02),
+        # Normalt gäller: pris över flip = positiv gamma. I en putdominerad kedja
+        # kan profilen vända tillbaka och bli negativ ovanför flippen. Då ljuger
+        # tumregeln, och det ska synas i meddelandet.
+        "flip_inverted": bool(zero is not None and ((net < 0 and spot > zero) or (net > 0 and spot < zero))),
     }
 
 
@@ -355,6 +362,7 @@ def to_futures(levels, fut_price, etf_price, ratio=None, basis=None):
         "max_pain": sc(levels.get("max_pain")), "em": sc(levels.get("em_straddle")),
         "iv_1d": sc(levels.get("iv_1d")), "near_expiry": levels.get("near_expiry"),
         "em_src": levels.get("em_src"), "flip_uncertain": levels.get("flip_uncertain", False),
+        "flip_inverted": levels.get("flip_inverted", False),
     }
 
 
