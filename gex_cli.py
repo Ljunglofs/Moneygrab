@@ -225,23 +225,21 @@ def _once(inst):
         if index_mode:
             prev, stamp = stored_map(inst, "basis")
             live = g["futures"].get("basis")
+            parity_src = None
             if prev is None and g.get("spot_source") == "put-call-paritet":
                 # Ingen basis uppmätt med index och futures öppna samtidigt — men
                 # kedjan bär sitt eget terminspris via put-call-paritet, och det
                 # är satt vid kedjans stängning. Para det med futurepriset vid
                 # samma klockslag så blir basisen rätt utan att någon RTH-körning
-                # behöver ha lyckats först.
+                # behöver ha lyckats först. Omräkningen sker i grenen nedan, som
+                # redan gör exakt det för en sparad basis.
                 fut_close, at = _fut_at_chain_close(inst)
                 sp = (g.get("levels") or {}).get("spot")
                 if fut_close and sp:
-                    b = fut_close - sp
-                    g = dict(g)
-                    g["futures"] = GX.to_futures(g["levels"], fut, sp, basis=b)
-                    ratio_src = f"basis ur paritet {at}"
-                    ratio_at = datetime.now(ET).isoformat(timespec="seconds")
-                    print(f"[gex] {inst}: basis {b:.1f} ur paritet ({sp:.1f}) mot "
+                    prev = fut_close - sp
+                    parity_src = f"basis {prev:.1f} ur paritet {at}"
+                    print(f"[gex] {inst}: basis {prev:.1f} ur paritet ({sp:.1f}) mot "
                           f"futures {fut_close:.1f} vid {at}")
-                    prev = b       # hoppa över ETF-fallbacken nedan
             if prev is None:
                 # Varken sparad basis eller paritet. Indexkursen är gårdagens
                 # stängning medan futuren rört sig i natt, så basisen skulle
@@ -260,8 +258,11 @@ def _once(inst):
             elif live is not None and abs(live - prev) > MIN_BASIS_DIFF:
                 g = dict(g)
                 g["futures"] = GX.to_futures(g["levels"], fut, g["levels"]["spot"], basis=prev)
-                ratio_src = "senaste RTH " + str(stamp)[:16].replace("T", " ")
-                ratio_at = stamp
+                # Etiketten ska säga var basisen kom ifrån. Är den framräknad ur
+                # paritet i grenen ovan finns ingen sparad tidsstämpel, och
+                # "senaste RTH None" vore både fel och obegripligt.
+                ratio_src = parity_src or ("senaste RTH " + str(stamp)[:16].replace("T", " "))
+                ratio_at = datetime.now(ET).isoformat(timespec="seconds") if parity_src else stamp
         else:
             prev, stamp = stored_map(inst, "ratio")
             live = g["futures"]["ratio"]
