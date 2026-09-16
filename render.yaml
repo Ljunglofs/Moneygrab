@@ -1,10 +1,35 @@
+# GRABIT på Render
+#
+# OBS: den här filen styr tjänsten bara om den skapats som en Blueprint.
+# Är tjänsten skapad för hand i dashboarden ignoreras filen helt, och det är
+# planen i dashboarden som gäller — kontrollera där om räkningen ser fel ut.
 services:
   - type: web
     name: grabit-api
     env: python
     region: frankfurt
+    # starter räcker för appen. Ligger tjänsten på standard eller pro i
+    # dashboarden är det den inställningen som kostar, inte trafiken.
     plan: starter
     buildCommand: pip install -r requirements_api.txt
     startCommand: uvicorn grabit_entry:app --host 0.0.0.0 --port $PORT
     autoDeploy: true
     healthCheckPath: /api/health
+    # GEX-jobbet committar nivåer till main tre gånger per vardag — 34 gånger
+    # den senaste månaden. Utan det här filtret byggdes appen om varje gång:
+    # flera minuters pip install, omstart, och allt som desken håller i minnet
+    # (barer, VWAP, profil) nollställt. Två av körningarna ligger 13:05 och
+    # 16:05, alltså mitt i USA-sessionen. Textfiler med nivåer, Pine-skript och
+    # dokumentation ändrar inte appen och ska inte starta om den.
+    buildFilter:
+      ignoredPaths:
+        - levels/**
+        - pine/**
+        - "**/*.md"
+        - .github/**
+        - gex_lab.py
+        - gex_check.py
+        - Dockerfile
+        - docker-compose.yml
+        - Caddyfile
+        - deploy.sh
