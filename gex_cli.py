@@ -66,6 +66,46 @@ def _fut_price(inst):
     return float(h["Close"].iloc[-1]) if h is not None and len(h) else None
 
 
+CHAIN_CLOSE_ET = (16, 15)      # CBOE:s fördröjda kedja är stängningskurser
+CHAIN_CLOSE_TOL_MIN = int(os.environ.get("GEX_CHAIN_CLOSE_TOL", "25"))
+
+
+def _fut_at_chain_close(inst, hhmm=CHAIN_CLOSE_ET):
+    """Futurespriset vid samma tidpunkt som optionskedjans kurser sattes.
+
+    Basis är skillnaden mellan två priser i SAMMA ögonblick. Utanför USA-börsens
+    öppettider är kedjan gårdagens stängning medan futuren rört sig i natt — tar
+    man live-priset minus kedjans terminspris svälјer basisen hela nattrörelsen,
+    och varenda nivå flyttas med den.
+
+    Därför: para kedjans paritetspris med futurepriset vid kedjans egen
+    stängning (16:15 ET). Returnerar (pris, tidsstämpel) eller (None, None).
+    """
+    import yfinance as yf
+    try:
+        h = yf.Ticker(FUT[inst]).history(period="7d", interval="5m")
+    except Exception as e:
+        print(f"[gex] {inst}: 5m-historik misslyckades — {type(e).__name__}: {e}")
+        return None, None
+    if h is None or not len(h):
+        return None, None
+    idx = h.index.tz_convert(ET)
+    mins = [t.hour * 60 + t.minute for t in idx]
+    days = [t.date() for t in idx]
+    target = hhmm[0] * 60 + hhmm[1]
+    for d in sorted(set(days), reverse=True):
+        cand = [(i, m) for i, (dd, m) in enumerate(zip(days, mins)) if dd == d and m <= target]
+        if not cand:
+            continue
+        i, m = max(cand, key=lambda x: x[1])
+        # Halv dag i datat (feeden tappade eftermiddagen) duger inte — då är
+        # baren långt från stängning och basisen skulle bli lika fel som förut.
+        if target - m > CHAIN_CLOSE_TOL_MIN:
+            continue
+        return float(h["Close"].iloc[i]), f"{d} {m // 60:02d}:{m % 60:02d} ET"
+    return None, None
+
+
 def _open_and_atr(inst):
     """Dagens RTH-öppning (09:30 ET) om den finns, annars senaste dagsöppning; ATR14 på dagsbarer."""
     import yfinance as yf
@@ -185,11 +225,27 @@ def _once(inst):
         if index_mode:
             prev, stamp = stored_map(inst, "basis")
             live = g["futures"].get("basis")
+            if prev is None and g.get("spot_source") == "put-call-paritet":
+                # Ingen basis uppmätt med index och futures öppna samtidigt — men
+                # kedjan bär sitt eget terminspris via put-call-paritet, och det
+                # är satt vid kedjans stängning. Para det med futurepriset vid
+                # samma klockslag så blir basisen rätt utan att någon RTH-körning
+                # behöver ha lyckats först.
+                fut_close, at = _fut_at_chain_close(inst)
+                sp = (g.get("levels") or {}).get("spot")
+                if fut_close and sp:
+                    b = fut_close - sp
+                    g = dict(g)
+                    g["futures"] = GX.to_futures(g["levels"], fut, sp, basis=b)
+                    ratio_src = f"basis ur paritet {at}"
+                    ratio_at = datetime.now(ET).isoformat(timespec="seconds")
+                    print(f"[gex] {inst}: basis {b:.1f} ur paritet ({sp:.1f}) mot "
+                          f"futures {fut_close:.1f} vid {at}")
+                    prev = b       # hoppa över ETF-fallbacken nedan
             if prev is None:
-                # Ingen basis uppmätt med index och futures öppna samtidigt ännu.
-                # Indexkursen är då gårdagens stängning medan futuren rört sig i
-                # natt, så basisen skulle svälja hela nattrörelsen. Ta ETF-vägen
-                # i stället tills en riktig basis finns.
+                # Varken sparad basis eller paritet. Indexkursen är gårdagens
+                # stängning medan futuren rört sig i natt, så basisen skulle
+                # svälja hela nattrörelsen. Ta ETF-vägen i stället.
                 alt = GX.get_gex(inst, fut_price=fut, force=True, prefer=GX.FALLBACK_UNDERLYING.get(inst))
                 if alt and alt.get("futures") and alt.get("mapping") != "basis":
                     print(f"[gex] {inst}: ingen RTH-basis sparad — använder {alt.get('underlying')} tills vidare")

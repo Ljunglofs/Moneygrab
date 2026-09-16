@@ -147,6 +147,18 @@ var tionde punkt i stället för var 41:e, och ingen kvot kan bli fel. QQQ finns
 live-kvoten futures/ETF. Open interest uppdateras en gång per dygn, så strängen är stabil
 under dagen; expected move och IV läses från aktuella premier.
 
+Basisen NQ−NDX måste mätas mellan två priser från samma ögonblick. Under USA-börsens öppettider
+går det direkt. Utanför dem är kedjan gårdagens stängning medan futuren rört sig i natt, och en
+basis räknad mot live-priset skulle svälja hela nattrörelsen — då hamnar varenda nivå fel.
+Ordningen är därför: live-mätning när börsen är öppen, annars kedjans eget terminspris ur
+put-call-paritet parat med futurepriset vid kedjans stängning (16:15 ET), annars en sparad
+RTH-mätning från `levels/ratio.json`, och först om allt det saknas QQQ-kedjan som reserv.
+
+Den sista vägen syns i Telegram som `⚠ reservkedja QQQ — inte NDX`. Den 16 september 2026 gick
+morgonkörningen på QQQ utan att det syntes någonstans, och eftersom QQQ:s strikes ligger 41
+NQ-punkter isär i stället för 10 låg put wall 329 punkter från vad en NDX-baserad tjänst visade.
+Meddelandet säger nu alltid vilken kedja nivåerna kommer från.
+
 Hämta strängen:
 
 - Telegram: `/tvgex nq`, `/tvgex gc` eller `/tvgex all`. Svaret är ett kodblock, tryck för att kopiera.

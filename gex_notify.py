@@ -94,6 +94,14 @@ def build_message(results, fallback=None):
                     f"är däremot gamla.\n<pre>{_esc(old['string'])}</pre>")
             continue
         flag = " ⚠ flip osäker" if r.get("flip_uncertain") else ""
+        # Vilken kedja nivåerna är räknade på. NQ ska gå på NDX — samma
+        # underliggande som futuren, strikes var tionde punkt. Faller den
+        # tillbaka på QQQ hamnar väggarna på ett fyrtiopunktsraster och kan
+        # skilja hundratals punkter mot en tjänst som räknar på NDX. Det ska
+        # synas i meddelandet, inte upptäckas genom att jämföra strängar.
+        und = (r.get("underlying") or "").lstrip("_")
+        if r["inst"] == "NQ" and und and und != "NDX":
+            flag += f" ⚠ reservkedja {und} — inte NDX"
         if r.get("walls_inverted"):
             flag += " ⚠ priset under båda väggarna"
         if r.get("flip_inverted"):
@@ -106,9 +114,11 @@ def build_message(results, fallback=None):
 
         parts.append(
             f"\n<b>{r['inst']}</b> {r['fut_price']:.2f} · gamma {r['regime']}{flag}"
+            + (f" · via {und}" if und else "")
             + (f" · {r['source']}" if r.get("source") else "")
-            + ((" · basis från RTH" if r.get("mapping") == "basis" else " · kvot från RTH")
-               if r.get("ratio_source", "live") != "live" else "") + "\n"
+            # Hur kopplingen index->futures mättes: live, en sparad RTH-mätning
+            # eller ur kedjans egen put-call-paritet. Står det inget är den live.
+            + (f" · {r['ratio_source']}" if r.get("ratio_source", "live") != "live" else "") + "\n"
             f"Call Wall <b>{num(r['call_wall'], 2)}</b> · Put Wall <b>{num(r['put_wall'], 2)}</b> · Flip {num(r['zero_gamma'], 2)}"
             # Flippen räknas på de närmaste expirierna. Skiljer sig hela kedjans
             # flipp mer än en halv procent är det ett kvartals- eller månadsförfall
