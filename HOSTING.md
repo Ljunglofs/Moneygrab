@@ -1,9 +1,11 @@
-# Flytta grabit från Render
+# Var grabit ska köra
 
-Render tar ungefär tusen kronor i månaden för det här. Samma app kör gratis på
-en Oracle Always Free-maskin eller för runt fyrtio kronor på Hetzner. Filerna i
-repot (`Dockerfile`, `docker-compose.yml`, `Caddyfile`, `deploy.sh`) gör flytten
-till samma handgrepp oavsett vilken du väljer.
+Render tar ungefär tusen kronor i månaden för det här. Det går att få ner på
+tre sätt: stanna kvar men rätta planen, flytta till en gratis Oracle-maskin,
+eller flytta till Hetzner för runt fyrtio kronor. Filerna i repot (`Dockerfile`,
+`docker-compose.yml`, `Caddyfile`, `deploy.sh`) gör flytten till samma handgrepp
+oavsett vilken värd du väljer — men läs **Alternativ 0** först, för appen i sig
+är inte dyr att köra.
 
 Appkoden är oförändrad. Det enda som skiljer mot Render är att HTTPS sköts av
 Caddy i stället för av plattformen, och att den persistenta disken är en
@@ -45,6 +47,39 @@ bråkdelen av tusen kronor i månaden. Är det flera tjänster, en stor disk ell
 en uppgraderad instans som drar? Det avgör om något mer behöver flyttas.
 
 Koden behöver du inte ta med — den ligger här.
+
+## Alternativ 0: stanna på Render, men billigare
+
+Appen är inte dyr att köra — en tusenlapp i månaden är ungefär tio gånger vad
+starter-planen kostar. Innan du flyttar, kontrollera i tur och ordning:
+
+**Vilken plan tjänsten faktiskt ligger på.** `render.yaml` säger `starter`, men
+den filen styr bara om tjänsten skapats som en Blueprint. Är den skapad för hand
+i dashboarden gäller inställningen där, och en tjänst som råkat hamna på standard
+eller pro kostar mångdubbelt utan att du märker något annat än på fakturan.
+Dashboard → grabit-api → Settings → Instance Type.
+
+**Hur många tjänster som faktiskt är igång.** Fakturan är per tjänst. Ligger det
+kvar en gammal testtjänst, en streamlit-variant av `app.py` eller en cron job
+sedan tidigare betalar du för dem också.
+
+**Diskens storlek.** Render tar betalt per gigabyte och månad. `DATA_DIR` innehåller
+jsonl-filer som växer — `desk_bars_*.jsonl` får en rad per minutbar och varje
+dag. Är disken tilltagen i överkant går den att krympa.
+
+**Bandbredd.** Bakgrundsslingorna i `api.py` hämtar kursdata dygnet runt. Ligger
+du över fribeloppet syns det som en egen rad på fakturan.
+
+Landar du på starter är appen tillbaka på en normal kostnad, och det enda som
+återstår är att den har 512 MB att röra sig på. Det räcker, men med liten
+marginal — pandas, numpy och yfinance tar det mesta. Vill du ha luft kan
+bakgrundsslingorna (watchlist, facit, daily extra) flyttas till GitHub Actions
+på samma sätt som GEX-jobbet redan är. Repot är publikt, så de körningarna är
+gratis utan minutgräns, och webbtjänsten behöver då bara svara på anrop.
+
+Oavsett vad du väljer: `buildFilter` i `render.yaml` stoppar ombyggena som
+GEX-nivåerna utlöste. Trettiofyra deployer den senaste månaden, varav två om
+dagen mitt i USA-sessionen, med allt desken höll i minnet nollställt varje gång.
 
 ## Alternativ 1: Oracle Cloud Always Free (0 kr)
 
