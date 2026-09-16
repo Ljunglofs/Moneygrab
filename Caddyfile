@@ -1,0 +1,26 @@
+# Caddy sköter HTTPS åt grabit. Domänen kommer från DOMAIN i .env.
+#
+# Har du ingen egen domän: skaffa en gratis subdomän hos duckdns.org, peka den
+# på serverns IP och sätt DOMAIN=dittnamn.duckdns.org. Certifikatet tas ut över
+# port 80 och fungerar likadant som för en köpt domän.
+{
+	email {$TLS_EMAIL}
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	# Appen. Caddy skickar vidare besökarens riktiga IP, vilket
+	# TV_IP_CHECK i tradingview_bridge.py behöver för att kunna
+	# släppa igenom TradingViews servrar.
+	reverse_proxy grabit:8000 {
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

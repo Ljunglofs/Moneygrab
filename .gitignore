@@ -11,3 +11,6 @@ desk_bars_GC.jsonl
 desk_state.json
 desk_setups.jsonl
 desk_gex.json
+
+# hemligheter — aldrig i ett publikt repo
+.env

@@ -1,0 +1,49 @@
+# GRABIT · en fil att köra hela appen med
+#
+#   docker compose up -d --build     starta (eller uppdatera efter git pull)
+#   docker compose logs -f grabit    följ loggen
+#   docker compose down              stoppa
+#
+# Två tjänster: appen och Caddy som terminerar HTTPS. Caddy hämtar och förnyar
+# certifikatet automatiskt från Let's Encrypt — inget att komma ihåg, inget som
+# går ut. Det kräver att DOMAIN pekar på serverns IP och att port 80 och 443 är
+# öppna utåt.
+services:
+  grabit:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      # Allt som måste överleva en omstart. Motsvarar Renders persistenta disk.
+      - grabit-data:/data
+    expose:
+      - "8000"
+    # Appen läser hela optionskedjor och håller barer i minnet. 1 GB räcker med
+    # marginal; Render starter gav 512 MB och låg nära taket.
+    mem_limit: 1g
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [grabit]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+      TLS_EMAIL: ${TLS_EMAIL:-}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data          # certifikaten — raderas de tas nya ut, och
+      - caddy-config:/config      # Let's Encrypt har en gräns per vecka
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+volumes:
+  grabit-data:
+  caddy-data:
+  caddy-config:
