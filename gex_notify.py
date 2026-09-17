@@ -106,6 +106,8 @@ def build_message(results, fallback=None):
             flag += " ⚠ priset under båda väggarna"
         if r.get("flip_inverted"):
             flag += " ⚠ flip omvänd — läs regimen, inte flippen"
+        if not r.get("expected_move") and not r.get("iv_1d"):
+            flag += " ⚠ inget EM-band — kedjan saknade ATM-priser"
         def num(v, d=0):
             """Tal utan efterhängande nollor, '–' när värdet saknas."""
             if v is None:

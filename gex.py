@@ -44,6 +44,7 @@ N_EXPIRIES = int(os.environ.get("GEX_EXPIRIES", "4"))    # närmaste expiries (0
 # ska beskriva styrs av gamman som förfaller närmast.
 FLIP_EXPIRIES = int(os.environ.get("GEX_FLIP_EXPIRIES", "3"))
 NEAR_PCT = float(os.environ.get("GEX_NEAR_PCT", "0.05"))   # HGEX och G+/G- inom 5 % av priset
+ATM_TRIES = int(os.environ.get("GEX_ATM_TRIES", "7"))      # strikes att prova för ATM-IV/straddle
 
 # NQ räknas på NDX-indexoptionerna: samma underliggande som futuren, strikes var
 # tionde punkt i stället för var 41:e, och ingen ETF-kvot som kan bli fel. QQQ
@@ -186,23 +187,39 @@ def gex_from_chain(spot, rows, now=None):
     em = iv_atm = None
     em_src = None
     if nr:
-        atm = min({float(r["strike"]) for r in nr}, key=lambda k: abs(k - spot))
-        c = [r for r in nr if r["type"] == "C" and float(r["strike"]) == atm]
-        pu = [r for r in nr if r["type"] == "P" and float(r["strike"]) == atm]
-        if c and pu:
+        # Gå utåt från pengarna tills en strike har brukbar IV på båda benen.
+        # Att bara titta på den allra närmaste striken är för skört: den 17
+        # september saknade NDX:s ATM-strike IV i CBOE:s fil, och då föll hela
+        # NQ bort på sanity-kontrollen trots att kedjan hade 1485 rader med
+        # öppen balans och väggarna var helt i sin ordning.
+        ks = sorted({float(r["strike"]) for r in nr}, key=lambda k: abs(k - spot))[:ATM_TRIES]
+        T_near = _years_to(near, now)
+        cand_iv, straddle = [], None
+        for atm in ks:
+            c = [r for r in nr if r["type"] == "C" and float(r["strike"]) == atm]
+            pu = [r for r in nr if r["type"] == "P" and float(r["strike"]) == atm]
+            if not (c and pu):
+                continue
             ivs = [float(r.get("iv") or 0) for r in (c[0], pu[0]) if 0.01 < float(r.get("iv") or 0) < 5]
-            iv_atm = sum(ivs) / len(ivs) if ivs else None
-            T_near = _years_to(near, now)
-            # 1σ till expiry ur ATM-IV — robust även när Yahoo saknar bid/ask (helger, kvällar)
-            if iv_atm:
-                em = spot * iv_atm * math.sqrt(T_near); em_src = "iv"
-            # Levande straddle (bid OCH ask > 0 på båda benen) får ersätta, om den är rimlig.
-            live = all(float(r.get("bid") or 0) > 0 and float(r.get("ask") or 0) > 0 for r in (c[0], pu[0]))
-            if live:
+            if ivs:
+                cand_iv.append(sum(ivs) / len(ivs))
+            # Levande straddle (bid OCH ask > 0 på båda benen) — närmast pengarna vinner.
+            if straddle is None and all(float(r.get("bid") or 0) > 0 and float(r.get("ask") or 0) > 0
+                                        for r in (c[0], pu[0])):
                 straddle = _mid(c[0]) + _mid(pu[0])
-                em_str = 0.85 * straddle            # 1σ ≈ 0,85 × ATM-straddle
-                if em is None or 0.5 * em <= em_str <= 1.5 * em:
-                    em = em_str; em_src = "straddle"
+        # Medianen av grannarnas IV, inte den första bästa: skevheten gör att en
+        # enstaka strike kan ligga långt över de omkringliggande, och EM-bandet
+        # blir då för brett. Medianen tål både en tom och en extrem strike.
+        if cand_iv:
+            cand_iv.sort()
+            iv_atm = cand_iv[len(cand_iv) // 2]
+        # 1σ till expiry ur ATM-IV — robust även när Yahoo saknar bid/ask (helger, kvällar)
+        if iv_atm:
+            em, em_src = spot * iv_atm * math.sqrt(T_near), "iv"
+        if straddle is not None:
+            em_str = 0.85 * straddle                          # 1σ ≈ 0,85 × ATM-straddle
+            if em is None or 0.5 * em <= em_str <= 1.5 * em:
+                em, em_src = em_str, "straddle"
     iv_1d = spot * iv_atm * math.sqrt(1 / 252) if iv_atm else None
 
     return {

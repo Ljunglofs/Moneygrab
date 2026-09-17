@@ -189,8 +189,15 @@ def sanity(g, fut, inst=None, today=None):
     for name, px in (("call wall", cw), ("put wall", pw)):
         if abs(px / fut - 1) > MAX_WALL_PCT:
             return f"{name} {px} ligger {abs(px / fut - 1) * 100:.0f} % från priset {fut:.0f} — orimligt"
+    # Saknas EM och IV är det illa, men inte dödligt. Har kedjan gott om strikes
+    # med öppen balans och rimliga väggar är gammaläget helt användbart — det är
+    # bara EM-bandet och IV-intervallet som uteblir. Den 17 september föll NQ
+    # bort helt på den här regeln trots 1485 rader med OI, och användaren fick
+    # gårdagens nivåer i stället för dagens. En halv kedja fångas ändå av
+    # strike-räkningen ovan.
     if not (f.get("iv_1d") or f.get("em")):
-        return "varken IV eller expected move gick att räkna — kedjan saknar priser"
+        print(f"[gex] {inst}: varken IV eller expected move gick att räkna — "
+              f"nivåerna behålls, EM-bandet uteblir")
     if f.get("basis") is not None:
         verified = g.get("spot_source") == "put-call-paritet"
         cap = MAX_BASIS_PCT if verified else MAX_BASIS_PCT_UNVERIFIED
