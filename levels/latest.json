@@ -1,56 +1,53 @@
 {
-  "generated": "2026-09-17T08:07:13+02:00",
+  "generated": "2026-09-17T08:13:10+02:00",
   "levels": [
     {
       "inst": "NQ",
-      "fut_price": 29467.25,
+      "fut_price": 29395.5,
       "underlying": "_NDX",
-      "etf_spot": 29099.100000000002,
-      "ratio": 1.0127,
+      "etf_spot": 28960.0,
+      "ratio": 1.015,
       "regime": "positiv",
       "expiries": [
-        "2026-09-16",
         "2026-09-17",
         "2026-09-18",
-        "2026-09-21"
+        "2026-09-21",
+        "2026-09-22"
       ],
       "source": "cboe",
       "spot_source": "put-call-paritet",
       "mapping": "basis",
       "basis": 368.15,
-      "ratio_source": "live",
-      "ratio_rth": true,
+      "ratio_source": "senaste RTH 2026-09-16 10:07",
+      "ratio_rth": false,
       "ratio_at": "2026-09-16T10:07:01-04:00",
-      "n_strikes": 473,
+      "n_strikes": 451,
       "call_wall": 29643.15,
       "put_wall": 29368.15,
-      "zero_gamma": 29210.4,
-      "zero_gamma_all": 29213.97,
+      "zero_gamma": 29159.24,
+      "zero_gamma_all": 29162.09,
       "flip_expiries": [
-        "2026-09-16",
         "2026-09-17",
-        "2026-09-18"
+        "2026-09-18",
+        "2026-09-21"
       ],
       "hgex": 29643.15,
-      "call_wall_0dte": 29618.15,
-      "put_wall_0dte": 29268.15,
-      "max_pain": 29418.15,
-      "expected_move": 552.34,
+      "call_wall_0dte": 29548.15,
+      "put_wall_0dte": 29368.15,
+      "max_pain": 29568.15,
+      "expected_move": 607.3,
       "em_src": "straddle",
-      "iv_1d": 1008.63,
+      "iv_1d": 789.47,
       "flip_uncertain": false,
       "flip_inverted": false,
       "walls_inverted": false,
-      "open": 29386.75,
-      "atr_daily": 400.6607142857143,
-      "string": "29643.25,Call Wall,res;29368.25,Put Wall,sup;29618.25,Call Wall 0DTE,res0;29268.25,Put Wall 0DTE,sup0;29210.5,Gamma Flip,flip;29418.25,Max Pain 0DTE,mpain;29818.25,G+ 1,gpos;29918.25,G+ 2,gpos;28368.25,G- 1,gneg;29068.25,G- 2,gneg;30019.5,EM+,emh;28915,EM-,eml;29743.5,EM +50%,emb;29191,EM -50%,emb;30476,1D High IV,ivh;28458.5,1D Low IV,ivl;29386.75,Open,opo;29587,O +0.5 ATR,opu;29186.5,O -0.5 ATR,opd;29787.5,O +1 ATR,opu;28986,O -1 ATR,opd",
-      "_generated": "2026-09-16T16:07:02+02:00",
-      "stale": true,
-      "last_error": "varken IV eller expected move gick att räkna — kedjan saknar priser [källa: cboe] — 3 försök"
+      "open": 29271.0,
+      "atr_daily": 404.94642857142856,
+      "string": "29643.25,Call Wall,res;29368.25,Put Wall,sup;29548.25,Call Wall 0DTE,res0;29159.25,Gamma Flip,flip;29568.25,Max Pain 0DTE,mpain;29818.25,G+ 1,gpos;29918.25,G+ 2,gpos;29068.25,G- 1,gneg;29168.25,G- 2,gneg;30002.75,EM+,emh;28788.25,EM-,eml;29699.25,EM +50%,emb;29091.75,EM -50%,emb;30185,1D High IV,ivh;28606,1D Low IV,ivl;29271,Open,opo;29473.5,O +0.5 ATR,opu;29068.5,O -0.5 ATR,opd;29676,O +1 ATR,opu;28866,O -1 ATR,opd"
     },
     {
       "inst": "GC",
-      "fut_price": 4341.7998046875,
+      "fut_price": 4344.39990234375,
       "underlying": "GLD",
       "etf_spot": 391.74,
       "ratio": 10.9934,
@@ -71,8 +68,8 @@
       "n_strikes": 255,
       "call_wall": 4397.36,
       "put_wall": 4287.43,
-      "zero_gamma": 4311.16,
-      "zero_gamma_all": 4310.5,
+      "zero_gamma": 4311.33,
+      "zero_gamma_all": 4310.66,
       "flip_expiries": [
         "2026-09-17",
         "2026-09-18",
@@ -84,13 +81,13 @@
       "max_pain": 4430.34,
       "expected_move": 47.7,
       "em_src": "straddle",
-      "iv_1d": 83.71,
+      "iv_1d": 84.13,
       "flip_uncertain": false,
       "flip_inverted": false,
       "walls_inverted": false,
       "open": 4301.39990234375,
       "atr_daily": 117.871337890625,
-      "string": "4397.4,Call Wall,res;4287.4,Put Wall,sup;4309.4,Put Wall 0DTE,sup0;4311.2,Gamma Flip,flip;4430.3,Max Pain 0DTE,mpain;4507.3,G+ 1,gpos;4430.3,G+ 2,gpos;4309.4,G- 1,gneg;4177.5,G- 2,gneg;4389.5,EM+,emh;4294.1,EM-,eml;4365.6,EM +50%,emb;4317.9,EM -50%,emb;4425.5,1D High IV,ivh;4258.1,1D Low IV,ivl;4301.4,Open,opo;4360.3,O +0.5 ATR,opu;4242.5,O -0.5 ATR,opd;4419.3,O +1 ATR,opu;4183.5,O -1 ATR,opd"
+      "string": "4397.4,Call Wall,res;4287.4,Put Wall,sup;4309.4,Put Wall 0DTE,sup0;4311.3,Gamma Flip,flip;4430.3,Max Pain 0DTE,mpain;4507.3,G+ 1,gpos;4430.3,G+ 2,gpos;4309.4,G- 1,gneg;4177.5,G- 2,gneg;4392.1,EM+,emh;4296.7,EM-,eml;4368.2,EM +50%,emb;4320.5,EM -50%,emb;4428.5,1D High IV,ivh;4260.3,1D Low IV,ivl;4301.4,Open,opo;4360.3,O +0.5 ATR,opu;4242.5,O -0.5 ATR,opd;4419.3,O +1 ATR,opu;4183.5,O -1 ATR,opd"
     }
   ]
 }
