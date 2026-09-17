@@ -194,25 +194,32 @@ def gex_from_chain(spot, rows, now=None):
         # öppen balans och väggarna var helt i sin ordning.
         ks = sorted({float(r["strike"]) for r in nr}, key=lambda k: abs(k - spot))[:ATM_TRIES]
         T_near = _years_to(near, now)
+        cand_iv, straddle = [], None
         for atm in ks:
             c = [r for r in nr if r["type"] == "C" and float(r["strike"]) == atm]
             pu = [r for r in nr if r["type"] == "P" and float(r["strike"]) == atm]
             if not (c and pu):
                 continue
             ivs = [float(r.get("iv") or 0) for r in (c[0], pu[0]) if 0.01 < float(r.get("iv") or 0) < 5]
-            iv_here = sum(ivs) / len(ivs) if ivs else None
-            # 1σ till expiry ur ATM-IV — robust även när Yahoo saknar bid/ask (helger, kvällar)
-            em_here = spot * iv_here * math.sqrt(T_near) if iv_here else None
-            src_here = "iv" if em_here else None
-            # Levande straddle (bid OCH ask > 0 på båda benen) får ersätta, om den är rimlig.
-            live = all(float(r.get("bid") or 0) > 0 and float(r.get("ask") or 0) > 0 for r in (c[0], pu[0]))
-            if live:
-                em_str = 0.85 * (_mid(c[0]) + _mid(pu[0]))    # 1σ ≈ 0,85 × ATM-straddle
-                if em_here is None or 0.5 * em_here <= em_str <= 1.5 * em_here:
-                    em_here, src_here = em_str, "straddle"
-            if em_here or iv_here:
-                iv_atm, em, em_src = iv_here, em_here, src_here
-                break
+            if ivs:
+                cand_iv.append(sum(ivs) / len(ivs))
+            # Levande straddle (bid OCH ask > 0 på båda benen) — närmast pengarna vinner.
+            if straddle is None and all(float(r.get("bid") or 0) > 0 and float(r.get("ask") or 0) > 0
+                                        for r in (c[0], pu[0])):
+                straddle = _mid(c[0]) + _mid(pu[0])
+        # Medianen av grannarnas IV, inte den första bästa: skevheten gör att en
+        # enstaka strike kan ligga långt över de omkringliggande, och EM-bandet
+        # blir då för brett. Medianen tål både en tom och en extrem strike.
+        if cand_iv:
+            cand_iv.sort()
+            iv_atm = cand_iv[len(cand_iv) // 2]
+        # 1σ till expiry ur ATM-IV — robust även när Yahoo saknar bid/ask (helger, kvällar)
+        if iv_atm:
+            em, em_src = spot * iv_atm * math.sqrt(T_near), "iv"
+        if straddle is not None:
+            em_str = 0.85 * straddle                          # 1σ ≈ 0,85 × ATM-straddle
+            if em is None or 0.5 * em <= em_str <= 1.5 * em:
+                em, em_src = em_str, "straddle"
     iv_1d = spot * iv_atm * math.sqrt(1 / 252) if iv_atm else None
 
     return {
