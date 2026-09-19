@@ -1,0 +1,738 @@
+//@version=6
+// GRABIT — Node Breach Engine (NBE)
+// ---------------------------------------------------------------------------
+// Bygger volymprofiler över swing- eller sessionsstruktur, plockar ut noderna
+// (POC/HVN = tjock handel, POV/LVN = tunn handel) och utvärderar vad priset gör
+// när det kommer tillbaka till dem: avvisning eller acceptans igenom.
+//
+// INSTALLATION
+//  1. Pine Editor -> klistra in -> Add to chart.
+//  2. Profile Type: Swing för pivot-till-pivot, Session för ett fast tidsfönster.
+//  3. Larm: klocksymbolen -> Create Alert -> villkor "GRABIT NBE" ->
+//     "Any alert() function call". Meddelandet byggs av scriptet som JSON mot
+//     /tv/webhook (se TRADINGVIEW.md), så signalen går rakt in i GRABIT.
+//
+// RITAR INTE OM (i förval)
+//  Med Profile Window = "Stängda profiler" fryses noderna när profilen STÄNGER
+//  — vid bekräftad motsatt pivot (Swing) eller vid sessionsskifte (Session) —
+//  och signaler utvärderas bara på bekräftade barer. Ingenting flyttar sig i
+//  efterhand.
+//  Med "Pågående" räknas noderna om var femte bar ur den levande profilen. Då
+//  FLYTTAR de sig, och historiska signaler ser bättre ut än de var i stunden.
+//  Använd det för att läsa marknaden, inte för att bedöma om motorn är bra.
+//
+// NODSTYRKA
+//  Styrkan är VÅRT mått, inte någon annans. Formeln står öppet i f_mkNodes:
+//  koncentration + prominens + deltaskevhet + massa, summerat till 0-10.
+//  Den rangordnar noder mot varandra på samma graf. Den är INTE en sannolikhet
+//  och ska inte läsas som en träffprocent.
+//
+// VOLYMDATA
+//  Profilen är bara så bra som volymen. På CFD:er är "volym" oftast tickantal,
+//  inte kontrakt — då beskriver noderna hur ofta priset rörde sig, inte hur
+//  mycket som omsattes. Statusraden varnar när volymen saknas eller ser ut att
+//  vara tick. För riktiga noder: handla futures (MNQ1!/MGC1!).
+//
+// INTE MEDTAGET
+//  Strategy Preset och Optimization Run finns medvetet inte. Vi har inga
+//  validerade parameteruppsättningar ännu — de ska mätas fram i Strategy Tester
+//  med commission och slippage satta, inte gissas.
+// ---------------------------------------------------------------------------
+indicator("GRABIT Node Breach Engine", "GRABIT NBE", overlay = true,
+     max_boxes_count = 500, max_lines_count = 500, max_labels_count = 500, max_bars_back = 2000)
+
+// ════════════════════════ INPUTS ════════════════════════
+const string G_P = "Profil"
+string profType  = input.string("Swing", "Profile Type", options = ["Swing", "Session"], group = G_P,
+     tooltip = "Swing: pivot-till-pivot ur marknadsstrukturen. Session: fast tidsfönster. Byter du här byter du vilken struktur som analyseras.")
+string profWin   = input.string("Stängda profiler", "Profile Window", options = ["Stängda profiler", "Pågående"], group = G_P,
+     tooltip = "Stängda profiler: noderna fryses när profilen stänger — ritar inte om. Pågående: noderna räknas om ur den levande profilen och FLYTTAR SIG.")
+int    barsScan  = input.int(600, "Bars Scan", minval = 50, maxval = 1500, group = G_P,
+     tooltip = "Tak för hur långt en profil får läsa bakåt. Säkerhets- och prestandainställning.")
+int    swWidth   = input.int(12, "Swing Width", minval = 2, maxval = 60, group = G_P,
+     tooltip = "Pivotbredd. Högre värde ger färre och bredare swingar, lägre ger fler och mer responsiva. Ändrar profilsegmenteringen i grunden.")
+int    rows      = input.int(120, "Histogram Rows", minval = 20, maxval = 300, group = G_P,
+     tooltip = "Profilens vertikala upplösning. Fler rader ger mer detalj men också mer visuellt brus och tyngre räkning.")
+float  vaPct     = input.float(70, "Value Area %", minval = 50, maxval = 95, group = G_P,
+     tooltip = "Hur stor andel av profilens aktivitet som räknas som värde. Ändra inte bara för att träffa ett önskat historiskt utfall.") / 100
+string profSess  = input.session("0900-1730", "Profile Session", group = G_P,
+     tooltip = "Används när Profile Type = Session. Kontrollera tidszonen innan du ändrar.")
+string sessTz    = input.string("Europe/Stockholm", "Session Timezone",
+     options = ["Europe/Stockholm", "Europe/London", "America/New_York", "Asia/Tokyo", "UTC"], group = G_P)
+string ltfMode   = input.string("Auto", "Intrabar-upplösning", options = ["Auto", "1", "5", "Av"], group = G_P,
+     tooltip = "Auto delar varje bar i minutbarer för en finare profil. Av räknar på barens egen range — grövre men billigare.")
+
+const string G_N = "Noder"
+int    maxHvn    = input.int(2, "Max POC/HVN per profil", minval = 1, maxval = 6, group = G_N)
+int    maxLvn    = input.int(2, "Max POV/LVN per profil", minval = 0, maxval = 6, group = G_N)
+int    keepProf  = input.int(4, "Profiler att hålla aktiva", minval = 1, maxval = 10, group = G_N)
+int    nodeSep   = input.int(6, "Minsta avstånd mellan noder (rader)", minval = 2, maxval = 40, group = G_N)
+float  hvnPct    = input.float(55, "HVN-tröskel (% av POC)", minval = 20, maxval = 100, group = G_N) / 100
+float  lvnPct    = input.float(35, "LVN-tröskel (% av POC)", minval = 5,  maxval = 80,  group = G_N) / 100
+int    smoothN   = input.int(2, "Utjämning av histogram (rader)", minval = 0, maxval = 10, group = G_N,
+     tooltip = "Jämnar ut histogrammet innan toppar och dalar letas upp. 0 = råa buckets, vilket ger många falska noder.")
+bool   pocMargin = input.bool(true,  "POC Margin", inline = "pm", group = G_N,
+     tooltip = "Tolerans runt POC vid interaktionstest. Bredare marginal ger fler men mindre precisa träffar.")
+float  pocDist   = input.float(0.15, "", minval = 0.0, maxval = 2.0, step = 0.05, inline = "pm", group = G_N)
+bool   povMargin = input.bool(true,  "POV Margin", inline = "vm", group = G_N)
+float  povDist   = input.float(0.10, "", minval = 0.0, maxval = 2.0, step = 0.05, inline = "vm", group = G_N)
+bool   extendPov = input.bool(true, "Extend POV", group = G_N,
+     tooltip = "Håller POV-strukturen utsträckt framåt för framtida interaktion. Av = bara den lokala profilvyn.")
+float  minStr    = input.float(3.5, "Minsta nodstyrka (0-10)", minval = 0, maxval = 10, step = 0.5, group = G_N,
+     tooltip = "Vårt eget mått, inte en sannolikhet. Se filhuvudet.")
+
+const string G_S = "Signal & filter"
+bool   sigPocRej = input.bool(true,  "POC: avvisning", inline = "s1", group = G_S)
+bool   sigPocBrk = input.bool(true,  "POC: brott",     inline = "s1", group = G_S)
+bool   sigPovRej = input.bool(true,  "POV: avvisning", inline = "s2", group = G_S)
+bool   sigPovBrk = input.bool(false, "POV: brott",     inline = "s2", group = G_S,
+     tooltip = "Brott genom en tunn nod är väntat beteende och säger lite. Av i förval.")
+bool   reqClose  = input.bool(true, "Rejection Close", group = G_S,
+     tooltip = "Kräver att signalbaren stänger tillbaka på den sida av noden den kom ifrån. Av ger fler och svagare interaktioner.")
+bool   momGuard  = input.bool(true, "Momentum Guard", inline = "mg", group = G_S,
+     tooltip = "Förkastar onormalt stora barer mot rådande volatilitet, så att en genomkörare inte räknas som en ren avvisning.")
+float  atrMult   = input.float(2.0, "", minval = 0.5, maxval = 6.0, step = 0.1, inline = "mg", group = G_S)
+int    atrLen    = input.int(14, "ATR-längd", minval = 5, maxval = 50, group = G_S)
+bool   wickFilt  = input.bool(true, "Wick Filter", inline = "wf", group = G_S,
+     tooltip = "Veken är kontextuellt bevis för avvisning — inte bevis för vändning.")
+float  wickMin   = input.float(0.35, "Minimum Wick", minval = 0.05, maxval = 0.9, step = 0.05, inline = "wf", group = G_S,
+     tooltip = "Höj för strängare avvisningsstruktur. Mycket strikta värden tar bort giltiga grunda avvisningar.")
+float  breachAtr = input.float(0.25, "Brottmarginal (xATR)", minval = 0.0, maxval = 2.0, step = 0.05, group = G_S,
+     tooltip = "Hur långt bortom noden baren måste stänga för att räknas som acceptans igenom och inte bara en nudd.")
+bool   sessFilt  = input.bool(false, "Session Filter", group = G_S)
+string sessMode  = input.string("Inuti", "Session Mode", options = ["Inuti", "Utanför"], group = G_S)
+string sigSess   = input.session("0900-1730", "Signal Session", group = G_S)
+bool   emaFilt   = input.bool(false, "EMA Filter", inline = "ef", group = G_S,
+     tooltip = "Trendfilter: long bara över trendlinjen, short bara under. Minskar motstrukturella signaler men fördröjer dem.")
+int    emaLen    = input.int(80, "", minval = 5, maxval = 400, inline = "ef", group = G_S)
+string smType    = input.string("EMA", "Smoothing Type", options = ["EMA", "SMA", "RMA", "WMA"], group = G_S)
+int    smLen     = input.int(3, "Smoothing Length", minval = 1, maxval = 50, group = G_S)
+
+const string G_R = "Retest"
+bool   retestOn  = input.bool(false, "Retest Mode", group = G_R,
+     tooltip = "Av: noden pensioneras efter första kvalificerade interaktionen. På: den får testas flera gånger. Fler retester ger fler tillfällen men också upprepade test av försvagad struktur.")
+int    maxRetest = input.int(2, "Max Retests", minval = 1, maxval = 10, group = G_R)
+bool   finalOnly = input.bool(false, "Final Retest Only", group = G_R,
+     tooltip = "Larma bara på den sista tillåtna interaktionen i stället för på varje.")
+bool   killBrk   = input.bool(true, "Pensionera noden vid brott", group = G_R)
+
+const string G_T = "Trade-plan"
+string tradeMode = input.string("Av", "Trade Mode", options = ["Av", "Custom"], group = G_T,
+     tooltip = "Av = ren analys. Custom = visar entry, stop och mål. Detta är ett visualiseringslager, inte automatik.")
+float  slAtr     = input.float(1.0, "Custom Stop Loss (xATR bortom noden)", minval = 0.1, maxval = 5.0, step = 0.1, group = G_T)
+float  rrMult    = input.float(2.0, "Custom Take Profit (xR)", minval = 0.3, maxval = 10.0, step = 0.1, group = G_T,
+     tooltip = "Ett större mål byter träffrekvens mot större R. Det gör inte signalen bättre.")
+bool   tradeVis  = input.bool(true, "Trade Visuals", group = G_T)
+int    tradeHist = input.int(6, "Trade History", minval = 1, maxval = 30, group = G_T,
+     tooltip = "TradingView har objektgränser — en mycket lång historik tränger undan äldre grafik.")
+
+const string G_V = "Visuellt"
+bool   showProf  = input.bool(true,  "Volume Profile", group = G_V)
+bool   profBack  = input.bool(true,  "Profile Backdrop", group = G_V)
+bool   showVA    = input.bool(true,  "VAH/VAL", group = G_V)
+bool   swingChg  = input.bool(true,  "Swing Change", group = G_V)
+bool   profCvd   = input.bool(true,  "Profile CVD", group = G_V,
+     tooltip = "Riktningskontext vid sidan av fördelningen. Läs inte CVD ensamt som en entry.")
+bool   showSigLb = input.bool(true,  "Text vid signal", group = G_V)
+bool   showDash  = input.bool(true,  "Dashboard", group = G_V)
+int    zoneTr    = input.int(78, "Nodzonernas transparens", minval = 0, maxval = 100, group = G_V)
+color  colPOC    = input.color(color.new(#ffc400, 0), "POC", group = G_V)
+color  colHVN    = input.color(color.new(#ff9100, 0), "HVN", group = G_V)
+color  colPOV    = input.color(color.new(#9d6bff, 0), "POV / LVN", group = G_V)
+color  colVA     = input.color(color.new(#00e5ff, 55), "VAH/VAL", group = G_V)
+color  colBars   = input.color(color.new(#4b5568, 55), "Histogram", group = G_V)
+color  colUp     = input.color(color.new(#00e5ff, 0), "Long", group = G_V)
+color  colDn     = input.color(color.new(#ff2e88, 0), "Short", group = G_V)
+
+// ════════════════════════ TYP ════════════════════════
+type Node
+    float price
+    float top
+    float bot
+    float vol
+    float share
+    float buyPct
+    int   row
+    int   kind       //  1 = POC/HVN,  -1 = POV/LVN
+    bool  isPoc
+    bool  dev        //  true = hämtad ur den pågående profilen
+    int   bornBar
+    int   touches
+    int   side       //  senast kända sida:  1 = priset över,  -1 = under,  0 = inuti
+    int   fromSide   //  sidan interaktionen inleddes från
+    bool  inside     //  en interaktion pågår
+    bool  active
+    float strength
+    line  ln
+    box   bx
+    label lb
+
+// ════════════════════════ HJÄLPARE ════════════════════════
+f_grade(float s) =>
+    s >= 7.5 ? "+++" : s >= 5.5 ? "++" : s >= 3.5 ? "+" : "-"
+
+// Value area enligt TradingViews metod: väx ut från POC, två rader i taget,
+// åt det håll som bär mest volym, tills andelen är uppnådd.
+f_va(array<float> bk, int poc, float tot, float frac) =>
+    int nR = array.size(bk)
+    float acc = array.get(bk, poc)
+    int up = poc
+    int dn = poc
+    int guard = 0
+    while acc < tot * frac and (up < nR - 1 or dn > 0) and guard < nR
+        guard += 1
+        float vUp = 0.0
+        int   nUp = 0
+        if up + 1 <= nR - 1
+            vUp += array.get(bk, up + 1)
+            nUp := 1
+            if up + 2 <= nR - 1
+                vUp += array.get(bk, up + 2)
+                nUp := 2
+        float vDn = 0.0
+        int   nDn = 0
+        if dn - 1 >= 0
+            vDn += array.get(bk, dn - 1)
+            nDn := 1
+            if dn - 2 >= 0
+                vDn += array.get(bk, dn - 2)
+                nDn := 2
+        if nUp > 0 and (nDn == 0 or vUp >= vDn)
+            up += nUp
+            acc += vUp
+        else if nDn > 0
+            dn -= nDn
+            acc += vDn
+        else
+            break
+    [up, dn]
+
+f_smooth(array<float> bk, int n) =>
+    out = array.copy(bk)
+    if n > 0
+        int sz = array.size(bk)
+        for j = 0 to sz - 1
+            float acc = 0.0
+            int   cnt = 0
+            for q = math.max(0, j - n) to math.min(sz - 1, j + n)
+                acc += array.get(bk, q)
+                cnt += 1
+            array.set(out, j, acc / cnt)
+    out
+
+// Bygger histogrammet ur de ackumulerade cellerna [0, nUse-1].
+// Inga historiska referenser här inne — allt kommer in som arrayer.
+f_profile(array<float> aHi, array<float> aLo, array<float> aVol, array<float> aBuy, int nUse, int nRows) =>
+    float hh = na
+    float ll = na
+    if nUse > 0
+        for i = 0 to nUse - 1
+            float h = array.get(aHi, i)
+            float l = array.get(aLo, i)
+            hh := na(hh) ? h : math.max(hh, h)
+            ll := na(ll) ? l : math.min(ll, l)
+    bk  = array.new_float(nRows, 0.0)
+    bbk = array.new_float(nRows, 0.0)
+    float step = 0.0
+    float totV = 0.0
+    float totB = 0.0
+    if not na(hh) and hh > ll
+        step := (hh - ll) / nRows
+        for i = 0 to nUse - 1
+            float h = array.get(aHi, i)
+            float l = array.get(aLo, i)
+            float v = array.get(aVol, i)
+            float b = array.get(aBuy, i)
+            int j0 = math.max(0, math.min(nRows - 1, int(math.floor((l - ll) / step))))
+            int j1 = math.max(0, math.min(nRows - 1, int(math.floor((h - ll) / step))))
+            int sp = j1 - j0 + 1
+            for j = j0 to j1
+                array.set(bk,  j, array.get(bk,  j) + v / sp)
+                array.set(bbk, j, array.get(bbk, j) + b / sp)
+            totV += v
+            totB += b
+    [ll, step, bk, bbk, totV, totB, hh]
+
+f_poc(array<float> bk) =>
+    int   idx = 0
+    float mx  = 0.0
+    for j = 0 to array.size(bk) - 1
+        float v = array.get(bk, j)
+        if v > mx
+            mx  := v
+            idx := j
+    [idx, mx]
+
+f_topN(array<Node> src, int n) =>
+    out = array.new<Node>()
+    tmp = array.copy(src)
+    while array.size(out) < n and array.size(tmp) > 0
+        int   bi = 0
+        float bs = -1.0
+        for i = 0 to array.size(tmp) - 1
+            Node c = array.get(tmp, i)
+            if c.strength > bs
+                bs := c.strength
+                bi := i
+        array.push(out, array.remove(tmp, bi))
+    out
+
+// ── NODSTYRKA (vårt mått, öppet) ───────────────────────────────────────────
+//   koncentration : radens volym mot en jämn fördelning (1.0 = helt jämnt)
+//   prominens     : hur mycket raden reser sig över sin egen omgivning
+//   deltaskevhet  : hur ensidig köp/sälj-fördelningen är i nodbandet
+//   massa         : hur stor andel av hela profilen nodbandet bär
+// Summan är 0-10 och rangordnar noder mot varandra på samma graf.
+// För en POV vänds logiken: tunnhet och djup ersätter koncentration.
+f_mkNodes(array<float> bk, array<float> bbk, float lo, float step, float totV, int pocIdx,
+     int nRows, int bornBar, float px, bool isDev) =>
+    out = array.new<Node>()
+    if totV > 0 and step > 0
+        sm = f_smooth(bk, smoothN)
+        float mx = 0.0
+        for j = 0 to nRows - 1
+            mx := math.max(mx, array.get(sm, j))
+        if mx > 0
+            hvn = array.new<Node>()
+            lvn = array.new<Node>()
+            for j = 0 to nRows - 1
+                float v = array.get(sm, j)
+                float acc = 0.0
+                int   cnt = 0
+                bool  isMax = true
+                bool  isMin = true
+                for q = math.max(0, j - nodeSep) to math.min(nRows - 1, j + nodeSep)
+                    float w = array.get(sm, q)
+                    acc += w
+                    cnt += 1
+                    if w > v or (w == v and q < j)
+                        isMax := false
+                    if w < v or (w == v and q < j)
+                        isMin := false
+                float mean = cnt > 0 ? acc / cnt : 0.0
+                bool wantHi = isMax and v >= hvnPct * mx
+                bool wantLo = isMin and v <= lvnPct * mx and maxLvn > 0
+                if wantHi or wantLo
+                    int halfB = math.max(1, int(math.round(nodeSep / 2.0)))
+                    int r0 = math.max(0, j - halfB)
+                    int r1 = math.min(nRows - 1, j + halfB)
+                    float nv = 0.0
+                    float nb = 0.0
+                    for q = r0 to r1
+                        nv += array.get(bk, q)
+                        nb += array.get(bbk, q)
+                    float buyPct = nv > 0 ? 100 * nb / nv : 50.0
+                    float conc   = array.get(bk, j) / totV * nRows
+                    float mass   = nv / totV
+                    float price  = lo + (j + 0.5) * step
+                    float dist   = wantHi ? (pocMargin ? pocDist : 0.0) : (povMargin ? povDist : 0.0)
+                    float half   = math.max(step * 0.5, step * halfB * (1.0 + dist))
+                    float strength = 0.0
+                    if wantHi
+                        float prom  = mean > 0 ? v / mean : 1.0
+                        float sConc = math.min(4.0, math.max(0.0, (conc - 1.5) * 0.9))
+                        float sProm = math.min(3.0, math.max(0.0, (prom - 1.05) * 5.0))
+                        float sDelt = math.min(2.0, math.abs(buyPct - 50) / 50 * 4.0)
+                        float sMass = math.min(1.0, math.max(0.0, (mass - 0.04) * 12.0))
+                        strength := sConc + sProm + sDelt + sMass
+                    else
+                        float depth = v > 0 and mean > 0 ? mean / v : 3.0
+                        float thin  = 1.0 - v / mx
+                        float sThin = math.min(5.0, math.max(0.0, (thin - 0.4) * 8.0))
+                        float sDeep = math.min(3.0, math.max(0.0, (depth - 1.2) * 2.5))
+                        float sDelt = math.min(2.0, math.abs(buyPct - 50) / 50 * 4.0)
+                        strength := sThin + sDeep + sDelt
+                    int side0 = px > price + half ? 1 : px < price - half ? -1 : 0
+                    Node nd = Node.new(price = price, top = price + half, bot = price - half,
+                         vol = array.get(bk, j), share = mass, buyPct = buyPct, row = j,
+                         kind = wantHi ? 1 : -1, isPoc = false, dev = isDev, bornBar = bornBar,
+                         touches = 0, side = side0, fromSide = 0, inside = false,
+                         active = true, strength = strength)
+                    if wantHi
+                        array.push(hvn, nd)
+                    else
+                        array.push(lvn, nd)
+            topH = f_topN(hvn, maxHvn)
+            topL = f_topN(lvn, maxLvn)
+            int bestI = -1
+            int bestD = 999999
+            for i = 0 to array.size(topH) - 1
+                Node c = array.get(topH, i)
+                int d = math.abs(c.row - pocIdx)
+                if d < bestD
+                    bestD := d
+                    bestI := i
+            if bestI >= 0
+                Node p = array.get(topH, bestI)
+                p.isPoc := true
+            for c in topH
+                array.push(out, c)
+            for c in topL
+                array.push(out, c)
+    out
+
+// ════════════════════════ DATA ════════════════════════
+int    tfSec  = timeframe.in_seconds()
+string ltfRes = ltfMode == "Av" ? timeframe.period : ltfMode == "1" ? "1" : ltfMode == "5" ? "5" : (tfSec >= 3600 ? "5" : tfSec > 60 ? "1" : timeframe.period)
+[ltfH, ltfL, ltfV, ltfC] = request.security_lower_tf(syminfo.tickerid, ltfRes, [high, low, volume, close])
+
+float atr  = ta.atr(atrLen)
+float rng  = high - low
+float upWk = high - math.max(open, close)
+float dnWk = math.min(open, close) - low
+
+// Alla medelvärden beräknas ovillkorligt — ta.* får inte sitta bakom en gren.
+float baseMa = ta.ema(close, emaLen)
+float mSma = ta.sma(baseMa, smLen)
+float mEma = ta.ema(baseMa, smLen)
+float mRma = ta.rma(baseMa, smLen)
+float mWma = ta.wma(baseMa, smLen)
+float trend = smType == "SMA" ? mSma : smType == "RMA" ? mRma : smType == "WMA" ? mWma : mEma
+
+int  sigSessT  = time(timeframe.period, sigSess, sessTz)
+bool sessOk    = not sessFilt or (sessMode == "Inuti" ? not na(sigSessT) : na(sigSessT))
+bool momOk     = not momGuard or rng <= atrMult * atr
+
+int  profSessT = time(timeframe.period, profSess, sessTz)
+bool newSessB  = profType == "Session" and not na(profSessT) and na(profSessT[1])
+
+// ── Ackumulerade profilceller (kapas av Bars Scan) ──
+var array<float> cHi  = array.new_float()
+var array<float> cLo  = array.new_float()
+var array<float> cVol = array.new_float()
+var array<float> cBuy = array.new_float()
+var array<int>   cBar = array.new_int()
+int maxCells = barsScan * 6
+
+f_pushCell(float h, float l, float v, float c) =>
+    float r = h - l
+    array.push(cHi,  h)
+    array.push(cLo,  l)
+    array.push(cVol, v)
+    array.push(cBuy, r > 0 ? v * (c - l) / r : v * 0.5)
+    array.push(cBar, bar_index)
+
+// ════════════════════════ SEGMENTERING ════════════════════════
+var int   segStart  = na
+var int   lastPivD  = 0
+var float segStartP = na
+
+float ph = ta.pivothigh(swWidth, swWidth)
+float pl = ta.pivotlow(swWidth, swWidth)
+
+bool closeNow = false
+int  cutBar   = na
+
+if na(segStart)
+    segStart  := bar_index
+    segStartP := open
+
+if profType == "Session"
+    if newSessB and bar_index > segStart
+        closeNow := true
+        cutBar   := bar_index - 1
+else
+    int d = not na(ph) ? 1 : not na(pl) ? -1 : 0
+    if d != 0
+        int pivBar = bar_index - swWidth
+        if d != lastPivD and lastPivD != 0 and pivBar > segStart
+            closeNow := true
+            cutBar   := pivBar
+        if d != lastPivD
+            lastPivD := d
+
+// ════════════════════════ NODER ════════════════════════
+var array<Node> nodes   = array.new<Node>()
+var array<int>  profIds = array.new_int()
+var float lastPoc  = na
+var float lastVah  = na
+var float lastVal  = na
+var float lastPov  = na
+var float lastBuyP = na
+var float lastPocB = na
+var float lastChg  = na
+
+f_dropNode(Node n) =>
+    line.delete(n.ln)
+    box.delete(n.bx)
+    label.delete(n.lb)
+
+f_trimProfiles() =>
+    while array.size(profIds) > keepProf
+        int gone = array.shift(profIds)
+        if array.size(nodes) > 0
+            for i = array.size(nodes) - 1 to 0
+                Node n = array.get(nodes, i)
+                if n.bornBar == gone and not n.dev
+                    f_dropNode(n)
+                    array.remove(nodes, i)
+
+if closeNow and not na(cutBar)
+    // dela cellerna vid cutBar: prefixet tillhör profilen som stänger
+    int nUse = 0
+    int nAll = array.size(cBar)
+    if nAll > 0
+        for i = 0 to nAll - 1
+            if array.get(cBar, i) <= cutBar
+                nUse := i + 1
+            else
+                break
+    if nUse > 10
+        [plo, pstep, pbk, pbbk, ptot, pbuy, phi] = f_profile(cHi, cLo, cVol, cBuy, nUse, rows)
+        if ptot > 0 and pstep > 0
+            [pidx, pmax] = f_poc(pbk)
+            [vahI, valI] = f_va(pbk, pidx, ptot, vaPct)
+            int  back   = math.max(0, bar_index - cutBar)
+            float endPx = close[back]
+            lastPoc  := plo + (pidx + 0.5) * pstep
+            lastVah  := plo + (vahI + 1) * pstep
+            lastVal  := plo + valI * pstep
+            lastBuyP := 100 * pbuy / ptot
+            lastPocB := array.get(pbk, pidx) > 0 ? 100 * array.get(pbbk, pidx) / array.get(pbk, pidx) : 50.0
+            lastChg  := na(segStartP) or segStartP == 0 ? na : 100 * (endPx - segStartP) / segStartP
+            fresh = f_mkNodes(pbk, pbbk, plo, pstep, ptot, pidx, rows, cutBar, close, false)
+            float povP = na
+            for n in fresh
+                array.push(nodes, n)
+                if n.kind == -1 and na(povP)
+                    povP := n.price
+            lastPov := povP
+            if array.size(fresh) > 0
+                array.push(profIds, cutBar)
+                f_trimProfiles()
+            segStartP := endPx
+    if nUse > 0
+        for i = 1 to nUse
+            array.shift(cHi)
+            array.shift(cLo)
+            array.shift(cVol)
+            array.shift(cBuy)
+            array.shift(cBar)
+    segStart := cutBar
+
+// ── Ackumulera den här barens celler ──
+int nK = array.size(ltfV)
+if nK > 0 and ltfMode != "Av"
+    for k = 0 to nK - 1
+        f_pushCell(array.get(ltfH, k), array.get(ltfL, k), array.get(ltfV, k), array.get(ltfC, k))
+else
+    f_pushCell(high, low, nz(volume), close)
+
+while array.size(cVol) > maxCells
+    array.shift(cHi)
+    array.shift(cLo)
+    array.shift(cVol)
+    array.shift(cBuy)
+    array.shift(cBar)
+
+// ── Pågående profil som nodkälla (ritar om — se filhuvudet) ──
+if profWin == "Pågående" and barstate.isconfirmed and array.size(cVol) > 10 and bar_index % 5 == 0
+    if array.size(nodes) > 0
+        for i = array.size(nodes) - 1 to 0
+            Node n = array.get(nodes, i)
+            if n.dev
+                f_dropNode(n)
+                array.remove(nodes, i)
+    [xlo, xstep, xbk, xbbk, xtot, xbuy, xhi] = f_profile(cHi, cLo, cVol, cBuy, array.size(cVol), rows)
+    if xtot > 0 and xstep > 0
+        [xidx, xmax] = f_poc(xbk)
+        devFresh = f_mkNodes(xbk, xbbk, xlo, xstep, xtot, xidx, rows, segStart, close, true)
+        for n in devFresh
+            array.push(nodes, n)
+
+// ════════════════════════ INTERAKTIONER ════════════════════════
+// En interaktion öppnas när priset kommer IN i zonen utifrån, och stängs först
+// när den löst ut — avvisning eller brott. Därför räknas ett besök som ett
+// besök även om priset ligger kvar i zonen i flera barer.
+bool   sigLong  = false
+bool   sigShort = false
+string sigTxt   = ""
+float  sigStr   = 0.0
+float  sigStop  = na
+float  sigTgt   = na
+
+if barstate.isconfirmed and array.size(nodes) > 0
+    for n in nodes
+        if n.active
+            bool inZone  = high >= n.bot and low <= n.top
+            int  sideNow = close > n.top ? 1 : close < n.bot ? -1 : 0
+            // öppna en ny interaktion
+            if inZone and not n.inside and n.side != 0
+                n.inside   := true
+                n.fromSide := n.side
+                n.touches  += 1
+            if n.inside and n.fromSide != 0
+                int  lim     = retestOn ? maxRetest : 1
+                bool countOk = n.touches <= lim and (not finalOnly or n.touches == lim)
+                bool strOk   = n.strength >= minStr
+                bool rejStr  = sideNow == n.fromSide
+                bool rejLoo  = sideNow == 0
+                bool isRej   = rejStr or (not reqClose and rejLoo and not inZone)
+                float wkFrac = rng > 0 ? (n.fromSide == 1 ? dnWk / rng : upWk / rng) : 0.0
+                bool wickOk  = not wickFilt or wkFrac >= wickMin
+                bool kindRej = n.kind == 1 ? sigPocRej : sigPovRej
+                bool kindBrk = n.kind == 1 ? sigPocBrk : sigPovBrk
+                float marg   = breachAtr * atr
+                bool  brkRaw = sideNow == -n.fromSide and (sideNow == 1 ? close - n.top >= marg : n.bot - close >= marg)
+                bool  trOkL  = not emaFilt or close > trend
+                bool  trOkS  = not emaFilt or close < trend
+                string kindTx = n.kind == 1 ? (n.isPoc ? "POC" : "HVN") : "POV"
+                if isRej
+                    bool wantL = n.fromSide == 1
+                    if wickOk and momOk and sessOk and kindRej and strOk and countOk and (wantL ? trOkL : trOkS) and n.strength > sigStr
+                        sigStr   := n.strength
+                        sigLong  := wantL
+                        sigShort := not wantL
+                        sigTxt   := kindTx + " avvisning " + str.tostring(n.strength, "#.#") + "/10 " + f_grade(n.strength) + " T" + str.tostring(n.touches)
+                        sigStop  := wantL ? n.bot - slAtr * atr : n.top + slAtr * atr
+                    n.inside := false
+                else if brkRaw
+                    bool wantL2 = sideNow == 1
+                    if momOk and sessOk and kindBrk and strOk and countOk and (wantL2 ? trOkL : trOkS) and n.strength > sigStr
+                        sigStr   := n.strength
+                        sigLong  := wantL2
+                        sigShort := not wantL2
+                        sigTxt   := kindTx + " brott " + str.tostring(n.strength, "#.#") + "/10 " + f_grade(n.strength) + " T" + str.tostring(n.touches)
+                        sigStop  := wantL2 ? n.bot - slAtr * atr : n.top + slAtr * atr
+                    n.inside := false
+                    if killBrk
+                        n.active := false
+                if not n.inside and n.touches >= (retestOn ? maxRetest : 1)
+                    n.active := false
+                if n.kind == -1 and not extendPov and not n.inside
+                    n.active := false
+            if sideNow != 0
+                n.side := sideNow
+
+if (sigLong or sigShort) and not na(sigStop)
+    float risk = math.abs(close - sigStop)
+    sigTgt := sigLong ? close + rrMult * risk : close - rrMult * risk
+
+// ════════════════════════ RITNING ════════════════════════
+var array<line>  drawLn = array.new_line()
+var array<label> drawLb = array.new_label()
+var array<box>   drawBx = array.new_box()
+
+if barstate.islast
+    while array.size(drawLn) > 0
+        line.delete(array.pop(drawLn))
+    while array.size(drawLb) > 0
+        label.delete(array.pop(drawLb))
+    while array.size(drawBx) > 0
+        box.delete(array.pop(drawBx))
+    if array.size(nodes) > 0
+        for n in nodes
+            color c  = n.kind == 1 ? (n.isPoc ? colPOC : colHVN) : colPOV
+            color cc = n.active ? c : color.new(c, 72)
+            if na(n.bx)
+                n.bx := box.new(n.bornBar, n.top, bar_index, n.bot, border_color = na, bgcolor = color.new(c, zoneTr))
+                n.ln := line.new(n.bornBar, n.price, bar_index, n.price, color = cc, width = n.isPoc ? 2 : 1,
+                     style = n.kind == 1 ? line.style_solid : line.style_dashed)
+                n.lb := label.new(bar_index, n.price, "", style = label.style_label_left,
+                     color = color.new(color.black, 100), textcolor = cc, size = size.tiny)
+            box.set_right(n.bx, bar_index)
+            box.set_bgcolor(n.bx, color.new(c, n.active ? zoneTr : math.min(96, zoneTr + 14)))
+            line.set_x2(n.ln, bar_index)
+            line.set_color(n.ln, cc)
+            string kindTx = n.kind == 1 ? (n.isPoc ? "POC" : "HVN") : "POV"
+            string txt = kindTx + "  " + str.tostring(n.price, format.mintick) + "  " + str.tostring(n.strength, "#.#") + " " + f_grade(n.strength)
+            if profCvd
+                txt += "  " + str.tostring(n.buyPct >= 50 ? n.buyPct : 100 - n.buyPct, "#") + "% " + (n.buyPct >= 50 ? "B" : "S")
+            if n.touches > 0
+                txt += "  T" + str.tostring(n.touches)
+            if not n.active
+                txt += "  slut"
+            label.set_xy(n.lb, bar_index + 2, n.price)
+            label.set_text(n.lb, txt)
+            label.set_textcolor(n.lb, cc)
+    int nAll2 = array.size(cVol)
+    if showProf and nAll2 > 10
+        [dlo, dstep, dbk, dbbk, dtot, dbuy, dhi] = f_profile(cHi, cLo, cVol, cBuy, nAll2, rows)
+        if dtot > 0 and dstep > 0
+            [didx, dmax] = f_poc(dbk)
+            [dvah, dval] = f_va(dbk, didx, dtot, vaPct)
+            int x0 = math.max(0, math.max(segStart, bar_index - barsScan))
+            int wMax = math.max(6, int((bar_index - x0) * 0.22))
+            if profBack
+                array.push(drawBx, box.new(x0, dhi, bar_index, dlo, border_color = na, bgcolor = color.new(#0a1a24, 92)))
+            if dmax > 0
+                for j = 0 to rows - 1
+                    float v = array.get(dbk, j)
+                    if v > 0
+                        int w = math.max(1, int(math.round(math.sqrt(v / dmax) * wMax)))
+                        float y = dlo + (j + 0.5) * dstep
+                        color bc = j == didx ? colPOC : (j >= dval and j <= dvah ? color.new(colBars, math.max(0, color.t(colBars) - 22)) : colBars)
+                        array.push(drawLn, line.new(x0, y, x0 + w, y, color = bc, width = 1))
+            if showVA
+                float vahP = dlo + (dvah + 1) * dstep
+                float valP = dlo + dval * dstep
+                array.push(drawLn, line.new(x0, vahP, bar_index, vahP, color = colVA, style = line.style_dotted))
+                array.push(drawLn, line.new(x0, valP, bar_index, valP, color = colVA, style = line.style_dotted))
+                array.push(drawLb, label.new(bar_index + 2, vahP, "VAH", style = label.style_label_left, color = color.new(color.black, 100), textcolor = colVA, size = size.tiny))
+                array.push(drawLb, label.new(bar_index + 2, valP, "VAL", style = label.style_label_left, color = color.new(color.black, 100), textcolor = colVA, size = size.tiny))
+
+plotshape(sigLong  ? low  - 0.7 * atr : na, "NBE Long",  shape.triangleup,   location.absolute, colUp, size = size.small)
+plotshape(sigShort ? high + 0.7 * atr : na, "NBE Short", shape.triangledown, location.absolute, colDn, size = size.small)
+plot(emaFilt ? trend : na, "Trend", color = color.new(#7f8ca6, 35))
+
+if showSigLb and (sigLong or sigShort)
+    label.new(bar_index, sigLong ? low - 1.4 * atr : high + 1.4 * atr, sigTxt,
+         style = sigLong ? label.style_label_up : label.style_label_down,
+         color = color.new(color.black, 100), textcolor = sigLong ? colUp : colDn, size = size.tiny)
+
+var array<line> tpLn = array.new_line()
+if tradeMode == "Custom" and tradeVis and (sigLong or sigShort) and not na(sigStop) and not na(sigTgt)
+    color tc = sigLong ? colUp : colDn
+    array.push(tpLn, line.new(bar_index, close,   bar_index + 14, close,   color = tc, width = 1))
+    array.push(tpLn, line.new(bar_index, sigStop, bar_index + 14, sigStop, color = color.new(#f23645, 25), style = line.style_dashed))
+    array.push(tpLn, line.new(bar_index, sigTgt,  bar_index + 14, sigTgt,  color = color.new(#00e676, 25), style = line.style_dashed))
+    while array.size(tpLn) > tradeHist * 3
+        line.delete(array.shift(tpLn))
+
+// ════════════════════════ DASHBOARD ════════════════════════
+float cumV   = ta.cum(nz(volume))
+float volAvg = ta.sma(nz(volume), 50)
+var table dash = table.new(position.top_right, 2, 7, bgcolor = color.new(color.black, 22), border_width = 1, border_color = color.new(color.gray, 72))
+if barstate.islast and showDash
+    color mut = color.new(color.gray, 20)
+    int nAct = 0
+    if array.size(nodes) > 0
+        for n in nodes
+            if n.active
+                nAct += 1
+    table.cell(dash, 0, 0, "PROFIL", text_color = mut, text_size = size.small, text_halign = text.align_left)
+    table.cell(dash, 1, 0, profType + " · " + profWin, text_color = color.new(#00e5ff, 0), text_size = size.small, text_halign = text.align_right)
+    table.cell(dash, 0, 1, "POC", text_color = colPOC, text_size = size.small, text_halign = text.align_left)
+    table.cell(dash, 1, 1, na(lastPoc) ? "–" : str.tostring(lastPoc, format.mintick), text_color = na(lastPoc) ? mut : close >= lastPoc ? colUp : colDn, text_size = size.small, text_halign = text.align_right)
+    table.cell(dash, 0, 2, "POV", text_color = colPOV, text_size = size.small, text_halign = text.align_left)
+    table.cell(dash, 1, 2, na(lastPov) ? "–" : str.tostring(lastPov, format.mintick), text_color = na(lastPov) ? mut : close >= lastPov ? colUp : colDn, text_size = size.small, text_halign = text.align_right)
+    table.cell(dash, 0, 3, "VA", text_color = colVA, text_size = size.small, text_halign = text.align_left)
+    table.cell(dash, 1, 3, na(lastVah) ? "–" : str.tostring(lastVal, format.mintick) + " – " + str.tostring(lastVah, format.mintick), text_color = colVA, text_size = size.small, text_halign = text.align_right)
+    table.cell(dash, 0, 4, "PROFIL-CVD", text_color = mut, text_size = size.small, text_halign = text.align_left)
+    table.cell(dash, 1, 4, not profCvd or na(lastBuyP) ? "–" : str.tostring(lastBuyP, "#") + "% B · POC " + str.tostring(lastPocB, "#") + "%", text_color = na(lastBuyP) ? mut : lastBuyP >= 50 ? colUp : colDn, text_size = size.small, text_halign = text.align_right)
+    table.cell(dash, 0, 5, "SWING", text_color = mut, text_size = size.small, text_halign = text.align_left)
+    table.cell(dash, 1, 5, not swingChg or na(lastChg) ? "–" : (lastChg >= 0 ? "+" : "") + str.tostring(lastChg, "#.##") + "%", text_color = na(lastChg) ? mut : lastChg >= 0 ? colUp : colDn, text_size = size.small, text_halign = text.align_right)
+    table.cell(dash, 0, 6, "NODER", text_color = mut, text_size = size.small, text_halign = text.align_left)
+    table.cell(dash, 1, 6, str.tostring(nAct) + " aktiva / " + str.tostring(array.size(nodes)), text_color = nAct > 0 ? color.new(#00e5ff, 0) : mut, text_size = size.small, text_halign = text.align_right)
+
+var table wm = table.new(position.bottom_right, 1, 1)
+if barstate.islast
+    bool noVol   = cumV == 0
+    bool tickVol = not noVol and volAvg < 1000 and syminfo.type == "cfd"
+    string wtxt = noVol ? "GRABIT NBE — INGEN VOLYMDATA, profilen är meningslös" : tickVol ? "GRABIT NBE — ser ut som tickvolym, inte kontrakt" : "GRABIT NBE"
+    table.cell(wm, 0, 0, wtxt, text_color = noVol ? color.new(#f23645, 0) : tickVol ? color.new(#ffc400, 20) : color.new(color.gray, 60), text_size = size.small)
+
+// ════════════════════════ LARM ════════════════════════
+alertcondition(sigLong,  "NBE Long",  "GRABIT NBE: long vid nod")
+alertcondition(sigShort, "NBE Short", "GRABIT NBE: short vid nod")
+alertcondition(sigLong or sigShort, "NBE Signal", "GRABIT NBE: nodsignal")
+
+if sigLong or sigShort
+    string jm = '{"ticker":"' + syminfo.ticker + '","exchange":"' + syminfo.prefix +
+         '","action":"' + (sigLong ? "buy" : "sell") +
+         '","price":' + str.tostring(close) +
+         (na(sigStop) ? "" : ',"stop":' + str.tostring(sigStop)) +
+         (na(sigTgt)  ? "" : ',"target":' + str.tostring(sigTgt)) +
+         ',"interval":"' + timeframe.period +
+         '","strategy":"NBE","note":"' + sigTxt + '"}'
+    alert(jm, alert.freq_once_per_bar_close)
