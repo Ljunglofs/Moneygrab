@@ -64,7 +64,8 @@ string ltfMode   = input.string("Auto", "Intrabar-upplösning", options = ["Auto
 
 const string G_N = "Noder"
 int    maxHvn    = input.int(2, "Max POC/HVN per profil", minval = 1, maxval = 6, group = G_N)
-int    maxLvn    = input.int(2, "Max POV/LVN per profil", minval = 0, maxval = 6, group = G_N)
+bool   povOn     = input.bool(true, "POV (Point of Void)", group = G_N,
+     tooltip = "Den tunnaste raden INNE i värdeområdet. Det finns per definition exakt en per profil, så den rangordnas inte — den lokaliseras.")
 int    keepProf  = input.int(4, "Profiler att hålla aktiva", minval = 1, maxval = 10, group = G_N)
 int    nodeSep   = input.int(6, "Minsta avstånd mellan noder (rader)", minval = 2, maxval = 40, group = G_N)
 float  hvnPct    = input.float(55, "HVN-tröskel (% av POC)", minval = 20, maxval = 100, group = G_N) / 100
@@ -78,8 +79,8 @@ bool   povMargin = input.bool(true,  "POV Margin", inline = "vm", group = G_N)
 float  povDist   = input.float(0.10, "", minval = 0.0, maxval = 2.0, step = 0.05, inline = "vm", group = G_N)
 bool   extendPov = input.bool(true, "Extend POV", group = G_N,
      tooltip = "Håller POV-strukturen utsträckt framåt för framtida interaktion. Av = bara den lokala profilvyn.")
-float  minStr    = input.float(3.5, "Minsta nodstyrka (0-10)", minval = 0, maxval = 10, step = 0.5, group = G_N,
-     tooltip = "Vårt eget mått, inte en sannolikhet. Se filhuvudet.")
+float  minStr    = input.float(2.0, "Minsta nodkoncentration (x jämn fördelning)", minval = 0.5, maxval = 12.0, step = 0.25, group = G_N,
+     tooltip = "Hur många gånger tätare än en jämn fördelning en POC/HVN måste vara. 1.0 = ingen koncentration alls. Gäller bara POC/HVN — POV är strukturellt definierad och filtreras inte på styrka.")
 
 const string G_S = "Signal & filter"
 bool   sigPocRej = input.bool(true,  "POC: avvisning", inline = "s1", group = G_S)
@@ -151,6 +152,8 @@ type Node
     float bot
     float vol
     float share
+    float timeAt     //  antal intrabar-celler som rörde raden ("time at price")
+    float strengthPct//  nodstyrka i procent: radens volym / profilens volym
     float buyPct
     int   row
     int   kind       //  1 = POC/HVN,  -1 = POV/LVN
@@ -168,9 +171,6 @@ type Node
     label lb
 
 // ════════════════════════ HJÄLPARE ════════════════════════
-f_grade(float s) =>
-    s >= 7.5 ? "+++" : s >= 5.5 ? "++" : s >= 3.5 ? "+" : "-"
-
 // Value area enligt TradingViews metod: väx ut från POC, två rader i taget,
 // åt det håll som bär mest volym, tills andelen är uppnådd.
 f_va(array<float> bk, int poc, float tot, float frac) =>
@@ -233,6 +233,7 @@ f_profile(array<float> aHi, array<float> aLo, array<float> aVol, array<float> aB
             ll := na(ll) ? l : math.min(ll, l)
     bk  = array.new_float(nRows, 0.0)
     bbk = array.new_float(nRows, 0.0)
+    tbk = array.new_float(nRows, 0.0)
     float step = 0.0
     float totV = 0.0
     float totB = 0.0
@@ -249,9 +250,10 @@ f_profile(array<float> aHi, array<float> aLo, array<float> aVol, array<float> aB
             for j = j0 to j1
                 array.set(bk,  j, array.get(bk,  j) + v / sp)
                 array.set(bbk, j, array.get(bbk, j) + b / sp)
+                array.set(tbk, j, array.get(tbk, j) + 1)
             totV += v
             totB += b
-    [ll, step, bk, bbk, totV, totB, hh]
+    [ll, step, bk, bbk, tbk, totV, totB, hh]
 
 f_poc(array<float> bk) =>
     int   idx = 0
@@ -277,15 +279,20 @@ f_topN(array<Node> src, int n) =>
         array.push(out, array.remove(tmp, bi))
     out
 
-// ── NODSTYRKA (vårt mått, öppet) ───────────────────────────────────────────
-//   koncentration : radens volym mot en jämn fördelning (1.0 = helt jämnt)
-//   prominens     : hur mycket raden reser sig över sin egen omgivning
-//   deltaskevhet  : hur ensidig köp/sälj-fördelningen är i nodbandet
-//   massa         : hur stor andel av hela profilen nodbandet bär
-// Summan är 0-10 och rangordnar noder mot varandra på samma graf.
-// För en POV vänds logiken: tunnhet och djup ersätter koncentration.
-f_mkNodes(array<float> bk, array<float> bbk, float lo, float step, float totV, int pocIdx,
-     int nRows, int bornBar, float px, bool isDev) =>
+// ── NODSTYRKA ──────────────────────────────────────────────────────────────
+// Node Strength % = radens volym delat med profilens totala volym. Samma mått
+// som förlagan redovisar i sina tooltips, "Node Strength % (POC/Total)".
+// Talet beror på hur många rader profilen har, så filtret använder i stället
+// samma storhet uttryckt som koncentration: hur många gånger tätare raden är
+// än en jämn fördelning. 1.0 = ingen koncentration alls.
+//
+// POV = Point of Void: den tunnaste raden INNE i värdeområdet. Generiska LVN
+// kan ligga var som helst i profilen, även ute i de tunnhandlade extremerna,
+// där tunnheten bara betyder att priset var där en enda gång. POV isolerar det
+// tunna stället inuti fair value. Det är hela skillnaden mellan en nod som
+// betyder något och profilens golv.
+f_mkNodes(array<float> bk, array<float> bbk, array<float> tbk, float lo, float step, float totV,
+     int pocIdx, int vahIdx, int valIdx, int nRows, int bornBar, float px, bool isDev) =>
     out = array.new<Node>()
     if totV > 0 and step > 0
         sm = f_smooth(bk, smoothN)
@@ -293,67 +300,37 @@ f_mkNodes(array<float> bk, array<float> bbk, float lo, float step, float totV, i
         for j = 0 to nRows - 1
             mx := math.max(mx, array.get(sm, j))
         if mx > 0
+            int halfB = math.max(1, int(math.round(nodeSep / 2.0)))
             hvn = array.new<Node>()
-            lvn = array.new<Node>()
+            // ── POC / HVN: lokala toppar i histogrammet ──
             for j = 0 to nRows - 1
                 float v = array.get(sm, j)
-                float acc = 0.0
-                int   cnt = 0
-                bool  isMax = true
-                bool  isMin = true
+                bool isMax = true
                 for q = math.max(0, j - nodeSep) to math.min(nRows - 1, j + nodeSep)
                     float w = array.get(sm, q)
-                    acc += w
-                    cnt += 1
                     if w > v or (w == v and q < j)
                         isMax := false
-                    if w < v or (w == v and q < j)
-                        isMin := false
-                float mean = cnt > 0 ? acc / cnt : 0.0
-                bool wantHi = isMax and v >= hvnPct * mx
-                bool wantLo = isMin and v <= lvnPct * mx and maxLvn > 0
-                if wantHi or wantLo
-                    int halfB = math.max(1, int(math.round(nodeSep / 2.0)))
+                if isMax and v >= hvnPct * mx
                     int r0 = math.max(0, j - halfB)
                     int r1 = math.min(nRows - 1, j + halfB)
                     float nv = 0.0
                     float nb = 0.0
+                    float nt = 0.0
                     for q = r0 to r1
                         nv += array.get(bk, q)
                         nb += array.get(bbk, q)
-                    float buyPct = nv > 0 ? 100 * nb / nv : 50.0
-                    float conc   = array.get(bk, j) / totV * nRows
-                    float mass   = nv / totV
-                    float price  = lo + (j + 0.5) * step
-                    float dist   = wantHi ? (pocMargin ? pocDist : 0.0) : (povMargin ? povDist : 0.0)
-                    float half   = math.max(step * 0.5, step * halfB * (1.0 + dist))
-                    float strength = 0.0
-                    if wantHi
-                        float prom  = mean > 0 ? v / mean : 1.0
-                        float sConc = math.min(4.0, math.max(0.0, (conc - 1.5) * 0.9))
-                        float sProm = math.min(3.0, math.max(0.0, (prom - 1.05) * 5.0))
-                        float sDelt = math.min(2.0, math.abs(buyPct - 50) / 50 * 4.0)
-                        float sMass = math.min(1.0, math.max(0.0, (mass - 0.04) * 12.0))
-                        strength := sConc + sProm + sDelt + sMass
-                    else
-                        float depth = v > 0 and mean > 0 ? mean / v : 3.0
-                        float thin  = 1.0 - v / mx
-                        float sThin = math.min(5.0, math.max(0.0, (thin - 0.4) * 8.0))
-                        float sDeep = math.min(3.0, math.max(0.0, (depth - 1.2) * 2.5))
-                        float sDelt = math.min(2.0, math.abs(buyPct - 50) / 50 * 4.0)
-                        strength := sThin + sDeep + sDelt
-                    int side0 = px > price + half ? 1 : px < price - half ? -1 : 0
-                    Node nd = Node.new(price = price, top = price + half, bot = price - half,
-                         vol = array.get(bk, j), share = mass, buyPct = buyPct, row = j,
-                         kind = wantHi ? 1 : -1, isPoc = false, dev = isDev, bornBar = bornBar,
-                         touches = 0, side = side0, fromSide = 0, inside = false,
-                         active = true, strength = strength)
-                    if wantHi
-                        array.push(hvn, nd)
-                    else
-                        array.push(lvn, nd)
+                        nt += array.get(tbk, q)
+                    float price = lo + (j + 0.5) * step
+                    float half  = math.max(step * 0.5, step * halfB * (1.0 + (pocMargin ? pocDist : 0.0)))
+                    array.push(hvn, Node.new(price = price, top = price + half, bot = price - half,
+                         vol = array.get(bk, j), share = nv / totV, timeAt = nt,
+                         strengthPct = 100 * array.get(bk, j) / totV,
+                         buyPct = nv > 0 ? 100 * nb / nv : 50.0, row = j, kind = 1, isPoc = false,
+                         dev = isDev, bornBar = bornBar, touches = 0,
+                         side = px > price + half ? 1 : px < price - half ? -1 : 0,
+                         fromSide = 0, inside = false, active = true,
+                         strength = array.get(bk, j) / totV * nRows))
             topH = f_topN(hvn, maxHvn)
-            topL = f_topN(lvn, maxLvn)
             int bestI = -1
             int bestD = 999999
             for i = 0 to array.size(topH) - 1
@@ -363,12 +340,39 @@ f_mkNodes(array<float> bk, array<float> bbk, float lo, float step, float totV, i
                     bestD := d
                     bestI := i
             if bestI >= 0
-                Node p = array.get(topH, bestI)
-                p.isPoc := true
+                Node pnode = array.get(topH, bestI)
+                pnode.isPoc := true
             for c in topH
                 array.push(out, c)
-            for c in topL
-                array.push(out, c)
+            // ── POV: tunnaste raden inuti värdeområdet ──
+            if povOn and vahIdx > valIdx
+                int   vi = -1
+                float vv = 0.0
+                for j = valIdx to vahIdx
+                    float w = array.get(sm, j)
+                    if vi < 0 or w < vv
+                        vv := w
+                        vi := j
+                if vi >= 0
+                    int r0 = math.max(0, vi - halfB)
+                    int r1 = math.min(nRows - 1, vi + halfB)
+                    float nv = 0.0
+                    float nb = 0.0
+                    float nt = 0.0
+                    for q = r0 to r1
+                        nv += array.get(bk, q)
+                        nb += array.get(bbk, q)
+                        nt += array.get(tbk, q)
+                    float price = lo + (vi + 0.5) * step
+                    float half  = math.max(step * 0.5, step * halfB * (1.0 + (povMargin ? povDist : 0.0)))
+                    array.push(out, Node.new(price = price, top = price + half, bot = price - half,
+                         vol = array.get(bk, vi), share = nv / totV, timeAt = nt,
+                         strengthPct = 100 * array.get(bk, vi) / totV,
+                         buyPct = nv > 0 ? 100 * nb / nv : 50.0, row = vi, kind = -1, isPoc = false,
+                         dev = isDev, bornBar = bornBar, touches = 0,
+                         side = px > price + half ? 1 : px < price - half ? -1 : 0,
+                         fromSide = 0, inside = false, active = true,
+                         strength = mx > 0 ? 1.0 - vv / mx : 0.0))
     out
 
 // ════════════════════════ DATA ════════════════════════
@@ -376,7 +380,8 @@ int    tfSec  = timeframe.in_seconds()
 string ltfRes = ltfMode == "Av" ? timeframe.period : ltfMode == "1" ? "1" : ltfMode == "5" ? "5" : (tfSec >= 3600 ? "5" : tfSec > 60 ? "1" : timeframe.period)
 [ltfH, ltfL, ltfV, ltfC] = request.security_lower_tf(syminfo.tickerid, ltfRes, [high, low, volume, close])
 
-float atr  = ta.atr(atrLen)
+float atr   = ta.atr(atrLen)
+float vwapV = ta.vwap(hlc3)
 float rng  = high - low
 float upWk = high - math.max(open, close)
 float dnWk = math.min(open, close) - low
@@ -450,6 +455,7 @@ var float lastVal  = na
 var float lastPov  = na
 var float lastBuyP = na
 var float lastPocB = na
+var float lastNS   = na
 var float lastChg  = na
 
 f_dropNode(Node n) =>
@@ -478,7 +484,7 @@ if closeNow and not na(cutBar)
             else
                 break
     if nUse > 10
-        [plo, pstep, pbk, pbbk, ptot, pbuy, phi] = f_profile(cHi, cLo, cVol, cBuy, nUse, rows)
+        [plo, pstep, pbk, pbbk, ptbk, ptot, pbuy, phi] = f_profile(cHi, cLo, cVol, cBuy, nUse, rows)
         if ptot > 0 and pstep > 0
             [pidx, pmax] = f_poc(pbk)
             [vahI, valI] = f_va(pbk, pidx, ptot, vaPct)
@@ -489,8 +495,9 @@ if closeNow and not na(cutBar)
             lastVal  := plo + valI * pstep
             lastBuyP := 100 * pbuy / ptot
             lastPocB := array.get(pbk, pidx) > 0 ? 100 * array.get(pbbk, pidx) / array.get(pbk, pidx) : 50.0
+            lastNS   := 100 * array.get(pbk, pidx) / ptot
             lastChg  := na(segStartP) or segStartP == 0 ? na : 100 * (endPx - segStartP) / segStartP
-            fresh = f_mkNodes(pbk, pbbk, plo, pstep, ptot, pidx, rows, cutBar, close, false)
+            fresh = f_mkNodes(pbk, pbbk, ptbk, plo, pstep, ptot, pidx, vahI, valI, rows, cutBar, close, false)
             float povP = na
             for n in fresh
                 array.push(nodes, n)
@@ -533,10 +540,11 @@ if profWin == "Pågående" and barstate.isconfirmed and array.size(cVol) > 10 an
             if n.dev
                 f_dropNode(n)
                 array.remove(nodes, i)
-    [xlo, xstep, xbk, xbbk, xtot, xbuy, xhi] = f_profile(cHi, cLo, cVol, cBuy, array.size(cVol), rows)
+    [xlo, xstep, xbk, xbbk, xtbk, xtot, xbuy, xhi] = f_profile(cHi, cLo, cVol, cBuy, array.size(cVol), rows)
     if xtot > 0 and xstep > 0
         [xidx, xmax] = f_poc(xbk)
-        devFresh = f_mkNodes(xbk, xbbk, xlo, xstep, xtot, xidx, rows, segStart, close, true)
+        [xvah, xval] = f_va(xbk, xidx, xtot, vaPct)
+        devFresh = f_mkNodes(xbk, xbbk, xtbk, xlo, xstep, xtot, xidx, xvah, xval, rows, segStart, close, true)
         for n in devFresh
             array.push(nodes, n)
 
@@ -564,7 +572,7 @@ if barstate.isconfirmed and array.size(nodes) > 0
             if n.inside and n.fromSide != 0
                 int  lim     = retestOn ? maxRetest : 1
                 bool countOk = n.touches <= lim and (not finalOnly or n.touches == lim)
-                bool strOk   = n.strength >= minStr
+                bool strOk   = n.kind == 1 ? n.strength >= minStr : true
                 bool rejStr  = sideNow == n.fromSide
                 bool rejLoo  = sideNow == 0
                 bool isRej   = rejStr or (not reqClose and rejLoo and not inZone)
@@ -583,7 +591,7 @@ if barstate.isconfirmed and array.size(nodes) > 0
                         sigStr   := n.strength
                         sigLong  := wantL
                         sigShort := not wantL
-                        sigTxt   := kindTx + " avvisning " + str.tostring(n.strength, "#.#") + "/10 " + f_grade(n.strength) + " T" + str.tostring(n.touches)
+                        sigTxt   := kindTx + " avvisning " + str.tostring(n.strengthPct, "#.##") + "% T" + str.tostring(n.touches)
                         sigStop  := wantL ? n.bot - slAtr * atr : n.top + slAtr * atr
                     n.inside := false
                 else if brkRaw
@@ -592,7 +600,7 @@ if barstate.isconfirmed and array.size(nodes) > 0
                         sigStr   := n.strength
                         sigLong  := wantL2
                         sigShort := not wantL2
-                        sigTxt   := kindTx + " brott " + str.tostring(n.strength, "#.#") + "/10 " + f_grade(n.strength) + " T" + str.tostring(n.touches)
+                        sigTxt   := kindTx + " brott " + str.tostring(n.strengthPct, "#.##") + "% T" + str.tostring(n.touches)
                         sigStop  := wantL2 ? n.bot - slAtr * atr : n.top + slAtr * atr
                     n.inside := false
                     if killBrk
@@ -635,9 +643,13 @@ if barstate.islast
             line.set_x2(n.ln, bar_index)
             line.set_color(n.ln, cc)
             string kindTx = n.kind == 1 ? (n.isPoc ? "POC" : "HVN") : "POV"
-            string txt = kindTx + "  " + str.tostring(n.price, format.mintick) + "  " + str.tostring(n.strength, "#.#") + " " + f_grade(n.strength)
+            string txt = kindTx + "  " + str.tostring(n.price, format.mintick) + "  " + str.tostring(n.strengthPct, "#.##") + "%"
+            txt += n.kind == 1 ? "  " + str.tostring(n.strength, "#.#") + "x" : "  tunn " + str.tostring(100 * n.strength, "#") + "%"
             if profCvd
                 txt += "  " + str.tostring(n.buyPct >= 50 ? n.buyPct : 100 - n.buyPct, "#") + "% " + (n.buyPct >= 50 ? "B" : "S")
+            if not na(vwapV) and vwapV > 0
+                txt += "  VW " + (n.price >= vwapV ? "+" : "") + str.tostring(100 * (n.price - vwapV) / vwapV, "#.##") + "%"
+            txt += "  t" + str.tostring(n.timeAt, "#")
             if n.touches > 0
                 txt += "  T" + str.tostring(n.touches)
             if not n.active
@@ -647,7 +659,7 @@ if barstate.islast
             label.set_textcolor(n.lb, cc)
     int nAll2 = array.size(cVol)
     if showProf and nAll2 > 10
-        [dlo, dstep, dbk, dbbk, dtot, dbuy, dhi] = f_profile(cHi, cLo, cVol, cBuy, nAll2, rows)
+        [dlo, dstep, dbk, dbbk, dtbk, dtot, dbuy, dhi] = f_profile(cHi, cLo, cVol, cBuy, nAll2, rows)
         if dtot > 0 and dstep > 0
             [didx, dmax] = f_poc(dbk)
             [dvah, dval] = f_va(dbk, didx, dtot, vaPct)
@@ -692,7 +704,7 @@ if tradeMode == "Custom" and tradeVis and (sigLong or sigShort) and not na(sigSt
 // ════════════════════════ DASHBOARD ════════════════════════
 float cumV   = ta.cum(nz(volume))
 float volAvg = ta.sma(nz(volume), 50)
-var table dash = table.new(position.top_right, 2, 7, bgcolor = color.new(color.black, 22), border_width = 1, border_color = color.new(color.gray, 72))
+var table dash = table.new(position.top_right, 2, 8, bgcolor = color.new(color.black, 22), border_width = 1, border_color = color.new(color.gray, 72))
 if barstate.islast and showDash
     color mut = color.new(color.gray, 20)
     int nAct = 0
@@ -712,8 +724,10 @@ if barstate.islast and showDash
     table.cell(dash, 1, 4, not profCvd or na(lastBuyP) ? "–" : str.tostring(lastBuyP, "#") + "% B · POC " + str.tostring(lastPocB, "#") + "%", text_color = na(lastBuyP) ? mut : lastBuyP >= 50 ? colUp : colDn, text_size = size.small, text_halign = text.align_right)
     table.cell(dash, 0, 5, "SWING", text_color = mut, text_size = size.small, text_halign = text.align_left)
     table.cell(dash, 1, 5, not swingChg or na(lastChg) ? "–" : (lastChg >= 0 ? "+" : "") + str.tostring(lastChg, "#.##") + "%", text_color = na(lastChg) ? mut : lastChg >= 0 ? colUp : colDn, text_size = size.small, text_halign = text.align_right)
-    table.cell(dash, 0, 6, "NODER", text_color = mut, text_size = size.small, text_halign = text.align_left)
-    table.cell(dash, 1, 6, str.tostring(nAct) + " aktiva / " + str.tostring(array.size(nodes)), text_color = nAct > 0 ? color.new(#00e5ff, 0) : mut, text_size = size.small, text_halign = text.align_right)
+    table.cell(dash, 0, 6, "STYRKA", text_color = mut, text_size = size.small, text_halign = text.align_left)
+    table.cell(dash, 1, 6, na(lastNS) ? "–" : str.tostring(lastNS, "#.##") + "% (POC/Total)", text_color = na(lastNS) ? mut : colPOC, text_size = size.small, text_halign = text.align_right)
+    table.cell(dash, 0, 7, "NODER", text_color = mut, text_size = size.small, text_halign = text.align_left)
+    table.cell(dash, 1, 7, str.tostring(nAct) + " aktiva / " + str.tostring(array.size(nodes)), text_color = nAct > 0 ? color.new(#00e5ff, 0) : mut, text_size = size.small, text_halign = text.align_right)
 
 var table wm = table.new(position.bottom_right, 1, 1)
 if barstate.islast
