@@ -39,7 +39,7 @@ float proxK  = input.float(2.0, "VWAP-närhet (xATR)", minval = 0.2, maxval = 10
 float wImb   = input.float(0.5, "Vikt: orderflödesobalans", minval = 0.0, maxval = 2.0, step = 0.1, group = G_C)
 float wVol   = input.float(0.5, "Vikt: effektiv volym", minval = 0.0, maxval = 2.0, step = 0.1, group = G_C)
 int   zLen   = input.int(200, "Normaliseringsfönster", minval = 30, maxval = 1000, group = G_C,
-     tooltip = "Över hur lång historik värdet centreras och skalas. Kortare fönster ger fler extremvärden.")
+     tooltip = "Horisonten som tillståndet normaliseras mot. Längre fönster ger långsammare kontext, kortare ger snabbare anpassning. Ändra bara när du medvetet testar.")
 int   smLen  = input.int(3, "Utjämning av resultatet", minval = 1, maxval = 20, group = G_C)
 
 const string G_Z = "Zoner"
@@ -47,11 +47,15 @@ float effHi  = input.float(4.6,  "Effektiv zon (över)", step = 0.1, group = G_Z
 float effLo  = input.float(-4.6, "Ineffektiv zon (under)", step = 0.1, group = G_Z)
 bool  sigRev = input.bool(true, "Signal när värdet lämnar en zon", group = G_Z,
      tooltip = "Markerar när trycket släpper: uppåt ut ur den ineffektiva zonen, nedåt ut ur den effektiva. Det är en reversionsläsning, inte en trendläsning.")
-bool  showMid = input.bool(true, "Mittband (±0.05)", group = G_Z)
+bool  showMid = input.bool(true, "Mittband (±0.05)", group = G_Z,
+     tooltip = "Det smala bandet runt noll. Värdet ligger normalt här inne — de stora utslagen är sällsynta per konstruktion, eftersom volym är fettsvansad.")
+float bandHi  = input.float(0.20, "Övre varningsband", step = 0.01, group = G_Z)
 
 const string G_V = "Utseende"
 bool  showHist = input.bool(true, "Histogram", group = G_V)
 bool  showLine = input.bool(true, "Linje", group = G_V)
+bool  showDimb = input.bool(false, "DIMB (riktad obalans)", group = G_V,
+     tooltip = "Orderflödesobalansen för sig, skalad till oscillatorns intervall. Läs den aldrig ensam som en entry.")
 bool  showDash = input.bool(true, "Statusruta", group = G_V)
 color colPos   = input.color(color.new(#00e5ff, 0),  "Positiv", group = G_V)
 color colNeg   = input.color(color.new(#ff2e88, 0),  "Negativ", group = G_V)
@@ -111,6 +115,8 @@ bool leaveEff   = sigRev and barstate.isconfirmed and ne < effHi and ne[1] >= ef
 color barCol = ne >= 0 ? color.new(colPos, inEff ? 0 : 45) : color.new(colNeg, inIneff ? 0 : 45)
 plot(showHist ? ne : na, "NE histogram", color = barCol, style = plot.style_histogram, linewidth = 2)
 plot(showLine ? ne : na, "NE", color = color.new(#7f8ca6, 20), linewidth = 1)
+plot(showDimb ? imb * math.max(math.abs(effHi), math.abs(effLo)) : na, "DIMB",
+     color = color.new(#ffc400, 35), linewidth = 1)
 
 hline(0, "Noll", color = color.new(color.gray, 55), linestyle = hline.style_dotted)
 hEff = hline(effHi, "Effektiv", color = color.new(#00e676, 45), linestyle = hline.style_dashed)
@@ -119,6 +125,7 @@ hTop = hline(1000,  "", color = color.new(color.gray, 100))
 hBot = hline(-1000, "", color = color.new(color.gray, 100))
 fill(hEff, hTop, color = colEff,   title = "Effektiv zon")
 fill(hIne, hBot, color = colIneff, title = "Ineffektiv zon")
+hline(bandHi, "Varning", color = showMid ? color.new(#ffc400, 55) : color.new(color.gray, 100), linestyle = hline.style_dotted)
 hline( 0.05, "Mitt +", color = showMid ? color.new(color.gray, 78) : color.new(color.gray, 100), linestyle = hline.style_dotted)
 hline(-0.05, "Mitt −", color = showMid ? color.new(color.gray, 78) : color.new(color.gray, 100), linestyle = hline.style_dotted)
 
