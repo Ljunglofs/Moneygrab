@@ -98,12 +98,14 @@ bool   wickFilt  = input.bool(true, "Wick Filter", inline = "wf", group = G_S,
      tooltip = "Veken är kontextuellt bevis för avvisning — inte bevis för vändning.")
 float  wickMin   = input.float(0.35, "Minimum Wick", minval = 0.05, maxval = 0.9, step = 0.05, inline = "wf", group = G_S,
      tooltip = "Höj för strängare avvisningsstruktur. Mycket strikta värden tar bort giltiga grunda avvisningar.")
+float  penetMin  = input.float(0.25, "Minsta penetration av noden", minval = 0.0, maxval = 1.0, step = 0.05, group = G_S,
+     tooltip = "Hur djupt in i nodzonen priset måste tränga, som andel av zonens höjd, innan besöket räknas. 0 = en nudd räcker, vilket bränner noder på skrap. Mäts från den sida priset kom ifrån.")
 float  breachAtr = input.float(0.25, "Brottmarginal (xATR)", minval = 0.0, maxval = 2.0, step = 0.05, group = G_S,
      tooltip = "Hur långt bortom noden baren måste stänga för att räknas som acceptans igenom och inte bara en nudd.")
 bool   sessFilt  = input.bool(false, "Session Filter", group = G_S)
 string sessMode  = input.string("Inuti", "Session Mode", options = ["Inuti", "Utanför"], group = G_S)
 string sigSess   = input.session("0900-1730", "Signal Session", group = G_S)
-bool   emaFilt   = input.bool(false, "EMA Filter", inline = "ef", group = G_S,
+bool   emaFilt   = input.bool(true, "EMA Filter", inline = "ef", group = G_S,
      tooltip = "Trendfilter: long bara över trendlinjen, short bara under. Minskar motstrukturella signaler men fördröjer dem.")
 int    emaLen    = input.int(80, "", minval = 5, maxval = 400, inline = "ef", group = G_S)
 string smType    = input.string("EMA", "Smoothing Type", options = ["EMA", "SMA", "RMA", "WMA"], group = G_S)
@@ -562,7 +564,13 @@ float  sigTgt   = na
 if barstate.isconfirmed and array.size(nodes) > 0
     for n in nodes
         if n.active
-            bool inZone  = high >= n.bot and low <= n.top
+            // Besöket räknas först när priset trängt in en bit i zonen från den
+            // sida det kom ifrån. En bar som snuddar kanten med en tick är ingen
+            // interaktion — den skulle annars bränna noden utan att ha testat den.
+            float zh     = n.top - n.bot
+            bool  inZone = n.side == 1  ? low  <= n.top - penetMin * zh :
+                           n.side == -1 ? high >= n.bot + penetMin * zh :
+                           (high >= n.bot and low <= n.top)
             int  sideNow = close > n.top ? 1 : close < n.bot ? -1 : 0
             // öppna en ny interaktion
             if inZone and not n.inside and n.side != 0
