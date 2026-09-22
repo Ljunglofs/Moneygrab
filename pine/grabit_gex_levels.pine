@@ -22,8 +22,10 @@
 // låg guldets två tyngsta callstrikes båda på 0,01 miljarder — vilken som vann
 // avgjordes av brus, och då ska nivån inte se lika säker ut som de andra.
 //
-// LAYOUT: förvalet "Ren" visar tre linjer — Call Wall, Zero Gamma, Put Wall —
-// med prispiller i högerkanten och en statusrad överst. "Nyckelnivåer" lägger
+// LAYOUT: förvalet "Ren" visar exakt tre linjer — Call Wall, Zero Gamma och
+// Put Wall — med prispiller i högerkanten och en statusrad överst. Andra
+// väggen (CW2/PW2) är avstängd som förval; kryssa i den om du vill se nästa
+// gammakoncentration innanför huvudväggen. "Nyckelnivåer" lägger
 // till HGEX, Max Pain och EM±, "Alla" resten (0DTE, G+/G−, IV-range, ATR-grid).
 //
 // Strängformat: pris,etikett,typ;pris,etikett,typ;...
@@ -44,12 +46,12 @@ float  pxOff  = input.float(0.0, "Prisjustering (punkter)", step = 0.25, group =
 
 const string G_VIEW = "Vy"
 string preset = input.string("Ren", "Nivåer", options = ["Ren", "Nyckelnivåer", "Alla"], group = G_VIEW,
-     tooltip = "Ren: Call Wall, Gamma Flip, Put Wall. Nyckelnivåer: + HGEX, Max Pain, EM±. Alla: + 0DTE, G+/G−, IV-range och ATR-grid.")
+     tooltip = "Ren: tre linjer — Call Wall, Zero Gamma, Put Wall. Nyckelnivåer: + HGEX, Max Pain, EM±. Alla: + 0DTE, G+/G−, IV-range och ATR-grid.")
 float  secMinSep = input.float(0.4, "Andra väggen: minsta avstånd till första (%)", minval = 0.0, maxval = 5.0, step = 0.1, group = G_VIEW,
      tooltip = "Ligger andra väggen närmare huvudväggen än så här är det samma vägg ritad två gånger — då ritas den inte. Den 22 september låg Call Wall 31010 och Call Wall 2 30985, tjugofem punkter isär.")
 bool   showWeak = input.bool(true, "Visa svaga väggar", group = G_VIEW,
      tooltip = "En vägg är svag när den knappt vinner över nästa strike på samma sida — då kan den hoppa när open interest uppdateras. Svaga väggar ritas prickade och märks med ?. Kryssa ur för att dölja dem helt.")
-bool   showSec  = input.bool(true, "Andra väggen (CW2 / PW2)", group = G_VIEW,
+bool   showSec  = input.bool(false, "Andra väggen (CW2 / PW2)", group = G_VIEW,
      tooltip = "En extra nivå per håll: närmaste positiva gamma-strike ovanför priset (CW2) och närmaste negativa under (PW2). I vyn Alla visas i stället alla G+/G− med sina egna namn.")
 bool   showHdr  = input.bool(true, "Statusrad överst", group = G_VIEW)
 bool   showTags = input.bool(true, "Prispiller i högerkanten", group = G_VIEW)
