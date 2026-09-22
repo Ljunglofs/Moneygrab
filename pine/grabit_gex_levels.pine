@@ -11,6 +11,11 @@
 //  4. Valfritt: larm på indikatorn ("Any alert() function call") ger notis när
 //     priset korsar Call Wall, Put Wall, 0DTE-väggarna, Flip eller HGEX.
 //
+// ANDRA VÄGGEN: ritas bara när den ligger minst secMinSep procent från
+// huvudväggen. Annars är det samma vägg två gånger — den 22 september låg
+// Call Wall 31010 och Call Wall 2 30985, tjugofem punkter isär på ett pris
+// runt 30900.
+//
 // SVAGA VÄGGAR: en vägg som knappt vinner över nästa strike på samma sida
 // ritas prickad och dämpad, märks "Call Wall ?" / "Put Wall ?", och ger inga
 // larm. Kryssa ur "Visa svaga väggar" för att dölja dem helt. Den 22 september
@@ -40,6 +45,8 @@ float  pxOff  = input.float(0.0, "Prisjustering (punkter)", step = 0.25, group =
 const string G_VIEW = "Vy"
 string preset = input.string("Ren", "Nivåer", options = ["Ren", "Nyckelnivåer", "Alla"], group = G_VIEW,
      tooltip = "Ren: Call Wall, Gamma Flip, Put Wall. Nyckelnivåer: + HGEX, Max Pain, EM±. Alla: + 0DTE, G+/G−, IV-range och ATR-grid.")
+float  secMinSep = input.float(0.4, "Andra väggen: minsta avstånd till första (%)", minval = 0.0, maxval = 5.0, step = 0.1, group = G_VIEW,
+     tooltip = "Ligger andra väggen närmare huvudväggen än så här är det samma vägg ritad två gånger — då ritas den inte. Den 22 september låg Call Wall 31010 och Call Wall 2 30985, tjugofem punkter isär.")
 bool   showWeak = input.bool(true, "Visa svaga väggar", group = G_VIEW,
      tooltip = "En vägg är svag när den knappt vinner över nästa strike på samma sida — då kan den hoppa när open interest uppdateras. Svaga väggar ritas prickade och märks med ?. Kryssa ur för att dölja dem helt.")
 bool   showSec  = input.bool(true, "Andra väggen (CW2 / PW2)", group = G_VIEW,
@@ -212,14 +219,29 @@ if barstate.islast
     int secDn = -1
     float upBest = na
     float dnBest = na
+    // Huvudväggarna, oavsett om de är starka (res/sup) eller svaga (resw/supw).
+    // Hämtas direkt ur arrayen — f_lvl deklareras längre ner i filen.
+    float cwMain = na
+    float pwMain = na
+    if array.size(aP) > 0
+        for i = 0 to array.size(aP) - 1
+            string kk = array.get(aK, i)
+            if kk == "res" or kk == "resw"
+                cwMain := array.get(aP, i)
+            if kk == "sup" or kk == "supw"
+                pwMain := array.get(aP, i)
+    float sep = close * secMinSep / 100.0
     if array.size(aP) > 0
         for i = 0 to array.size(aP) - 1
             string kk = array.get(aK, i)
             float pp = array.get(aP, i)
-            if kk == "gpos" and pp > close and (na(upBest) or pp < upBest)
+            // Ligger kandidaten i huvudväggens zon är det samma vägg, inte en till.
+            bool dupUp = not na(cwMain) and math.abs(pp - cwMain) < sep
+            bool dupDn = not na(pwMain) and math.abs(pp - pwMain) < sep
+            if kk == "gpos" and pp > close and not dupUp and (na(upBest) or pp < upBest)
                 upBest := pp
                 secUp := i
-            if kk == "gneg" and pp < close and (na(dnBest) or pp > dnBest)
+            if kk == "gneg" and pp < close and not dupDn and (na(dnBest) or pp > dnBest)
                 dnBest := pp
                 secDn := i
 
