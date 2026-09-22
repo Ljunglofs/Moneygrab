@@ -45,6 +45,13 @@ N_EXPIRIES = int(os.environ.get("GEX_EXPIRIES", "4"))    # närmaste expiries (0
 FLIP_EXPIRIES = int(os.environ.get("GEX_FLIP_EXPIRIES", "3"))
 NEAR_PCT = float(os.environ.get("GEX_NEAR_PCT", "0.05"))   # HGEX och G+/G- inom 5 % av priset
 ATM_TRIES = int(os.environ.get("GEX_ATM_TRIES", "7"))      # strikes att prova för ATM-IV/straddle
+# En vägg är bara värd att handla på om den vinner övertygande över nästa
+# strike på samma sida. Den 22 september låg guldets två tyngsta callstrikes
+# (410 och 414) båda på 0,01 miljarder — då är "väggen" en slant, och vilken
+# som vinner avgörs av brus i open interest. Grannstrikes inom WALL_ZONE_PCT
+# räknas inte som konkurrenter: de är samma vägg, bara utspridd.
+WALL_MIN_MARGIN = float(os.environ.get("GEX_WALL_MIN_MARGIN", "1.5"))
+WALL_ZONE_PCT = float(os.environ.get("GEX_WALL_ZONE_PCT", "0.005"))
 
 # NQ räknas på NDX-indexoptionerna: samma underliggande som futuren, strikes var
 # tionde punkt i stället för var 41:e, och ingen ETF-kvot som kan bli fel. QQQ
@@ -152,6 +159,23 @@ def gex_from_chain(spot, rows, now=None):
     # betyda något för dagens rörelse, och på diagrammet blir den bara en linje
     # långt utanför bild. Därför väljs de bland strikes inom NEAR_PCT av priset.
     # Väggarna själva får ligga var som helst; de säger var strukturen tar slut.
+    def _margin(wall, sign):
+        """Hur övertygande vinner väggen över närmaste konkurrent på samma sida?
+        Returnerar kvoten mellan väggens gamma och den tyngsta rivalen utanför
+        väggens egen zon. Under WALL_MIN_MARGIN är väggen inte värd att lita på."""
+        if wall is None:
+            return None
+        best = abs(per_strike.get(wall, 0.0))
+        if best <= 0:
+            return None
+        rivals = [abs(g) for k, g in per_strike.items()
+                  if g * sign > 0 and abs(k / wall - 1) > WALL_ZONE_PCT]
+        rival = max(rivals) if rivals else 0.0
+        return best / rival if rival > 0 else float("inf")
+
+    cw_margin = _margin(call_wall, 1.0)
+    pw_margin = _margin(put_wall, -1.0)
+
     near = [k for k in strikes if abs(k / spot - 1) <= NEAR_PCT] or strikes
     top = sorted(near, key=lambda k: -abs(per_strike[k]))[:7]
     hgex = top[0] if top else None
@@ -229,6 +253,9 @@ def gex_from_chain(spot, rows, now=None):
         "spot": spot, "net_gex": net_near, "net_gex_all": net,
         "regime": "positiv" if net_near > 0 else "negativ",
         "call_wall": call_wall, "put_wall": put_wall, "zero_gamma": zero,
+        "call_wall_margin": cw_margin, "put_wall_margin": pw_margin,
+        "call_wall_weak": bool(cw_margin is not None and cw_margin < WALL_MIN_MARGIN),
+        "put_wall_weak": bool(pw_margin is not None and pw_margin < WALL_MIN_MARGIN),
         "zero_gamma_all": zero_all, "flip_expiries": flip_exps,
         "top": [{"strike": k, "gex": per_strike[k]} for k in sorted(top)],
         "n_strikes": len(strikes),
@@ -447,6 +474,10 @@ def to_futures(levels, fut_price, etf_price, ratio=None, basis=None):
         "net_gex": levels["net_gex"], "net_gex_all": levels.get("net_gex_all"),
         "regime": levels["regime"],
         "call_wall": sc(levels["call_wall"]), "put_wall": sc(levels["put_wall"]),
+        "call_wall_margin": levels.get("call_wall_margin"),
+        "put_wall_margin": levels.get("put_wall_margin"),
+        "call_wall_weak": levels.get("call_wall_weak", False),
+        "put_wall_weak": levels.get("put_wall_weak", False),
         "zero_gamma": sc(levels["zero_gamma"]), "zero_gamma_all": sc(levels.get("zero_gamma_all")),
         "flip_expiries": levels.get("flip_expiries"),
         "top": [{"level": sc(t["strike"]), "strike": t["strike"], "gex": t["gex"]} for t in levels["top"]],
@@ -559,8 +590,10 @@ def levels_string(inst, g, open_price=None, atr_daily=None, today=None):
     def add(px, label, kind):
         if px is not None and px > 0:
             parts.append(f"{_fmt_px(px, tick)},{label},{kind}")
-    add(f.get("call_wall"), "Call Wall", "res")
-    add(f.get("put_wall"), "Put Wall", "sup")
+    # Svag vägg får typen resw/supw. Gamla indikatorversioner ritar okända
+    # typer prickade i dämpad färg — de går alltså inte sönder, de blir svaga.
+    add(f.get("call_wall"), "Call Wall", "resw" if f.get("call_wall_weak") else "res")
+    add(f.get("put_wall"), "Put Wall", "supw" if f.get("put_wall_weak") else "sup")
     ne = f.get("near_expiry") or ""
     tag0 = "0DTE" if (today and ne == str(today)) else (ne[5:] if ne else "near")
     if f.get("call_wall_0") and f["call_wall_0"] != f.get("call_wall"):

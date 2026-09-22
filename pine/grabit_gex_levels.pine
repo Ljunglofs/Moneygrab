@@ -11,6 +11,12 @@
 //  4. Valfritt: larm på indikatorn ("Any alert() function call") ger notis när
 //     priset korsar Call Wall, Put Wall, 0DTE-väggarna, Flip eller HGEX.
 //
+// SVAGA VÄGGAR: en vägg som knappt vinner över nästa strike på samma sida
+// ritas prickad och dämpad, märks "Call Wall ?" / "Put Wall ?", och ger inga
+// larm. Kryssa ur "Visa svaga väggar" för att dölja dem helt. Den 22 september
+// låg guldets två tyngsta callstrikes båda på 0,01 miljarder — vilken som vann
+// avgjordes av brus, och då ska nivån inte se lika säker ut som de andra.
+//
 // LAYOUT: förvalet "Ren" visar tre linjer — Call Wall, Zero Gamma, Put Wall —
 // med prispiller i högerkanten och en statusrad överst. "Nyckelnivåer" lägger
 // till HGEX, Max Pain och EM±, "Alla" resten (0DTE, G+/G−, IV-range, ATR-grid).
@@ -34,6 +40,8 @@ float  pxOff  = input.float(0.0, "Prisjustering (punkter)", step = 0.25, group =
 const string G_VIEW = "Vy"
 string preset = input.string("Ren", "Nivåer", options = ["Ren", "Nyckelnivåer", "Alla"], group = G_VIEW,
      tooltip = "Ren: Call Wall, Gamma Flip, Put Wall. Nyckelnivåer: + HGEX, Max Pain, EM±. Alla: + 0DTE, G+/G−, IV-range och ATR-grid.")
+bool   showWeak = input.bool(true, "Visa svaga väggar", group = G_VIEW,
+     tooltip = "En vägg är svag när den knappt vinner över nästa strike på samma sida — då kan den hoppa när open interest uppdateras. Svaga väggar ritas prickade och märks med ?. Kryssa ur för att dölja dem helt.")
 bool   showSec  = input.bool(true, "Andra väggen (CW2 / PW2)", group = G_VIEW,
      tooltip = "En extra nivå per håll: närmaste positiva gamma-strike ovanför priset (CW2) och närmaste negativa under (PW2). I vyn Alla visas i stället alla G+/G− med sina egna namn.")
 bool   showHdr  = input.bool(true, "Statusrad överst", group = G_VIEW)
@@ -69,25 +77,31 @@ string src = useSrc ? (f_market() == "GC" ? srcGC : srcNQ) : ""
 
 // ── Vilka typer som visas ──────────────────────────────────────────────────
 f_isCore(string k) =>
-    k == "res" or k == "sup" or k == "flip"
+    k == "res" or k == "sup" or k == "flip" or k == "resw" or k == "supw"
 
 f_isKey(string k) =>
     f_isCore(k) or k == "hgex" or k == "mpain" or k == "emh" or k == "eml"
 
 f_show(string k) =>
     bool sec = (k == "gpos" or k == "gneg") and showSec
-    switch preset
+    // Svag vägg göms bara om kryssrutan är urbockad — annars ritas den
+    // prickad och dämpad så den syns, men inte som en nivå att luta sig mot.
+    bool hidden = (k == "resw" or k == "supw") and not showWeak
+    bool base = switch preset
         "Ren"           => f_isCore(k) or sec
         "Nyckelnivåer"  => f_isKey(k) or sec
         => true
+    base and not hidden
 
 // ── Utseende per typ ───────────────────────────────────────────────────────
 f_col(string k) =>
     switch k
         "res"   => cCall
+        "resw"  => color.new(cCall, 45)
         "res0"  => cCall
         "gpos"  => cCall
         "sup"   => cPut
+        "supw"  => color.new(cPut, 45)
         "sup0"  => cPut
         "gneg"  => cPut
         "flip"  => cFlip
@@ -107,6 +121,8 @@ f_width(string k) =>
     switch k
         "res"  => wKey
         "sup"  => wKey
+        "resw" => math.max(1, wKey - 1)
+        "supw" => math.max(1, wKey - 1)
         "flip" => math.max(1, wKey - 1)
         "hgex" => 2
         => 1
@@ -115,6 +131,8 @@ f_style(string k) =>
     switch k
         "res"  => line.style_solid
         "sup"  => line.style_solid
+        "resw" => line.style_dotted
+        "supw" => line.style_dotted
         "hgex" => line.style_solid
         "flip" => line.style_dashed
         "res0" => line.style_dashed
@@ -128,6 +146,8 @@ f_code(string k, string tag, bool isSec) =>
     switch k
         "res"   => "Call Wall"
         "sup"   => "Put Wall"
+        "resw"  => "Call Wall ?"
+        "supw"  => "Put Wall ?"
         "res0"  => "Call Wall 0DTE"
         "sup0"  => "Put Wall 0DTE"
         "flip"  => "Zero Gamma"
@@ -245,20 +265,26 @@ var table hdr = table.new(position.top_center, 6, 1, bgcolor = color.new(cBg, 10
 if barstate.islast
     table.clear(hdr, 0, 0, 5, 0)
     if showHdr and array.size(aP) > 0
-        float cw = f_lvl("res")
-        float pw = f_lvl("sup")
+        // Väggen kan ligga under typen res eller resw (svag). Leta båda, och
+        // låt rubriken säga vilket det är.
+        float cwS = f_lvl("res")
+        float pwS = f_lvl("sup")
+        float cw = na(cwS) ? f_lvl("resw") : cwS
+        float pw = na(pwS) ? f_lvl("supw") : pwS
+        string cwM = na(cwS) and not na(cw) ? " ?" : ""
+        string pwM = na(pwS) and not na(pw) ? " ?" : ""
         float zg = f_lvl("flip")
         bool  hasZ = not na(zg)
         bool  pos = hasZ and close > zg
-        string und = f_market() == "GC" ? "GLD" : "QQQ"
+        string und = f_market() == "GC" ? "GLD" : "NDX"
         table.cell(hdr, 0, 0, und + " → " + f_market(), text_color = cSoft, text_size = size.small)
         table.cell(hdr, 1, 0, str.tostring(close, format.mintick), text_color = #E8E6E1,
              text_size = size.small, text_formatting = text.format_bold)
-        table.cell(hdr, 2, 0, na(cw) ? "Call Wall –" : "Call Wall " + str.tostring(cw, format.mintick),
+        table.cell(hdr, 2, 0, na(cw) ? "Call Wall –" : "Call Wall" + cwM + " " + str.tostring(cw, format.mintick),
              text_color = cCall, text_size = size.small)
         table.cell(hdr, 3, 0, na(zg) ? "Zero Gamma –" : "Zero Gamma " + str.tostring(zg, format.mintick),
              text_color = cFlip, text_size = size.small)
-        table.cell(hdr, 4, 0, na(pw) ? "Put Wall –" : "Put Wall " + str.tostring(pw, format.mintick),
+        table.cell(hdr, 4, 0, na(pw) ? "Put Wall –" : "Put Wall" + pwM + " " + str.tostring(pw, format.mintick),
              text_color = cPut, text_size = size.small)
         if hasZ
             table.cell(hdr, 5, 0, pos ? "POSITIV GAMMA" : "NEGATIV GAMMA",
@@ -269,7 +295,7 @@ if barstate.islast
 if useAlerts and barstate.isconfirmed and array.size(aP) > 0
     for i = 0 to array.size(aP) - 1
         string k = array.get(aK, i)
-        if f_isCore(k) or k == "hgex" or k == "res0" or k == "sup0"
+        if (f_isCore(k) and k != "resw" and k != "supw") or k == "hgex" or k == "res0" or k == "sup0"
             float lv = array.get(aP, i)
             bool up = close[1] < lv and close >= lv
             bool dn = close[1] > lv and close <= lv

@@ -114,6 +114,7 @@ Samma nivåer gäller NQ och MNQ (samma pris). GC och MGC likaså.
 | Typ | Nivå | Så räknas den |
 |---|---|---|
 | `res` / `sup` | Call Wall / Put Wall | strike med störst positiv resp. negativ dealer-GEX över de 4 närmaste expiries |
+| `resw` / `supw` | samma vägg, men svag | väggen vinner mindre än `GEX_WALL_MIN_MARGIN` gånger över nästa strike — ritas prickad, märks "?" och ger inga larm |
 | `res0` / `sup0` | 0DTE-väggar | samma sak, bara närmaste expiry |
 | `flip` | Gamma Flip | spotnivå där nettoprofilen byter tecken (över: dämpning, under: trend), räknad på de 3 närmaste expiries |
 | `hgex` | HGEX | strike med störst absolut gamma, dagens magnet |
@@ -138,6 +139,18 @@ strax ovanför priset till en bit under, alltså från negativ till positiv regi
 som faktiskt förföll den veckan sa negativ. Väggarna behöver tvärtom ha kvartalen med: först då
 träffar de. Skiljer sig hela kedjans flipp mer än en halv procent visas den inom parentes i
 Telegram, för efter förfallet hoppar nivån dit.
+
+En vägg är bara värd att handla på om den vinner övertygande över nästa strike
+på samma sida. Den 22 september låg guldets två tyngsta callstrikes, 410 och 414,
+båda på 0,01 miljarder — vilken av dem som blev "call wall" avgjordes av brus i
+open interest, medan putsidan samma dag vann med sex gångers marginal. Därför
+mäts marginalen mot den tyngsta rivalen utanför väggens egen zon: grannstrikes
+inom `GEX_WALL_ZONE_PCT` (0,5 %) räknas inte som konkurrenter, de är samma vägg
+utspridd över två priser. Vinner väggen mindre än `GEX_WALL_MIN_MARGIN` (1,5)
+gånger får den typen `resw`/`supw`, ritas prickad och dämpad, märks med "?" i
+etiketten och statusraden, ger inga larm, och kan döljas helt med kryssrutan
+"Visa svaga väggar". Telegram skriver ut marginalen: "Call wall svag (1,2× nästa
+strike)".
 
 Källa är NDX-indexoptioner för NQ och GLD-optioner för GC, hämtade från CBOE:s fördröjda kedja med
 yfinance som reserv (`GEX_SOURCE=auto|cboe|yahoo`). NDX är samma underliggande som NQ, så
