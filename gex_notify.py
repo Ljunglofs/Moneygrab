@@ -108,6 +108,14 @@ def build_message(results, fallback=None):
             flag += " ⚠ flip omvänd — läs regimen, inte flippen"
         if not r.get("expected_move") and not r.get("iv_1d"):
             flag += " ⚠ inget EM-band — kedjan saknade ATM-priser"
+        # En vägg som knappt vinner över nästa strike är ingen vägg att handla
+        # på — den kan hoppa när open interest uppdateras. Säg vilken, och hur
+        # knappt, i stället för att låta siffran se lika säker ut som de andra.
+        for side, mk, wk in (("Call wall", "call_wall_margin", "call_wall_weak"),
+                             ("Put wall", "put_wall_margin", "put_wall_weak")):
+            if r.get(wk):
+                m = r.get(mk)
+                flag += (f" ⚠ {side} svag ({m:.1f}× nästa strike)" if m else f" ⚠ {side} svag")
         def num(v, d=0):
             """Tal utan efterhängande nollor, '–' när värdet saknas."""
             if v is None:
@@ -121,7 +129,9 @@ def build_message(results, fallback=None):
             # Hur kopplingen index->futures mättes: live, en sparad RTH-mätning
             # eller ur kedjans egen put-call-paritet. Står det inget är den live.
             + (f" · {r['ratio_source']}" if r.get("ratio_source", "live") != "live" else "") + "\n"
-            f"Call Wall <b>{num(r['call_wall'], 2)}</b> · Put Wall <b>{num(r['put_wall'], 2)}</b> · Flip {num(r['zero_gamma'], 2)}"
+            f"Call Wall <b>{num(r['call_wall'], 2)}</b>{'⚠' if r.get('call_wall_weak') else ''}"
+            f" · Put Wall <b>{num(r['put_wall'], 2)}</b>{'⚠' if r.get('put_wall_weak') else ''}"
+            f" · Flip {num(r['zero_gamma'], 2)}"
             # Flippen räknas på de närmaste expirierna. Skiljer sig hela kedjans
             # flipp mer än en halv procent är det ett kvartals- eller månadsförfall
             # som drar — värt att veta, för efter det förfallet hoppar nivån dit.

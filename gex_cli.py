@@ -294,6 +294,8 @@ def _once(inst):
             "n_strikes": g["levels"].get("n_strikes"),
             "call_wall": f["call_wall"], "put_wall": f["put_wall"], "zero_gamma": f["zero_gamma"],
             "zero_gamma_all": f.get("zero_gamma_all"), "flip_expiries": f.get("flip_expiries"),
+            "call_wall_margin": f.get("call_wall_margin"), "put_wall_margin": f.get("put_wall_margin"),
+            "call_wall_weak": f.get("call_wall_weak", False), "put_wall_weak": f.get("put_wall_weak", False),
             "hgex": f.get("hgex"), "call_wall_0dte": f.get("call_wall_0"), "put_wall_0dte": f.get("put_wall_0"),
             "max_pain": f.get("max_pain"), "expected_move": f.get("em"), "em_src": f.get("em_src"),
             "iv_1d": f.get("iv_1d"), "flip_uncertain": f.get("flip_uncertain"),
