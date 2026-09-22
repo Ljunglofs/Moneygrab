@@ -187,7 +187,10 @@ Hämta strängen:
 Indikatorn finns i repot: `pine/grabit_gex_levels.pine`. Klistra in den i Pine Editor, lägg till på grafen och
 klistra in strängarna i fälten "NQ — levels string" och "GC — levels string". Den ritar bara GEX-nivåerna.
 
-Förvalet "Ren" visar tre linjer — Call Wall, Gamma Flip och Put Wall — plus andra väggen (CW2/PW2), med korta prispiller i högerkanten och en statusrad överst: underliggande → instrument, pris, C/Z/P och om priset ligger över eller under flippen. "Nyckelnivåer" lägger till HGEX, Max Pain och EM±, "Alla" resten (0DTE-väggar, G+/G−, IV-range och ATR-grid). Färgtemat GRABIT har röd Call Wall och lila Put Wall, Klassisk har grön respektive röd. Larm går vid korsning av väggar, 0DTE-väggar, flip och HGEX.
+Förvalet "Ren" visar exakt tre linjer — Call Wall, Gamma Flip och Put Wall — med korta prispiller i högerkanten och en statusrad överst: underliggande → instrument, pris, C/Z/P och om priset ligger över eller under flippen. "Nyckelnivåer" lägger till HGEX, Max Pain och EM±, "Alla" resten (0DTE-väggar, G+/G−, IV-range och ATR-grid). Färgtemat GRABIT har röd Call Wall och lila Put Wall, Klassisk har grön respektive röd. Larm går vid korsning av väggar, 0DTE-väggar, flip och HGEX — dock aldrig på
+en svag vägg. Andra väggen (CW2/PW2) är avstängd som förval: tre linjer räcker
+för de flesta dagar, och resten ligger kvar i strängen för den som kryssar i
+dem eller byter preset.
 
 ## 6. Telegram-kommandon
 
