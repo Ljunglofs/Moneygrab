@@ -460,14 +460,22 @@ def to_futures(levels, fut_price, etf_price, ratio=None, basis=None):
     if not levels or not fut_price or not (etf_price or ratio or basis is not None):
         return None
     # Index: futures = index + basis (additivt). ETF: futures = strike x kvot.
+    # sc() flyttar en KURSNIVÅ. Bredder (EM-band, 1D-IV) är avstånd, inte nivåer,
+    # och ska aldrig få basen pålagd — en bas på -175 gjorde ett EM på 122 punkter
+    # till -53 och vände EM-bandet upp och ner. Därför skalas de med w() i stället:
+    # i indexläget är en indexpunkt redan en futurespunkt, i ETF-läget skalar kvoten.
     if basis is not None:
         r = round(fut_price / etf_price, 4) if etf_price else None
         def sc(x):
             return round(x + basis, 2) if x is not None else None
+        def w(x):
+            return round(x, 2) if x and x > 0 else None
     else:
         r = ratio if ratio else fut_price / etf_price
         def sc(x):
             return round(x * r, 2) if x is not None else None
+        def w(x):
+            return round(x * r, 2) if x and x > 0 else None
     return {
         "ratio": (round(r, 4) if r else None), "basis": (round(basis, 2) if basis is not None else None),
         "fut_price": fut_price, "etf_price": etf_price,
@@ -484,8 +492,8 @@ def to_futures(levels, fut_price, etf_price, ratio=None, basis=None):
         "hgex": sc(levels.get("hgex")), "gpos": [sc(k) for k in levels.get("gpos", [])],
         "gneg": [sc(k) for k in levels.get("gneg", [])],
         "call_wall_0": sc(levels.get("call_wall_0")), "put_wall_0": sc(levels.get("put_wall_0")),
-        "max_pain": sc(levels.get("max_pain")), "em": sc(levels.get("em_straddle")),
-        "iv_1d": sc(levels.get("iv_1d")), "near_expiry": levels.get("near_expiry"),
+        "max_pain": sc(levels.get("max_pain")), "em": w(levels.get("em_straddle")),
+        "iv_1d": w(levels.get("iv_1d")), "near_expiry": levels.get("near_expiry"),
         "em_src": levels.get("em_src"), "flip_uncertain": levels.get("flip_uncertain", False),
         "flip_inverted": levels.get("flip_inverted", False),
     }
