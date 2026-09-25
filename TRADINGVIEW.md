@@ -111,6 +111,25 @@ inte licensierad orderflow, men nära på NQ och GC.
 - Auto använder minutupplösning. Sekundtidsramar (1S/5S/15S) ger finare delta men
   kräver TradingView Premium — utan Premium ger de körfelet RE10063.
 
+## Grabit VP (`pine/grabit_vp.pine`)
+
+VWAP, volymprofil, Initial Balance, sessioner, POC-nivåer och order blocks i
+samma overlay.
+
+Högerprofilen är som förval delad i köp och sälj: säljvolym åt vänster (röd),
+köpvolym åt höger (grön) runt en mittlinje, med POC, VAH och VAL som tidigare.
+Delen utanför value area tonas ner. Överst står deltat, (köp − sälj) / total
+i procent och i kontrakt. Underst står total volym uppdelad på köp och sälj.
+"Siffror per nivå" slår ihop raderna till N nivåer och skriver köp- och
+säljvolym vid varje nivå, som en enkel footprint. "Klassisk" under Profiltyp ger
+den gamla enfärgade profilen.
+
+Köp och sälj skattas ur 1-minutersbarer: en intrabar som stänger högt i sitt
+spann räknas mest som köp, en som stänger lågt mest som sälj. Det är en
+approximation, inte riktig bid/ask-data. Siffrorna blir därför något jämnare än
+i en riktig footprint, och kan skilja lite från CVD-indikatorn ovan, som räknar
+hela intrabaren åt ett håll.
+
 ## GRABIT Breakout · strategy (`pine/grabit_breakout_strategy.pine`)
 
 Backtestbar version av den signaltyp som säljs som "Weakness Below X /
