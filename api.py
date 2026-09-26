@@ -624,8 +624,10 @@ def _mcap_loop():
     _mcap_load()
     while True:
         now = time.time()
-        todo = [t for t in ALL_TICKERS if _market_of(t) == "US"
-                and (t not in _MCAP or now - _MCAP[t][1] > _MCAP_TTL)]
+        # Universumet först, sedan resten av marknaden i omsättningsordning.
+        mkt = [r["ticker"] for r in sorted(_MKT["rows"], key=lambda r: -float(r.get("dollar_vol") or 0))][:2500]
+        todo = [t for t in list(dict.fromkeys([t for t in ALL_TICKERS if _market_of(t) == "US"] + mkt))
+                if t not in _MCAP or now - _MCAP[t][1] > _MCAP_TTL]
         if not todo:
             time.sleep(3600)
             continue
@@ -655,6 +657,110 @@ def _enrich_rows(rows):
         r["mcap_musd"] = _mcap_of(t)
 
 
+# ---- Hela USA-marknaden (Polygon, dagsdata) --------------------------
+# Live-skanningen ovan täcker universumet (~660 aktier, Yahoo, intradag).
+# Resten av marknaden — alla likvida vanliga aktier — skannas en gång per
+# handelsdag på Polygons dagsdata och slås ihop i scan_universe(None).
+import market_data
+_MKT = {"asof": None, "rows": [], "busy": False, "secs": None}
+
+
+def _market_rescan():
+    """Kör motorn på hela marknaden. Anropas från bakgrundstråden när en ny
+    handelsdag finns på disken."""
+    got = market_data.frames()
+    if not got:
+        return
+    frames, spy, asof, nm = got
+    if asof == _MKT["asof"]:
+        return
+    t0 = time.time()
+    uni = set(ALL_TICKERS)
+    rows = []
+    for t, df in frames.items():
+        if t in uni:
+            continue                              # finns redan i live-skanningen
+        try:
+            a = analyze(df)
+        except Exception:
+            continue
+        a["ticker"] = t
+        a["theme"] = ""
+        a["name"] = nm.get(t) or ""
+        a["src"] = "eod"
+        a["asof"] = asof
+        a.update(_rs_vs_bench(df, spy))
+        a["hetta"] = hetta_of(a)
+        rows.append(_jsonable(a))
+        if len(rows) % 200 == 0:
+            time.sleep(0.05)                      # släpp fram andra anrop
+    _MKT.update(asof=asof, rows=rows, secs=round(time.time() - t0))
+    print("Marknad: %d aktier skannade för %s på %ss" % (len(rows), asof, _MKT["secs"]))
+    # Markera skanningen som inaktuell: nästa anrop får det gamla svaret direkt
+    # och en ny skanning (med marknadsdatan) startar i bakgrunden.
+    for k in [k for k in list(_CACHE) if k[0] == "scan_universe"]:
+        try:
+            _CACHE[k] = (0.0, _CACHE[k][1])
+        except Exception:
+            pass
+
+
+def _market_loop():
+    if not market_data.enabled():
+        return
+    while True:
+        try:
+            market_data.sync()
+            _market_rescan()
+        except Exception as e:
+            market_data.STATE["error"] = str(e)[:200]
+            print("[market] fel:", e)
+        time.sleep(1800)
+
+
+# Samma regler som screener-korten i appen (index.html _scrMatch).
+def _scr_match(f, r):
+    lab = str(r.get("label") or "").upper()
+    try:
+        last = float(r.get("last") or 0)
+        above50 = r.get("ema50") is not None and last > float(r["ema50"])
+    except Exception:
+        above50 = False
+    fh = float(r.get("pct_from_high") or -100)
+    rv = float(r.get("rank_rel_vol") if r.get("rank_rel_vol") is not None else (r.get("rel_vol") or 0))
+    if f == "bull":
+        return int(r.get("score10") or 0) >= 7 and fh >= -5 and rv >= 1.2 and above50 and not r.get("cooling")
+    if f == "early":
+        return bool(r.get("rs_up")) and (bool(r.get("rs_line_hi")) or float(r.get("rs_20") or 0) > 0) \
+            and above50 and fh <= -3 and not r.get("cooling")
+    if f == "micro":
+        mc = r.get("mcap_musd")
+        return mc is not None and 0 < float(mc) < 300
+    if f == "risk":
+        return lab in ("BEAR", "AVSVALNING") or str(r.get("bos") or "").upper() == "BEARISH"
+    return True
+
+
+def _scr_sort_key(f):
+    if f in ("bull", "early"):
+        return lambda r: (-(r.get("rs_rating") or 0), -(r.get("score10") or 0))
+    if f == "micro":
+        return lambda r: -float(r.get("rank_rel_vol") or r.get("rel_vol") or 0)
+    if f == "risk":
+        return lambda r: float(r.get("ret_20") or 0)
+    return lambda r: -(r.get("score10") or 0)
+
+
+_SLIM_KEYS = ("ticker", "theme", "name", "last", "ema50", "ema200", "score10", "pct_from_high",
+              "rel_vol", "rank_rel_vol", "label", "color", "cooling", "rs_rating", "rs_up",
+              "rs_line_hi", "rs_20", "ret_1", "ret_5", "ret_20", "mcap_musd", "earnings_in",
+              "spark", "bos", "hetta", "src", "rsi", "setup_grade", "atr_pct")
+
+
+def _slim(r):
+    return {k: r.get(k) for k in _SLIM_KEYS if k in r}
+
+
 import gc as _gc
 SCAN_CHUNK = int(os.environ.get("SCAN_CHUNK", "40"))   # Starter 512MB-säkert. Mer RAM? Höj via env SCAN_CHUNK.
 
@@ -681,6 +787,10 @@ def scan_universe(theme_key: Optional[str] = None) -> list:
                 out.append(_jsonable(a))
         _PREFETCH.clear()             # släpp råa prisdataframes direkt
         _gc.collect()                 # ge minnet tillbaka till OS
+    # Hela marknaden: dagsdata-raderna för allt utanför universumet (kopior,
+    # eftersom RS-rating och etikett sätts om vid varje skanning).
+    if _MKT["rows"]:
+        out += [dict(r) for r in _MKT["rows"]]
     _rs_ratings(out)
     _enrich_rows(out)
     # Täckning per marknad — Yahoo blockar ibland moln-IP:n, och då tystnar
@@ -3026,7 +3136,33 @@ def screen(themes: Optional[str] = Query(None, description="Komma-separerade tem
         want = {l.strip().upper() for l in labels.split(",")}
         rows = [r for r in rows if str(r.get("label", "")).upper() in want]
     rows.sort(key=lambda x: x.get("score10", 0), reverse=True)
-    return {"count": len(rows), "rows": rows}
+    # Antal per screener-kort räknas på hela marknaden. Listan till appen hålls
+    # liten: universumet + de mest intressanta aktierna i resten av marknaden.
+    counts = {f: sum(1 for r in rows if _scr_match(f, r)) for f in ("bull", "early", "micro", "risk")}
+    uni = [r for r in rows if r.get("src") != "eod"]
+    mkt = [r for r in rows if r.get("src") == "eod" and (
+        (r.get("rs_rating") or 0) >= 90 or float(r.get("rel_vol") or 0) >= 3
+        or abs(float(r.get("ret_1") or 0)) >= 8)]
+    mkt.sort(key=lambda r: -(r.get("rs_rating") or 0))
+    out = [_slim(r) for r in uni + mkt[:300]]
+    return {"count": len(out), "total": len(rows), "counts": counts,
+            "market": {"asof": _MKT["asof"], "tickers": len(_MKT["rows"])}, "rows": out}
+
+
+@app.get("/api/screener")
+def screener(f: str = "bull", limit: int = 40):
+    """Ett screener-kort på hela marknaden: träffarna sorterade som i appen."""
+    rows = [r for r in (scan_universe(None) or []) if _scr_match(f, r)]
+    rows.sort(key=_scr_sort_key(f))
+    return {"f": f, "count": len(rows), "rows": [_slim(r) for r in rows[:max(1, min(limit, 100))]]}
+
+
+@app.get("/api/market/status")
+def market_status():
+    st = dict(market_data.STATE)
+    st.update(enabled=market_data.enabled(), scanned=len(_MKT["rows"]), scan_asof=_MKT["asof"],
+              scan_secs=_MKT["secs"])
+    return st
 
 
 @cached(120)
@@ -4437,6 +4573,7 @@ def _warmup_loop():
 def _start_warmup():
     _threading.Thread(target=_warmup_loop, daemon=True).start()
     _threading.Thread(target=_mcap_loop, daemon=True).start()
+    _threading.Thread(target=_market_loop, daemon=True).start()
 
 
 # ---- Watchlist-push -------------------------------------------------

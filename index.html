@@ -2390,18 +2390,29 @@ function _scrSort(filt){
   return (a,b)=>(+b.score10||0)-(+a.score10||0);
 }
 function _filterRows(rows,filt){return rows.filter(r=>_scrMatch(filt,r));}
-function openScreener(i){
-  const s=(window._screeners||[])[i]; if(!s)return;
+function openScreener(i,srvRows,srvCount){
+  const s0=(window._screeners||[])[i]; if(!s0)return;
+  const s=srvRows?Object.assign({},s0,{_srv:true}):s0;
   const c=s.c;
   if(s.filt==="rocket"){openRocketscan(s);return;}
-  const all=_screenRows();
-  const rows=_filterRows(all,s.filt).sort(_scrSort(s.filt)).slice(0,40);
   $("#scr-title").textContent=s.n;
+  const B=CONFIG.API_BASE?CONFIG.API_BASE.replace(/\/$/,""):"";
+  if(B&&!s._srv){
+    // Hela marknaden: servern filtrerar och sorterar, appen visar.
+    $("#scr-body").innerHTML='<div class="scl-empty">'+(window.GRABIT_LANG==="en"?"Scanning the market…":"Skannar marknaden…")+'</div>';
+    const el0=document.getElementById("screener");el0.classList.add("on");el0.scrollTop=0;
+    fetch(B+"/api/screener?f="+encodeURIComponent(s.filt)+"&limit=40",{cache:"no-store"}).then(r=>r.json()).then(j=>{
+      (j.rows||[]).forEach(r=>{if(r.name&&!NAMES[r.ticker])NAMES[r.ticker]=r.name;});
+      openScreener(i,j.rows||[],j.count);}).catch(()=>openScreener(i,_filterRows(_screenRows(),s.filt).sort(_scrSort(s.filt)).slice(0,40)));
+    return;
+  }
+  const all=_screenRows();
+  const rows=srvRows||_filterRows(all,s.filt).sort(_scrSort(s.filt)).slice(0,40);
   const list=rows.length?rows.map(r=>{const tk=r.ticker,sc=+r.score10||0;
     const rs=r.rs_rating!=null?`<span class="scl-rs">RS ${r.rs_rating}</span>`:"";
     const extra=s.filt==="micro"&&r.mcap_musd!=null?`<span class="scl-rs">$${Math.round(r.mcap_musd)}M</span>`:(r.earnings_in!=null&&r.earnings_in<=5?`<span class="scl-rs" style="color:#F5C542;border-color:#F5C54266">Rapport ${r.earnings_in===0?"idag":"om "+r.earnings_in+" d"}</span>`:"");
     return `<div class="scl-row" onclick="closeScreener();openStock('${tk}')">${lic(tk,34,scoreColor(sc))}<div class="scl-nm"><div class="scl-t">${tk} ${rs}${extra}</div><div class="scl-co">${NAMES[tk]||r.theme||''}</div></div><div class="scl-sc" style="color:${scoreColor(sc)}">${sc.toFixed(1)}</div></div>`;
-  }).join(""):`<div class="scl-empty">${all.length?"Inga träffar just nu.":"Skannern laddar — försök igen om en stund."}</div>`;
+  }).join(""):`<div class="scl-empty">${(srvRows||all.length)?"Inga träffar just nu.":"Skannern laddar — försök igen om en stund."}</div>`;
   $("#scr-body").innerHTML=`<div class="scl-head" style="border-color:${c}55"><div class="scl-ic" style="color:${c};background:${c}1a">${I[s.ic]||I.dot}</div><div class="scl-meta"><div class="scl-h">${s.n}</div><div class="scl-d">${s.d}</div></div><div class="scl-cnt" style="color:${c}">${rows.length}</div></div>${list}`;
   const el=document.getElementById("screener");el.classList.add("on");el.scrollTop=0;
 }
@@ -3025,10 +3036,12 @@ function mapScreen(rows,d){
   renderTopMovers();          // Most Bullish är nu en flik i Top Movers
   d.scanner.volume =by("rel_vol").slice(0,5).map(r=>({tkr:r.ticker,x:+(+r.rel_vol||0).toFixed(1)}));
   const cnt=f=>rows.filter(f).length;
-  const cBull=cnt(r=>_scrMatch("bull",r));
-  const cEarly=cnt(r=>_scrMatch("early",r));
-  const cMicro=cnt(r=>_scrMatch("micro",r));
-  const cRisk=cnt(r=>_scrMatch("risk",r));
+  // Antalen räknas av servern på hela marknaden; lokalt bara som reserv.
+  const SC=window._scrCounts||{};
+  const cBull=SC.bull!=null?SC.bull:cnt(r=>_scrMatch("bull",r));
+  const cEarly=SC.early!=null?SC.early:cnt(r=>_scrMatch("early",r));
+  const cMicro=SC.micro!=null?SC.micro:cnt(r=>_scrMatch("micro",r));
+  const cRisk=SC.risk!=null?SC.risk:cnt(r=>_scrMatch("risk",r));
   // Hetaste temat just nu: räknat ur skanningen (snitt 20-dagarsfart + antal utbrott)
   const th={};rows.forEach(r=>{if(!r.theme)return;const t=th[r.theme]||(th[r.theme]={n:0,s:0,b:0});t.n++;t.s+=(+r.ret_20||0);if(_scrMatch("bull",r))t.b++;});
   const tk=Object.keys(th).filter(k=>th[k].n>=4).sort((a,b)=>(th[b].s/th[b].n+th[b].b*3)-(th[a].s/th[a].n+th[a].b*3))[0];
@@ -3096,7 +3109,7 @@ async function load(){
     J("/api/overview"),J("/api/screen"),J("/api/signals"),J("/api/news"),J("/api/events")
   ]);
   if(ov){mapOverview(ov,d);live=true;}
-  if(sc){mapScreen(sc.rows||[],d);live=true;}
+  if(sc){window._scrCounts=sc.counts||null;window._mktInfo=sc.market||null;mapScreen(sc.rows||[],d);live=true;}
   if(sg&&Array.isArray(sg.feed)&&sg.feed.length){d.feed=sg.feed;live=true;}
   if(nw&&Array.isArray(nw.news)&&nw.news.length){d.news=nw.news;live=true;}
   if(ev&&Array.isArray(ev.events)&&ev.events.length){d.events=mapEvents(ev.events);live=true;}
