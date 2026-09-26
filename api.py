@@ -1221,6 +1221,8 @@ _STATIC_FILES = {
     "grabit_wordmark.png": "image/png",
     "hero.mp4": "video/mp4",
     "hero_poster.jpg": "image/jpeg",
+    "hero_wide.mp4": "video/mp4",
+    "hero_wide_poster.jpg": "image/jpeg",
 }
 
 @app.get("/{fname}")
