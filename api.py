@@ -973,7 +973,7 @@ activity on your account.</p>
 
 <h2>3. PRO subscription and price</h2>
 <p>GRABIT PRO is a subscription. Current prices are shown in the app (currently
-SEK&nbsp;174/month or SEK&nbsp;1&nbsp;566/year, incl. VAT). The subscription
+SEK&nbsp;250/month or SEK&nbsp;2&nbsp;250/year, incl. VAT). The subscription
 <b>renews automatically</b> at the end of each period until you cancel it.</p>
 
 <h2>3b. Free trial (7 days)</h2>
@@ -1053,7 +1053,7 @@ aktiviteten på ditt konto.</p>
 
 <h2>3. PRO-prenumeration och pris</h2>
 <p>GRABIT PRO är en prenumeration. Aktuella priser visas i appen (för närvarande
-174 kr/månad respektive 1&nbsp;566 kr/år, inklusive moms). Prenumerationen
+250 kr/månad respektive 2&nbsp;250 kr/år, inklusive moms). Prenumerationen
 <b>förnyas automatiskt</b> vid varje periods slut tills du säger upp den.</p>
 
 <h2>3b. Kostnadsfri provperiod (7 dagar)</h2>

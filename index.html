@@ -1147,7 +1147,7 @@ var GRABIT_LANG = (function(){try{return localStorage.getItem("grabit_lang")||"e
 window.GRABIT_LANG = GRABIT_LANG;
 var _I18N_EXACT = {
 "Ny extrem möjlighet":"New extreme opportunity","Rädsla":"Fear","RÄDSLA":"FEAR","Extrem rädsla":"Extreme fear","EXTREM RÄDSLA":"EXTREME FEAR","Girighet":"Greed","GIRIGHET":"GREED","Extrem girighet":"Extreme greed","EXTREM GIRIGHET":"EXTREME GREED","GULD":"GOLD","Guld":"Gold","AI · MARKNADSLÄGE":"AI · MARKET OUTLOOK","MARKNADSLÄGE":"MARKET OUTLOOK","Laddar dagens läge…":"Loading today's outlook…","Laddar dagens läge...":"Loading today's outlook…",
-"Månad":"Month","År":"Year","/mån":"/mo","/år":"/yr","/månad":"/month","3 MÅN GRATIS":"3 MONTHS FREE","0 kr":"SEK 0","174 kr":"SEK 174","1566 kr":"SEK 1,566","Betalningen sker säkert via Google Play (appen) eller vår betalpartner (webben). Avsluta när som helst. Ingen finansiell rådgivning.":"Payment is handled securely by Google Play (in the app) or our payment partner (on the web). Cancel anytime. Not financial advice.","Spara 25%":"Save 25%","Fortsätt med PRO":"Continue with PRO","Har du en licensnyckel?":"Have a license key?","Betalningen är inte konfigurerad än.":"Checkout isn't set up yet.",
+"Månad":"Month","År":"Year","/mån":"/mo","/år":"/yr","/månad":"/month","3 MÅN GRATIS":"3 MONTHS FREE","0 kr":"SEK 0","250 kr":"SEK 250","2250 kr":"SEK 2,250","Betalningen sker säkert via Google Play (appen) eller vår betalpartner (webben). Avsluta när som helst. Ingen finansiell rådgivning.":"Payment is handled securely by Google Play (in the app) or our payment partner (on the web). Cancel anytime. Not financial advice.","Spara 25%":"Save 25%","Fortsätt med PRO":"Continue with PRO","Har du en licensnyckel?":"Have a license key?","Betalningen är inte konfigurerad än.":"Checkout isn't set up yet.",
   // Nav
   "Översikt":"Overview","Daytrade":"Daytrade","Signaler":"Signals","Research":"Research",
   "Portfölj":"Portfolio","Smart":"Smart",
@@ -1736,15 +1736,15 @@ else _i18nBoot();
     <div class="pw-logo"><img id="pw-brand" alt="GRABIT"><span class="pw-badge">PRO</span></div>
     <div class="pw-trial" id="pw-sub"><b>7 dagar gratis</b></div>
     <div class="pw-big"><span class="pw-149">0 kr</span><span class="pw-per">i 7 dagar</span></div>
-    <div class="pw-cancel" id="pw-after">Sedan 174 kr/mån. Avsluta när som helst.</div>
+    <div class="pw-cancel" id="pw-after">Sedan 250 kr/mån. Avsluta när som helst.</div>
     <div class="pw-feats2"><div class="pwf"><span class="pwf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18"/><path d="M3 6h18" stroke-dasharray="3 2"/><path d="M3 13h18"/><path d="M6 20V9M10 20V4M14 20V11M18 20V7"/></svg></span><span class="pwf-tx"><b>GEX-nivåer NQ &amp; Guld</b><i>Call Wall, Put Wall &amp; Gamma Flip varje dag</i></span></div><div class="pwf"><span class="pwf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></span><span class="pwf-tx"><b>The Trump Signal</b><i>Push direkt när Trump rör marknaden</i></span></div><div class="pwf"><span class="pwf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.6A8 8 0 1 1 21 12z"/></svg></span><span class="pwf-tx"><b>Discord-community</b><i>Setups &amp; nivåer med andra traders</i></span></div><div class="pwf"><span class="pwf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 4 8-9"/><path d="M15 7h5v5"/></svg></span><span class="pwf-tx"><b>GRABIT-indikatorer</b><i>Flow Profile, CVD &amp; GEX Levels för TradingView</i></span></div><div class="pw-plus">+ Screener, Ask Grabit, FDA-kalender, Insider Flow och push-larm</div></div>
     <div class="pw-buybox">
       <div class="pw-plans">
-        <button type="button" class="pw-plan on" data-plan="monthly" onclick="setProPlan('monthly',this)"><span class="pp-t">Månad</span><span class="pp-p">174 kr<i>/mån</i></span></button>
-        <button type="button" class="pw-plan" data-plan="annual" onclick="setProPlan('annual',this)"><span class="pp-badge">3 MÅN GRATIS</span><span class="pp-t">År</span><span class="pp-p">1566 kr<i>/år</i></span><span class="pp-save">Spara 25%</span></button>
+        <button type="button" class="pw-plan on" data-plan="monthly" onclick="setProPlan('monthly',this)"><span class="pp-t">Månad</span><span class="pp-p">250 kr<i>/mån</i></span></button>
+        <button type="button" class="pw-plan" data-plan="annual" onclick="setProPlan('annual',this)"><span class="pp-badge">3 MÅN GRATIS</span><span class="pp-t">År</span><span class="pp-p">2250 kr<i>/år</i></span><span class="pp-save">Spara 25%</span></button>
       </div>
       <button class="pw-btn" onclick="buyPro()">Starta 7 dagar gratis <span class="pw-arrow">&#8594;</span></button>
-      <div class="pw-terms" id="pw-terms">Gratis i 7 dagar. Därefter <b>174 kr/mån</b> tills du säger upp.
+      <div class="pw-terms" id="pw-terms">Gratis i 7 dagar. Därefter <b>250 kr/mån</b> tills du säger upp.
         Prenumerationen <b>förnyas automatiskt</b> &mdash; avsluta när som helst innan perioden löper ut, utan avgift.
         Betalkort krävs. Du får en påminnelse innan första betalningen.</div>
       <div class="pw-restore" onclick="restorePro()">Har du redan PRO? Återställ köp &#8250;</div>
@@ -4260,7 +4260,7 @@ window.setPriceAlert=async function(tkr,px){
     say(res&&res.ok?("Larm satt: "+tkr+" "+m[1]+" "+m[2]):("Kunde inte sätta larmet"+(res&&res.fel?": "+res.fel:"")));
   }catch(e){say("Kunde inte sätta larmet");}
 };
-/* ===== GRABIT PRO · 174 kr/mån (webben: Stripe · appen: Google Play) =====
+/* ===== GRABIT PRO · 250 kr/mån (webben: Stripe · appen: Google Play) =====
    Körs bara inne i Play-appen (TWA) där Digital Goods API finns.
    I vanlig webbläsare är appen öppen — där finns inget köp att göra. */
 var BILLING={SKU:"grabit_pro",svc:null,twa:false};
@@ -4298,7 +4298,7 @@ function setProPlan(p,btn){window._proPlan=p;var ps=document.querySelectorAll(".
    förnyelse och hur man avslutar. Krav vid abonnemang som förnyas själv. */
 function syncTrialText(p){var EN=(window.GRABIT_LANG==="en");
   var yr=(p==="annual");
-  var pris=yr?(EN?"SEK 1,566/year":"1 566 kr/år"):(EN?"SEK 174/month":"174 kr/mån");
+  var pris=yr?(EN?"SEK 2,250/year":"2 250 kr/år"):(EN?"SEK 250/month":"250 kr/mån");
   var a=document.getElementById("pw-after");
   if(a)a.textContent=(EN?("Then "+pris+". Cancel anytime."):("Sedan "+pris+". Avsluta när som helst."));
   var t=document.getElementById("pw-terms");
