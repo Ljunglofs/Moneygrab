@@ -6,7 +6,7 @@
 //
 // Ändringslogg v2.5:
 //  · NY: Tryck 0–100 — RSI byggd på deltat. Över 70 = köparna har dominerat ovanligt
-//    mycket (överköpt), under 30 = säljarna (översålt). Välj "Panel: Tryck (0–100)" för
+//    mycket (överköpt), under 30 = säljarna (översålt). Välj "Panel: Pressure (0–100)" för
 //    att se linjen, eller lägg indikatorn två gånger: en med CVD, en med Tryck.
 //  · NY: Signaler bara nära nivåer — VWAP ±1 SD, PDH/PDL och GEX-strängen (samma som
 //    GRABIT GEX Levels). GEX-nivåerna gäller bara senaste dygnet, de är dagens nivåer.
@@ -20,46 +20,46 @@
 //  · FIX: Väntande divergenser nollställs vid ny dag.
 //  · FIX: Lägre tidsram väljs automatiskt efter grafen.
 // ---------------------------------------------------------------------------
-indicator("Grabit CVD v2.5", "Grabit CVD", overlay=false, format=format.volume, max_labels_count=200)
+indicator("GRABIT CVD", "GRABIT CVD", overlay=false, format=format.volume, max_labels_count=200)
 import TradingView/ta/8 as tvta
 
 grp = "CVD"
-panel    = input.string("CVD", "Panel", options=["CVD", "Tryck (0–100)"], group=grp, tooltip="CVD: kumulativ delta. Tryck: överköpt/översålt-linje som RSI, räknad på deltat. Vill du se båda, lägg till indikatorn två gånger.")
-ltfIn    = input.string("Auto", "Lägre tidsram för delta", options=["Auto", "1", "5", "15", "1S", "5S", "15S"], group=grp, tooltip="Auto väljer minuter efter grafens tidsram. Sekunder (S) kräver TradingView Premium.")
-anchorIn = input.string("RTH-öppning", "Nollställ vid", options=["RTH-öppning", "Dag (1D)", "Vecka"], group=grp, tooltip="RTH-öppning: CVD börjar om när New York öppnar (guld: COMEX-öppningen). Dag: 18:00 New York-tid, nattsessionen räknas med.")
-sess     = input.session("0930-1600", "RTH (New York-tid)", group=grp, tooltip="Guld byter automatiskt till 0820-1330 så länge fältet står på 0930-1600.")
-useSess  = input.bool(false, "Signaler bara i RTH", group=grp)
-pivL     = input.int(3, "Pivot-längd", group=grp)
-extLen   = input.int(60, "Extrem = högsta/lägsta på (bars)", group=grp)
-maxGap   = input.int(100, "Max bars mellan pivoter", group=grp)
-minStep  = input.float(0.5, "Ny extrem minst (x ATR) bortom gamla", step=0.1, group=grp)
-confirmIt = input.bool(true, "Kräv bekräftelse (stäng tillbaka)", group=grp)
-confBars = input.int(6, "Bekräftelse inom (bars)", group=grp)
-divBars  = input.int(12, "Divergens gäller i (bars)", group=grp)
-sideHys  = input.float(0.10, "Sid-hysteres (andel av dagens max)", step=0.05, group=grp)
-emaLen   = input.int(21, "EMA på delta", group=grp)
+panel    = input.string("CVD", "Panel", options=["CVD", "Pressure (0–100)"], group=grp, tooltip="CVD: cumulative delta. Pressure: overbought/oversold line like RSI, computed on delta. To see both, add the indicator twice.")
+ltfIn    = input.string("Auto", "Lower timeframe for delta", options=["Auto", "1", "5", "15", "1S", "5S", "15S"], group=grp, tooltip="Auto picks minutes based on the chart timeframe. Seconds (S) require TradingView Premium.")
+anchorIn = input.string("RTH open", "Reset at", options=["RTH open", "Day (1D)", "Week"], group=grp, tooltip="RTH open: CVD restarts at the New York open (gold: the COMEX open). Day: 18:00 New York time, overnight session included.")
+sess     = input.session("0930-1600", "RTH (New York time)", group=grp, tooltip="Gold switches automatically to 0820-1330 as long as this field is 0930-1600.")
+useSess  = input.bool(false, "Signals only in RTH", group=grp)
+pivL     = input.int(3, "Pivot length", group=grp)
+extLen   = input.int(60, "Extreme = highest/lowest over (bars)", group=grp)
+maxGap   = input.int(100, "Max bars between pivots", group=grp)
+minStep  = input.float(0.5, "New extreme at least (x ATR) beyond old", step=0.1, group=grp)
+confirmIt = input.bool(true, "Require confirmation (close back)", group=grp)
+confBars = input.int(6, "Confirm within (bars)", group=grp)
+divBars  = input.int(12, "Divergence valid for (bars)", group=grp)
+sideHys  = input.float(0.10, "Side hysteresis (share of daily max)", step=0.05, group=grp)
+emaLen   = input.int(21, "EMA on delta", group=grp)
 bullCol  = input.color(#00e5ff, "Bull", group=grp)
 bearCol  = input.color(#ff1744, "Bear", group=grp)
 
 gA = "Absorption"
-absPct   = input.float(30, "Delta minst (% av barens volym)", minval=5, maxval=90, group=gA)
-absRange = input.float(0.6, "Spann högst (x ATR)", step=0.1, group=gA, tooltip="Absorption = mycket tryck men liten rörelse. En stor bar som rör sig mycket är inte absorption.")
-absVol   = input.float(1.0, "Volym minst (x snitt 20)", step=0.1, group=gA)
+absPct   = input.float(30, "Min delta (% of bar volume)", minval=5, maxval=90, group=gA)
+absRange = input.float(0.6, "Max range (x ATR)", step=0.1, group=gA, tooltip="Absorption = heavy pressure but little movement. A large bar that moves a lot is not absorption.")
+absVol   = input.float(1.0, "Min volume (x 20-bar avg)", step=0.1, group=gA)
 
-gT = "Tryck (överköpt / översålt)"
-presLen  = input.int(14, "Längd", minval=2, group=gT)
-obLvl    = input.int(70, "Överköpt", minval=50, maxval=95, group=gT)
-osLvl    = input.int(30, "Översålt", minval=5, maxval=50, group=gT)
+gT = "Pressure (overbought / oversold)"
+presLen  = input.int(14, "Length", minval=2, group=gT)
+obLvl    = input.int(70, "Overbought", minval=50, maxval=95, group=gT)
+osLvl    = input.int(30, "Oversold", minval=5, maxval=50, group=gT)
 
-gL = "Nivåfilter"
-lvlOn    = input.bool(true, "Signaler bara nära en nivå", group=gL)
-lvlDist  = input.float(0.5, "Max avstånd till nivån (x ATR)", step=0.1, group=gL)
+gL = "Level filter"
+lvlOn    = input.bool(true, "Signals only near a level", group=gL)
+lvlDist  = input.float(0.5, "Max distance to level (x ATR)", step=0.1, group=gL)
 useVwap  = input.bool(true, "VWAP ±1 SD", group=gL)
 usePD    = input.bool(true, "PDH / PDL", group=gL)
-useGex   = input.bool(true, "GEX-nivåer", group=gL)
-srcNQ    = input.string("", "NQ — levels string", group=gL, tooltip="Samma sträng som i GRABIT GEX Levels (/tvgex i Telegram). Gäller bara senaste dygnet.")
+useGex   = input.bool(true, "GEX levels", group=gL)
+srcNQ    = input.string("", "NQ — levels string", group=gL, tooltip="Same string as in GRABIT GEX Levels (/tvgex in Telegram). Only applies to the last 24 hours.")
 srcGC    = input.string("", "GC — levels string", group=gL)
-lblOn    = input.bool(true, "Etiketter i prisgrafen", group=gL)
+lblOn    = input.bool(true, "Labels on price chart", group=gL)
 
 // ── Instrument och tidsram
 bool isGold = str.contains(syminfo.root, "GC") or str.contains(syminfo.ticker, "XAU")
@@ -71,7 +71,7 @@ string ltf = ltfIn != "Auto" ? ltfIn : chartSec < 60 ? timeframe.period : chartS
 [dO, dH, dL, delta] = tvta.requestVolumeDelta(ltf)
 bool inRth = not na(time(timeframe.period, sessEff, "America/New_York"))
 bool rthOpen = inRth and not inRth[1]
-bool reset = anchorIn == "RTH-öppning" ? rthOpen : anchorIn == "Vecka" ? timeframe.change("W") : timeframe.change("D")
+bool reset = anchorIn == "RTH open" ? rthOpen : anchorIn == "Week" ? timeframe.change("W") : timeframe.change("D")
 var float cvd = 0.0
 cvd := reset ? nz(delta) : cvd + nz(delta)
 float atr = ta.atr(14)
@@ -253,19 +253,19 @@ bool showCvd = panel == "CVD"
 bool showPres = not showCvd
 bgcolor(absBear ? color.new(bearCol, 80) : absBull ? color.new(bullCol, 80) : showCvd and sideUp ? color.new(bullCol, 94) : showCvd and sideDn ? color.new(bearCol, 94) : na)
 plot(showCvd ? cvd : na, "CVD", color=sideUp ? bullCol : sideDn ? bearCol : color.gray, linewidth=2)
-plot(showCvd ? 0 : na, "Noll", color=color.new(color.gray, 50), style=plot.style_circles, linewidth=1)
+plot(showCvd ? 0 : na, "Zero", color=color.new(color.gray, 50), style=plot.style_circles, linewidth=1)
 
-pPres = plot(showPres ? pres : na, "Tryck", color=isOB ? bullCol : isOS ? bearCol : color.new(color.white, 20), linewidth=2)
-pOB   = plot(showPres ? obLvl : na, "Överköpt", color=color.new(bullCol, 50))
-pOS   = plot(showPres ? osLvl : na, "Översålt", color=color.new(bearCol, 50))
-pMid  = plot(showPres ? 50 : na, "Mitt", color=color.new(color.gray, 60), style=plot.style_circles)
-pTop  = plot(showPres ? 100 : na, "Topp", display=display.none)
-pBot  = plot(showPres ? 0 : na, "Botten", display=display.none)
+pPres = plot(showPres ? pres : na, "Pressure", color=isOB ? bullCol : isOS ? bearCol : color.new(color.white, 20), linewidth=2)
+pOB   = plot(showPres ? obLvl : na, "Overbought", color=color.new(bullCol, 50))
+pOS   = plot(showPres ? osLvl : na, "Oversold", color=color.new(bearCol, 50))
+pMid  = plot(showPres ? 50 : na, "Mid", color=color.new(color.gray, 60), style=plot.style_circles)
+pTop  = plot(showPres ? 100 : na, "High", display=display.none)
+pBot  = plot(showPres ? 0 : na, "Low", display=display.none)
 fill(pOB, pTop, color=color.new(bullCol, 92))
 fill(pBot, pOS, color=color.new(bearCol, 92))
 
-plotshape(bearDiv, "Sälj-div", shape.triangledown, location.top, bearCol, offset=confirmIt ? 0 : -pivL, size=size.small)
-plotshape(bullDiv, "Köp-div", shape.triangleup, location.bottom, bullCol, offset=confirmIt ? 0 : -pivL, size=size.small)
+plotshape(bearDiv, "Sell div", shape.triangledown, location.top, bearCol, offset=confirmIt ? 0 : -pivL, size=size.small)
+plotshape(bullDiv, "Buy div", shape.triangleup, location.bottom, bullCol, offset=confirmIt ? 0 : -pivL, size=size.small)
 
 // Etiketter i prisgrafen med nivån signalen kom vid.
 if lblOn and bearDiv
@@ -281,18 +281,18 @@ if lblOn and absBull
 
 var table t = table.new(position.top_right, 2, 4, bgcolor=color.new(color.black, 20), border_width=1, border_color=color.new(color.gray, 70))
 if barstate.islast
-    table.cell(t, 0, 0, "SIDA", text_color=color.gray, text_size=size.small)
-    table.cell(t, 1, 0, sideUp ? "KÖP" : sideDn ? "SÄLJ" : "—", text_color=sideUp ? bullCol : sideDn ? bearCol : color.gray, text_size=size.normal)
+    table.cell(t, 0, 0, "SIDE", text_color=color.gray, text_size=size.small)
+    table.cell(t, 1, 0, sideUp ? "BUY" : sideDn ? "SELL" : "—", text_color=sideUp ? bullCol : sideDn ? bearCol : color.gray, text_size=size.normal)
     table.cell(t, 0, 1, "DIV", text_color=color.gray, text_size=size.small)
-    table.cell(t, 1, 1, recentBear ? "SÄLJ" : recentBull ? "KÖP" : "—", text_color=recentBear ? bearCol : recentBull ? bullCol : color.gray, text_size=size.normal)
-    table.cell(t, 0, 2, "BRÄNSLE", text_color=color.gray, text_size=size.small)
-    table.cell(t, 1, 2, fuel ? "ÖKAR" : "AVTAR", text_color=fuel ? color.white : color.gray, text_size=size.normal)
-    table.cell(t, 0, 3, "TRYCK", text_color=color.gray, text_size=size.small)
-    table.cell(t, 1, 3, str.tostring(pres, "#") + (isOB ? " ÖVERKÖPT" : isOS ? " ÖVERSÅLT" : ""), text_color=isOB ? bullCol : isOS ? bearCol : color.white, text_size=size.normal)
+    table.cell(t, 1, 1, recentBear ? "SELL" : recentBull ? "BUY" : "—", text_color=recentBear ? bearCol : recentBull ? bullCol : color.gray, text_size=size.normal)
+    table.cell(t, 0, 2, "FUEL", text_color=color.gray, text_size=size.small)
+    table.cell(t, 1, 2, fuel ? "RISING" : "FADING", text_color=fuel ? color.white : color.gray, text_size=size.normal)
+    table.cell(t, 0, 3, "PRESSURE", text_color=color.gray, text_size=size.small)
+    table.cell(t, 1, 3, str.tostring(pres, "#") + (isOB ? " OVERBOUGHT" : isOS ? " OVERSOLD" : ""), text_color=isOB ? bullCol : isOS ? bearCol : color.white, text_size=size.normal)
 
 // ── Alerts
-alertcondition(bearDiv or absBear, "Grabit CVD – sälj-signal", "Sälj-divergens bekräftad eller absorption")
-alertcondition(bullDiv or absBull, "Grabit CVD – köp-signal", "Köp-divergens bekräftad eller absorption")
-alertcondition(sideChg, "Grabit CVD – sidbyte", "CVD har bytt sida")
-alertcondition(obExit, "Grabit CVD – lämnar överköpt", "Trycket har gått ner under överköpt-nivån")
-alertcondition(osExit, "Grabit CVD – lämnar översålt", "Trycket har gått upp över översålt-nivån")
+alertcondition(bearDiv or absBear, "GRABIT CVD – sell signal", "Sell divergence confirmed or absorption")
+alertcondition(bullDiv or absBull, "GRABIT CVD – buy signal", "Buy divergence confirmed or absorption")
+alertcondition(sideChg, "GRABIT CVD – side flip", "CVD has flipped side")
+alertcondition(obExit, "GRABIT CVD – leaving overbought", "Pressure has dropped below the overbought level")
+alertcondition(osExit, "GRABIT CVD – leaving oversold", "Pressure has risen above the oversold level")

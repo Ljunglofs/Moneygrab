@@ -193,3 +193,47 @@ Innan ett resultat betyder något: sätt Commission och Slippage i Properties
 (NQ ligger kring 4-5 USD per round turn och minst en tick), kör Deep Backtest
 över några hundra affärer, och kontrollera i Bar Replay att signalen står kvar
 när baren stängt.
+
+## Invite-only och automatisk åtkomst för PRO
+
+Indikatorerna som ingår i PRO är GRABIT Flow Profile (`grabit_vp.pine`),
+GRABIT CVD (`grabit_cvd.pine`) och GRABIT GEX Levels (`grabit_gex_levels.pine`).
+All text som användaren ser är på engelska. Kommentarerna i koden är kvar på
+svenska, eftersom ingen annan ser källkoden i ett invite-only-skript.
+
+### 1. Publicera som invite-only (en gång per skript)
+
+Det kräver TradingView Premium eller högre.
+
+1. Öppna skriptet i Pine Editor, klicka **Publish script**.
+2. Visibility: **Invite-only**. Skriv beskrivningen och publicera.
+3. Uppdateringar görs sedan med **Publish script → Update existing script**.
+   Då behåller alla medlemmar sin åtkomst.
+
+### 2. Koppla appen (Render → grabit-api → Environment)
+
+| Variabel | Värde |
+|---|---|
+| `TV_PINE_IDS` | Skriptens id:n, kommaseparerade, t.ex. `PUB;abc123,PUB;def456,PUB;ghi789`. Id:t står i Pine Editor under skriptets namn (… → *Copy script ID*) eller i nätverksfliken på skriptsidan. |
+| `TV_SESSIONID` | Cookien `sessionid` från din inloggning på tradingview.com (DevTools → Application → Cookies). |
+| `TV_SESSIONID_SIGN` | Cookien `sessionid_sign`, om den finns. |
+
+Klistra aldrig in cookien i chatt eller i repot: den är din inloggning.
+Loggar du ut från TradingView slutar cookien att gälla, och då behöver den
+bytas.
+
+### Så fungerar det
+
+- En PRO-medlem skriver sitt TradingView-namn på medlemskortet i appen.
+- Appen kollar att namnet finns och lägger till det i alla skript i
+  `TV_PINE_IDS`, på samma sätt som *Manage access* gör. Du får en bekräftelse
+  på Telegram.
+- När prenumerationen upphör (uppsagd, obetald eller pausad efter
+  provperioden) tas namnet bort automatiskt från alla skript.
+- Saknas variablerna, eller svarar TradingView med fel, går begäran till dig
+  på Telegram och du lägger till namnet för hand.
+- `GET /api/pro/tradingview/status` visar om automatiken är på och hur många
+  som har fått åtkomst.
+
+Anropen går mot TradingViews interna gränssnitt, inte ett officiellt API.
+Om TradingView ändrar det faller flödet tillbaka till Telegram.

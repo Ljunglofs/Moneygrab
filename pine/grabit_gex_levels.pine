@@ -18,15 +18,15 @@
 //
 // SVAGA VÄGGAR: en vägg som knappt vinner över nästa strike på samma sida
 // ritas prickad och dämpad, märks "Call Wall ?" / "Put Wall ?", och ger inga
-// larm. Kryssa ur "Visa svaga väggar" för att dölja dem helt. Den 22 september
+// larm. Kryssa ur "Show weak walls" för att dölja dem helt. Den 22 september
 // låg guldets två tyngsta callstrikes båda på 0,01 miljarder — vilken som vann
 // avgjordes av brus, och då ska nivån inte se lika säker ut som de andra.
 //
-// LAYOUT: förvalet "Ren" visar exakt tre linjer — Call Wall, Zero Gamma och
+// LAYOUT: förvalet "Clean" visar exakt tre linjer — Call Wall, Zero Gamma och
 // Put Wall — med prispiller i högerkanten och en statusrad överst. Andra
 // väggen (CW2/PW2) är avstängd som förval; kryssa i den om du vill se nästa
-// gammakoncentration innanför huvudväggen. "Nyckelnivåer" lägger
-// till HGEX, Max Pain och EM±, "Alla" resten (0DTE, G+/G−, IV-range, ATR-grid).
+// gammakoncentration innanför huvudväggen. "Key levels" lägger
+// till HGEX, Max Pain och EM±, "All" resten (0DTE, G+/G−, IV-range, ATR-grid).
 //
 // Strängformat: pris,etikett,typ;pris,etikett,typ;...
 // Typer: res sup res0 sup0 flip hgex mpain gpos gneg emh eml emb ivh ivl opo opu opd
@@ -35,40 +35,40 @@
 indicator("GRABIT GEX Levels", overlay = true, max_lines_count = 500, max_labels_count = 500)
 
 // ── Inmatning ──────────────────────────────────────────────────────────────
-const string G_SRC = "GEX-strängar (från /tvgex)"
+const string G_SRC = "GEX strings (from /tvgex)"
 string market = input.string("Auto", "Market", options = ["Auto", "NQ", "GC"], group = G_SRC,
-     tooltip = "Auto: NQ/MNQ/NDX/US100 -> NQ-strängen, GC/MGC/XAU -> GC-strängen.")
+     tooltip = "Auto: NQ/MNQ/NDX/US100 -> NQ string, GC/MGC/XAU -> GC string.")
 string srcNQ  = input.string("", "NQ — levels string", group = G_SRC)
 string srcGC  = input.string("", "GC — levels string", group = G_SRC)
-bool   useSrc = input.bool(true, "Visa GEX-nivåer", group = G_SRC)
-float  pxOff  = input.float(0.0, "Prisjustering (punkter)", step = 0.25, group = G_SRC,
-     tooltip = "0 normalt. Använd bara om din feed (t.ex. CFD) ligger systematiskt bredvid futurespriset.")
+bool   useSrc = input.bool(true, "Show GEX levels", group = G_SRC)
+float  pxOff  = input.float(0.0, "Price offset (points)", step = 0.25, group = G_SRC,
+     tooltip = "0 normally. Only use it if your feed (e.g. a CFD) sits consistently off the futures price.")
 
-const string G_VIEW = "Vy"
-string preset = input.string("Ren", "Nivåer", options = ["Ren", "Nyckelnivåer", "Alla"], group = G_VIEW,
-     tooltip = "Ren: tre linjer — Call Wall, Zero Gamma, Put Wall. Nyckelnivåer: + HGEX, Max Pain, EM±. Alla: + 0DTE, G+/G−, IV-range och ATR-grid.")
-float  secMinSep = input.float(0.4, "Andra väggen: minsta avstånd till första (%)", minval = 0.0, maxval = 5.0, step = 0.1, group = G_VIEW,
-     tooltip = "Ligger andra väggen närmare huvudväggen än så här är det samma vägg ritad två gånger — då ritas den inte. Den 22 september låg Call Wall 31010 och Call Wall 2 30985, tjugofem punkter isär.")
-bool   showWeak = input.bool(true, "Visa svaga väggar", group = G_VIEW,
-     tooltip = "En vägg är svag när den knappt vinner över nästa strike på samma sida — då kan den hoppa när open interest uppdateras. Svaga väggar ritas prickade och märks med ?. Kryssa ur för att dölja dem helt.")
-bool   showSec  = input.bool(false, "Andra väggen (CW2 / PW2)", group = G_VIEW,
-     tooltip = "En extra nivå per håll: närmaste positiva gamma-strike ovanför priset (CW2) och närmaste negativa under (PW2). I vyn Alla visas i stället alla G+/G− med sina egna namn.")
-bool   showHdr  = input.bool(true, "Statusrad överst", group = G_VIEW)
-bool   showTags = input.bool(true, "Prispiller i högerkanten", group = G_VIEW)
-bool   showPx   = input.bool(true, "Piller för aktuellt pris", group = G_VIEW)
+const string G_VIEW = "View"
+string preset = input.string("Clean", "Levels", options = ["Clean", "Key levels", "All"], group = G_VIEW,
+     tooltip = "Clean: three lines — Call Wall, Zero Gamma, Put Wall. Key levels: + HGEX, Max Pain, EM±. All: + 0DTE, G+/G−, IV range and ATR grid.")
+float  secMinSep = input.float(0.4, "Second wall: min distance to first (%)", minval = 0.0, maxval = 5.0, step = 0.1, group = G_VIEW,
+     tooltip = "If the second wall is closer to the main wall than this, it is the same wall drawn twice and is skipped. Example: Call Wall 31010 and Call Wall 2 30985, 25 points apart.")
+bool   showWeak = input.bool(true, "Show weak walls", group = G_VIEW,
+     tooltip = "A wall is weak when it barely beats the next strike on the same side, so it can jump when open interest updates. Weak walls are drawn dotted and marked with ?. Untick to hide them completely.")
+bool   showSec  = input.bool(false, "Second wall (CW2 / PW2)", group = G_VIEW,
+     tooltip = "One extra level each way: the nearest positive-gamma strike above price (CW2) and the nearest negative one below (PW2). The All view shows every G+/G− with its own name instead.")
+bool   showHdr  = input.bool(true, "Status line on top", group = G_VIEW)
+bool   showTags = input.bool(true, "Price pills on the right edge", group = G_VIEW)
+bool   showPx   = input.bool(true, "Pill for current price", group = G_VIEW)
 
-const string G_STYLE = "Utseende"
-string theme = input.string("GRABIT", "Färgtema", options = ["GRABIT", "Klassisk"], group = G_STYLE,
-     tooltip = "GRABIT: Call Wall röd (tak), Put Wall lila (golv). Klassisk: Call Wall grön, Put Wall röd.")
-int    wKey   = input.int(2, "Linjebredd väggar", minval = 1, maxval = 5, group = G_STYLE)
-string tagSz  = input.string("Small", "Textstorlek", options = ["Tiny", "Small", "Normal", "Large"], group = G_STYLE)
-int    tagOff = input.int(8, "Avstånd till kanten (barer)", minval = 1, maxval = 60, group = G_STYLE)
-bool   extBoth = input.bool(false, "Förläng linjer bakåt också", group = G_STYLE)
-bool   useAlerts = input.bool(true, "Larm vid korsning av väggar/flip/HGEX", group = G_STYLE)
+const string G_STYLE = "Appearance"
+string theme = input.string("GRABIT", "Color theme", options = ["GRABIT", "Classic"], group = G_STYLE,
+     tooltip = "GRABIT: Call Wall red (ceiling), Put Wall purple (floor). Classic: Call Wall green, Put Wall red.")
+int    wKey   = input.int(2, "Wall line width", minval = 1, maxval = 5, group = G_STYLE)
+string tagSz  = input.string("Small", "Text size", options = ["Tiny", "Small", "Normal", "Large"], group = G_STYLE)
+int    tagOff = input.int(8, "Distance from edge (bars)", minval = 1, maxval = 60, group = G_STYLE)
+bool   extBoth = input.bool(false, "Extend lines backwards too", group = G_STYLE)
+bool   useAlerts = input.bool(true, "Alert when price crosses walls/flip/HGEX", group = G_STYLE)
 
 // ── Färger ─────────────────────────────────────────────────────────────────
-color cCall = theme == "Klassisk" ? #26A69A : #EF5350
-color cPut  = theme == "Klassisk" ? #EF5350 : #AB47BC
+color cCall = theme == "Classic" ? #26A69A : #EF5350
+color cPut  = theme == "Classic" ? #EF5350 : #AB47BC
 color cFlip = #F0B90B
 color cSoft = #8A8A94
 color cInk  = #0B0B0D
@@ -97,8 +97,8 @@ f_show(string k) =>
     // prickad och dämpad så den syns, men inte som en nivå att luta sig mot.
     bool hidden = (k == "resw" or k == "supw") and not showWeak
     bool base = switch preset
-        "Ren"           => f_isCore(k) or sec
-        "Nyckelnivåer"  => f_isKey(k) or sec
+        "Clean"           => f_isCore(k) or sec
+        "Key levels"  => f_isKey(k) or sec
         => true
     base and not hidden
 
@@ -254,7 +254,7 @@ if barstate.islast
             bool isSec = (k == "gpos" and i == secUp) or (k == "gneg" and i == secDn)
             bool show = f_show(k)
             if k == "gpos" or k == "gneg"
-                show := preset == "Alla" ? true : (showSec and isSec)
+                show := preset == "All" ? true : (showSec and isSec)
             if show and not na(p)
                 color c = f_col(k)
                 array.push(lns, line.new(bar_index - 1, p, bar_index, p,
@@ -311,7 +311,7 @@ if barstate.islast
         table.cell(hdr, 4, 0, na(pw) ? "Put Wall –" : "Put Wall" + pwM + " " + str.tostring(pw, format.mintick),
              text_color = cPut, text_size = size.small)
         if hasZ
-            table.cell(hdr, 5, 0, pos ? "POSITIV GAMMA" : "NEGATIV GAMMA",
+            table.cell(hdr, 5, 0, pos ? "POSITIVE GAMMA" : "NEGATIVE GAMMA",
                  text_color = cInk, bgcolor = pos ? #26A69A : #EF5350,
                  text_size = size.small, text_formatting = text.format_bold)
 
@@ -324,4 +324,4 @@ if useAlerts and barstate.isconfirmed and array.size(aP) > 0
             bool up = close[1] < lv and close >= lv
             bool dn = close[1] > lv and close <= lv
             if up or dn
-                alert("GRABIT GEX · " + f_market() + " korsade " + array.get(aT, i) + " @ " + str.tostring(lv, format.mintick) + (up ? " ▲" : " ▼"), alert.freq_once_per_bar)
+                alert("GRABIT GEX · " + f_market() + " crossed " + array.get(aT, i) + " @ " + str.tostring(lv, format.mintick) + (up ? " ▲" : " ▼"), alert.freq_once_per_bar)

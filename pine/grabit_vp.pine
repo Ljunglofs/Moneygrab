@@ -5,75 +5,75 @@
 // Ändringslogg (senaste):
 //  · ÄNDRAT: Volymsidan i Delta + Volym är en färg (cyan) — den visar bara total volym.
 //    Köp/sälj syns på deltasidan. Högerprofilen räknar åter på pågående session som förval.
-//  · NY: "Senaste sessioner" (förval, 5 st) i högerprofilen, så att den täcker flera dagar och
+//  · NY: "Recent sessions" (förval, 5 st) i högerprofilen, så att den täcker flera dagar och
 //    visar nivåerna från tidigare dagar och inte bara dagens range.
-//  · NY: Profiltyp "Delta + Volym" (förval), ritad som tunna linjer per rad. Vänster om mittlinjen
+//  · NY: Profiltyp "Delta + Volume" (förval), ritad som tunna linjer per rad. Vänster om mittlinjen
 //    är deltat per nivå (cyan = köpare ledde, rött = säljare). Höger är total volym, cyan köpdel
 //    närmast mitten och röd säljdel utanför. Delta och volym står som ren text utan ruta.
 //  · NY: Högerprofilen är delad köp/sälj — säljare åt vänster (röd), köpare åt höger (grön)
 //    runt en mittlinje. Delta i % överst och total volym (köp/sälj) underst. Valfria siffror
-//    per prisnivå. "Klassisk" finns kvar som profiltyp.
+//    per prisnivå. "Classic" finns kvar som profiltyp.
 //    Köp/sälj skattas ur 1-minutersbarer (var i baren den stängde) — inte riktig bid/ask.
 //  · FIX: Dashboardens DELTA räknas nu som (köp − sälj) / total, samma som profilen.
 //  · FIX: Högerprofilens rader ritas med bar-index i stället för tid. Tidsbaserad x hamnade
-//    i helg-/sessionsluckor (fredag kväll, helg) och kollapsade till noll bredd → profilen "borta".
+//    i helg-/sessionsluckor (fredag kväll, helg) och kollapsade till noll bredd → profilen "gone".
 //  · RENSNING: nya defaults — Asia/London av, öppningslabels av, IB-extensioner av, HTF-swingar av,
 //    order blocks av, POC-zoner max 3 utan text, developing POC-spår av, dashboard 4 rader.
 //    Allt finns kvar som val i inställningarna.
 //  · FIX: Last week POC räknas nu ur de stängda sessionsprofilerna.
 //  · POC-zoner per session, developing POC-spår, heatmap, Buy/Sell/Delta, ritstil Streck,
 //    skalning av bredd, pågående session i högerprofilen, VA enligt TV-metoden, HTF swing, SMC-OB.
-indicator("vwap - volume profile with IB / sessions - by Grabit", "Grabit VP", overlay=true, max_boxes_count=500, max_lines_count=500, max_labels_count=500, max_polylines_count=100, max_bars_back=2000)
+indicator("GRABIT Flow Profile", "GRABIT Flow", overlay=true, max_boxes_count=500, max_lines_count=500, max_labels_count=500, max_polylines_count=100, max_bars_back=2000)
 
 // ════════════════════ INPUTS ════════════════════
 // Instrument
 gX = "Instrument"
-presetSel = input.string("Auto", "Preset", options=["Auto", "MNQ/NQ", "GULD (GC/MGC)", "Av"], group=gX, tooltip="Auto känner igen NQ/MNQ och GC/MGC/XAU på tickern. GULD flyttar NY-sessionen till COMEX-pitfönstret (14:20–19:30 svensk tid).")
+presetSel = input.string("Auto", "Preset", options=["Auto", "MNQ/NQ", "GOLD (GC/MGC)", "Off"], group=gX, tooltip="Auto detects NQ/MNQ and GC/MGC/XAU from the ticker. GOLD moves the NY session to the COMEX pit window (08:20–13:30 New York time).")
 
 // VWAP
 gV = "VWAP"
-showVwap  = input.bool(true, "Visa VWAP", group=gV)
+showVwap  = input.bool(true, "Show VWAP", group=gV)
 showB1    = input.bool(true, "Band ±1 SD", group=gV)
 showB2    = input.bool(false, "Band ±2 SD", group=gV)
-fillBand  = input.bool(false, "Fyllnad mellan band", group=gV)
-colVwap   = input.color(color.new(#00e5ff, 0), "VWAP-färg", group=gV)
-colBand   = input.color(color.new(#00e5ff, 92), "Bandfyllnad", group=gV)
+fillBand  = input.bool(false, "Fill between bands", group=gV)
+colVwap   = input.color(color.new(#00e5ff, 0), "VWAP color", group=gV)
+colBand   = input.color(color.new(#00e5ff, 92), "Band fill", group=gV)
 
 // Volume Profile
 gP = "Volume Profile"
-profMode  = input.string("Höger sida", "Läge", options=["Höger sida", "I sessionerna"], group=gP)
-profType  = input.string("Delta + Volym", "Profiltyp (högerläge)", options=["Delta + Volym", "Köp/Sälj (delad)", "Klassisk"], group=gP, tooltip="Delta + Volym: till vänster om mittlinjen deltat per nivå (cyan = fler köpare, rött = fler säljare), till höger total volym i en färg.\nKöp/Sälj (delad): säljare åt vänster, köpare åt höger.")
-deltaShare= input.int(35, "Deltasidans andel av bredden (%)", minval=15, maxval=60, group=gP)
-showDT    = input.bool(true, "Delta och Total vid profilen", group=gP)
-numGroups = input.int(0, "Siffror per nivå (antal grupper, 0 = av)", minval=0, maxval=40, group=gP, tooltip="Slår ihop raderna till så här många nivåer och skriver köp/sälj-volym vid varje, som en footprint. 15–25 brukar vara läsbart.")
-colBuyP   = input.color(color.new(#00e5ff, 10), "Köpare", group=gP)
-colSellP  = input.color(color.new(#ff1744, 10), "Säljare", group=gP)
-res       = input.timeframe("D",  "Profilperiod (session)", group=gP)
-rows      = input.int(400, "Rader per profil", minval=20, maxval=400, group=gP)
+profMode  = input.string("Right side", "Mode", options=["Right side", "In sessions"], group=gP)
+profType  = input.string("Delta + Volume", "Profile type (right mode)", options=["Delta + Volume", "Buy/Sell (split)", "Classic"], group=gP, tooltip="Delta + Volume: left of the center line is delta per level (cyan = more buyers, red = more sellers), right is total volume in one color.\nBuy/Sell (split): sellers to the left, buyers to the right.")
+deltaShare= input.int(35, "Delta side share of width (%)", minval=15, maxval=60, group=gP)
+showDT    = input.bool(true, "Delta and Total at profile", group=gP)
+numGroups = input.int(0, "Numbers per level (groups, 0 = off)", minval=0, maxval=40, group=gP, tooltip="Merges the rows into this many levels and prints buy/sell volume at each, like a footprint. 15–25 is usually readable.")
+colBuyP   = input.color(color.new(#00e5ff, 10), "Buyers", group=gP)
+colSellP  = input.color(color.new(#ff1744, 10), "Sellers", group=gP)
+res       = input.timeframe("D",  "Profile period (session)", group=gP)
+rows      = input.int(400, "Rows per profile", minval=20, maxval=400, group=gP)
 vaPct     = input.float(70, "Value Area %", minval=50, maxval=95, group=gP) / 100
-profSrc   = input.string("Pågående session", "Data i högerprofil", options=["Senaste sessioner", "Pågående session", "Lookback (bars)"], group=gP, tooltip="Senaste sessioner: profilen täcker de senaste N dagarna (inklusive i dag), så att nivåer från tidigare dagar syns.\nPågående session: bara i dag.\nLookback: ett fast antal bars.")
-profDays  = input.int(5, "Antal sessioner i högerprofil", minval=1, maxval=30, group=gP)
-lookback  = input.int(240, "Bars i högerprofil (lookback-läge)", minval=50, maxval=1000, group=gP)
-drawStyle = input.string("Streck (TV-look)", "Ritstil", options=["Streck (TV-look)", "Boxar"], group=gP)
-rowGap    = input.int(25, "Mellanrum mellan rader (%, boxläge)", minval=0, maxval=60, group=gP)
-profScale = input.string("Kvadratrot", "Skalning av bredd", options=["Linjär", "Kvadratrot", "Klipp topp 90%"], group=gP)
-offBars   = input.int(25,  "Avstånd från priset (bars)", minval=2, maxval=100, group=gP)
-profWbars = input.int(80,  "Profilbredd (bars, högerläge)", minval=10, maxval=200, group=gP)
-widthPct  = input.float(18, "Profilbredd % (sessionsläge)", minval=5, maxval=60, group=gP) / 100
-showProf  = input.bool(true,  "Visa profil", group=gP)
-smoothN   = input.int(0, "Utjämning (rader, 0 = av)", minval=0, maxval=10, group=gP)
-showVA    = input.bool(true,  "VAH/VAL-linjer", group=gP)
+profSrc   = input.string("Current session", "Right profile data", options=["Recent sessions", "Current session", "Lookback (bars)"], group=gP, tooltip="Recent sessions: the profile covers the last N days (including today), so levels from earlier days show.\nCurrent session: today only.\nLookback: a fixed number of bars.")
+profDays  = input.int(5, "Sessions in right profile", minval=1, maxval=30, group=gP)
+lookback  = input.int(240, "Bars in right profile (lookback mode)", minval=50, maxval=1000, group=gP)
+drawStyle = input.string("Lines (TV look)", "Draw style", options=["Lines (TV look)", "Boxes"], group=gP)
+rowGap    = input.int(25, "Gap between rows (%, box mode)", minval=0, maxval=60, group=gP)
+profScale = input.string("Square root", "Width scaling", options=["Linear", "Square root", "Clip top 90%"], group=gP)
+offBars   = input.int(25,  "Distance from price (bars)", minval=2, maxval=100, group=gP)
+profWbars = input.int(80,  "Profile width (bars, right mode)", minval=10, maxval=200, group=gP)
+widthPct  = input.float(18, "Profile width % (session mode)", minval=5, maxval=60, group=gP) / 100
+showProf  = input.bool(true,  "Show profile", group=gP)
+smoothN   = input.int(0, "Smoothing (rows, 0 = off)", minval=0, maxval=10, group=gP)
+showVA    = input.bool(true,  "VAH/VAL lines", group=gP)
 showDash  = input.bool(true,  "Dashboard", group=gP)
 colProf   = input.color(color.new(#4b5568, 45), "Bars", group=gP)
-colVAbar  = input.color(color.new(#7f8ca6, 32), "Bars i Value Area", group=gP)
-colPOCbar = input.color(color.new(#ffc400, 12), "POC-bar", group=gP)
-colVA     = input.color(color.new(#00e5ff, 55), "VAH/VAL-linjer", group=gP)
-colPOC    = input.color(color.new(#ffc400, 0), "POC-linje", group=gP)
+colVAbar  = input.color(color.new(#7f8ca6, 32), "Bars in Value Area", group=gP)
+colPOCbar = input.color(color.new(#ffc400, 12), "POC bar", group=gP)
+colVA     = input.color(color.new(#00e5ff, 55), "VAH/VAL lines", group=gP)
+colPOC    = input.color(color.new(#ffc400, 0), "POC line", group=gP)
 
 // Sessioner
-gS = "Sessioner (svensk tid som standard)"
-tzS       = input.string("Europe/Stockholm", "Tidszon", options=["Europe/Stockholm", "Europe/London", "America/New_York", "UTC"], group=gS)
-showAsia  = input.bool(false, "Asien", inline="a", group=gS)
+gS = "Sessions (Stockholm time by default)"
+tzS       = input.string("Europe/Stockholm", "Time zone", options=["Europe/Stockholm", "Europe/London", "America/New_York", "UTC"], group=gS)
+showAsia  = input.bool(false, "Asia", inline="a", group=gS)
 asiaSess  = input.session("0100-0900", "", inline="a", group=gS)
 colAsia   = input.color(color.new(#9d6bff, 0), "", inline="a", group=gS)
 showLdn   = input.bool(false, "London", inline="l", group=gS)
@@ -82,98 +82,98 @@ colLdn    = input.color(color.new(#2979ff, 0), "", inline="l", group=gS)
 showNy    = input.bool(true, "New York", inline="n", group=gS)
 nySess    = input.session("1530-2200", "", inline="n", group=gS)
 colNy     = input.color(color.new(#00e5ff, 0), "", inline="n", group=gS)
-sessLines = input.bool(false, "Sessionslinjer (av = endast text)", group=gS)
-sessTransp= input.int(35, "Tona ner linjer", minval=0, maxval=90, group=gS)
-openLbls  = input.bool(false, "Label vid varje öppning", group=gS)
+sessLines = input.bool(false, "Session lines (off = text only)", group=gS)
+sessTransp= input.int(35, "Fade lines", minval=0, maxval=90, group=gS)
+openLbls  = input.bool(false, "Label at each open", group=gS)
 
 // Initial Balance
 gI = "Initial Balance"
-showIB    = input.bool(true, "Visa IB", group=gI)
-ibAnchor  = input.string("New York", "IB räknas från öppning", options=["New York", "London", "Asien"], group=gI)
-ibMin     = input.int(60, "IB-längd (minuter)", minval=15, maxval=240, group=gI)
-ibExt     = input.int(8, "Stubb-längd (bars ut från priset)", minval=3, maxval=30, group=gI)
-showIBx   = input.bool(false, "Extensioner (Mid, x2)", group=gI)
-ibLabels  = input.bool(true, "IB-breakout (endast alerts)", group=gI)
-colIB     = input.color(color.new(#ffffff, 55), "IB-färg", group=gI)
+showIB    = input.bool(true, "Show IB", group=gI)
+ibAnchor  = input.string("New York", "IB anchored to open", options=["New York", "London", "Asia"], group=gI)
+ibMin     = input.int(60, "IB length (minutes)", minval=15, maxval=240, group=gI)
+ibExt     = input.int(8, "Stub length (bars out from price)", minval=3, maxval=30, group=gI)
+showIBx   = input.bool(false, "Extensions (Mid, x2)", group=gI)
+ibLabels  = input.bool(true, "IB breakout (alerts only)", group=gI)
+colIB     = input.color(color.new(#ffffff, 55), "IB color", group=gI)
 
 // PDH / PDL
-gD2 = "PDH / PDL (gårdagens high/low)"
-showPD    = input.bool(true, "Visa PDH/PDL", group=gD2)
-showPrevVA= input.bool(true, "dVAH/dVAL (gårdagens value area)", group=gD2)
-colPD     = input.color(color.new(#e0e0e0, 30), "Färg", group=gD2)
+gD2 = "PDH / PDL (yesterday's high/low)"
+showPD    = input.bool(true, "Show PDH/PDL", group=gD2)
+showPrevVA= input.bool(true, "dVAH/dVAL (yesterday's value area)", group=gD2)
+colPD     = input.color(color.new(#e0e0e0, 30), "Color", group=gD2)
 var float lastVahP = na
 var float lastValP = na
 
 // POC-nivåer
-gY = "POC-nivåer (Yesterday / Last week)"
-showStubs   = input.bool(true, "Stubbar vid priset", group=gY)
-showWeekDev = input.bool(false, "Visa även pågående veckas POC", group=gY)
+gY = "POC levels (Yesterday / Last week)"
+showStubs   = input.bool(true, "Stubs at price", group=gY)
+showWeekDev = input.bool(false, "Also show this week's POC", group=gY)
 colYpoc     = input.color(color.new(#ffc400, 0), "Yesterday POC", group=gY)
 colWpoc     = input.color(color.new(#ff9100, 0), "Last week POC", group=gY)
 
 // POC-zoner per session
-gZ = "POC-zoner per session"
-zoneOn   = input.bool(true, "POC-zoner (förlängda)", group=gZ)
-zoneMax  = input.int(3, "Max sessioner", minval=1, maxval=30, group=gZ)
-zoneRowsN= input.int(6, "Zonhöjd (rader av profilen)", minval=1, maxval=40, group=gZ)
-zoneExt  = input.bool(true, "Förläng till aktuell bar", group=gZ)
-zoneLbl  = input.bool(false, "Etikett (volym + köp/sälj)", group=gZ)
-zoneMid  = input.bool(true, "Streckad mittlinje", group=gZ)
-zoneKill = input.bool(false, "Ta bort när priset stängt igenom", group=gZ)
-zoneTr   = input.int(70, "Transparens", minval=0, maxval=100, group=gZ)
-colZup   = input.color(color.new(#00e5ff, 0), "Zon under priset", group=gZ)
-colZdn   = input.color(color.new(#f23645, 0), "Zon över priset", group=gZ)
-devOn    = input.bool(false, "Developing POC-spår (pågående session)", group=gZ)
-devRows  = input.int(50, "Rader för spår/heatmap", minval=10, maxval=100, group=gZ)
-heatOn   = input.bool(false, "Heatmap i sessionerna", group=gZ)
-heatMax  = input.int(5, "Heatmap: sessioner", minval=1, maxval=8, group=gZ)
-heatTr   = input.int(75, "Heatmap: transparens", minval=0, maxval=100, group=gZ)
+gZ = "POC zones per session"
+zoneOn   = input.bool(true, "POC zones (extended)", group=gZ)
+zoneMax  = input.int(3, "Max sessions", minval=1, maxval=30, group=gZ)
+zoneRowsN= input.int(6, "Zone height (profile rows)", minval=1, maxval=40, group=gZ)
+zoneExt  = input.bool(true, "Extend to current bar", group=gZ)
+zoneLbl  = input.bool(false, "Label (volume + buy/sell)", group=gZ)
+zoneMid  = input.bool(true, "Dashed center line", group=gZ)
+zoneKill = input.bool(false, "Remove when price closes through", group=gZ)
+zoneTr   = input.int(70, "Transparency", minval=0, maxval=100, group=gZ)
+colZup   = input.color(color.new(#00e5ff, 0), "Zone below price", group=gZ)
+colZdn   = input.color(color.new(#f23645, 0), "Zone above price", group=gZ)
+devOn    = input.bool(false, "Developing POC trail (current session)", group=gZ)
+devRows  = input.int(50, "Rows for trail/heatmap", minval=10, maxval=100, group=gZ)
+heatOn   = input.bool(false, "Heatmap in sessions", group=gZ)
+heatMax  = input.int(5, "Heatmap: sessions", minval=1, maxval=8, group=gZ)
+heatTr   = input.int(75, "Heatmap: transparency", minval=0, maxval=100, group=gZ)
 
 // Trendmoln
-gC = "Trendmoln"
-showCloud = input.bool(false, "Visa moln", group=gC)
-fLen      = input.int(50,  "EMA snabb", group=gC)
-sLen      = input.int(100, "EMA långsam", group=gC)
-colBull   = input.color(color.new(#00e5ff, 92), "Moln upp", group=gC)
-colBear   = input.color(color.new(#ff2e88, 92), "Moln ned", group=gC)
+gC = "Trend cloud"
+showCloud = input.bool(false, "Show cloud", group=gC)
+fLen      = input.int(50,  "EMA fast", group=gC)
+sLen      = input.int(100, "EMA slow", group=gC)
+colBull   = input.color(color.new(#00e5ff, 92), "Cloud up", group=gC)
+colBear   = input.color(color.new(#ff2e88, 92), "Cloud down", group=gC)
 
 // Candles
 gB = "Candles"
-paintBars = input.bool(true, "Färga candles i temat", group=gB)
-colCup    = input.color(color.new(#00e5ff, 0), "Upp", group=gB)
-colCdn    = input.color(color.new(#f23645, 0), "Ned", group=gB)
+paintBars = input.bool(true, "Color candles in theme", group=gB)
+colCup    = input.color(color.new(#00e5ff, 0), "Up", group=gB)
+colCdn    = input.color(color.new(#f23645, 0), "Down", group=gB)
 
 // Extremkanal
-gK = "Extremkanal"
-showCh    = input.bool(false, "Visa kanal", group=gK)
+gK = "Extreme channel"
+showCh    = input.bool(false, "Show channel", group=gK)
 chLen     = input.int(240, "Lookback (bars)", minval=20, maxval=1000, group=gK)
-fillCh    = input.bool(false, "Fyllnad", group=gK)
-colCh     = input.color(color.new(#2aa8b8, 62), "Kanalfärg", group=gK)
-colChFill = input.color(color.new(#2aa8b8, 96), "Fyllnadsfärg", group=gK)
+fillCh    = input.bool(false, "Fill", group=gK)
+colCh     = input.color(color.new(#2aa8b8, 62), "Channel color", group=gK)
+colChFill = input.color(color.new(#2aa8b8, 96), "Fill color", group=gK)
 
 // HTF swing-nivåer
 gSw = "HTF swing high/low"
-swOn      = input.bool(false, "Visa HTF swing-nivåer", group=gSw)
+swOn      = input.bool(false, "Show HTF swing levels", group=gSw)
 swTf1     = input.timeframe("60", "Timeframe 1", group=gSw)
 swTf2     = input.timeframe("240", "Timeframe 2", group=gSw)
-swLen     = input.int(5, "Pivot-längd (bars på HTF)", minval=2, maxval=20, group=gSw)
+swLen     = input.int(5, "Pivot length (bars on HTF)", minval=2, maxval=20, group=gSw)
 swHighs   = input.bool(true, "Swing highs", group=gSw)
 swLows    = input.bool(true, "Swing lows", group=gSw)
-colSw1    = input.color(color.new(#ff5252, 0), "Färg TF1", group=gSw)
-colSw2    = input.color(color.new(#ff1744, 0), "Färg TF2", group=gSw)
+colSw1    = input.color(color.new(#ff5252, 0), "Color TF1", group=gSw)
+colSw2    = input.color(color.new(#ff1744, 0), "Color TF2", group=gSw)
 
 // Order Blocks (SMC / BOS)
 gO = "Order Blocks"
-obOn    = input.bool(false, "Visa order blocks", group=gO)
-obPiv   = input.int(5, "Pivot-längd (struktur)", minval=2, maxval=20, group=gO)
-obConf  = input.string("Close", "BOS-bekräftelse", options=["Close", "Wick"], group=gO)
-obZone  = input.string("Body", "Zon", options=["Body", "Hela range"], group=gO)
-obLook  = input.int(15, "Max bars bak till OB-candlen", minval=3, maxval=50, group=gO)
-obMult  = input.float(1.0, "Displacement-krav (×ATR, 0 = av)", minval=0, step=0.1, group=gO)
-obBosLbl= input.bool(true, "Visa BOS-markering", group=gO)
-obMaxN  = input.int(6, "Max aktiva blocks", minval=2, maxval=20, group=gO)
-obTransp= input.int(40, "Tona ner", minval=0, maxval=90, group=gO)
-obTxt   = input.bool(true, "Visa text i blocken", group=gO)
+obOn    = input.bool(false, "Show order blocks", group=gO)
+obPiv   = input.int(5, "Pivot length (structure)", minval=2, maxval=20, group=gO)
+obConf  = input.string("Close", "BOS confirmation", options=["Close", "Wick"], group=gO)
+obZone  = input.string("Body", "Zone", options=["Body", "Full range"], group=gO)
+obLook  = input.int(15, "Max bars back to OB candle", minval=3, maxval=50, group=gO)
+obMult  = input.float(1.0, "Displacement required (×ATR, 0 = off)", minval=0, step=0.1, group=gO)
+obBosLbl= input.bool(true, "Show BOS marker", group=gO)
+obMaxN  = input.int(6, "Max active blocks", minval=2, maxval=20, group=gO)
+obTransp= input.int(40, "Fade", minval=0, maxval=90, group=gO)
+obTxt   = input.bool(true, "Show text in blocks", group=gO)
 colObUp = input.color(color.new(#00e5ff, 84), "Bull OB", group=gO)
 colObDn = input.color(color.new(#ff2e88, 84), "Bear OB", group=gO)
 
@@ -182,7 +182,7 @@ newWeek = timeframe.change("W")
 
 // Instrument-preset
 bool isGoldSym = syminfo.root == "GC" or syminfo.root == "MGC" or str.contains(syminfo.ticker, "XAU")
-bool useGold   = presetSel == "GULD (GC/MGC)" or (presetSel == "Auto" and isGoldSym)
+bool useGold   = presetSel == "GOLD (GC/MGC)" or (presetSel == "Auto" and isGoldSym)
 string nySessEff = useGold ? "1420-1930" : nySess
 
 // Nedtonade sessionsfärger
@@ -467,7 +467,7 @@ buildProfile() =>
         retValP := sLo + valIdx * step
         int sessLen = bar_index - sessStart
         float maxW = math.max(3, sessLen * widthPct)
-        if showProf and profMode == "I sessionerna" and maxV > 0
+        if showProf and profMode == "In sessions" and maxV > 0
             pts = array.new<chart.point>()
             array.push(pts, chart.point.from_index(sessStart, sLo))
             pva = array.new<chart.point>()
@@ -487,7 +487,7 @@ buildProfile() =>
                 polyline.delete(array.shift(sessPl))
             int wPoc = math.round(array.get(buckets, pocIdx) / maxV * maxW)
             line.new(sessStart, sLo + (pocIdx + 0.5) * step, sessStart + wPoc, sLo + (pocIdx + 0.5) * step, color=colPOCbar, width=2)
-        if showVA and profMode == "I sessionerna"
+        if showVA and profMode == "In sessions"
             line.new(sessStart, retVahP, bar_index, retVahP, color=colVA, width=1)
             line.new(sessStart, retValP, bar_index, retValP, color=colVA, width=1)
         float pocPrice = sLo + (pocIdx + 0.5) * step
@@ -668,7 +668,7 @@ if barstate.islast and array.size(zBx) > 0
         label lb = array.get(zLb, i)
         float bp = array.get(zBuy, i)
         bool bDom = bp >= 50
-        string txt = zoneLbl ? str.tostring(nZ - i) + (nZ - i == 1 ? " session" : " sessioner") + " · Vol " + f_volTxt(array.get(zVol, i)) + " (" + str.tostring(bDom ? bp : 100 - bp, "#") + "% " + (bDom ? "B" : "S") + ")" : ""
+        string txt = zoneLbl ? str.tostring(nZ - i) + (nZ - i == 1 ? " session" : " sessions") + " · Vol " + f_volTxt(array.get(zVol, i)) + " (" + str.tostring(bDom ? bp : 100 - bp, "#") + "% " + (bDom ? "B" : "S") + ")" : ""
         label.set_xy(lb, x2 + 3, mid)
         label.set_text(lb, txt)
         label.set_textcolor(lb, c)
@@ -903,12 +903,12 @@ f_smooth(array<float> a) =>
 
 // Breddskalning av ett enskilt värde.
 f_sc(float v) =>
-    profScale == "Kvadratrot" ? math.sqrt(v) : v
+    profScale == "Square root" ? math.sqrt(v) : v
 
 // Utjämning + kvadratrot på en kopia, för den delade profilens två sidor.
 f_shape(array<float> a) =>
     out = f_smooth(a)
-    if profScale == "Kvadratrot"
+    if profScale == "Square root"
         for j = 0 to rows - 1
             array.set(out, j, math.sqrt(array.get(out, j)))
     out
@@ -963,7 +963,7 @@ var array<box> rBoxes = array.new_box()
 var array<line> rLines = array.new_line()
 var array<label> rLabels = array.new_label()
 var array<polyline> rPolys = array.new<polyline>()
-if showProf and profMode == "Höger sida" and barstate.islast
+if showProf and profMode == "Right side" and barstate.islast
     while array.size(rBoxes) > 0
         box.delete(array.pop(rBoxes))
     while array.size(rLines) > 0
@@ -972,11 +972,11 @@ if showProf and profMode == "Höger sida" and barstate.islast
         label.delete(array.pop(rLabels))
     while array.size(rPolys) > 0
         polyline.delete(array.pop(rPolys))
-    bool useSess = profSrc == "Pågående session" and array.size(bVol) > 0 and not na(sHi)
+    bool useSess = profSrc == "Current session" and array.size(bVol) > 0 and not na(sHi)
     // Senaste sessioner: räkna bakåt till starten av den N:te senaste sessionen. Taket 1999 bars
     // följer max_bars_back; på 1-minutersgraf räcker det till drygt en dag, på 5 minuter till en vecka.
     int nDaysBars = array.size(sessStarts) > 0 ? bar_index - array.get(sessStarts, math.max(0, array.size(sessStarts) - profDays)) + 1 : bar_index + 1
-    int N = useSess ? 0 : math.min(profSrc == "Senaste sessioner" ? nDaysBars : lookback, bar_index + 1, 1999)
+    int N = useSess ? 0 : math.min(profSrc == "Recent sessions" ? nDaysBars : lookback, bar_index + 1, 1999)
     float hh = useSess ? sHi : high
     float ll = useSess ? sLo : low
     if not useSess and N > 0
@@ -1036,14 +1036,14 @@ if showProf and profMode == "Höger sida" and barstate.islast
         [vahIdx, valIdx] = f_va(buckets, pocIdx, totV, vaPct)
         int x0 = bar_index + offBars
         int xE = x0 + profWbars
-        bool dvMode = profType == "Delta + Volym"
+        bool dvMode = profType == "Delta + Volume"
         int half = math.max(5, int(profWbars / 2))
         int wDel = math.max(4, int(profWbars * deltaShare / 100))
         int xc = dvMode ? x0 + wDel : x0 + half
         sellBk = array.new_float(rows, 0.0)
         for j = 0 to rows - 1
             array.set(sellBk, j, math.max(0.0, array.get(buckets, j) - array.get(buyBk, j)))
-        if profType == "Klassisk"
+        if profType == "Classic"
             disp = array.copy(buckets)
             float dMax = maxV
             if smoothN > 0
@@ -1057,13 +1057,13 @@ if showProf and profMode == "Höger sida" and barstate.islast
                     float dv = acc / cnt
                     array.set(disp, j, dv)
                     dMax := math.max(dMax, dv)
-            if profScale == "Kvadratrot"
+            if profScale == "Square root"
                 dMax := 0.0
                 for j = 0 to rows - 1
                     float dv = math.sqrt(array.get(disp, j))
                     array.set(disp, j, dv)
                     dMax := math.max(dMax, dv)
-            else if profScale == "Klipp topp 90%"
+            else if profScale == "Clip top 90%"
                 srt = array.copy(disp)
                 array.sort(srt, order.ascending)
                 float cap = array.get(srt, math.min(rows - 1, int(rows * 0.9)))
@@ -1081,7 +1081,7 @@ if showProf and profMode == "Höger sida" and barstate.islast
                         float y2 = ll + (j + 1) * step - gap
                         bool inVA = j >= valIdx and j <= vahIdx
                         color c = j == pocIdx ? colPOCbar : inVA ? colVAbar : colProf
-                        if drawStyle == "Boxar"
+                        if drawStyle == "Boxes"
                             array.push(rBoxes, box.new(xE - w, y2, xE, y1, border_color=na, bgcolor=c))
                         else
                             float yM = ll + (j + 0.5) * step
@@ -1099,7 +1099,7 @@ if showProf and profMode == "Höger sida" and barstate.islast
                 array.set(dSc, j, f_sc(math.abs(b - s)))
             float mT = array.max(tSc)
             float mD = array.max(dSc)
-            if profScale == "Klipp topp 90%"
+            if profScale == "Clip top 90%"
                 array.sort(tSc, order.ascending)
                 array.sort(dSc, order.ascending)
                 mT := array.get(tSc, math.min(rows - 1, int(rows * 0.9)))
@@ -1140,7 +1140,7 @@ if showProf and profMode == "Höger sida" and barstate.islast
             dB = f_shape(buyBk)
             dS = f_shape(sellBk)
             float dMx = math.max(array.max(dB), array.max(dS))
-            if profScale == "Klipp topp 90%"
+            if profScale == "Clip top 90%"
                 srt = array.concat(array.copy(dB), dS)
                 array.sort(srt, order.ascending)
                 float cap = array.get(srt, math.min(array.size(srt) - 1, int(array.size(srt) * 0.9)))
@@ -1185,11 +1185,11 @@ if showProf and profMode == "Höger sida" and barstate.islast
             color dCol = dPct >= 0 ? colBuyP : colSellP
             // Utan bakgrundsruta: bara text, så att den inte tar över bilden.
             array.push(rLabels, label.new(xc, hh, "Delta " + (dPct >= 0 ? "+" : "") + str.tostring(dPct, "#.##") + "%  " + (dPct >= 0 ? "+" : "-") + f_volTxt(math.abs(totB - totS)), style=label.style_label_down, color=color.new(color.black, 100), textcolor=color.new(dCol, 0), size=size.small))
-            array.push(rLabels, label.new(xc, ll, "Volym " + f_volTxt(totV) + "   Köp " + f_volTxt(totB) + " / Sälj " + f_volTxt(totS), style=label.style_label_up, color=color.new(color.black, 100), textcolor=color.new(color.gray, 10), size=size.small))
+            array.push(rLabels, label.new(xc, ll, "Volume " + f_volTxt(totV) + "   Buy " + f_volTxt(totB) + " / Sell " + f_volTxt(totS), style=label.style_label_up, color=color.new(color.black, 100), textcolor=color.new(color.gray, 10), size=size.small))
         float pocP = ll + (pocIdx + 0.5) * step
         float vahP = ll + (vahIdx + 1) * step
         float valP = ll + valIdx * step
-        bool thin = profType != "Klassisk"
+        bool thin = profType != "Classic"
         array.push(rLines, line.new(x0, pocP, xE, pocP, color=colPOC, width=thin ? 1 : 3))
         array.push(rLines, line.new(x0, vahP, xE, vahP, color=colVA, style=thin ? line.style_dashed : line.style_dotted, width=thin ? 1 : 2))
         array.push(rLines, line.new(x0, valP, xE, valP, color=colVA, style=thin ? line.style_dashed : line.style_dotted, width=thin ? 1 : 2))
@@ -1205,15 +1205,15 @@ if showProf and profMode == "Höger sida" and barstate.islast
 efT = ta.ema(close, fLen)
 esT = ta.ema(close, sLen)
 bool bullBias = efT >= esT
-c1 = plot(showCloud ? efT : na, "EMA snabb", color=color.new(color.gray, 100))
-c2 = plot(showCloud ? esT : na, "EMA långsam", color=color.new(color.gray, 100))
+c1 = plot(showCloud ? efT : na, "EMA fast", color=color.new(color.gray, 100))
+c2 = plot(showCloud ? esT : na, "EMA slow", color=color.new(color.gray, 100))
 fill(c1, c2, color=showCloud ? (bullBias ? colBull : colBear) : na)
 
 // Extremkanal
 chU = ta.highest(high[1], chLen)
 chL = ta.lowest(low[1], chLen)
-pChU = plot(showCh ? chU : na, "Kanal övre", color=colCh, style=plot.style_stepline)
-pChL = plot(showCh ? chL : na, "Kanal undre", color=colCh, style=plot.style_stepline)
+pChU = plot(showCh ? chU : na, "Channel upper", color=colCh, style=plot.style_stepline)
+pChL = plot(showCh ? chL : na, "Channel lower", color=colCh, style=plot.style_stepline)
 fill(pChU, pChL, color=showCh and fillCh ? colChFill : na)
 
 // ════════════════════ DASHBOARD (4 rader) ════════════════════
@@ -1227,20 +1227,20 @@ if barstate.islast and showDash
     float sSell = na(sBuy) ? na : sTot - sBuy
     float sDelta = na(sBuy) or sTot <= 0 ? na : 100 * (sBuy - sSell) / sTot
     table.cell(dash, 0, 0, "VWAP", text_color=dMut, text_size=size.small, text_halign=text.align_left)
-    table.cell(dash, 1, 0, na(vwap) ? "–" : (close >= vwap ? "ÖVER " : "UNDER ") + str.tostring(math.abs(100 * (close - vwap) / vwap), "#.##") + "%", text_color=close >= vwap ? dUp : dDn, text_size=size.small, text_halign=text.align_right)
+    table.cell(dash, 1, 0, na(vwap) ? "–" : (close >= vwap ? "ABOVE " : "BELOW ") + str.tostring(math.abs(100 * (close - vwap) / vwap), "#.##") + "%", text_color=close >= vwap ? dUp : dDn, text_size=size.small, text_halign=text.align_right)
     table.cell(dash, 0, 1, "TREND", text_color=dMut, text_size=size.small, text_halign=text.align_left)
-    table.cell(dash, 1, 1, bullBias ? "UPP" : "NED", text_color=bullBias ? dUp : dDn, text_size=size.small, text_halign=text.align_right)
+    table.cell(dash, 1, 1, bullBias ? "UP" : "DOWN", text_color=bullBias ? dUp : dDn, text_size=size.small, text_halign=text.align_right)
     table.cell(dash, 0, 2, "Y-POC", text_color=colYpoc, text_size=size.small, text_halign=text.align_left)
     table.cell(dash, 1, 2, na(lastPocP) ? "–" : str.tostring(lastPocP, format.mintick), text_color=na(lastPocP) ? dMut : close >= lastPocP ? dUp : dDn, text_size=size.small, text_halign=text.align_right)
     table.cell(dash, 0, 3, "DELTA", text_color=dMut, text_size=size.small, text_halign=text.align_left)
     table.cell(dash, 1, 3, na(sDelta) ? "–" : (sDelta >= 0 ? "+" : "") + str.tostring(sDelta, "#.#") + "%", text_color=na(sDelta) ? dMut : sDelta >= 0 ? dUp : dDn, text_size=size.small, text_halign=text.align_right)
 
 // ════════════════════ ALERTS ════════════════════
-alertcondition(obTouchBar, "Order Block touch", "Priset har gått in i ett aktivt order block")
-alertcondition(ibUpBar, "IB breakout upp", "Stängning över IB High")
-alertcondition(ibDnBar, "IB breakout ned", "Stängning under IB Low")
-alertcondition(swSweepUp, "HTF swing high tagen", "Priset har gått över en HTF swing high")
-alertcondition(swSweepDn, "HTF swing low tagen", "Priset har gått under en HTF swing low")
+alertcondition(obTouchBar, "Order Block touch", "Price has entered an active order block")
+alertcondition(ibUpBar, "IB breakout up", "Close above IB High")
+alertcondition(ibDnBar, "IB breakout down", "Close below IB Low")
+alertcondition(swSweepUp, "HTF swing high taken", "Price has broken above an HTF swing high")
+alertcondition(swSweepDn, "HTF swing low taken", "Price has broken below an HTF swing low")
 
 // ==================== CANDLE-FÄRGER ====================
 barcolor(paintBars ? (close >= open ? colCup : colCdn) : na)
@@ -1249,4 +1249,4 @@ barcolor(paintBars ? (close >= open ? colCup : colCdn) : na)
 var table wm = table.new(position.bottom_right, 1, 1)
 if barstate.islast
     bool noVol = cumVolAll == 0
-    table.cell(wm, 0, 0, noVol ? "GRABIT — INGEN VOLYMDATA · byt till futures (MNQ1!/MGC1!)" : "GRABIT", text_color=noVol ? color.new(#f23645, 0) : color.new(color.gray, 60), text_size=size.small)
+    table.cell(wm, 0, 0, noVol ? "GRABIT — NO VOLUME DATA · switch to futures (MNQ1!/MGC1!)" : "GRABIT", text_color=noVol ? color.new(#f23645, 0) : color.new(color.gray, 60), text_size=size.small)
