@@ -3470,9 +3470,11 @@ async function loadMemberHub(){
   }catch(e){}
   try{var n=localStorage.getItem("grabit_tv");if(n)_tvShow(n);}catch(e){}
 }
-function _tvShow(name){var EN=(window.GRABIT_LANG==="en");var sub=document.getElementById("mh-tv-sub");
-  if(sub)sub.textContent=EN?("Requested for "+name+" — you'll find the scripts under Invite-only scripts in TradingView once we've added you.")
-                           :("Begärt för "+name+" — du hittar skripten under Invite-only scripts i TradingView när vi lagt till dig.");}
+function _tvShow(name,st){var EN=(window.GRABIT_LANG==="en");var sub=document.getElementById("mh-tv-sub");
+  if(!st){try{st=localStorage.getItem("grabit_tv_st")||"pending";}catch(e){st="pending";}}
+  if(sub)sub.textContent=st==="granted"
+    ?(EN?("Access granted for "+name+" — open TradingView → Indicators → Invite-only scripts."):("Klart för "+name+" — öppna TradingView → Indikatorer → Invite-only scripts."))
+    :(EN?("Requested for "+name+" — you'll find the scripts under Invite-only scripts in TradingView once we've added you."):("Begärt för "+name+" — du hittar skripten under Invite-only scripts i TradingView när vi lagt till dig."));}
 async function tvRequest(){
   var EN=(window.GRABIT_LANG==="en");var say=window.pToast||window.say||function(m){alert(m);};
   var inp=document.getElementById("mh-tv-in");var name=inp?inp.value.trim().replace(/^@/,""):"";
@@ -3481,8 +3483,11 @@ async function tvRequest(){
     var r=await fetch(CONFIG.API_BASE.replace(/\/$/,"")+"/api/pro/tradingview",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({token:localStorage.getItem("grabit_token")||"",username:name})});
     var j=await r.json();
-    if(j&&j.ok){try{localStorage.setItem("grabit_tv",name);}catch(e){}_tvShow(name);if(inp)inp.value="";
-      say(EN?"Sent! We'll add you to the indicators.":"Skickat! Vi lägger till dig i indikatorerna.");}
+    if(j&&j.ok){var st=j.status==="granted"?"granted":"pending";
+      try{localStorage.setItem("grabit_tv",name);localStorage.setItem("grabit_tv_st",st);}catch(e){}_tvShow(name,st);if(inp)inp.value="";
+      say(st==="granted"?(EN?"Done! The indicators are in TradingView under Invite-only scripts.":"Klart! Indikatorerna finns i TradingView under Invite-only scripts.")
+                        :(EN?"Sent! We'll add you to the indicators.":"Skickat! Vi lägger till dig i indikatorerna."));}
+    else if(j&&j.error==="unknown_user")say(EN?"No TradingView user named "+name+" — check the spelling.":"Hittar ingen TradingView-användare som heter "+name+" — kolla stavningen.");
     else say(EN?"Couldn't send — is your PRO active?":"Kunde inte skicka — är din PRO aktiv?");
   }catch(e){say(EN?"Couldn't send right now.":"Kunde inte skicka just nu.");}
 }

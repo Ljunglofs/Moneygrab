@@ -247,6 +247,24 @@ def _period_end(sub: dict):
     return sub.get("trial_end")
 
 
+def _revoke_extras(sub_id) -> None:
+    """Prenumerationen har upphört: ta bort det som ligger utanför appen
+    (TradingView-skripten). Appen själv låses via /api/pro/status."""
+    sub_id = str(sub_id or "").strip()
+    if not sub_id:
+        return
+    try:
+        d = _load_ent()
+        keys = [hashlib.sha256(cid.encode("utf-8")).hexdigest()[:16]
+                for cid, sid in d["cid2sub"].items() if sid == sub_id]
+        if keys:
+            import threading
+            import community
+            threading.Thread(target=community.revoke_for_keys, args=(keys,), daemon=True).start()
+    except Exception as e:
+        print("[billing] revoke-fel:", e)
+
+
 # --------------------------------------------------------------------------
 #  Stripe webhook-signatur  (schema: "t=<ts>,v1=<hex>")
 # --------------------------------------------------------------------------
@@ -361,10 +379,13 @@ def register(app) -> None:
         elif etype in ("customer.subscription.created", "customer.subscription.updated"):
             _set_sub(obj.get("id"), status=obj.get("status"),
                      period_end=_period_end(obj))
+            if str(obj.get("status", "")).lower() not in ("active", "trialing", "past_due"):
+                _revoke_extras(obj.get("id"))
             handled = True
 
         elif etype == "customer.subscription.deleted":
             _set_sub(obj.get("id"), status="canceled")
+            _revoke_extras(obj.get("id"))
             handled = True
 
         return {"ok": True, "event": etype, "handled": handled}
