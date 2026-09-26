@@ -251,7 +251,8 @@ footer .socs{margin-left:auto;margin-right:18px}
 .camp{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:12px;max-width:760px;margin:30px auto 0;padding:14px 18px;border-radius:16px;background:linear-gradient(90deg,rgba(255,201,64,.10),rgba(0,229,255,.08));border:1px solid rgba(255,201,64,.4);box-shadow:0 0 34px rgba(255,201,64,.10);text-align:center;color:#e6eef2;font-size:15px}
 .camp b{color:var(--gold2)}
 .camp-pill{font-size:12px;font-weight:700;letter-spacing:.08em;color:#1a1200;background:linear-gradient(180deg,var(--gold2),var(--gold));border-radius:999px;padding:5px 12px;box-shadow:0 0 16px rgba(255,201,64,.55);animation:pulse 2.4s infinite}
-.was{margin-top:8px;color:var(--mut2);font-size:17px;text-decoration:line-through;text-decoration-color:rgba(255,23,68,.8);text-decoration-thickness:2px}
+.was{margin-top:8px;color:var(--mut2);font-size:13.5px}
+.camp-cd{font-size:13px;font-weight:700;color:var(--neon);text-shadow:0 0 10px rgba(0,229,255,.5);letter-spacing:.04em}
 .price .off{position:absolute;top:-12px;right:22px;font-size:11px;font-weight:700;letter-spacing:.06em;color:#fff;background:linear-gradient(180deg,#ff4d6d,var(--red));border-radius:8px;padding:5px 10px;box-shadow:0 0 16px rgba(255,23,68,.5)}
 .price .amount{margin-top:0}
 
@@ -294,7 +295,7 @@ footer .socs{margin-left:auto;margin-right:18px}
         <a class="btn btn-gold" href="/?pw=1" data-t="cta">Start 7 days free &rarr;</a>
         <a class="btn btn-ghost" href="/?app=1" data-t="explore">Explore the app</a>
       </div>
-      <p class="fine" data-t="fine"><b>Free for 7 days</b> · then SEK 174/month · <span class="campfine">early access 50% off</span> · cancel anytime</p>
+      <p class="fine" data-t="fine"><b>Free for 7 days</b> · then SEK 174/month · <span class="campfine">early access price until 31 Dec</span> · cancel anytime</p>
     </div>
     <div class="vis">
       <div class="phone">
@@ -471,11 +472,11 @@ footer .socs{margin-left:auto;margin-right:18px}
       <h2 data-t="h2g">Try everything. <span class="hl">Free for 7 days.</span></h2>
       <p class="sub" data-t="s7">Full access from the first minute. Cancel anytime during the trial and it costs nothing.</p>
     </div>
-    <div class="camp"><span class="camp-pill" data-t="cpill">EARLY ACCESS · 50% OFF</span><span data-t="ctext">Launch campaign &mdash; the prices below are already <b>half the regular price</b>.</span></div>
+    <div class="camp"><span class="camp-pill" data-t="cpill">EARLY ACCESS PRICE</span><span data-t="ctext">Half price until <b>31 December 2026</b>. From 1 January the regular price is SEK 348/month.</span><span class="camp-cd" id="cd"></span></div>
     <div class="prices">
       <div class="price">
-        <span class="off">−50%</span><h3 data-t="pm">Monthly</h3>
-        <div class="was" data-t="wm">SEK 348/mo</div><div class="amount" data-t="pma">SEK 174 <small>/mo</small></div>
+        <span class="off" data-t="offt">−50% until 31 Dec</span><h3 data-t="pm">Monthly</h3>
+        <div class="was" data-t="wm">From 1 Jan 2027: SEK 348/mo</div><div class="amount" data-t="pma">SEK 174 <small>/mo</small></div>
         <div class="save">&nbsp;</div>
         <div class="trial" data-t="tr">7 days free</div>
         <a class="btn btn-ghost" href="/?pw=1&amp;plan=monthly" data-t="ctab">Start 7 days free</a>
@@ -483,15 +484,15 @@ footer .socs{margin-left:auto;margin-right:18px}
       </div>
       <div class="price hot">
         <span class="badge" data-t="badge">3 MONTHS FREE</span>
-        <span class="off" style="right:auto;left:22px">−50%</span><h3 data-t="py">Yearly</h3>
-        <div class="was" data-t="wy">SEK 3,132/yr</div><div class="amount" data-t="pya">SEK 1,566 <small>/yr</small></div>
+        <span class="off" style="right:auto;left:22px" data-t="offt">−50% until 31 Dec</span><h3 data-t="py">Yearly</h3>
+        <div class="was" data-t="wy">From 1 Jan 2027: SEK 3,132/yr</div><div class="amount" data-t="pya">SEK 1,566 <small>/yr</small></div>
         <div class="save" data-t="sv">Save 25% &middot; SEK 130.50/mo</div>
         <div class="trial" data-t="tr">7 days free</div>
         <a class="btn btn-gold" href="/?pw=1&amp;plan=annual" data-t="ctab">Start 7 days free</a>
         <ul><li data-t="l6">Everything in Monthly</li><li data-t="l7">Three months free compared with monthly</li><li data-t="l8">One payment per year</li></ul>
       </div>
     </div>
-    <p class="terms" data-t="terms">Free for 7 days, then SEK 174/month or SEK 1,566/year until you cancel. The subscription <b>renews automatically</b> &mdash; cancel anytime before the period ends, at no charge. A payment card is required. You get a reminder before the first payment. Early access price &mdash; regular price SEK 348/month or SEK 3,132/year.</p>
+    <p class="terms" data-t="terms">Free for 7 days, then SEK 174/month or SEK 1,566/year until you cancel. The subscription <b>renews automatically</b> &mdash; cancel anytime before the period ends, at no charge. A payment card is required. You get a reminder before the first payment. Early access price valid for sign-ups until 31 December 2026; from 1 January 2027 the price is SEK 348/month or SEK 3,132/year.</p>
   </div>
 </section>
 
@@ -548,8 +549,8 @@ var SV={
  n1:"Funktioner",n2:"GEX-nivåer",n3:"Indikatorer",n4:"Priser",n5:"Frågor",openapp:"Öppna appen",try:"Prova gratis",
  newb:"NYTT",pill:"GEX-nivåer för NQ &amp; Guld",
  lead:"<b>GEX-nivåer, The Trump Signal, insiderköp, FDA-kalender, screener och AI-analys</b> &mdash; allt en trader behöver, samlat i en app. Plus våra egna indikatorer för TradingView och en community att handla med.",
- cta:"Starta 7 dagar gratis &rarr;",explore:"Utforska appen",fine:"<b>0 kr i 7 dagar</b> · sedan 174 kr/mån · <span class=\"campfine\">early access 50 % rabatt</span> · avsluta när som helst",
- cpill:"EARLY ACCESS · 50 % RABATT",ctext:"Lanseringskampanj &mdash; priserna nedan är redan <b>halva ordinarie pris</b>.",wm:"348 kr/mån",wy:"3 132 kr/år",
+ cta:"Starta 7 dagar gratis &rarr;",explore:"Utforska appen",fine:"<b>0 kr i 7 dagar</b> · sedan 174 kr/mån · <span class=\"campfine\">early access-pris till 31 dec</span> · avsluta när som helst",
+ cpill:"EARLY ACCESS-PRIS",ctext:"Halva priset till <b>31 december 2026</b>. Från 1 januari är ordinarie pris 348 kr/mån.",wm:"Från 1 jan 2027: 348 kr/mån",wy:"Från 1 jan 2027: 3 132 kr/år",offt:"−50 % till 31 dec",
  nqsub:"Nasdaq 100 (termin)",posg:"Positiv gamma · rörelser brukar dämpas",price:"Pris",ex:"Exempel",
  m1:"Politiker- &amp; VD-köp",m2t:"FDA-kalender",m2:"Bio-beslut",m3:"AI på alla aktier",m4:"660 aktier",
  f1:"Push direkt till mobilen",f2t:"Nya GEX-nivåer",
@@ -597,7 +598,7 @@ var SV={
  l1:"GEX-nivåer NQ &amp; Guld",l3:"Insider Flow &amp; FDA-kalender",l4:"Screener &amp; Ask Grabit",l5:"Indikatorer, Discord &amp; NASDAQ Robber",
  badge:"3 MÅN GRATIS",py:"År",pya:"1 566 kr <small>/år</small>",sv:"Spara 25 % &middot; 130,50 kr/mån",
  l6:"Allt i Månad",l7:"Tre månader gratis jämfört med månadspris",l8:"Ett betalningstillfälle per år",
- terms:"Gratis i 7 dagar, därefter 174 kr/mån eller 1 566 kr/år tills du säger upp. Prenumerationen <b>förnyas automatiskt</b> &mdash; avsluta när som helst innan perioden löper ut, utan avgift. Betalkort krävs. Du får en påminnelse innan första betalningen. Early access-pris &mdash; ordinarie pris 348 kr/mån eller 3 132 kr/år.",
+ terms:"Gratis i 7 dagar, därefter 174 kr/mån eller 1 566 kr/år tills du säger upp. Prenumerationen <b>förnyas automatiskt</b> &mdash; avsluta när som helst innan perioden löper ut, utan avgift. Betalkort krävs. Du får en påminnelse innan första betalningen. Early access-priset gäller för dig som börjar senast 31 december 2026; från 1 januari 2027 är priset 348 kr/mån eller 3 132 kr/år.",
  h2h:"Vanliga frågor",
  fq1:"Vad är GEX-nivåer?",fa1a:"GEX (gamma exposure) visar hur mycket market makers behöver köpa eller sälja när priset rör sig, beräknat ur optionsmarknaden. Där exponeringen är stor uppstår nivåer som priset ofta reagerar mot: Call Wall fungerar som tak, Put Wall som golv, och Gamma Flip skiljer en lugn marknad från en som förstärker rörelserna.",
  fq2:"Hur fungerar provperioden?",fa2a:"Du får full tillgång i 7 dagar utan kostnad. Betalkort krävs för att starta, men ingenting dras under provperioden. Avslutar du innan den löper ut kostar det ingenting. Annars fortsätter prenumerationen automatiskt, och du får en påminnelse innan första betalningen.",
@@ -623,6 +624,13 @@ function applyLang(l){
 }
 function toggleLang(){var l=(document.documentElement.lang==="sv")?"en":"sv";try{localStorage.setItem("grabit_lang",l);}catch(e){}applyLang(l);}
 (function(){var l="en";try{l=localStorage.getItem("grabit_lang")||"en";}catch(e){}applyLang(l);})();
+
+/* Nedräkning till kampanjens slut (31 dec 2026, 23:59 svensk tid). */
+(function(){var el=document.getElementById("cd");if(!el)return;var end=Date.parse("2026-12-31T23:59:59+01:00");
+  function t(){var ms=end-Date.now();if(ms<=0){el.style.display="none";return;}
+    var d=Math.floor(ms/864e5),h=Math.floor(ms%864e5/36e5),sv=document.documentElement.lang==="sv";
+    el.textContent=sv?(d+" dagar "+h+" tim kvar"):(d+" days "+h+" hrs left");}
+  t();setInterval(t,60000);document.addEventListener("click",function(e){if(e.target&&e.target.id==="lang")setTimeout(t,0);});})();
 
 /* Tona in sektionerna när de scrollas fram. */
 (function(){var els=document.querySelectorAll(".feat,.spot>div,.panel,.price,.discord,.final,.center,details");
