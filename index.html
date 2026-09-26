@@ -931,8 +931,9 @@ body.not-pro .discordcard{display:none}
 .p4-hd{display:flex;align-items:center;gap:9px}.p4-hd b{font-size:15.5px;line-height:1.3}
 .p4-pro{font-size:10px;font-weight:800;letter-spacing:.06em;color:#000;background:var(--gold);border-radius:6px;padding:3px 6px;flex:none}
 .p4-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
-.p4{background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px}
+.p4{position:relative;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px}
 .p4 b{display:block;font-size:13px;color:var(--gold2)}.p4 i{display:block;font-style:normal;font-size:11.5px;color:#9aa4b2;margin-top:2px}
+.p4-new{position:absolute;top:8px;right:8px;font-size:9px;font-weight:800;letter-spacing:.05em;color:#000;background:#22d3ee;border-radius:5px;padding:2px 5px}
 .p4-cta{margin-top:12px;text-align:center;padding:11px;border-radius:12px;background:var(--gold);color:#000;font-weight:800;font-size:14px}
 .pw-links{margin-top:10px;text-align:center;font-size:11px;color:#5b6675}
 .pw-links a{color:#8a93a3;text-decoration:none}
@@ -1521,10 +1522,14 @@ else _i18nBoot();
 <main>
   <section class="screen on" id="s-hem">
     <div class="promo4" onclick="showPaywall(null,true)" role="button" aria-label="Starta 7 dagar gratis">
-      <div class="p4-hd"><span class="p4-pro">PRO</span><b>Allt du behöver för att handla NQ &amp; Guld</b></div>
+      <div class="p4-hd"><span class="p4-pro">PRO</span><b>Allt en trader behöver &mdash; i en app</b></div>
       <div class="p4-grid">
-        <div class="p4"><b>GEX-nivåer</b><i>NQ &amp; Guld, varje dag</i></div>
+        <div class="p4"><b>GEX-nivåer</b><i>NQ &amp; Guld, varje dag</i><span class="p4-new">NY</span></div>
         <div class="p4"><b>Trump Signal</b><i>Push när han rör marknaden</i></div>
+        <div class="p4"><b>Screener</b><i>Hela scannern &amp; dagens lägen</i></div>
+        <div class="p4"><b>Ask Grabit</b><i>AI-analys på alla aktier</i></div>
+        <div class="p4"><b>FDA-kalender</b><i>Bio-beslut före marknaden</i></div>
+        <div class="p4"><b>Insider Flow</b><i>Politiker- &amp; VD-köp</i></div>
         <div class="p4"><b>Discord</b><i>Community med traders</i></div>
         <div class="p4"><b>Indikatorer</b><i>GRABIT för TradingView</i></div>
       </div>
@@ -1632,7 +1637,7 @@ else _i18nBoot();
     <div class="pw-trial" id="pw-sub"><b>7 dagar gratis</b></div>
     <div class="pw-big"><span class="pw-149">0 kr</span><span class="pw-per">i 7 dagar</span></div>
     <div class="pw-cancel" id="pw-after">Sedan 174 kr/mån. Avsluta när som helst.</div>
-    <div class="pw-feats2"><div class="pwf"><span class="pwf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18"/><path d="M3 6h18" stroke-dasharray="3 2"/><path d="M3 13h18"/><path d="M6 20V9M10 20V4M14 20V11M18 20V7"/></svg></span><span class="pwf-tx"><b>GEX-nivåer NQ &amp; Guld</b><i>Call Wall, Put Wall &amp; Gamma Flip varje dag</i></span></div><div class="pwf"><span class="pwf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></span><span class="pwf-tx"><b>The Trump Signal</b><i>Push direkt när Trump rör marknaden</i></span></div><div class="pwf"><span class="pwf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.6A8 8 0 1 1 21 12z"/></svg></span><span class="pwf-tx"><b>Discord-community</b><i>Setups &amp; nivåer med andra traders</i></span></div><div class="pwf"><span class="pwf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 4 8-9"/><path d="M15 7h5v5"/></svg></span><span class="pwf-tx"><b>GRABIT-indikatorer</b><i>Flow Profile, CVD &amp; GEX Levels för TradingView</i></span></div><div class="pw-plus">+ AI-analys, screeners, larm och allt annat i appen</div></div>
+    <div class="pw-feats2"><div class="pwf"><span class="pwf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18"/><path d="M3 6h18" stroke-dasharray="3 2"/><path d="M3 13h18"/><path d="M6 20V9M10 20V4M14 20V11M18 20V7"/></svg></span><span class="pwf-tx"><b>GEX-nivåer NQ &amp; Guld</b><i>Call Wall, Put Wall &amp; Gamma Flip varje dag</i></span></div><div class="pwf"><span class="pwf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></span><span class="pwf-tx"><b>The Trump Signal</b><i>Push direkt när Trump rör marknaden</i></span></div><div class="pwf"><span class="pwf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.6A8 8 0 1 1 21 12z"/></svg></span><span class="pwf-tx"><b>Discord-community</b><i>Setups &amp; nivåer med andra traders</i></span></div><div class="pwf"><span class="pwf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 4 8-9"/><path d="M15 7h5v5"/></svg></span><span class="pwf-tx"><b>GRABIT-indikatorer</b><i>Flow Profile, CVD &amp; GEX Levels för TradingView</i></span></div><div class="pw-plus">+ Screener, Ask Grabit, FDA-kalender, Insider Flow och push-larm</div></div>
     <div class="pw-buybox">
       <div class="pw-plans">
         <button type="button" class="pw-plan on" data-plan="monthly" onclick="setProPlan('monthly',this)"><span class="pp-t">Månad</span><span class="pp-p">174 kr<i>/mån</i></span></button>
