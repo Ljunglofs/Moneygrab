@@ -234,6 +234,19 @@ def _active_for_email(email: str) -> bool:
     return False
 
 
+def _period_end(sub: dict):
+    """Periodslut för en prenumeration. Sedan API-versionen 2025-03-31 ligger
+    fältet på prenumerationsraderna, inte på själva prenumerationen."""
+    pe = sub.get("current_period_end")
+    if pe:
+        return pe
+    items = ((sub.get("items") or {}).get("data")) or []
+    ends = [i.get("current_period_end") for i in items if i.get("current_period_end")]
+    if ends:
+        return max(ends)
+    return sub.get("trial_end")
+
+
 # --------------------------------------------------------------------------
 #  Stripe webhook-signatur  (schema: "t=<ts>,v1=<hex>")
 # --------------------------------------------------------------------------
@@ -347,7 +360,7 @@ def register(app) -> None:
 
         elif etype in ("customer.subscription.created", "customer.subscription.updated"):
             _set_sub(obj.get("id"), status=obj.get("status"),
-                     period_end=obj.get("current_period_end"))
+                     period_end=_period_end(obj))
             handled = True
 
         elif etype == "customer.subscription.deleted":
