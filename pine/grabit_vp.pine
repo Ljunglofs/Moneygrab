@@ -3,6 +3,8 @@
 // Klistra in i TradingView Pine Editor -> Save -> Add to chart.
 //
 // Ändringslogg (senaste):
+//  · NY: "Senaste sessioner" (förval, 5 st) i högerprofilen, så att den täcker flera dagar och
+//    visar nivåerna från tidigare dagar och inte bara dagens range.
 //  · NY: Profiltyp "Delta + Volym" (förval), ritad som tunna linjer per rad. Vänster om mittlinjen
 //    är deltat per nivå (cyan = köpare ledde, rött = säljare). Höger är total volym, cyan köpdel
 //    närmast mitten och röd säljdel utanför. Delta och volym står som ren text utan ruta.
@@ -47,7 +49,8 @@ colSellP  = input.color(color.new(#ff1744, 10), "Säljare", group=gP)
 res       = input.timeframe("D",  "Profilperiod (session)", group=gP)
 rows      = input.int(400, "Rader per profil", minval=20, maxval=400, group=gP)
 vaPct     = input.float(70, "Value Area %", minval=50, maxval=95, group=gP) / 100
-profSrc   = input.string("Pågående session", "Data i högerprofil", options=["Pågående session", "Lookback (bars)"], group=gP)
+profSrc   = input.string("Senaste sessioner", "Data i högerprofil", options=["Senaste sessioner", "Pågående session", "Lookback (bars)"], group=gP, tooltip="Senaste sessioner: profilen täcker de senaste N dagarna (inklusive i dag), så att nivåer från tidigare dagar syns.\nPågående session: bara i dag.\nLookback: ett fast antal bars.")
+profDays  = input.int(5, "Antal sessioner i högerprofil", minval=1, maxval=30, group=gP)
 lookback  = input.int(240, "Bars i högerprofil (lookback-läge)", minval=50, maxval=1000, group=gP)
 drawStyle = input.string("Streck (TV-look)", "Ritstil", options=["Streck (TV-look)", "Boxar"], group=gP)
 rowGap    = input.int(25, "Mellanrum mellan rader (%, boxläge)", minval=0, maxval=60, group=gP)
@@ -579,6 +582,7 @@ if newWeek and weekId > 0
 if newWeek
     weekId += 1
 
+var array<int> sessStarts = array.new<int>()
 if newSess
     array.clear(bHi)
     array.clear(bLo)
@@ -587,6 +591,9 @@ if newSess
     sessStart := bar_index
     sHi := high
     sLo := low
+    array.push(sessStarts, bar_index)
+    if array.size(sessStarts) > 31
+        array.shift(sessStarts)
 
 int nLtf = array.size(ltfV)
 if nLtf > 0
@@ -970,7 +977,10 @@ if showProf and profMode == "Höger sida" and barstate.islast
     while array.size(rPolys) > 0
         polyline.delete(array.pop(rPolys))
     bool useSess = profSrc == "Pågående session" and array.size(bVol) > 0 and not na(sHi)
-    int N = useSess ? 0 : math.min(lookback, bar_index + 1)
+    // Senaste sessioner: räkna bakåt till starten av den N:te senaste sessionen. Taket 1999 bars
+    // följer max_bars_back; på 1-minutersgraf räcker det till drygt en dag, på 5 minuter till en vecka.
+    int nDaysBars = array.size(sessStarts) > 0 ? bar_index - array.get(sessStarts, math.max(0, array.size(sessStarts) - profDays)) + 1 : bar_index + 1
+    int N = useSess ? 0 : math.min(profSrc == "Senaste sessioner" ? nDaysBars : lookback, bar_index + 1, 1999)
     float hh = useSess ? sHi : high
     float ll = useSess ? sLo : low
     if not useSess and N > 0

@@ -129,6 +129,12 @@ Högerprofilen har tre typer:
 - **Köp/Sälj (delad)**: säljvolym åt vänster, köpvolym åt höger.
 - **Klassisk**: den gamla enfärgade profilen.
 
+Profilen täcker som förval de **senaste 5 sessionerna** ("Data i
+högerprofil"), så att nivåerna från tidigare dagar syns och inte bara dagens
+range. Antalet går att ändra. "Pågående session" ger bara i dag och "Lookback"
+ett fast antal bars. Högst 1999 bars räknas, vilket på 5-minutersgraf räcker
+till drygt en vecka men på 1-minutersgraf bara till lite mer än en dag.
+
 Överst står deltat för hela profilen, (köp − sälj) / total i procent och i
 kontrakt. Underst står total volym uppdelad på köp och sälj. "Siffror per
 nivå" slår ihop raderna till N nivåer och skriver ut värdena vid varje nivå,
