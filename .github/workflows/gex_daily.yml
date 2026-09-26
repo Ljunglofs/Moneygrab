@@ -25,6 +25,7 @@
 # Secrets (Settings -> Secrets and variables -> Actions):
 #   TELEGRAM_TOKEN  samma bot som roboten
 #   CHAT_ID         din chat
+#   TELEGRAM_MEMBERS_CHAT_ID  (valfri) medlemskanalen, standard GRABIT-kanalen
 name: GEX Daily Levels
 
 on:
@@ -114,6 +115,8 @@ jobs:
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
+          # GRABIT-kanalen på Telegram (PRO-medlemmar). Boten måste vara admin där.
+          TELEGRAM_MEMBERS_CHAT_ID: ${{ secrets.TELEGRAM_MEMBERS_CHAT_ID || '-1003509671256' }}
           EVENT: ${{ github.event_name }}
           FORCE: ${{ inputs.force }}
         run: |

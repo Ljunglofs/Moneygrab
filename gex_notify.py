@@ -144,17 +144,32 @@ def build_message(results, fallback=None):
     return "\n".join(parts)
 
 
-def send_telegram(text):
-    token, chat = os.environ.get("TELEGRAM_TOKEN", ""), os.environ.get("CHAT_ID", "")
-    if not (token and chat):
-        print("TELEGRAM_TOKEN/CHAT_ID saknas — skickar inte.")
-        return False
+def _post(token, chat, text):
     import requests
     r = requests.post(f"https://api.telegram.org/bot{token}/sendMessage",
                       json={"chat_id": chat, "text": text, "parse_mode": "HTML",
                             "disable_web_page_preview": True}, timeout=20)
+    return r
+
+
+def send_telegram(text):
+    """Skickar till ägarens chatt (CHAT_ID) och, om den är satt, till
+    medlemskanalen (TELEGRAM_MEMBERS_CHAT_ID — GRABIT-kanalen för PRO).
+    Returvärdet gäller ägarens chatt: den styr låset för dagens fönster."""
+    token, chat = os.environ.get("TELEGRAM_TOKEN", ""), os.environ.get("CHAT_ID", "")
+    if not (token and chat):
+        print("TELEGRAM_TOKEN/CHAT_ID saknas — skickar inte.")
+        return False
+    r = _post(token, chat, text)
     ok = r.status_code == 200
     print("Telegram:", "skickat" if ok else f"{r.status_code} {r.text[:200]}")
+    members = os.environ.get("TELEGRAM_MEMBERS_CHAT_ID", "").strip()
+    if ok and members and members != chat:
+        try:
+            m = _post(token, members, text)
+            print("Telegram (medlemskanalen):", "skickat" if m.status_code == 200 else f"{m.status_code} {m.text[:200]}")
+        except Exception as e:
+            print("Telegram (medlemskanalen) fel:", e)
     return ok
 
 
