@@ -20,7 +20,9 @@ ENV (Render)
   TELEGRAM_TOKEN, CHAT_ID   ägarens Telegram — dit TradingView-begäran skickas
   TV_SESSIONID          cookien "sessionid" från ägarens inloggning på tradingview.com
   TV_SESSIONID_SIGN     cookien "sessionid_sign" (valfri, krävs på vissa konton)
-  TV_PINE_IDS           skriptens id:n, kommaseparerade (PUB;xxxx — syns i skriptets URL/källa)
+  TV_PINE_IDS           (valfri) skriptens id:n, kommaseparerade (PUB;xxxx). Saknas den
+                        hittas ägarens publicerade skript med "GRABIT" i namnet automatiskt.
+  TV_SCRIPT_MATCH       (valfri) text som skriptnamnen ska innehålla, standard GRABIT
 """
 
 import os
@@ -82,9 +84,42 @@ def _tell_owner(text: str) -> bool:
 _TV_BASE = "https://www.tradingview.com"
 
 
+_TV_FOUND = {"ts": 0.0, "scripts": []}
+
+
+def _tv_discover():
+    """Hittar ägarens publicerade skript själv (samma lista som TradingView visar
+    under "My scripts"), så TV_PINE_IDS inte behöver fyllas i för hand.
+    Tar skript vars namn innehåller TV_SCRIPT_MATCH (standard "GRABIT").
+    Cachas en timme."""
+    if time.time() - _TV_FOUND["ts"] < 3600 and _TV_FOUND["scripts"]:
+        return _TV_FOUND["scripts"]
+    if not os.environ.get("TV_SESSIONID", "").strip():
+        return []
+    match = os.environ.get("TV_SCRIPT_MATCH", "GRABIT").lower()
+    found = []
+    try:
+        r = _tv_session().get("https://pine-facade.tradingview.com/pine-facade/list/",
+                              params={"filter": "published"}, timeout=15)
+        items = r.json() if r.status_code == 200 else []
+        for it in items or []:
+            pid = str(it.get("scriptIdPart") or "")
+            name = str(it.get("scriptName") or it.get("scriptTitle") or "")
+            if pid.startswith("PUB;") and match in name.lower():
+                found.append({"id": pid, "name": name})
+        if r.status_code != 200:
+            print("[community] pine-facade list: %s %s" % (r.status_code, r.text[:200]))
+    except Exception as e:
+        print("[community] kunde inte lista skript:", e)
+    _TV_FOUND.update(ts=time.time(), scripts=found)
+    return found
+
+
 def _tv_cfg():
     sid = os.environ.get("TV_SESSIONID", "").strip()
     ids = [p.strip() for p in os.environ.get("TV_PINE_IDS", "").split(",") if p.strip()]
+    if sid and not ids:
+        ids = [x["id"] for x in _tv_discover()]
     return sid, ids
 
 
@@ -229,4 +264,6 @@ def register(app) -> None:
         cnt = {}
         for e in d.values():
             cnt[e.get("status", "?")] = cnt.get(e.get("status", "?"), 0) + 1
-        return {"auto": bool(sid and ids), "scripts": len(ids), "requests": cnt}
+        names = [x["name"] for x in _TV_FOUND["scripts"]] if not os.environ.get("TV_PINE_IDS") else []
+        return {"auto": bool(sid and ids), "session_set": bool(sid), "scripts": len(ids),
+                "script_names": names, "requests": cnt}
