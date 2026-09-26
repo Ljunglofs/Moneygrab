@@ -92,8 +92,9 @@ jobs:
 
   levels:
     # Manuell körning från en testbranch kör bara diagnosen ovan — inget
-    # hamnar i Telegram förrän koden ligger på main.
-    if: github.event_name == 'schedule' || github.ref_name == 'main'
+    # hamnar i Telegram förrän koden ligger på main. Undantag: "force" i en
+    # manuell körning skickar på riktigt, för att testa från en branch.
+    if: github.event_name == 'schedule' || github.ref_name == 'main' || inputs.force
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
