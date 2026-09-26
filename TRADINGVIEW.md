@@ -116,13 +116,23 @@ inte licensierad orderflow, men nära på NQ och GC.
 VWAP, volymprofil, Initial Balance, sessioner, POC-nivåer och order blocks i
 samma overlay.
 
-Högerprofilen är som förval delad i köp och sälj: säljvolym åt vänster (röd),
-köpvolym åt höger (grön) runt en mittlinje, med POC, VAH och VAL som tidigare.
-Delen utanför value area tonas ner. Överst står deltat, (köp − sälj) / total
-i procent och i kontrakt. Underst står total volym uppdelad på köp och sälj.
-"Siffror per nivå" slår ihop raderna till N nivåer och skriver köp- och
-säljvolym vid varje nivå, som en enkel footprint. "Klassisk" under Profiltyp ger
-den gamla enfärgade profilen.
+Högerprofilen har tre typer:
+
+- **Delta + Volym** (förval), samma upplägg som orderflow-plattformarnas
+  profiler, ritad med en tunn linje per prisrad. Till **höger** om mittlinjen
+  står den totala volymen: den gröna delen närmast mitten är köp och den röda
+  delen utanför är sälj, så hela linjens längd är volymen på nivån. Till
+  **vänster** står deltat, köp − sälj på nivån. Linjen är grön när köparna
+  ledde och röd när säljarna gjorde det, och längden visar hur stor övervikten
+  var. Deltasidan skalas för sig, eftersom deltat alltid är mycket mindre än
+  volymen.
+- **Köp/Sälj (delad)**: säljvolym åt vänster, köpvolym åt höger.
+- **Klassisk**: den gamla enfärgade profilen.
+
+Överst står deltat för hela profilen, (köp − sälj) / total i procent och i
+kontrakt. Underst står total volym uppdelad på köp och sälj. "Siffror per
+nivå" slår ihop raderna till N nivåer och skriver ut värdena vid varje nivå,
+som en enkel footprint.
 
 Köp och sälj skattas ur 1-minutersbarer: en intrabar som stänger högt i sitt
 spann räknas mest som köp, en som stänger lågt mest som sälj. Det är en

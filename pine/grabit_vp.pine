@@ -3,6 +3,9 @@
 // Klistra in i TradingView Pine Editor -> Save -> Add to chart.
 //
 // Ändringslogg (senaste):
+//  · NY: Profiltyp "Delta + Volym" (förval), ritad som tunna linjer per rad. Vänster om mittlinjen
+//    är deltat per nivå (grönt = köpare ledde, rött = säljare). Höger är total volym, grön köpdel
+//    närmast mitten och röd säljdel utanför. Delta och volym står som ren text utan ruta.
 //  · NY: Högerprofilen är delad köp/sälj — säljare åt vänster (röd), köpare åt höger (grön)
 //    runt en mittlinje. Delta i % överst och total volym (köp/sälj) underst. Valfria siffror
 //    per prisnivå. "Klassisk" finns kvar som profiltyp.
@@ -35,11 +38,12 @@ colBand   = input.color(color.new(#00e5ff, 92), "Bandfyllnad", group=gV)
 // Volume Profile
 gP = "Volume Profile"
 profMode  = input.string("Höger sida", "Läge", options=["Höger sida", "I sessionerna"], group=gP)
-profType  = input.string("Köp/Sälj (delad)", "Profiltyp (högerläge)", options=["Köp/Sälj (delad)", "Klassisk"], group=gP, tooltip="Delad: säljare åt vänster, köpare åt höger om mittlinjen.")
+profType  = input.string("Delta + Volym", "Profiltyp (högerläge)", options=["Delta + Volym", "Köp/Sälj (delad)", "Klassisk"], group=gP, tooltip="Delta + Volym: till vänster om mittlinjen deltat per nivå (grönt = fler köpare, rött = fler säljare), till höger total volym där den gröna delen är köp och den röda sälj.\nKöp/Sälj (delad): säljare åt vänster, köpare åt höger.")
+deltaShare= input.int(35, "Deltasidans andel av bredden (%)", minval=15, maxval=60, group=gP)
 showDT    = input.bool(true, "Delta och Total vid profilen", group=gP)
 numGroups = input.int(0, "Siffror per nivå (antal grupper, 0 = av)", minval=0, maxval=40, group=gP, tooltip="Slår ihop raderna till så här många nivåer och skriver köp/sälj-volym vid varje, som en footprint. 15–25 brukar vara läsbart.")
-colBuyP   = input.color(color.new(#26a69a, 20), "Köpare", group=gP)
-colSellP  = input.color(color.new(#ef5350, 20), "Säljare", group=gP)
+colBuyP   = input.color(color.new(#26a69a, 10), "Köpare", group=gP)
+colSellP  = input.color(color.new(#ef5350, 10), "Säljare", group=gP)
 res       = input.timeframe("D",  "Profilperiod (session)", group=gP)
 rows      = input.int(400, "Rader per profil", minval=20, maxval=400, group=gP)
 vaPct     = input.float(70, "Value Area %", minval=50, maxval=95, group=gP) / 100
@@ -49,7 +53,7 @@ drawStyle = input.string("Streck (TV-look)", "Ritstil", options=["Streck (TV-loo
 rowGap    = input.int(25, "Mellanrum mellan rader (%, boxläge)", minval=0, maxval=60, group=gP)
 profScale = input.string("Kvadratrot", "Skalning av bredd", options=["Linjär", "Kvadratrot", "Klipp topp 90%"], group=gP)
 offBars   = input.int(25,  "Avstånd från priset (bars)", minval=2, maxval=100, group=gP)
-profWbars = input.int(60,  "Profilbredd (bars, högerläge)", minval=10, maxval=200, group=gP)
+profWbars = input.int(80,  "Profilbredd (bars, högerläge)", minval=10, maxval=200, group=gP)
 widthPct  = input.float(18, "Profilbredd % (sessionsläge)", minval=5, maxval=60, group=gP) / 100
 showProf  = input.bool(true,  "Visa profil", group=gP)
 smoothN   = input.int(0, "Utjämning (rader, 0 = av)", minval=0, maxval=10, group=gP)
@@ -875,8 +879,8 @@ if obOn and barstate.isconfirmed
                     label.new(bar_index, bosLvl, "BOS", style = bosUp ? label.style_label_down : label.style_label_up, color = color.new(color.black, 100), textcolor = bosUp ? color.new(#00e5ff, 20) : color.new(#ff2e88, 20), size = size.tiny)
 
 // ════════════════════ HÖGERPROFIL (bar-index, funkar i helgluckor) ════════════════════
-// Utjämning + kvadratrot på en kopia, för den delade profilens två sidor.
-f_shape(array<float> a) =>
+// Utjämning på en kopia.
+f_smooth(array<float> a) =>
     out = array.copy(a)
     if smoothN > 0
         for j = 0 to rows - 1
@@ -886,6 +890,15 @@ f_shape(array<float> a) =>
                 acc += array.get(a, q)
                 cnt += 1
             array.set(out, j, acc / cnt)
+    out
+
+// Breddskalning av ett enskilt värde.
+f_sc(float v) =>
+    profScale == "Kvadratrot" ? math.sqrt(v) : v
+
+// Utjämning + kvadratrot på en kopia, för den delade profilens två sidor.
+f_shape(array<float> a) =>
+    out = f_smooth(a)
     if profScale == "Kvadratrot"
         for j = 0 to rows - 1
             array.set(out, j, math.sqrt(array.get(out, j)))
@@ -902,6 +915,46 @@ f_sidePoly(array<float> d, int j0, int j1, float lo, float st, int xc, int dir, 
         array.push(pts, chart.point.from_index(xc + dir * w, lo + (j + 1) * st))
     array.push(pts, chart.point.from_index(xc, lo + (j1 + 1) * st))
     polyline.new(pts, closed=true, line_color=color.new(c, 100), fill_color=c)
+
+// Delta + Volym för raderna j0..j1: en tunn linje per rad, som i orderflow-plattformarnas profiler.
+// Varje färg är en öppen polyline som går ut längs raden och tillbaka till mittlinjen innan den
+// tar nästa rad, så att vägen mellan raderna hamnar på mittlinjen och inte syns. Det ger en linje
+// per rad med bara fyra polylines, där 400 rader × 3 linjer skulle spräcka max_lines_count.
+//  Höger: total volym. Röd linje ut till hela volymen, grön köpdel ovanpå från mittlinjen.
+//  Vänster: deltat (köp − sälj). Grönt när köparna ledde på nivån, rött när säljarna gjorde det.
+f_dvPolys(array<float> bb, array<float> ss, int j0, int j1, float lo, float st, int xc, int wV, int wD, float mT, float mD, color cB, color cS) =>
+    pSell = array.new<chart.point>()
+    pBuy  = array.new<chart.point>()
+    pPos  = array.new<chart.point>()
+    pNeg  = array.new<chart.point>()
+    for j = j0 to j1
+        float b = array.get(bb, j)
+        float s = array.get(ss, j)
+        float t = b + s
+        float y = lo + (j + 0.5) * st
+        int wT = t > 0 and mT > 0 ? math.round(math.min(1.0, f_sc(t) / mT) * wV) : 0
+        int wB = t > 0 ? math.round(wT * b / t) : 0
+        int wd = mD > 0 ? math.round(math.min(1.0, f_sc(math.abs(b - s)) / mD) * wD) : 0
+        int wP = b >= s ? wd : 0
+        int wN = b < s ? wd : 0
+        array.push(pSell, chart.point.from_index(xc, y))
+        array.push(pSell, chart.point.from_index(xc + wT, y))
+        array.push(pSell, chart.point.from_index(xc, y))
+        array.push(pBuy, chart.point.from_index(xc, y))
+        array.push(pBuy, chart.point.from_index(xc + wB, y))
+        array.push(pBuy, chart.point.from_index(xc, y))
+        array.push(pPos, chart.point.from_index(xc, y))
+        array.push(pPos, chart.point.from_index(xc - wP, y))
+        array.push(pPos, chart.point.from_index(xc, y))
+        array.push(pNeg, chart.point.from_index(xc, y))
+        array.push(pNeg, chart.point.from_index(xc - wN, y))
+        array.push(pNeg, chart.point.from_index(xc, y))
+    res = array.new<polyline>()
+    array.push(res, polyline.new(pSell, line_color=cS, line_width=1))
+    array.push(res, polyline.new(pBuy, line_color=cB, line_width=1))
+    array.push(res, polyline.new(pPos, line_color=cB, line_width=1))
+    array.push(res, polyline.new(pNeg, line_color=cS, line_width=1))
+    res
 
 var array<box> rBoxes = array.new_box()
 var array<line> rLines = array.new_line()
@@ -977,8 +1030,10 @@ if showProf and profMode == "Höger sida" and barstate.islast
         [vahIdx, valIdx] = f_va(buckets, pocIdx, totV, vaPct)
         int x0 = bar_index + offBars
         int xE = x0 + profWbars
+        bool dvMode = profType == "Delta + Volym"
         int half = math.max(5, int(profWbars / 2))
-        int xc = x0 + half
+        int wDel = math.max(4, int(profWbars * deltaShare / 100))
+        int xc = dvMode ? x0 + wDel : x0 + half
         sellBk = array.new_float(rows, 0.0)
         for j = 0 to rows - 1
             array.set(sellBk, j, math.max(0.0, array.get(buckets, j) - array.get(buyBk, j)))
@@ -1025,6 +1080,54 @@ if showProf and profMode == "Höger sida" and barstate.islast
                         else
                             float yM = ll + (j + 0.5) * step
                             array.push(rLines, line.new(xE - w, yM, xE, yM, color=color.new(c, math.max(0, color.t(c) - 20)), width=1))
+        else if dvMode
+            sB = f_smooth(buyBk)
+            sS = f_smooth(sellBk)
+            // Volymsidan och deltasidan skalas var för sig: deltat är alltid mycket mindre än volymen.
+            tSc = array.new_float(rows, 0.0)
+            dSc = array.new_float(rows, 0.0)
+            for j = 0 to rows - 1
+                float b = array.get(sB, j)
+                float s = array.get(sS, j)
+                array.set(tSc, j, f_sc(b + s))
+                array.set(dSc, j, f_sc(math.abs(b - s)))
+            float mT = array.max(tSc)
+            float mD = array.max(dSc)
+            if profScale == "Klipp topp 90%"
+                array.sort(tSc, order.ascending)
+                array.sort(dSc, order.ascending)
+                mT := array.get(tSc, math.min(rows - 1, int(rows * 0.9)))
+                mD := array.get(dSc, math.min(rows - 1, int(rows * 0.9)))
+            int wVol = xE - xc
+            // Utanför value area tonas ner.
+            color bOut = color.new(colBuyP, math.min(95, color.t(colBuyP) + 50))
+            color sOut = color.new(colSellP, math.min(95, color.t(colSellP) + 50))
+            if mT > 0
+                if valIdx > 0
+                    plLo = f_dvPolys(sB, sS, 0, valIdx - 1, ll, step, xc, wVol, wDel, mT, mD, bOut, sOut)
+                    array.concat(rPolys, plLo)
+                plVa = f_dvPolys(sB, sS, valIdx, vahIdx, ll, step, xc, wVol, wDel, mT, mD, colBuyP, colSellP)
+                array.concat(rPolys, plVa)
+                if vahIdx < rows - 1
+                    plHi = f_dvPolys(sB, sS, vahIdx + 1, rows - 1, ll, step, xc, wVol, wDel, mT, mD, bOut, sOut)
+                    array.concat(rPolys, plHi)
+            array.push(rLines, line.new(xc, ll, xc, hh, color=color.new(color.gray, 20), width=1))
+            // Siffror per nivå: deltat till vänster, total volym till höger.
+            if numGroups > 0
+                int g = math.min(numGroups, rows)
+                for gi = 0 to g - 1
+                    int a0 = int(gi * rows / g)
+                    int a1 = math.max(a0, int((gi + 1) * rows / g) - 1)
+                    float gb = 0.0
+                    float gs = 0.0
+                    for j = a0 to a1
+                        gb += array.get(buyBk, j)
+                        gs += array.get(sellBk, j)
+                    if gb + gs > 0
+                        float gy = ll + (a0 + a1 + 1) / 2.0 * step
+                        float gd = gb - gs
+                        array.push(rLabels, label.new(xc - 1, gy, (gd >= 0 ? "+" : "-") + f_volTxt(math.abs(gd)), style=label.style_label_right, color=color.new(color.black, 100), textcolor=color.new(gd >= 0 ? colBuyP : colSellP, 0), size=size.tiny))
+                        array.push(rLabels, label.new(xc + 1, gy, f_volTxt(gb + gs), style=label.style_label_left, color=color.new(color.black, 100), textcolor=color.new(color.gray, 10), size=size.tiny))
         else
             // Delad profil: säljare åt vänster, köpare åt höger. Båda sidor skalas mot samma max
             // så att en sida som är dubbelt så bred också har dubbelt så mycket volym.
@@ -1074,14 +1177,16 @@ if showProf and profMode == "Höger sida" and barstate.islast
             float totS = totV - totB
             float dPct = 100 * (totB - totS) / totV
             color dCol = dPct >= 0 ? colBuyP : colSellP
-            array.push(rLabels, label.new(xc, hh, "Delta: " + (dPct >= 0 ? "+" : "") + str.tostring(dPct, "#.##") + "%  (" + (dPct >= 0 ? "+" : "-") + f_volTxt(math.abs(totB - totS)) + ")", style=label.style_label_down, color=color.new(dCol, 0), textcolor=color.white, size=size.small))
-            array.push(rLabels, label.new(xc, ll, "Total: " + f_volTxt(totV) + "\nKöp " + f_volTxt(totB) + " · Sälj " + f_volTxt(totS), style=label.style_label_up, color=color.new(color.gray, 35), textcolor=color.white, size=size.small))
+            // Utan bakgrundsruta: bara text, så att den inte tar över bilden.
+            array.push(rLabels, label.new(xc, hh, "Delta " + (dPct >= 0 ? "+" : "") + str.tostring(dPct, "#.##") + "%  " + (dPct >= 0 ? "+" : "-") + f_volTxt(math.abs(totB - totS)), style=label.style_label_down, color=color.new(color.black, 100), textcolor=color.new(dCol, 0), size=size.small))
+            array.push(rLabels, label.new(xc, ll, "Volym " + f_volTxt(totV) + "   Köp " + f_volTxt(totB) + " / Sälj " + f_volTxt(totS), style=label.style_label_up, color=color.new(color.black, 100), textcolor=color.new(color.gray, 10), size=size.small))
         float pocP = ll + (pocIdx + 0.5) * step
         float vahP = ll + (vahIdx + 1) * step
         float valP = ll + valIdx * step
-        array.push(rLines, line.new(x0, pocP, xE, pocP, color=colPOC, width=3))
-        array.push(rLines, line.new(x0, vahP, xE, vahP, color=colVA, style=line.style_dotted, width=2))
-        array.push(rLines, line.new(x0, valP, xE, valP, color=colVA, style=line.style_dotted, width=2))
+        bool thin = profType != "Klassisk"
+        array.push(rLines, line.new(x0, pocP, xE, pocP, color=colPOC, width=thin ? 1 : 3))
+        array.push(rLines, line.new(x0, vahP, xE, vahP, color=colVA, style=thin ? line.style_dashed : line.style_dotted, width=thin ? 1 : 2))
+        array.push(rLines, line.new(x0, valP, xE, valP, color=colVA, style=thin ? line.style_dashed : line.style_dotted, width=thin ? 1 : 2))
         array.push(rLines, line.new(x0, hh, xE, hh, color=color.new(color.gray, 40), style=line.style_dotted))
         array.push(rLines, line.new(x0, ll, xE, ll, color=color.new(color.gray, 40), style=line.style_dotted))
         array.push(rLabels, label.new(xE + 1, pocP, "POC", style=label.style_label_left, color=color.new(color.black, 100), textcolor=colPOC, size=size.small))
