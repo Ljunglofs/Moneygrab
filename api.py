@@ -5064,9 +5064,15 @@ def _facit_log_today():
         if not r or not r.get("last") or r.get("ticker") in seen:
             continue
         seen.add(r.get("ticker"))
+        stop = r.get("ob_support") or r.get("atr_dn_1")
+        mal = r.get("atr_up_1")
         rows.append({"datum": tid, "roll": roll, "ticker": r["ticker"],
                      "tier": r.get("tier") or _pick_tier(r, reg), "regim": reg,
                      "pris": round(float(r["last"]), 2),
+                     # Stopp och mål som appen visar — facit mäter picken som affär.
+                     "stopp": round(float(stop), 2) if stop else None,
+                     "mal": round(float(mal), 2) if mal else None,
+                     "rs": r.get("rs_rating"),
                      "score": int(r.get("setup_score") or 0) or int(round(float(r.get("score10") or 0) * 10)),
                      "label": r.get("label", "")})
     _facit_save(rows)
@@ -5092,11 +5098,65 @@ def _trading_days_since(datum_str):
     return n
 
 
+def _facit_trade(e, h):
+    """Picken som affär: vad kom först inom 10 handelsdagar — stoppen eller målet?
+    Resultat i R (risk-multiplar): -1 = stoppad, +x = målet nåddes."""
+    try:
+        entry, stop, mal = float(e["pris"]), e.get("stopp"), e.get("mal")
+        if not stop or not mal or float(stop) >= entry or float(mal) <= entry:
+            return None
+        stop, mal = float(stop), float(mal)
+        risk = entry - stop
+        fut = h.iloc[1:11]
+        if len(fut) < 10:
+            return None
+        for _, bar in fut.iterrows():
+            if float(bar["Low"]) <= stop:
+                return -1.0
+            if float(bar["High"]) >= mal:
+                return round((mal - entry) / risk, 2)
+        return round((float(fut["Close"].iloc[-1]) - entry) / risk, 2)
+    except Exception:
+        return None
+
+
+def _facit_evaluate_long():
+    """10- och 20-dagarsutfall + affärsutfall för picks som hunnit bli så gamla.
+    Max 3 hämtningar per pass."""
+    rows = _facit_load()
+    todo = [e for e in rows if e.get("utfall_pct") is not None and (
+        ("utfall10_pct" not in e and _trading_days_since(e.get("datum", "")) >= 10) or
+        ("utfall20_pct" not in e and _trading_days_since(e.get("datum", "")) >= 20))][:3]
+    if not todo:
+        return
+    for e in todo:
+        try:
+            h = yf.Ticker(e["ticker"]).history(start=e["datum"], auto_adjust=True)
+            if h is None or h.empty:
+                continue
+            c = h["Close"].dropna()
+            p0 = float(e["pris"])
+            if "utfall10_pct" not in e and len(c) >= 11:
+                e["utfall10_pct"] = round((float(c.iloc[10]) - p0) / p0 * 100, 2)
+                tr = _facit_trade(e, h)
+                if tr is not None:
+                    e["affar_r"] = tr
+            if "utfall20_pct" not in e and len(c) >= 21:
+                e["utfall20_pct"] = round((float(c.iloc[20]) - p0) / p0 * 100, 2)
+        except Exception as ex:
+            print("Facit (10/20 d): %s: %s" % (e.get("ticker"), ex))
+    _facit_save(rows)
+
+
 def _facit_evaluate():
     """Mäter utfall för picks som är 5 handelsdagar gamla. Max 3 per pass (yfinance-snällt)."""
     import datetime as _dt2
     if yf is None:
         return
+    try:
+        _facit_evaluate_long()
+    except Exception as ex:
+        print("Facit (10/20 d) fel:", ex)
     rows = _facit_load()
     todo = [e for e in rows if "utfall_pct" not in e
             and _trading_days_since(e.get("datum", "")) >= _FACIT_EVAL_TRADING][:3]
@@ -5271,6 +5331,22 @@ def facit():
                 }
         if per_tier:
             stats["per_tier"] = per_tier
+        # Längre horisonter och picken som affär (stopp/mål) — ärligare än 5 dagar.
+        for key, name in (("utfall10_pct", "d10"), ("utfall20_pct", "d20")):
+            g = [e[key] for e in klara[-40:] if e.get(key) is not None]
+            if len(g) >= 5:
+                stats[name] = {"antal": len(g), "traffprocent": round(sum(1 for x in g if x > 0) / len(g) * 100),
+                               "snitt_pct": round(sum(g) / len(g), 1)}
+        ar = [e["affar_r"] for e in klara[-40:] if e.get("affar_r") is not None]
+        if len(ar) >= 5:
+            stats["affar"] = {"antal": len(ar), "snitt_r": round(sum(ar) / len(ar), 2),
+                              "vinst_pct": round(sum(1 for x in ar if x > 0) / len(ar) * 100)}
+        per_roll = {}
+        for e in klara[-60:]:
+            per_roll.setdefault(e.get("roll", "?"), []).append(e["utfall_pct"])
+        stats["per_roll"] = {k: {"antal": len(v), "snitt_pct": round(sum(v) / len(v), 1),
+                                 "traffprocent": round(sum(1 for x in v if x > 0) / len(v) * 100)}
+                             for k, v in per_roll.items() if len(v) >= 3}
     else:
         stats = {"antal": 0}
     # Loggade men ännu ej utvärderade picks — visas så kortet aldrig står tomt.
