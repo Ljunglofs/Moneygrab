@@ -307,6 +307,21 @@ footer .socs{margin-left:auto;margin-right:18px}
 .rv{opacity:0;transform:translateY(22px);transition:opacity .8s ease,transform .8s ease}
 .rv.in{opacity:1;transform:none}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}.rv{opacity:1;transform:none;transition:none}}
+
+/* Neonrutnät i bakgrunden på fler sektioner, några med svag guldglöd */
+.gridsec{isolation:isolate}
+.gridsec:before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
+  background-image:linear-gradient(rgba(0,229,255,.10) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,.10) 1px,transparent 1px);background-size:56px 56px;filter:drop-shadow(0 0 3px rgba(0,229,255,.55));
+  -webkit-mask-image:radial-gradient(ellipse 75% 70% at 50% 50%,#000 25%,transparent 78%);mask-image:radial-gradient(ellipse 75% 70% at 50% 50%,#000 25%,transparent 78%)}
+.gridsec:after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
+  background:radial-gradient(620px 340px at 50% 45%,rgba(0,229,255,.11),transparent 70%)}
+.gridsec.gold:before{background-image:linear-gradient(rgba(0,229,255,.09) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,.09) 1px,transparent 1px)}
+.gridsec.gold:after{background:radial-gradient(560px 320px at 70% 40%,rgba(255,201,64,.17),transparent 70%),radial-gradient(520px 300px at 22% 70%,rgba(0,229,255,.09),transparent 70%)}
+.gridsec.gold.l:after{background:radial-gradient(560px 320px at 25% 45%,rgba(255,201,64,.17),transparent 70%),radial-gradient(520px 300px at 80% 65%,rgba(0,229,255,.09),transparent 70%)}
+.facts{isolation:isolate}
+.facts:before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background-image:linear-gradient(rgba(0,229,255,.09) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,.09) 1px,transparent 1px);background-size:56px 56px;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 20%,#000 80%,transparent);mask-image:linear-gradient(90deg,transparent,#000 20%,#000 80%,transparent)}
+@media (prefers-reduced-transparency:reduce){.gridsec:before,.gridsec:after{display:none}}
 </style>
 </head>
 <body>
@@ -386,7 +401,7 @@ footer .socs{margin-left:auto;margin-right:18px}
   </div>
 </div>
 
-<section id="features">
+<section class="gridsec" id="features">
   <div class="wrap">
     <div class="center">
       <div class="eyebrow" data-t="e1">Everything in one app</div>
@@ -410,7 +425,7 @@ footer .socs{margin-left:auto;margin-right:18px}
   </div>
 </section>
 
-<section id="screener" style="padding-top:10px">
+<section class="gridsec" id="screener" style="padding-top:10px">
   <div class="wrap">
     <div class="center">
       <div class="eyebrow" data-t="e6">Live from the GRABIT Screener</div>
@@ -451,7 +466,7 @@ footer .socs{margin-left:auto;margin-right:18px}
   </div>
 </section>
 
-<section id="gex" style="padding-top:20px">
+<section class="gridsec gold" id="gex" style="padding-top:20px">
   <div class="wrap spot">
     <div>
       <div class="eyebrow" data-t="e2">New · GEX levels</div>
@@ -498,7 +513,7 @@ footer .socs{margin-left:auto;margin-right:18px}
   </div>
 </section>
 
-<section id="indicators" style="padding-top:20px">
+<section class="gridsec" id="indicators" style="padding-top:20px">
   <div class="wrap spot">
     <div>
       <div class="eyebrow" data-t="e3">GRABIT indicators for TradingView</div>
@@ -554,7 +569,7 @@ footer .socs{margin-left:auto;margin-right:18px}
   </div>
 </section>
 
-<section id="pricing">
+<section class="gridsec gold l" id="pricing">
   <div class="wrap">
     <div class="center">
       <div class="eyebrow" data-t="n4">Pricing</div>
@@ -604,7 +619,7 @@ footer .socs{margin-left:auto;margin-right:18px}
   </div>
 </section>
 
-<section style="padding-top:20px">
+<section class="gridsec gold" style="padding-top:20px">
   <div class="wrap">
     <div class="final">
       <h2 data-t="h2i">Ready to see the market <span class="hl">like the pros?</span></h2>

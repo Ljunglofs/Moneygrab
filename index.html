@@ -1076,10 +1076,10 @@ body.not-pro .memberhub{display:none}
 html{background:#020305}
 /* Rutnät och glöd bakom hela appen — syns även runt mobilkolumnen på datorn */
 html::before{content:"";position:fixed;inset:0;z-index:-2;pointer-events:none;
-  background-image:linear-gradient(rgba(0,229,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,.05) 1px,transparent 1px);background-size:56px 56px;
-  -webkit-mask-image:radial-gradient(ellipse 90% 70% at 50% 0%,#000 25%,transparent 80%);mask-image:radial-gradient(ellipse 90% 70% at 50% 0%,#000 25%,transparent 80%)}
+  background-image:linear-gradient(rgba(0,229,255,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,.08) 1px,transparent 1px);background-size:56px 56px;filter:drop-shadow(0 0 3px rgba(0,229,255,.5));
+  -webkit-mask-image:radial-gradient(ellipse 90% 70% at 50% 0%,#000 25%,transparent 80%),radial-gradient(ellipse 60% 45% at 15% 75%,#000 10%,transparent 75%),radial-gradient(ellipse 55% 40% at 90% 55%,#000 10%,transparent 75%);mask-image:radial-gradient(ellipse 90% 70% at 50% 0%,#000 25%,transparent 80%),radial-gradient(ellipse 60% 45% at 15% 75%,#000 10%,transparent 75%),radial-gradient(ellipse 55% 40% at 90% 55%,#000 10%,transparent 75%)}
 html::after{content:"";position:fixed;inset:0;z-index:-3;pointer-events:none;
-  background:radial-gradient(700px 420px at 50% -8%,rgba(0,229,255,.14),transparent 70%),radial-gradient(520px 380px at 95% 110%,rgba(255,201,64,.06),transparent 70%),#020305}
+  background:radial-gradient(700px 420px at 50% -8%,rgba(0,229,255,.14),transparent 70%),radial-gradient(560px 380px at 12% 78%,rgba(255,201,64,.13),transparent 70%),radial-gradient(480px 340px at 92% 52%,rgba(0,229,255,.06),transparent 70%),radial-gradient(520px 380px at 95% 110%,rgba(255,201,64,.06),transparent 70%),#020305}
 body{background:transparent!important}
 @media (min-width:600px){body{box-shadow:0 0 0 1px rgba(0,229,255,.10),0 0 80px rgba(0,229,255,.07);background:rgba(2,3,5,.72)!important}}
 
