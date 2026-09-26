@@ -111,6 +111,64 @@ inte licensierad orderflow, men nära på NQ och GC.
 - Auto använder minutupplösning. Sekundtidsramar (1S/5S/15S) ger finare delta men
   kräver TradingView Premium — utan Premium ger de körfelet RE10063.
 
+## Grabit VP (`pine/grabit_vp.pine`)
+
+VWAP, volymprofil, Initial Balance, sessioner, POC-nivåer och order blocks i
+samma overlay.
+
+Högerprofilen har tre typer:
+
+- **Delta + Volym** (förval), samma upplägg som orderflow-plattformarnas
+  profiler, ritad med en tunn linje per prisrad. Till **höger** om mittlinjen
+  står den totala volymen på nivån, i en färg. Till
+  **vänster** står deltat, köp − sälj på nivån. Linjen är cyan när köparna
+  ledde och röd när säljarna gjorde det, och längden visar hur stor övervikten
+  var. Deltasidan skalas för sig, eftersom deltat alltid är mycket mindre än
+  volymen.
+- **Köp/Sälj (delad)**: säljvolym åt vänster, köpvolym åt höger.
+- **Klassisk**: den gamla enfärgade profilen.
+
+Profilen täcker som förval **pågående session** ("Data i högerprofil"). Det
+är dagens nivåer, och tillsammans med gårdagens (dVAH/dVAL, Yesterday POC) är
+det dem man daytradar mot. "Senaste sessioner" (5 som förval) ger en
+flerdagarsprofil för större nivåer och målzoner, och "Lookback" ett fast antal
+bars. Högst 1999 bars räknas, vilket på 5-minutersgraf räcker
+till drygt en vecka men på 1-minutersgraf bara till lite mer än en dag.
+
+Överst står deltat för hela profilen, (köp − sälj) / total i procent och i
+kontrakt. Underst står total volym uppdelad på köp och sälj. "Siffror per
+nivå" slår ihop raderna till N nivåer och skriver ut värdena vid varje nivå,
+som en enkel footprint.
+
+Köp och sälj skattas ur 1-minutersbarer: en intrabar som stänger högt i sitt
+spann räknas mest som köp, en som stänger lågt mest som sälj. Det är en
+approximation, inte riktig bid/ask-data. Siffrorna blir därför något jämnare än
+i en riktig footprint, och kan skilja lite från CVD-indikatorn ovan, som räknar
+hela intrabaren åt ett håll.
+
+## Grabit CVD (`pine/grabit_cvd.pine`)
+
+CVD i egen panel med fyra rader i tabellen: SIDA (vem som leder dagen), DIV
+(divergens eller absorption nyligen), BRÄNSLE (om deltat växer åt sidans håll)
+och TRYCK.
+
+- **Tryck 0–100** är en RSI räknad på deltat: andelen köpdelta av allt delta,
+  utjämnat över 14 barer. Över 70 betyder att köparna har dominerat ovanligt
+  mycket, under 30 att säljarna har gjort det. Välj "Panel: Tryck (0–100)" för
+  att se linjen. Vill du se både CVD och Tryck, lägg till indikatorn två gånger.
+  Överköpt betyder starkt flöde, inte automatiskt vändning. Signalen är när
+  trycket lämnar zonen igen, särskilt vid en nivå, och det finns larm för det.
+- **Divergens**: priset gör en ny extrem men CVD gör det inte, och priset stänger
+  sedan tillbaka.
+- **Absorption**: deltat är minst 30 % av barens volym, men baren rör sig lite
+  och stänger åt andra hållet. Någon står emot trycket.
+- **Nivåfilter** (på som förval): signaler ges bara inom 0,5 × ATR från VWAP
+  ±1 SD, PDH/PDL eller en GEX-nivå. GEX-strängen klistras in som i GRABIT GEX
+  Levels och används bara för det senaste dygnet, eftersom det är dagens nivåer.
+  Etiketten i prisgrafen säger vilken nivå signalen kom vid.
+- CVD nollställs som förval vid **RTH-öppningen** (15:30 svensk tid för NQ,
+  COMEX 08:20 New York-tid för guld), så att nattens handel inte ligger med.
+
 ## GRABIT Breakout · strategy (`pine/grabit_breakout_strategy.pine`)
 
 Backtestbar version av den signaltyp som säljs som "Weakness Below X /

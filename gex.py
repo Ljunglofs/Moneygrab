@@ -452,6 +452,79 @@ def _save_disk(all_data):
         print("[gex] kunde inte spara cache:", e)
 
 
+# ---- Basis: futures minus index -------------------------------------------
+# Terminen prisas som index plus ränta minus utdelning fram till kontraktets
+# förfall: F - S = S * (r - q) * T. För NQ i slutet av september, med
+# decemberkontraktet 84 dagar bort, är det ungefär +230 punkter — alltid
+# positivt så länge räntan är högre än utdelningen.
+#
+# Den 24 september sparades ändå basisen -174,75: optionskedjan från CBOE
+# bar fortfarande gårdagens stängningskurser när den lästes 10:07 ET, och
+# futuren hade hunnit falla. Alla NQ-nivåer hamnade drygt 350 punkter för
+# lågt — Call Wall under priset. En uppmätt basis används därför bara om den
+# ligger nära det teoretiska värdet; annars används det teoretiska.
+NDX_DIV_YIELD = float(os.environ.get("GEX_NDX_DIV", "0.007"))
+BASIS_TOL_PCT = float(os.environ.get("GEX_BASIS_TOL_PCT", "0.004"))   # 0,4 % ~ 120 NQ-punkter
+ROLL_DAYS = int(os.environ.get("GEX_ROLL_DAYS", "8"))                 # CME rullar ~8 dagar före förfall
+
+
+def _third_friday(y, m):
+    from datetime import date
+    first = date(y, m, 1)
+    return date(y, m, 1 + (4 - first.weekday()) % 7 + 14)
+
+
+def _quarterly_expiries(today, n=3):
+    """De n närmaste kvartalsförfallen (mars/juni/sep/dec, tredje fredagen) från today."""
+    out, y, m = [], today.year, today.month
+    while len(out) < n:
+        if m in (3, 6, 9, 12):
+            e = _third_friday(y, m)
+            if e >= today:
+                out.append(e)
+        m += 1
+        if m > 12:
+            m, y = 1, y + 1
+    return out
+
+
+def front_expiry(today=None):
+    """Kontraktet en kontinuerlig NQ-serie följer: närmaste kvartal, men nästa
+    när det är mindre än ROLL_DAYS kvar (då har volymen rullat)."""
+    today = today or datetime.now(timezone.utc).date()
+    ex = _quarterly_expiries(today, 2)
+    return ex[1] if (ex[0] - today).days < ROLL_DAYS else ex[0]
+
+
+def carry_basis(index_px, today=None, expiry=None):
+    """Teoretisk basis F - S för NQ mot NDX, i indexpunkter."""
+    today = today or datetime.now(timezone.utc).date()
+    expiry = expiry or front_expiry(today)
+    T = max((expiry - today).days, 0) / 365.0
+    return index_px * (RISK_FREE - NDX_DIV_YIELD) * T
+
+
+def basis_ok(basis, index_px, today=None):
+    """Är en uppmätt basis rimlig? Den jämförs mot både det närmaste och nästa
+    kvartalskontraktet, så att rullveckan inte fäller en korrekt mätning."""
+    if basis is None or not index_px:
+        return False
+    today = today or datetime.now(timezone.utc).date()
+    tol = BASIS_TOL_PCT * index_px
+    return any(abs(basis - carry_basis(index_px, today, e)) <= tol
+               for e in _quarterly_expiries(today, 2))
+
+
+def pick_basis(measured, index_px, today=None):
+    """(basis, källa): den uppmätta om den håller, annars den teoretiska."""
+    if measured is not None and basis_ok(measured, index_px, today):
+        return measured, "live"
+    cb = carry_basis(index_px, today)
+    if measured is not None:
+        print(f"[gex] basis {measured:.1f} orimlig (teoretisk {cb:.1f}) — använder teoretisk")
+    return cb, "carry"
+
+
 def to_futures(levels, fut_price, etf_price, ratio=None, basis=None):
     """Skala ETF-nivåer till futures. ratio=None ger live-kvoten fut/etf.
     Utanför USA-börsens öppettider är ETF-kursen gårdagens stängning, och då
@@ -460,14 +533,21 @@ def to_futures(levels, fut_price, etf_price, ratio=None, basis=None):
     if not levels or not fut_price or not (etf_price or ratio or basis is not None):
         return None
     # Index: futures = index + basis (additivt). ETF: futures = strike x kvot.
+    # sc() flyttar en PRISNIVÅ, sw() skalar ett AVSTÅND (expected move,
+    # IV-range). Ett avstånd är lika stort i index och futures, så i
+    # basis-läget ska det inte få basisen påslagen. Förut blev NQ:s expected
+    # move 199 + (-174,75) = 24 punkter den 25 september.
     if basis is not None:
         r = round(fut_price / etf_price, 4) if etf_price else None
         def sc(x):
             return round(x + basis, 2) if x is not None else None
+        def sw(x):
+            return round(x, 2) if x is not None else None
     else:
         r = ratio if ratio else fut_price / etf_price
         def sc(x):
             return round(x * r, 2) if x is not None else None
+        sw = sc
     return {
         "ratio": (round(r, 4) if r else None), "basis": (round(basis, 2) if basis is not None else None),
         "fut_price": fut_price, "etf_price": etf_price,
@@ -484,8 +564,8 @@ def to_futures(levels, fut_price, etf_price, ratio=None, basis=None):
         "hgex": sc(levels.get("hgex")), "gpos": [sc(k) for k in levels.get("gpos", [])],
         "gneg": [sc(k) for k in levels.get("gneg", [])],
         "call_wall_0": sc(levels.get("call_wall_0")), "put_wall_0": sc(levels.get("put_wall_0")),
-        "max_pain": sc(levels.get("max_pain")), "em": sc(levels.get("em_straddle")),
-        "iv_1d": sc(levels.get("iv_1d")), "near_expiry": levels.get("near_expiry"),
+        "max_pain": sc(levels.get("max_pain")), "em": sw(levels.get("em_straddle")),
+        "iv_1d": sw(levels.get("iv_1d")), "near_expiry": levels.get("near_expiry"),
         "em_src": levels.get("em_src"), "flip_uncertain": levels.get("flip_uncertain", False),
         "flip_inverted": levels.get("flip_inverted", False),
     }
@@ -540,9 +620,13 @@ def get_gex(inst, fut_price=None, force=False, prefer=None):
     out = dict(data)
     if fut_price:
         sp = data["levels"]["spot"]
-        out["futures"] = (to_futures(data["levels"], fut_price, sp, basis=fut_price - sp)
-                          if data.get("mapping") == "basis"
-                          else to_futures(data["levels"], fut_price, sp))
+        if data.get("mapping") == "basis":
+            b, bsrc = pick_basis(fut_price - sp, sp)
+            out["futures"] = to_futures(data["levels"], fut_price, sp, basis=b)
+            if out["futures"]:
+                out["futures"]["basis_src"] = bsrc
+        else:
+            out["futures"] = to_futures(data["levels"], fut_price, sp)
     return out
 
 

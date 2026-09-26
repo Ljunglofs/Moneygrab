@@ -196,6 +196,11 @@ def save_ratios(results):
     for r in results:
         if r.get("error") or not r.get("ratio_rth"):
             continue
+        # Bara en uppmätt och godkänd koppling sparas. Har get_gex fått byta en
+        # orimlig basis mot den teoretiska ska ersättningen inte bli morgondagens
+        # "uppmätta" värde.
+        if r.get("ratio_source", "live") != "live":
+            continue
         if not r.get("ratio") and r.get("basis") is None:
             continue
         e = {"ratio": round(float(r["ratio"]), 4) if r.get("ratio") else None,

@@ -228,48 +228,43 @@ def _once(inst):
     index_mode = g.get("mapping") == "basis"
     ratio_src = "live"
     ratio_at = datetime.now(ET).isoformat(timespec="seconds")
+    if index_mode:
+        # get_gex har redan stämt av den levande basisen mot det teoretiska
+        # värdet och bytt ut den om den var orimlig.
+        if (g["futures"] or {}).get("basis_src") == "carry":
+            ratio_src = "carry (ränta − utdelning)"
     if not is_rth:
         if index_mode:
+            # Utanför börstid är indexet gårdagens stängning. Välj basis i
+            # ordning: sparad RTH-mätning, paritet vid kedjans stängning,
+            # teoretisk carry. Varje mätning måste klara basis_ok — den
+            # 24 september sparades -174,75 och alla nivåer hamnade 350
+            # punkter för lågt.
+            sp = (g.get("levels") or {}).get("spot")
+            choice = None
             prev, stamp = stored_map(inst, "basis")
-            live = g["futures"].get("basis")
-            parity_src = None
-            if prev is None and g.get("spot_source") == "put-call-paritet":
-                # Ingen basis uppmätt med index och futures öppna samtidigt — men
-                # kedjan bär sitt eget terminspris via put-call-paritet, och det
-                # är satt vid kedjans stängning. Para det med futurepriset vid
-                # samma klockslag så blir basisen rätt utan att någon RTH-körning
-                # behöver ha lyckats först. Omräkningen sker i grenen nedan, som
-                # redan gör exakt det för en sparad basis.
+            if prev is not None:
+                if GX.basis_ok(prev, sp):
+                    choice = (prev, "senaste RTH " + str(stamp)[:16].replace("T", " "), stamp)
+                else:
+                    print(f"[gex] {inst}: sparad basis {prev:.1f} orimlig — används inte")
+            if choice is None and g.get("spot_source") == "put-call-paritet":
                 fut_close, at = _fut_at_chain_close(inst)
-                sp = (g.get("levels") or {}).get("spot")
                 if fut_close and sp:
-                    prev = fut_close - sp
-                    parity_src = f"basis {prev:.1f} ur paritet {at}"
-                    print(f"[gex] {inst}: basis {prev:.1f} ur paritet ({sp:.1f}) mot "
-                          f"futures {fut_close:.1f} vid {at}")
-            if prev is None:
-                # Varken sparad basis eller paritet. Indexkursen är gårdagens
-                # stängning medan futuren rört sig i natt, så basisen skulle
-                # svälja hela nattrörelsen. Ta ETF-vägen i stället.
-                alt = GX.get_gex(inst, fut_price=fut, force=True, prefer=GX.FALLBACK_UNDERLYING.get(inst))
-                if alt and alt.get("futures") and alt.get("mapping") != "basis":
-                    print(f"[gex] {inst}: ingen RTH-basis sparad — använder {alt.get('underlying')} tills vidare")
-                    g, index_mode, ratio_src = alt, False, "ingen RTH-basis, ETF-vägen"
-                    prev, stamp = stored_map(inst, "ratio")
-                    live = g["futures"]["ratio"]
-                    if prev and abs(live / prev - 1) > RATIO_MIN_DIFF:
-                        g = dict(g)
-                        g["futures"] = GX.to_futures(g["levels"], fut, g["levels"]["spot"], ratio=prev)
-                        ratio_src = "senaste RTH " + str(stamp)[:16].replace("T", " ")
-                        ratio_at = stamp
-            elif live is not None and abs(live - prev) > MIN_BASIS_DIFF:
-                g = dict(g)
-                g["futures"] = GX.to_futures(g["levels"], fut, g["levels"]["spot"], basis=prev)
-                # Etiketten ska säga var basisen kom ifrån. Är den framräknad ur
-                # paritet i grenen ovan finns ingen sparad tidsstämpel, och
-                # "senaste RTH None" vore både fel och obegripligt.
-                ratio_src = parity_src or ("senaste RTH " + str(stamp)[:16].replace("T", " "))
-                ratio_at = datetime.now(ET).isoformat(timespec="seconds") if parity_src else stamp
+                    b = fut_close - sp
+                    if GX.basis_ok(b, sp):
+                        print(f"[gex] {inst}: basis {b:.1f} ur paritet ({sp:.1f}) mot futures {fut_close:.1f} vid {at}")
+                        choice = (b, f"basis {b:.1f} ur paritet {at}",
+                                  datetime.now(ET).isoformat(timespec="seconds"))
+                    else:
+                        print(f"[gex] {inst}: paritetsbasis {b:.1f} orimlig — används inte")
+            if choice is None:
+                b = GX.carry_basis(sp)
+                print(f"[gex] {inst}: teoretisk basis {b:.1f} (ränta − utdelning till {GX.front_expiry()})")
+                choice = (b, "carry (ränta − utdelning)", datetime.now(ET).isoformat(timespec="seconds"))
+            b, ratio_src, ratio_at = choice
+            g = dict(g)
+            g["futures"] = GX.to_futures(g["levels"], fut, sp, basis=b)
         else:
             prev, stamp = stored_map(inst, "ratio")
             live = g["futures"]["ratio"]
