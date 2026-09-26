@@ -1,6 +1,20 @@
 <!DOCTYPE html>
 <html lang="sv">
 <head>
+<script>
+/* Nya besökare på webben landar på säljsidan /start. Hoppas över för:
+   PRO-användare, den som redan klickat vidare till appen (?app=1 / ?pw=1),
+   Android-appen (referrer android-app://) och installerad app (standalone). */
+(function(){try{
+  var q=location.search;
+  if(/[?&](app|pw)=/.test(q)){localStorage.setItem("grabit_seen_start","1");return;}
+  if(localStorage.getItem("grabit_pro")==="1"||localStorage.getItem("grabit_seen_start"))return;
+  if((document.referrer||"").indexOf("android-app://")===0)return;
+  if(window.matchMedia&&matchMedia("(display-mode: standalone)").matches)return;
+  if(navigator.standalone)return;
+  location.replace("/start");
+}catch(e){}})();
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
 <title>GRABIT</title>
@@ -4370,6 +4384,14 @@ paywallCheck();
   if(isIOS){iosBarInit();}else if(!CONFIG.LOCK_TABS){proPromoInit();}
   /* Låst läge: paywallen med de fyra säljpunkterna poppar upp en gång per
      besök för den som inte har PRO. Den går att stänga — Översikt är öppen. */
+  /* Från säljsidan: ?pw=1 öppnar paywallen direkt, ?plan=annual väljer årsplanen. */
+  try{var _q=new URLSearchParams(location.search);
+    if(_q.get("pw")==="1"&&!isPro()){
+      try{sessionStorage.setItem("grabit_pw_seen","1");}catch(e){}
+      setTimeout(function(){showPaywall(null,true);
+        if(_q.get("plan")==="annual"){var b=document.querySelector('.pw-plan[data-plan="annual"]');if(b)setProPlan("annual",b);}},400);}
+    if(_q.has("pw")||_q.has("app")||_q.has("plan"))history.replaceState(null,"",location.pathname);
+  }catch(e){}
   if(CONFIG.LOCK_TABS){setTimeout(function(){
     try{if(isPro()||sessionStorage.getItem("grabit_pw_seen"))return;sessionStorage.setItem("grabit_pw_seen","1");}catch(e){}
     if(!isPro()&&window.showPaywall)showPaywall(null,true);},1500);}

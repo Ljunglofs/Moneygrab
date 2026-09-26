@@ -1202,11 +1202,23 @@ def push_status():
 
 
 
+# ---- Säljsidan (/start) ---------------------------------------------
+# Nya besökare på webben skickas hit från index.html. Måste registreras före
+# /{fname} nedan, annars fångar den routen /start och svarar 404.
+@app.get("/start", response_class=HTMLResponse)
+def start_page():
+    import os
+    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "landing.html")
+    with open(p, encoding="utf-8") as fh:
+        return HTMLResponse(fh.read(), headers={"Cache-Control": "no-cache"})
+
+
 # ---- Statiska assets (hero-video + poster) -------------------------
 _STATIC_FILES = {
     "bg_1280-1.mp4": "video/mp4",
     "bg_poster.jpg": "image/jpeg",
     "monthly_case.json": "application/json",
+    "grabit_wordmark.png": "image/png",
 }
 
 @app.get("/{fname}")
