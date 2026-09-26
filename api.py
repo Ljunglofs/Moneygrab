@@ -4606,11 +4606,16 @@ def _opp_of(r):
 
 
 def _topop_rank(r):
-    # RS-rating väger in: vid lika setup ska marknadsledaren gå först.
-    return ((r.get("setup_score") or 0) * 0.6
-            + float(r.get("score10") or 0) * 4.0
-            + float(r.get("hetta") or 0) * 0.2
-            + float(r.get("rs_rating") or 50) * 0.25)
+    """Rankning bland A-lägena, bestämd av backtestet (backtest/results/REPORT.md,
+    635 aktier, aug 2025 – aug 2026):
+      * Gamla rankningen (setup + score + hetta) valde systematiskt FEL aktie —
+        dagens pick slog S&P med -2,2 % på 10 dagar, i andra halvåret -5,7 %.
+        Den "perfekta" setupen (tight, nära toppen, högst score) är redan
+        prisad och backar oftare.
+      * RS-rating minus setup-poäng var den enda rankningen som slog S&P i
+        BÅDA halvåren: topp 1 +3,7 % och topp 5 +3,0 % mot S&P på 10 dagar.
+    Marknadsledaren som ännu inte ser färdig ut går alltså först."""
+    return float(r.get("rs_rating") or 50) - float(r.get("setup") or 0)
 
 
 # =====================================================================
