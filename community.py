@@ -91,8 +91,8 @@ def _tv_discover():
     """Hittar ägarens publicerade skript själv (samma lista som TradingView visar
     under "My scripts"), så TV_PINE_IDS inte behöver fyllas i för hand.
     Tar skript vars namn innehåller TV_SCRIPT_MATCH (standard "GRABIT").
-    Cachas en timme."""
-    if time.time() - _TV_FOUND["ts"] < 3600 and _TV_FOUND["scripts"]:
+    Cachas tio minuter, så nypublicerade skript kommer med snabbt."""
+    if time.time() - _TV_FOUND["ts"] < 600 and _TV_FOUND["scripts"]:
         return _TV_FOUND["scripts"]
     if not os.environ.get("TV_SESSIONID", "").strip():
         return []
