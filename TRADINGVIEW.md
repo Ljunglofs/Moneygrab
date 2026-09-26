@@ -196,7 +196,7 @@ när baren stängt.
 
 ## Invite-only och automatisk åtkomst för PRO
 
-Indikatorerna som ingår i PRO är GRABIT Flow Profile (`grabit_vp.pine`), GRABIT Precision Market Heatmap,
+Indikatorerna som ingår i PRO är GRABIT Flow Profile (`grabit_vp.pine`),
 GRABIT CVD (`grabit_cvd.pine`) och GRABIT GEX Levels (`grabit_gex_levels.pine`).
 All text som användaren ser är på engelska. Kommentarerna i koden är kvar på
 svenska, eftersom ingen annan ser källkoden i ett invite-only-skript.
