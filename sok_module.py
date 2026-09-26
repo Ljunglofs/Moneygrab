@@ -37,11 +37,12 @@ except Exception:
 #  INDIKATORER
 # ----------------------------------------------------------
 def _rsi(series, period=14):
+    """Wilders RSI — samma som TradingView, så värdena i appen stämmer med grafen."""
     delta = series.diff()
-    gain = delta.clip(lower=0).rolling(period).mean()
-    loss = (-delta.clip(upper=0)).rolling(period).mean()
+    gain = delta.clip(lower=0).ewm(alpha=1 / period, adjust=False, min_periods=period).mean()
+    loss = (-delta.clip(upper=0)).ewm(alpha=1 / period, adjust=False, min_periods=period).mean()
     rs = gain / loss.replace(0, np.nan)
-    return 100 - (100 / (1 + rs))
+    return (100 - (100 / (1 + rs))).fillna(100.0).where(gain.notna())
 
 
 def _ema(series, span):
@@ -56,7 +57,7 @@ def _atr(df, period=14):
         (high - prev_close).abs(),
         (low - prev_close).abs(),
     ], axis=1).max(axis=1)
-    return tr.rolling(period).mean()
+    return tr.ewm(alpha=1 / period, adjust=False, min_periods=period).mean()   # Wilder, som TradingView
 
 
 # ----------------------------------------------------------
@@ -320,7 +321,26 @@ def analyze(df):
     else:
         label, emoji, color = "SVAG", "", "#ff9f43"
 
+    # ---------- RELATIV STYRKA (rådata) ----------
+    # IBD-formeln: senaste kvartalet väger dubbelt. Percentilen (RS-rating
+    # 1-99) räknas i scan_universe, mot hela universumet.
+    def _ret(n):
+        return (last / close.iloc[-n - 1] - 1) * 100 if len(close) > n else None
+    r63, r126, r189, r252 = _ret(63), _ret(126), _ret(189), _ret(min(252, len(close) - 1))
+    rs_raw = None
+    if r63 is not None and r126 is not None:
+        parts = [(r63, 0.4), (r126, 0.2), (r189, 0.2), (r252, 0.2)]
+        w = sum(k for v, k in parts if v is not None)
+        rs_raw = sum(v * k for v, k in parts if v is not None) / w if w else None
+
+    # Likviditet: snittomsättning i valuta per dag (20 d). Picks kräver ett golv.
+    dollar_vol = float((close.tail(20) * vol.tail(20)).mean()) if len(close) >= 20 else 0.0
+    # Riktig kurs för minigrafer (30 senaste stängningarna).
+    spark = [round(float(x), 4) for x in close.tail(30).tolist()]
+
     result = {
+        "rs_raw": rs_raw, "ret_63": r63, "ret_126": r126, "ret_252": r252,
+        "dollar_vol": dollar_vol, "spark": spark,
         "last": last, "rsi": rsi, "atr_pct": atr_pct,
         "ema20": ema20, "ema50": ema50, "ema200": ema200,
         "pct_from_high": pct_from_high, "rng_pos": rng_pos,

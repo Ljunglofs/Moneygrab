@@ -222,7 +222,58 @@ def _jsonable(obj):
     return obj
 
 
-def scan(ticker: str):
+def _rs_vs_bench(df, bench):
+    """Relativ styrka mot S&P 500: RS-linjen (kurs / index).
+    rs_20     = aktiens 20-dagarsavkastning minus indexets
+    rs_up     = RS-linjen stiger (över sitt 10-dagarssnitt och högre än för 10 d sen)
+    rs_line_hi= RS-linjen på 3-månadershögsta — klassiskt ledartecken (före priset)."""
+    out = {"rs_20": None, "rs_up": None, "rs_line_hi": None}
+    try:
+        if bench is None or df is None:
+            return out
+        c = df["Close"].dropna()
+        b = bench.dropna()
+        ci = c.index.tz_localize(None) if getattr(c.index, "tz", None) is not None else c.index
+        bi = b.index.tz_localize(None) if getattr(b.index, "tz", None) is not None else b.index
+        c = pd.Series(c.values, index=pd.DatetimeIndex(ci).normalize())
+        b = pd.Series(b.values, index=pd.DatetimeIndex(bi).normalize())
+        j = pd.concat([c, b], axis=1, join="inner").dropna()
+        if len(j) < 64:
+            return out
+        line = j.iloc[:, 0] / j.iloc[:, 1]
+        cr = j.iloc[:, 0]; br = j.iloc[:, 1]
+        out["rs_20"] = float((cr.iloc[-1] / cr.iloc[-21] - br.iloc[-1] / br.iloc[-21]) * 100)
+        ma10 = float(line.tail(10).mean())
+        out["rs_up"] = bool(line.iloc[-1] > ma10 and line.iloc[-1] > line.iloc[-11])
+        out["rs_line_hi"] = bool(line.iloc[-1] >= line.tail(63).max() * 0.995)
+    except Exception:
+        pass
+    return out
+
+
+def _rs_ratings(rows):
+    """RS-rating 1-99: percentil av rs_raw mot hela universumet (som IBD)."""
+    vals = sorted(float(r["rs_raw"]) for r in rows if r.get("rs_raw") is not None)
+    if len(vals) < 20:
+        return
+    _RS_DIST[:] = vals
+    for r in rows:
+        r["rs_rating"] = rs_rating_of(r.get("rs_raw"))
+
+
+_RS_DIST: list = []      # senaste skanningens rs_raw, sorterad — för aktiekortet
+
+
+def rs_rating_of(v):
+    """RS-rating för ett enskilt värde mot senaste skanningen (None om okänt)."""
+    if v is None or len(_RS_DIST) < 20:
+        return None
+    import bisect
+    n = len(_RS_DIST)
+    return int(max(1, min(99, round(bisect.bisect_left(_RS_DIST, float(v)) / n * 98 + 1))))
+
+
+def scan(ticker: str, bench=None):
     try:
         df = _PREFETCH.get(ticker)
         if df is None:
@@ -237,6 +288,7 @@ def scan(ticker: str):
         return None
     a["ticker"] = ticker
     a["theme"] = TICKER_THEME.get(ticker, "")
+    a.update(_rs_vs_bench(df, bench))
     # Sessionsnormalisering: handlas börsen just nu är sista baren ofärdig.
     # Priset som visas ska vara live — men RANKNINGEN måste ske på senaste
     # FÄRDIGA session, annars jämförs öppna börser mot stängda.
@@ -279,6 +331,10 @@ def company_info(ticker: str) -> dict:
             "wk_low": info.get("fiftyTwoWeekLow"),
             "avg_vol": info.get("averageVolume"),
             "prev_close": info.get("regularMarketPreviousClose") or info.get("previousClose"),
+            # Ägande och blankning (andelar 0-1 från Yahoo; None om de saknas).
+            "inst_own": info.get("heldPercentInstitutions"),
+            "insider_own": info.get("heldPercentInsiders"),
+            "short_float": info.get("shortPercentOfFloat"),
         }
     except Exception:
         return {}
@@ -391,10 +447,8 @@ def _rank_metrics(df):
         last = float(c.iloc[-1])
         ret_5 = (last / float(c.iloc[-6]) - 1) * 100
         ret_20 = (last / float(c.iloc[-21]) - 1) * 100
-        d = c.diff()
-        up = d.clip(lower=0).tail(14).mean()
-        dn = (-d.clip(upper=0)).tail(14).mean()
-        rsi = 100.0 if dn == 0 else 100 - 100 / (1 + up / dn)
+        from sok_module import _rsi as _wrsi
+        rsi = float(_wrsi(c).iloc[-1])
         m = float(np.interp(ret_20, [-15, 0, 30], [0, 8, 18])
                   + np.interp(ret_5, [-10, 0, 15], [0, 4, 9]))
         if 50 <= rsi <= 70:   m += 8
@@ -461,6 +515,105 @@ def regime_of(ticker):
     return "BLANDAD", pct
 
 
+# ---- Rapportkalender + börsvärden (för scannern) ---------------------
+# Rapportdatum: en Finnhub-förfrågan täcker hela marknaden två veckor fram.
+# Börsvärden: Finnhub har bara per-ticker-anrop, så de fylls i bakgrunden i
+# lugn takt och sparas på disken (gäller i tre dagar).
+import json
+_MCAP_FILE = os.path.join(os.environ.get("DATA_DIR", "."), "mcap_cache.json")
+_MCAP: dict = {}
+_MCAP_TTL = 3 * 86400
+
+
+@cached(6 * 3600)
+def _earnings_map():
+    """{ticker: 'YYYY-MM-DD'} för rapporter de närmaste 14 dagarna."""
+    import datetime as _d
+    today = _d.date.today()
+    j = _finnhub("/calendar/earnings", {"from": today.isoformat(),
+                                         "to": (today + _d.timedelta(days=14)).isoformat()})
+    out = {}
+    for e in ((j or {}).get("earningsCalendar") or []):
+        sym, dt = (e.get("symbol") or "").upper(), e.get("date") or ""
+        if sym and dt and (sym not in out or dt < out[sym]):
+            out[sym] = dt
+    return out
+
+
+def _earnings_in(ticker, emap):
+    """Handelsdagar till nästa rapport (0 = i dag), None om ingen inom 14 d."""
+    dt = emap.get((ticker or "").upper())
+    if not dt:
+        return None
+    try:
+        import datetime as _d
+        return int(np.busday_count(_d.date.today().isoformat(), dt))
+    except Exception:
+        return None
+
+
+def _mcap_load():
+    global _MCAP
+    try:
+        with open(_MCAP_FILE) as f:
+            _MCAP = json.load(f) or {}
+    except Exception:
+        _MCAP = {}
+
+
+def _mcap_save():
+    try:
+        tmp = _MCAP_FILE + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(_MCAP, f)
+        os.replace(tmp, _MCAP_FILE)
+    except Exception:
+        pass
+
+
+def _mcap_of(ticker):
+    v = _MCAP.get(ticker)
+    return v[0] if v else None
+
+
+def _mcap_loop():
+    """Fyller börsvärden för USA-bolagen, ett anrop var 3:e sekund."""
+    if not os.getenv("FINNHUB_API_KEY", ""):
+        return
+    _mcap_load()
+    while True:
+        now = time.time()
+        todo = [t for t in ALL_TICKERS if _market_of(t) == "US"
+                and (t not in _MCAP or now - _MCAP[t][1] > _MCAP_TTL)]
+        if not todo:
+            time.sleep(3600)
+            continue
+        for i, t in enumerate(todo):
+            j = _finnhub("/stock/profile2", {"symbol": t}) or {}
+            mc = j.get("marketCapitalization")
+            try:
+                _MCAP[t] = [round(float(mc), 1) if mc not in (None, "", 0) else None, time.time()]
+            except Exception:
+                _MCAP[t] = [None, time.time()]
+            if i % 25 == 24:
+                _mcap_save()
+            time.sleep(3)
+        _mcap_save()
+
+
+def _enrich_rows(rows):
+    """Lägger rapportdatum och börsvärde på skanningens rader (billigt)."""
+    try:
+        emap = _earnings_map() or {}
+    except Exception:
+        emap = {}
+    for r in rows:
+        t = r.get("ticker")
+        r["earnings_in"] = _earnings_in(t, emap)
+        r["earnings_date"] = emap.get((t or "").upper())
+        r["mcap_musd"] = _mcap_of(t)
+
+
 import gc as _gc
 SCAN_CHUNK = int(os.environ.get("SCAN_CHUNK", "40"))   # Starter 512MB-säkert. Mer RAM? Höj via env SCAN_CHUNK.
 
@@ -468,18 +621,27 @@ SCAN_CHUNK = int(os.environ.get("SCAN_CHUNK", "40"))   # Starter 512MB-säkert. 
 def scan_universe(theme_key: Optional[str] = None) -> list:
     """Scannar universumet i bitar och tömmer råprisdata mellan varje bit.
     Håller minnet nere på Render Starter (512 MB) -> inga OOM-omstarter."""
-    tickers = UNIVERSE.get(theme_key, []) if theme_key else ALL_TICKERS
+    # Ett tema är en delmängd av hela skanningen. Att filtrera den (som redan
+    # ligger i cache) är snabbare än att ladda ner temat en gång till, och
+    # RS-ratingen blir jämförbar — den räknas alltid mot hela universumet.
+    if theme_key:
+        want = set(UNIVERSE.get(theme_key, []))
+        return [r for r in scan_universe(None) if r.get("ticker") in want]
+    tickers = ALL_TICKERS
+    bench = _bench_close()
     out = []
     for i in range(0, len(tickers), SCAN_CHUNK):
         chunk = tickers[i:i + SCAN_CHUNK]
         prefetch(chunk)               # hämta bara denna bit
         for t in chunk:
-            a = scan(t)
+            a = scan(t, bench)
             if a:
                 a["hetta"] = hetta_of(a)
                 out.append(_jsonable(a))
         _PREFETCH.clear()             # släpp råa prisdataframes direkt
         _gc.collect()                 # ge minnet tillbaka till OS
+    _rs_ratings(out)
+    _enrich_rows(out)
     # Täckning per marknad — Yahoo blockar ibland moln-IP:n, och då tystnar
     # hela USA-delen utan att något syns i appen. Nu står det i loggen.
     try:
@@ -2862,6 +3024,8 @@ def _stock_payload(ticker: str):
         return None, None
     a["ticker"] = ticker
     a["theme"] = TICKER_THEME.get(ticker, "")
+    a.update(_rs_vs_bench(df, _bench_close()))
+    a["rs_rating"] = rs_rating_of(a.get("rs_raw"))
     a["live_bar"] = _bar_is_live(ticker, df)
     if a["live_bar"] and len(df) > 26:
         rm = _rank_metrics(df.iloc[:-1])
@@ -2902,6 +3066,13 @@ def stock(ticker: str):
             print("stock %s: %s misslyckades: %s" % (ticker, what, e))
             return default
 
+    try:
+        emap = _earnings_map() or {}
+        a["earnings_date"] = emap.get(ticker.upper())
+        a["earnings_in"] = _earnings_in(ticker, emap)
+    except Exception:
+        pass
+    a["mcap_musd"] = _mcap_of(ticker)
     return {
         "analysis": _jsonable(a),
         "ai_score": _safe(lambda: ai_score_components(a), None, "ai_score"),
@@ -4223,6 +4394,7 @@ def _warmup_loop():
 @app.on_event("startup")
 def _start_warmup():
     _threading.Thread(target=_warmup_loop, daemon=True).start()
+    _threading.Thread(target=_mcap_loop, daemon=True).start()
 
 
 # ---- Watchlist-push -------------------------------------------------
@@ -4434,9 +4606,11 @@ def _opp_of(r):
 
 
 def _topop_rank(r):
+    # RS-rating väger in: vid lika setup ska marknadsledaren gå först.
     return ((r.get("setup_score") or 0) * 0.6
             + float(r.get("score10") or 0) * 4.0
-            + float(r.get("hetta") or 0) * 0.2)
+            + float(r.get("hetta") or 0) * 0.2
+            + float(r.get("rs_rating") or 50) * 0.25)
 
 
 # =====================================================================
@@ -4455,6 +4629,12 @@ _PICK_GATES      = os.environ.get("PICK_GATES", "1") != "0"
 _PICK_MIN_RELVOL = float(os.environ.get("PICK_MIN_RELVOL", "1.1"))
 _PICK_MIN_SCORE  = int(os.environ.get("PICK_MIN_SCORE", "6"))     # score10-golv
 _BULL_LABELS     = ("BULL", "MOMENTUM", "Rocketcase", "VÄNDNING", "NEUTRAL/BYGGER")
+# Relativ styrka: A-lägen ska vara marknadsledare (IBD-disciplin).
+_PICK_MIN_RS     = int(os.environ.get("PICK_MIN_RS", "70"))
+# Likviditet: snittomsättning per dag (lokal valuta, ~USD för USA-bolag).
+_PICK_MIN_DVOL   = float(os.environ.get("PICK_MIN_DVOL", "5e6"))    # A-läge
+_PICK_FLOOR_DVOL = float(os.environ.get("PICK_FLOOR_DVOL", "1e6"))  # aldrig pick under detta
+_PICK_EARN_DAYS  = int(os.environ.get("PICK_EARN_DAYS", "3"))       # handelsdagar före rapport
 
 
 def _market_regime():
@@ -4497,6 +4677,16 @@ def _pick_eligible(r, regime=None):
         return False
     if int(r.get("score10") or 0) < _PICK_MIN_SCORE:
         return False
+    # #5 marknadsledare: RS-rating över golvet (saknas den räknas det inte som A)
+    if int(r.get("rs_rating") or 0) < _PICK_MIN_RS:
+        return False
+    # #6 likviditet: en aktie som knappt handlas är ingen pick
+    if float(r.get("dollar_vol") or 0) < _PICK_MIN_DVOL:
+        return False
+    # #7 ingen rapport inom några dagar (gap-risk åt vilket håll som helst)
+    ed = r.get("earnings_in")
+    if ed is not None and 0 <= int(ed) <= _PICK_EARN_DAYS:
+        return False
     # #4 regim: i RISK_OFF krävs dessutom att bolaget är över EMA200 och
     #    har äkta styrka för att räknas som A+.
     if (regime or _market_regime()) == "RISK_OFF":
@@ -4521,6 +4711,8 @@ def _pick_tier(r, regime=None):
     if _pick_eligible(r, reg):
         return "A"
     if r.get("cooling") or str(r.get("label")) not in _BULL_LABELS:
+        return "C"
+    if float(r.get("dollar_vol") or 0) < _PICK_FLOOR_DVOL:
         return "C"
     last, e50 = r.get("last"), r.get("ema50")
     try:

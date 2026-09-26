@@ -40,7 +40,7 @@ def _atr(df, period=14):
         (high - prev_close).abs(),
         (low - prev_close).abs(),
     ], axis=1).max(axis=1)
-    return tr.rolling(period).mean()
+    return tr.ewm(alpha=1 / period, adjust=False, min_periods=period).mean()   # Wilder, som TradingView
 
 
 # ----------------------------------------------------------

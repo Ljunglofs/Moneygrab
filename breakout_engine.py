@@ -22,17 +22,18 @@ def _ema(s, n): return s.ewm(span=n, adjust=False).mean()
 
 
 def _rsi(s, p=14):
+    """Wilders RSI, som TradingView."""
     d = s.diff()
-    g = d.clip(lower=0).rolling(p).mean()
-    l = (-d.clip(upper=0)).rolling(p).mean()
-    return 100 - 100 / (1 + g / l.replace(0, np.nan))
+    g = d.clip(lower=0).ewm(alpha=1 / p, adjust=False, min_periods=p).mean()
+    l = (-d.clip(upper=0)).ewm(alpha=1 / p, adjust=False, min_periods=p).mean()
+    return (100 - 100 / (1 + g / l.replace(0, np.nan))).fillna(100.0).where(g.notna())
 
 
 def _atr(df, p=14):
     h, l, c = df["High"], df["Low"], df["Close"]
     pc = c.shift(1)
     tr = pd.concat([h - l, (h - pc).abs(), (l - pc).abs()], axis=1).max(axis=1)
-    return tr.rolling(p).mean()
+    return tr.ewm(alpha=1 / p, adjust=False, min_periods=p).mean()   # Wilder
 
 
 def _clamp(x, lo, hi): return max(lo, min(hi, x))
