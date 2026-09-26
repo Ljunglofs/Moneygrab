@@ -4123,6 +4123,64 @@ def _dt_all():
     return out
 
 
+# =====================================================================
+#  GEX-NIVÅER (NQ + Guld) — PRO-låst på servern
+# =====================================================================
+# Nivåerna räknas av GitHub Actions (gex_daily.yml på main) tre gånger per
+# vardag och sparas i levels/latest.json. Repot är publikt, så appen läser
+# filen direkt därifrån i stället för att räkna optionskedjor själv.
+_GEX_URL = os.environ.get(
+    "GEX_LEVELS_URL",
+    "https://raw.githubusercontent.com/Ljunglofs/Moneygrab/main/levels/latest.json")
+_GEX_CACHE = {"t": 0.0, "data": None}
+# Nivåtyper som visas i appen. Öppnings-grid, IV-range och G+/G- är för
+# TradingView-indikatorn; i appen blir det för många rader.
+_GEX_KEEP = ("res", "resw", "sup", "supw", "flip", "hgex", "mpain", "emh", "eml", "res0", "sup0")
+
+
+def _gex_levels():
+    now = time.time()
+    if _GEX_CACHE["data"] is not None and now - _GEX_CACHE["t"] < 120:
+        return _GEX_CACHE["data"]
+    try:
+        r = _rq.get(_GEX_URL, timeout=8)
+        r.raise_for_status()
+        _GEX_CACHE["data"] = r.json()
+        _GEX_CACHE["t"] = now
+    except Exception as e:
+        print(f"GEX: kunde inte hämta nivåer: {e}")
+    return _GEX_CACHE["data"]
+
+
+@app.get("/api/gex")
+def gex(token: str = ""):
+    """GEX-nivåer för NQ och Guld. Utan giltig PRO-token skickas bara vilka
+    instrument som finns och när nivåerna räknades — nivåerna lämnar aldrig
+    servern, så låset går inte att kringgå från webbläsaren."""
+    data = _gex_levels() or {}
+    try:
+        from billing_web import verify_token
+        is_pro = verify_token(token) is not None
+    except Exception:
+        is_pro = False
+    out = []
+    for g in data.get("levels", []) or []:
+        item = {"inst": g.get("inst"), "regime": g.get("regime")}
+        if is_pro:
+            lv = []
+            for part in str(g.get("string") or "").split(";"):
+                f = [x.strip() for x in part.split(",")]
+                if len(f) == 3 and f[2] in _GEX_KEEP:
+                    try:
+                        lv.append({"price": float(f[0]), "label": f[1], "kind": f[2]})
+                    except ValueError:
+                        pass
+            lv.sort(key=lambda x: -x["price"])
+            item.update(levels=lv, fut_price=g.get("fut_price"), string=g.get("string"))
+        out.append(item)
+    return {"generated": data.get("generated"), "pro": is_pro, "instruments": out}
+
+
 @app.get("/api/daytrade")
 def daytrade():
     return {"setups": _dt_all(), "interval": _DT_INTERVAL, "ts": int(time.time())}

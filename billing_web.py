@@ -49,7 +49,7 @@ _PRO_WELCOME_HTML = (
     # --- Svenska ---
     "<h2 style='color:#F5C542;margin:0 0 10px'>Välkommen till GRABIT PRO</h2>"
     "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'>Tack för att du prenumererar! Din PRO är "
-    "aktiv och allt är upplåst — Insider Flow, Daytrade-setups, Ask Grabit och alla screeners.</p>"
+    "aktiv och allt är upplåst — GEX-nivåer för NQ &amp; Guld, The Trump Signal, Insider Flow, Ask Grabit och alla screeners.</p>"
     "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'><b>På en annan enhet?</b> "
     "Öppna GRABIT, välj “Återställ köp” och logga in med den här "
     "mejladressen — så följer din PRO med överallt.</p>"
@@ -64,7 +64,7 @@ _PRO_WELCOME_HTML = (
     "<div style='border-top:1px solid rgba(255,255,255,.1);margin:20px 0'></div>"
     "<h2 style='color:#F5C542;margin:0 0 10px'>Welcome to GRABIT PRO</h2>"
     "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'>Thanks for subscribing! Your PRO is active "
-    "and everything is unlocked — Insider Flow, Daytrade setups, Ask Grabit and all screeners.</p>"
+    "and everything is unlocked — GEX levels for NQ &amp; Gold, The Trump Signal, Insider Flow, Ask Grabit and all screeners.</p>"
     "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'><b>On another device?</b> "
     "Open GRABIT, choose “Restore purchase” and log in with this email — your PRO follows you everywhere.</p>"
     "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'><b>NASDAQ ROBBER</b> has its own tab in "

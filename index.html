@@ -903,6 +903,40 @@ body{background:
 .mc-sec p{font-size:13.5px;line-height:1.5;color:#cdd5e1}
 /* Daytrade */
 #s-daytrade{padding-bottom:90px}
+/* GEX-fliken */
+.gex-intro{color:var(--mut2);font-size:12.5px;line-height:1.5;margin:-4px 2px 4px}
+.gex-reg{font-size:12px;font-weight:700;margin-top:8px}
+.gex-rows{margin-top:10px;border-top:1px solid var(--line)}
+.gex-row{display:flex;align-items:center;gap:9px;padding:8px 2px;border-bottom:1px solid var(--line)}
+.gex-row i{width:8px;height:8px;border-radius:50%;background:var(--mut2);flex:none}
+.gex-row span{flex:1;font-size:13px;color:var(--txt,#e8edf5)}
+.gex-row b{font-family:var(--disp);font-size:15px;font-weight:700}
+.gex-px{display:flex;align-items:center;gap:9px;padding:6px 2px;border-bottom:1px dashed rgba(255,255,255,.25);color:var(--mut2);font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+.gex-px span{flex:1}.gex-px b{font-family:var(--disp);font-size:13px;color:#fff}
+.gex-unlock{margin-top:12px;text-align:center;padding:11px;border-radius:12px;background:var(--goldsoft);color:var(--gold);font-weight:800;font-size:13px;cursor:pointer}
+/* Översikt: GEX-nyhet och Discord */
+.gexnews,.discordcard{display:flex;align-items:center;gap:12px;margin:10px 0 4px;padding:13px 14px;border-radius:16px;cursor:pointer;text-decoration:none;color:inherit}
+.gexnews{background:linear-gradient(135deg,rgba(34,211,238,.14),rgba(245,197,66,.08));border:1px solid rgba(34,211,238,.35)}
+.discordcard{background:rgba(88,101,242,.12);border:1px solid rgba(88,101,242,.4)}
+.gn-new{font-size:10px;font-weight:800;letter-spacing:.06em;color:#000;background:var(--gold);border-radius:6px;padding:3px 6px;flex:none}
+.gn-tx,.dc-tx{flex:1;display:flex;flex-direction:column;gap:2px}
+.gn-tx b,.dc-tx b{font-size:14px}.gn-tx i,.dc-tx i{font-style:normal;font-size:12px;color:var(--mut2)}
+.gn-ar{color:var(--gold);font-size:18px;flex:none}
+.dc-ic{width:34px;height:34px;border-radius:10px;background:#5865F2;color:#fff;display:flex;align-items:center;justify-content:center;flex:none}
+.dc-ic svg{width:20px;height:20px}
+.pw-plus{font-size:12px;color:#8a93a3;text-align:center;margin-top:2px}
+.promo4{display:none;margin:10px 0 6px;padding:15px 14px;border-radius:18px;cursor:pointer;background:linear-gradient(150deg,rgba(245,197,66,.16),rgba(34,211,238,.10));border:1px solid rgba(245,197,66,.45);box-shadow:0 0 28px rgba(245,197,66,.12)}
+body.not-pro .promo4{display:block}
+body.not-pro .discordcard{display:none}
+.p4-hd{display:flex;align-items:center;gap:9px}.p4-hd b{font-size:15.5px;line-height:1.3}
+.p4-pro{font-size:10px;font-weight:800;letter-spacing:.06em;color:#000;background:var(--gold);border-radius:6px;padding:3px 6px;flex:none}
+.p4-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.p4{background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px}
+.p4 b{display:block;font-size:13px;color:var(--gold2)}.p4 i{display:block;font-style:normal;font-size:11.5px;color:#9aa4b2;margin-top:2px}
+.p4-cta{margin-top:12px;text-align:center;padding:11px;border-radius:12px;background:var(--gold);color:#000;font-weight:800;font-size:14px}
+.pw-links{margin-top:10px;text-align:center;font-size:11px;color:#5b6675}
+.pw-links a{color:#8a93a3;text-decoration:none}
+
 .dt-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-top:11px;position:relative}
 .dt-tvlink{display:block;text-align:right;margin-top:11px;padding-top:10px;border-top:1px solid rgba(255,255,255,.06);font-size:11.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--gold2);cursor:pointer}
 .dt-tvbox{margin-top:8px;border:1px solid rgba(245,197,66,.3);border-radius:16px;overflow:hidden;box-shadow:0 0 20px rgba(245,197,66,.08)}
@@ -1486,9 +1520,21 @@ else _i18nBoot();
 
 <main>
   <section class="screen on" id="s-hem">
+    <div class="promo4" onclick="showPaywall(null,true)" role="button" aria-label="Starta 7 dagar gratis">
+      <div class="p4-hd"><span class="p4-pro">PRO</span><b>Allt du behöver för att handla NQ &amp; Guld</b></div>
+      <div class="p4-grid">
+        <div class="p4"><b>GEX-nivåer</b><i>NQ &amp; Guld, varje dag</i></div>
+        <div class="p4"><b>Trump Signal</b><i>Push när han rör marknaden</i></div>
+        <div class="p4"><b>Discord</b><i>Community med traders</i></div>
+        <div class="p4"><b>Indikatorer</b><i>GRABIT för TradingView</i></div>
+      </div>
+      <div class="p4-cta">Starta 7 dagar gratis &#8594;</div>
+    </div>
     <div class="card d3card prem gold" id="today3" style="display:none"></div>
     <div id="newsbar"></div>
     <div id="trumpbar" style="display:none"></div>
+    <div class="gexnews" onclick="go('daytrade')" role="button" aria-label="GEX-nivåer för NQ och Guld"><span class="gn-new">NYHET</span><div class="gn-tx"><b>GEX-nivåer för NQ &amp; Guld</b><i>Call Wall, Put Wall och Gamma Flip &mdash; varje handelsdag</i></div><span class="gn-ar">&#8594;</span></div>
+    <a class="discordcard js-discord" target="_blank" rel="noopener" aria-label="Gå med i GRABIT på Discord"><span class="dc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.6A8 8 0 1 1 21 12z"/><circle cx="9" cy="12" r=".9" fill="currentColor"/><circle cx="12.5" cy="12" r=".9" fill="currentColor"/><circle cx="16" cy="12" r=".9" fill="currentColor"/></svg></span><div class="dc-tx"><b>Gå med i vår Discord</b><i>Setups, nivåer och snack med andra traders</i></div><span class="gn-ar">&#8594;</span></a>
     <div id="aisummary"></div>
     <div class="card aibrief" id="aibrief"></div>
     <div id="heatmap"></div>
@@ -1586,7 +1632,7 @@ else _i18nBoot();
     <div class="pw-trial" id="pw-sub"><b>7 dagar gratis</b></div>
     <div class="pw-big"><span class="pw-149">0 kr</span><span class="pw-per">i 7 dagar</span></div>
     <div class="pw-cancel" id="pw-after">Sedan 174 kr/mån. Avsluta när som helst.</div>
-    <div class="pw-feats2"><div class="pwf"><span class="pwf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.6" fill="#22d3ee" stroke="none"/><line x1="12" y1="2.5" x2="12" y2="5.5"/><line x1="12" y1="18.5" x2="12" y2="21.5"/><line x1="2.5" y1="12" x2="5.5" y2="12"/><line x1="18.5" y1="12" x2="21.5" y2="12"/></svg></span><span class="pwf-tx"><b>Dagens Top Opportunity</b><i>Med entry, stopp &amp; targets</i></span></div><div class="pwf"><span class="pwf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4a3 3 0 0 0-3 3v10a3 3 0 0 0 6 0V7a3 3 0 0 0-3-3z"/><path d="M9 8H7a3 3 0 0 0 0 6h2"/><path d="M15 8h2a3 3 0 0 1 0 6h-2"/><circle cx="12" cy="12" r="1.3" fill="#22d3ee" stroke="none"/></svg></span><span class="pwf-tx"><b>AI-analys på alla aktier</b><i>+ Fråga Grabit</i></span></div><div class="pwf"><span class="pwf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></span><span class="pwf-tx"><b>Push-larm för din watchlist</b><i>Pris-larm, nyheter &amp; rapporter</i></span></div><div class="pwf"><span class="pwf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="16.2" y1="16.2" x2="21" y2="21"/></svg></span><span class="pwf-tx"><b>Screeners, facit</b><i>och hela scannern</i></span></div></div>
+    <div class="pw-feats2"><div class="pwf"><span class="pwf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18"/><path d="M3 6h18" stroke-dasharray="3 2"/><path d="M3 13h18"/><path d="M6 20V9M10 20V4M14 20V11M18 20V7"/></svg></span><span class="pwf-tx"><b>GEX-nivåer NQ &amp; Guld</b><i>Call Wall, Put Wall &amp; Gamma Flip varje dag</i></span></div><div class="pwf"><span class="pwf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></span><span class="pwf-tx"><b>The Trump Signal</b><i>Push direkt när Trump rör marknaden</i></span></div><div class="pwf"><span class="pwf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.6A8 8 0 1 1 21 12z"/></svg></span><span class="pwf-tx"><b>Discord-community</b><i>Setups &amp; nivåer med andra traders</i></span></div><div class="pwf"><span class="pwf-ic"><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 4 8-9"/><path d="M15 7h5v5"/></svg></span><span class="pwf-tx"><b>GRABIT-indikatorer</b><i>Flow Profile, CVD &amp; GEX Levels för TradingView</i></span></div><div class="pw-plus">+ AI-analys, screeners, larm och allt annat i appen</div></div>
     <div class="pw-buybox">
       <div class="pw-plans">
         <button type="button" class="pw-plan on" data-plan="monthly" onclick="setProPlan('monthly',this)"><span class="pp-t">Månad</span><span class="pp-p">174 kr<i>/mån</i></span></button>
@@ -1601,6 +1647,7 @@ else _i18nBoot();
     </div>
     <div class="pw-fine"><svg viewBox="0 0 24 24" fill="none" stroke="#5b6675" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;flex:none"><path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg><span>Betalningen sker säkert via Google Play (appen) eller vår betalpartner (webben).
     Avsluta när som helst. Ingen finansiell rådgivning.</span></div>
+    <div class="pw-links"><a href="/villkor" target="_blank" rel="noopener">Villkor</a> · <a href="/privacy" target="_blank" rel="noopener">Integritetspolicy</a> · <a href="mailto:support@grabitlabs.com">Support</a></div>
   </div>
 </div>
 
@@ -1625,7 +1672,7 @@ else _i18nBoot();
 
 <nav class="nav">
   <button class="on" data-s="hem"><span class="gi">${I.home}</span>Översikt</button>
-  <button data-s="daytrade"><span class="gi">${I.trend}</span>Daytrade</button>
+  <button data-s="daytrade"><span class="gi">${I.trend}</span>GEX</button>
   <button data-s="signal"><span class="gi">${I.signal}</span><span style="position:relative">Signaler<span class="badge">5</span></span></button>
   <button data-s="marknad"><span class="gi">${I.compass}</span>Research</button>
   <button data-s="portfolj"><span class="gi">${I.folio}</span>Portfölj</button>
@@ -1660,7 +1707,11 @@ else _i18nBoot();
 
 
 <script>
-const CONFIG = { API_BASE: "https://grabit-api-80dh.onrender.com" };  /* <-- KLISTRA IN din Render-URL här, t.ex. "https://grabit-api.onrender.com". Tom = demo-läge. */
+const CONFIG = { API_BASE: "https://grabit-api-80dh.onrender.com",
+  /* Översikt är öppen som skyltfönster; alla andra flikar kräver PRO eller
+     provperiod. false = freemium med teasers i alla flikar som förut. */
+  LOCK_TABS: true,
+  DISCORD_URL: "https://discord.com/channels/1528471339038671089/1552014938233376788" };  /* <-- KLISTRA IN din Render-URL här, t.ex. "https://grabit-api.onrender.com". Tom = demo-läge. */
 /* ORIGIN-LÅS (fixat): tvinga API_BASE till nuvarande origin BARA när appen faktiskt
    serveras från Render (samma server som API:t). På Netlify eller annan host behålls
    Render-URL:en ovan — annars gick alla anrop fel och appen fastnade i demo-läge. */
@@ -2915,7 +2966,11 @@ async function load(){
   if(live){try{localStorage.setItem("grabit_snap",JSON.stringify(d));}catch(e){}}
 }
 
-function go(s){document.querySelectorAll(".screen").forEach(x=>x.classList.remove("on"));
+/* Låsta flikar (CONFIG.LOCK_TABS): utan PRO visas paywallen och man stannar
+   på Översikt. Samma väg för nav-knappar och kort som leder till en flik. */
+function go(s){
+  if(CONFIG.LOCK_TABS&&s!=="hem"&&!isPro()){if(window.showPaywall)showPaywall(null,true);s="hem";}
+  document.querySelectorAll(".screen").forEach(x=>x.classList.remove("on"));
   document.getElementById("s-"+s)?.classList.add("on");
   if(s==="daytrade")loadDaytrade();
   if(s==="smart"){loadPoly();loadPolyInsiders();}
@@ -3242,46 +3297,64 @@ function openMonthly(){const m=_MCASE; if(!m)return;
 }
 function closeMonthly(){document.getElementById("mcdetail").classList.remove("on");}
 
-// ---- Daytrade ----
+// ---- GEX-nivåer (fliken hette tidigare Daytrade; funktionsnamnet behålls för anropen) ----
 let _dtLoaded=false;
+const GEX_META={NQ:["NQ","Nasdaq 100 (termin)","Nasdaq 100 (futures)"],GC:["GULD","Guld (termin)","Gold (futures)"]};
+function _gexCol(k){return /^res/.test(k)?"#FF3B30":/^sup/.test(k)?"#22d3ee":k==="flip"?"#F5C542":k==="hgex"?"#a78bfa":"#94a3bb";}
+function _gexFmt(p){return Number(p).toLocaleString("sv-SE",{minimumFractionDigits:2,maximumFractionDigits:2});}
+function _gexEsc(t){return String(t==null?"":t).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
+function gexCopy(el){var t=el.getAttribute("data-s")||"";var EN=(window.GRABIT_LANG==="en");var say=window.pToast||window.say||function(m){alert(m);};
+  try{navigator.clipboard.writeText(t).then(function(){say(EN?"Copied — paste into GRABIT GEX Levels in TradingView.":"Kopierat — klistra in i GRABIT GEX Levels i TradingView.");});}catch(e){say(t);}}
 async function loadDaytrade(force){
   if(_dtLoaded&&!force)return; _dtLoaded=true;
+  const EN=(window.GRABIT_LANG==="en");
   const wrap=document.getElementById("dtlist"); const head=document.getElementById("dt-head");
-  if(head)head.innerHTML=`<div class="sect"><h2>Daytrade-setups</h2><a onclick="loadDaytrade(true)">Uppdatera</a></div>`;
-  if(wrap&&!wrap.innerHTML)wrap.innerHTML=`<div class="scl-empty">Laddar setups…</div>`;
-  if(!CONFIG.API_BASE){if(wrap)wrap.innerHTML=`<div class="scl-empty">Koppla API:t för live daytrade-setups.</div>`;return;}
+  if(head)head.innerHTML='<div class="sect"><h2>'+(EN?"GEX levels":"GEX-nivåer")+'</h2><a onclick="loadDaytrade(true)">'+(EN?"Refresh":"Uppdatera")+'</a></div>'
+    +'<div class="gex-intro">'+(EN?"Where options market makers hedge — the levels NQ and gold tend to react to. Call Wall acts as a ceiling, Put Wall as a floor. Updated 08:00, 13:05 and 16:05 CET."
+      :"Där optionsmarknadens market makers hedgar — nivåerna NQ och guld brukar reagera på. Call Wall fungerar som tak, Put Wall som golv. Uppdateras 08:00, 13:05 och 16:05.")+'</div>';
+  if(!CONFIG.API_BASE){if(wrap)wrap.innerHTML='<div class="scl-empty">'+(EN?"Connect the API for GEX levels.":"Koppla API:t för GEX-nivåer.")+'</div>';return;}
+  if(wrap&&!wrap.innerHTML)wrap.innerHTML='<div class="scl-empty">'+(EN?"Loading levels…":"Laddar nivåer…")+'</div>';
   try{
-    const r=await fetch(CONFIG.API_BASE.replace(/\/$/,"")+"/api/daytrade",{cache:"no-store"});
-    if(!r.ok)throw 0; const j=await r.json(); const setups=j.setups||[];
-    if(!setups.length){wrap.innerHTML=`<div class="scl-empty">Inga setups just nu — försöker igen strax…</div>`;
-      window._dtRetry=(window._dtRetry||0)+1;if(window._dtRetry<=5)setTimeout(function(){loadDaytrade(true);},10000);return;}
+    const tok=encodeURIComponent(localStorage.getItem("grabit_token")||"");
+    const r=await fetch(CONFIG.API_BASE.replace(/\/$/,"")+"/api/gex?token="+tok,{cache:"no-store"});
+    if(!r.ok)throw 0; const j=await r.json(); const ins=j.instruments||[];
+    if(!ins.length)throw 0;
     window._dtRetry=0;
-    const _cards=setups.map(s=>{
-      const bias=String(s.bias||"").toLowerCase();
-      const bc=bias==="long"?"var(--pos)":bias==="short"?"var(--neg)":"var(--mut)";
-      const blab=bias==="long"?"LÅNG":bias==="short"?"KORT":"AVVAKTA";
-      const conf=+s.confidence||0; const cc=conf>=70?"var(--pos)":conf>=50?"var(--gold)":"var(--mut)";
-      const entry=(s.entryLabel&&s.entryLabel!=="—")?s.entryLabel:("$"+s.entry);
-      return `<div class="dt-card" style="border-color:${bc}44">
-        <div class="dt-top">${s.pinned?'<span class="dt-pin">★</span>':''}${lic(s.ticker,34,bc)}
-          <div class="dt-id"><div class="dt-tk">${s.ticker}</div><div class="dt-co">${s.name||""}</div></div>
-          <div class="dt-bias" style="background:${bc}1f;color:${bc}">${blab}</div></div>
-        <div class="dt-grid">
-          <div><span>Kurs</span><b>$${s.price}</b></div>
-          <div><span>Entry</span><b>${entry}</b></div>
-          <div><span>Stop</span><b style="color:var(--neg)">$${s.sl}</b></div>
-          <div><span>Mål 1</span><b style="color:var(--pos)">$${s.tp1}</b></div>
-          <div><span>Mål 2</span><b style="color:var(--pos)">$${s.tp2}</b></div>
-          <div><span>R/R</span><b>${s.rr}</b></div>
-        </div>
-        <div class="dt-foot"><span class="dt-conf" style="color:${cc}">Träffsäkerhet ${conf}%</span><span class="dt-ctx">${s.context||""}</span></div>
-        <div class="dt-tvlink" onclick="dtTv(this,'${s.ticker}')">Livegraf \u203A</div>
-      </div>`;
+    let when="";try{when=new Date(j.generated).toLocaleString(EN?"en-GB":"sv-SE",{weekday:"short",hour:"2-digit",minute:"2-digit"});}catch(e){}
+    wrap.innerHTML=ins.map(function(g){
+      const m=GEX_META[g.inst]||[g.inst,"",""];
+      const pos=String(g.regime||"").toLowerCase().indexOf("pos")===0;
+      const rc=pos?"#22d3ee":"#FF3B30";
+      const rl=EN?(pos?"Positive gamma · moves tend to be dampened":"Negative gamma · moves tend to be amplified")
+                 :(pos?"Positiv gamma · rörelser brukar dämpas":"Negativ gamma · rörelser brukar förstärkas");
+      let rows="",copy="";
+      if(j.pro&&g.levels){
+        const px=+g.fut_price||0; let marked=false;
+        const pxRow=px?'<div class="gex-px"><span>'+(EN?"Price at calculation":"Pris vid beräkning")+'</span><b>'+_gexFmt(px)+'</b></div>':"";
+        rows=g.levels.map(function(l){let pre="";if(px&&!marked&&l.price<px){marked=true;pre=pxRow;}
+          const c=_gexCol(l.kind);
+          return pre+'<div class="gex-row"><i style="background:'+c+'"></i><span>'+_gexEsc(l.label)+'</span><b style="color:'+c+'">'+_gexFmt(l.price)+'</b></div>';}).join("");
+        if(px&&!marked)rows+=pxRow;
+        rows='<div class="gex-rows">'+rows+'</div>';
+        if(g.string)copy='<div class="dt-tvlink" data-s="'+_gexEsc(g.string)+'" onclick="gexCopy(this)">'+(EN?"Copy for TradingView":"Kopiera till TradingView")+' ›</div>';
+      }else{
+        // Låst: platshållare — de riktiga nivåerna skickas aldrig utan PRO.
+        rows='<div class="pro-gated" data-lock="GEX"><div class="gex-rows">'+["Call Wall","Gamma Flip","Max Pain","Put Wall"].map(function(n){
+          return '<div class="gex-row"><i></i><span>'+n+'</span><b>00 000,00</b></div>';}).join("")+'</div></div>'
+          +'<div class="gex-unlock" onclick="showPaywall(null,true)">'+(EN?"Unlock GEX levels — 7 days free":"Lås upp GEX-nivåer — 7 dagar gratis")+' →</div>';
+      }
+      return '<div class="dt-card gex-card"><div class="dt-top"><div class="dt-id"><div class="dt-tk">'+m[0]+'</div><div class="dt-co">'+(EN?m[2]:m[1])+'</div></div>'
+        +'<div class="dt-bias" style="background:'+rc+'1f;color:'+rc+'">'+(pos?"+ GAMMA":"− GAMMA")+'</div></div>'
+        +'<div class="gex-reg" style="color:'+rc+'">'+rl+'</div>'+rows
+        +'<div class="dt-foot"><span class="dt-ctx">'+(EN?"Calculated ":"Beräknad ")+when+'</span></div>'+copy+'</div>';
     }).join("");
-    if(isPro()){wrap.innerHTML=_cards;}else{var _EN=(window.GRABIT_LANG==="en");wrap.innerHTML='<div class="pro-gated" data-lock="'+(_EN?"Daytrade setups":"Daytrade-setups")+'">'+_cards+'</div>';if(window.applyProLocks)applyProLocks(wrap);}
-  }catch(e){wrap.innerHTML=`<div class="scl-empty">Kunde inte hämta daytrade just nu — försöker igen strax…</div>`;
+    if(!j.pro&&window.applyProLocks)applyProLocks(wrap);
+  }catch(e){wrap.innerHTML='<div class="scl-empty">'+(EN?"Couldn't load GEX levels — trying again shortly…":"Kunde inte hämta GEX-nivåer just nu — försöker igen strax…")+'</div>';
     window._dtRetry=(window._dtRetry||0)+1;if(window._dtRetry<=5)setTimeout(function(){loadDaytrade(true);},10000);}
 }
+/* Discord-länkarna hämtar adressen från CONFIG, så den byts på ett ställe. */
+(function(){Array.prototype.forEach.call(document.querySelectorAll(".js-discord"),function(a){a.href=CONFIG.DISCORD_URL;});
+  document.body.classList.toggle("not-pro",!isPro());})();
 
 /* ===== Research (försidan) ===== */
 const RS={price15:false,relvol:false,mom:false,news:false,insider:false,lowcap:false,theme:""};
@@ -4289,7 +4362,12 @@ paywallCheck();
 (function(){
   var ua=navigator.userAgent||"";
   var isIOS=/iPhone|iPad|iPod/.test(ua)||(/(Macintosh)/.test(ua)&&navigator.maxTouchPoints>1);
-  if(isIOS){iosBarInit();}else{proPromoInit();}
+  if(isIOS){iosBarInit();}else if(!CONFIG.LOCK_TABS){proPromoInit();}
+  /* Låst läge: paywallen med de fyra säljpunkterna poppar upp en gång per
+     besök för den som inte har PRO. Den går att stänga — Översikt är öppen. */
+  if(CONFIG.LOCK_TABS){setTimeout(function(){
+    try{if(isPro()||sessionStorage.getItem("grabit_pw_seen"))return;sessionStorage.setItem("grabit_pw_seen","1");}catch(e){}
+    if(!isPro()&&window.showPaywall)showPaywall(null,true);},1500);}
 })();
 function _devLogoTap(){
   var now=Date.now();
