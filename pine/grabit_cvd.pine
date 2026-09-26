@@ -1,0 +1,298 @@
+//@version=6
+// GRABIT CVD v2.5
+// ---------------------------------------------------------------------------
+// CVD med sida, divergens vid riktiga extremer, absorption och tryck (0–100).
+// Deltat kommer från TradingViews eget bibliotek (samma som inbyggda Volume Delta).
+//
+// Ändringslogg v2.5:
+//  · NY: Tryck 0–100 — RSI byggd på deltat. Över 70 = köparna har dominerat ovanligt
+//    mycket (överköpt), under 30 = säljarna (översålt). Välj "Panel: Tryck (0–100)" för
+//    att se linjen, eller lägg indikatorn två gånger: en med CVD, en med Tryck.
+//  · NY: Signaler bara nära nivåer — VWAP ±1 SD, PDH/PDL och GEX-strängen (samma som
+//    GRABIT GEX Levels). GEX-nivåerna gäller bara senaste dygnet, de är dagens nivåer.
+//    Etiketten i prisgrafen säger vilken nivå signalen kom vid.
+//  · NY: Nollställ vid RTH-öppning (förval). Med 1D började dagen 18:00 New York-tid och
+//    hela natten låg med i CVD när New York öppnade. Guld använder COMEX 08:20–13:30.
+//  · FIX: Sidan nollställs vid ny dag och mäts mot dagens högsta |CVD| i stället för de
+//    senaste 100 barerna — den hängde kvar från igår.
+//  · FIX: Absorption mäts som delta i % av barens volym (samma skala hela dagen, inte bara
+//    vid öppningen) och kräver litet spann: mycket tryck men ingen rörelse.
+//  · FIX: Väntande divergenser nollställs vid ny dag.
+//  · FIX: Lägre tidsram väljs automatiskt efter grafen.
+// ---------------------------------------------------------------------------
+indicator("Grabit CVD v2.5", "Grabit CVD", overlay=false, format=format.volume, max_labels_count=200)
+import TradingView/ta/8 as tvta
+
+grp = "CVD"
+panel    = input.string("CVD", "Panel", options=["CVD", "Tryck (0–100)"], group=grp, tooltip="CVD: kumulativ delta. Tryck: överköpt/översålt-linje som RSI, räknad på deltat. Vill du se båda, lägg till indikatorn två gånger.")
+ltfIn    = input.string("Auto", "Lägre tidsram för delta", options=["Auto", "1", "5", "15", "1S", "5S", "15S"], group=grp, tooltip="Auto väljer minuter efter grafens tidsram. Sekunder (S) kräver TradingView Premium.")
+anchorIn = input.string("RTH-öppning", "Nollställ vid", options=["RTH-öppning", "Dag (1D)", "Vecka"], group=grp, tooltip="RTH-öppning: CVD börjar om när New York öppnar (guld: COMEX-öppningen). Dag: 18:00 New York-tid, nattsessionen räknas med.")
+sess     = input.session("0930-1600", "RTH (New York-tid)", group=grp, tooltip="Guld byter automatiskt till 0820-1330 så länge fältet står på 0930-1600.")
+useSess  = input.bool(false, "Signaler bara i RTH", group=grp)
+pivL     = input.int(3, "Pivot-längd", group=grp)
+extLen   = input.int(60, "Extrem = högsta/lägsta på (bars)", group=grp)
+maxGap   = input.int(100, "Max bars mellan pivoter", group=grp)
+minStep  = input.float(0.5, "Ny extrem minst (x ATR) bortom gamla", step=0.1, group=grp)
+confirmIt = input.bool(true, "Kräv bekräftelse (stäng tillbaka)", group=grp)
+confBars = input.int(6, "Bekräftelse inom (bars)", group=grp)
+divBars  = input.int(12, "Divergens gäller i (bars)", group=grp)
+sideHys  = input.float(0.10, "Sid-hysteres (andel av dagens max)", step=0.05, group=grp)
+emaLen   = input.int(21, "EMA på delta", group=grp)
+bullCol  = input.color(#00e5ff, "Bull", group=grp)
+bearCol  = input.color(#ff1744, "Bear", group=grp)
+
+gA = "Absorption"
+absPct   = input.float(30, "Delta minst (% av barens volym)", minval=5, maxval=90, group=gA)
+absRange = input.float(0.6, "Spann högst (x ATR)", step=0.1, group=gA, tooltip="Absorption = mycket tryck men liten rörelse. En stor bar som rör sig mycket är inte absorption.")
+absVol   = input.float(1.0, "Volym minst (x snitt 20)", step=0.1, group=gA)
+
+gT = "Tryck (överköpt / översålt)"
+presLen  = input.int(14, "Längd", minval=2, group=gT)
+obLvl    = input.int(70, "Överköpt", minval=50, maxval=95, group=gT)
+osLvl    = input.int(30, "Översålt", minval=5, maxval=50, group=gT)
+
+gL = "Nivåfilter"
+lvlOn    = input.bool(true, "Signaler bara nära en nivå", group=gL)
+lvlDist  = input.float(0.5, "Max avstånd till nivån (x ATR)", step=0.1, group=gL)
+useVwap  = input.bool(true, "VWAP ±1 SD", group=gL)
+usePD    = input.bool(true, "PDH / PDL", group=gL)
+useGex   = input.bool(true, "GEX-nivåer", group=gL)
+srcNQ    = input.string("", "NQ — levels string", group=gL, tooltip="Samma sträng som i GRABIT GEX Levels (/tvgex i Telegram). Gäller bara senaste dygnet.")
+srcGC    = input.string("", "GC — levels string", group=gL)
+lblOn    = input.bool(true, "Etiketter i prisgrafen", group=gL)
+
+// ── Instrument och tidsram
+bool isGold = str.contains(syminfo.root, "GC") or str.contains(syminfo.ticker, "XAU")
+string sessEff = isGold and sess == "0930-1600" ? "0820-1330" : sess
+int chartSec = timeframe.in_seconds(timeframe.period)
+string ltf = ltfIn != "Auto" ? ltfIn : chartSec < 60 ? timeframe.period : chartSec <= 3600 ? "1" : chartSec <= 14400 ? "5" : "15"
+
+// ── Delta per bar (exakt som TV:s inbyggda) och egen CVD med valfri nollställning
+[dO, dH, dL, delta] = tvta.requestVolumeDelta(ltf)
+bool inRth = not na(time(timeframe.period, sessEff, "America/New_York"))
+bool rthOpen = inRth and not inRth[1]
+bool reset = anchorIn == "RTH-öppning" ? rthOpen : anchorIn == "Vecka" ? timeframe.change("W") : timeframe.change("D")
+var float cvd = 0.0
+cvd := reset ? nz(delta) : cvd + nz(delta)
+float atr = ta.atr(14)
+bool inSess = not useSess or inRth
+
+// ── Nivåer
+[vwapV, vwapU, vwapL] = ta.vwap(hlc3, timeframe.change("D"), 1)
+[pdh, pdl] = request.security(syminfo.tickerid, "D", [high[1], low[1]], lookahead=barmerge.lookahead_on)
+
+var array<float>  gexP = array.new<float>()
+var array<string> gexN = array.new<string>()
+if barstate.isfirst and useGex
+    string src = isGold ? srcGC : srcNQ
+    if str.length(src) > 0
+        array<string> rowsS = str.split(src, ";")
+        for r in rowsS
+            array<string> f = str.split(r, ",")
+            if array.size(f) == 3
+                float p = str.tonumber(str.trim(array.get(f, 0)))
+                string k = str.trim(array.get(f, 2))
+                // Öppnings-grid och halva EM-band är inga riktiga nivåer att handla mot.
+                if not na(p) and k != "opo" and k != "opu" and k != "opd" and k != "emb"
+                    array.push(gexP, p)
+                    array.push(gexN, str.trim(array.get(f, 1)))
+// GEX-strängen är dagens nivåer; äldre barer filtreras bara mot VWAP och PDH/PDL.
+bool gexActive = useGex and array.size(gexP) > 0 and timenow - time <= 24 * 3600 * 1000
+bool anyLvl = useVwap or usePD or gexActive
+
+// Närmaste nivå inom tol. Returnerar [träff, namn].
+f_near(float px, float tol) =>
+    float best = tol
+    string nm = ""
+    if useVwap
+        if not na(vwapV) and math.abs(px - vwapV) <= best
+            best := math.abs(px - vwapV)
+            nm := "VWAP"
+        if not na(vwapU) and math.abs(px - vwapU) <= best
+            best := math.abs(px - vwapU)
+            nm := "VWAP +1SD"
+        if not na(vwapL) and math.abs(px - vwapL) <= best
+            best := math.abs(px - vwapL)
+            nm := "VWAP -1SD"
+    if usePD
+        if not na(pdh) and math.abs(px - pdh) <= best
+            best := math.abs(px - pdh)
+            nm := "PDH"
+        if not na(pdl) and math.abs(px - pdl) <= best
+            best := math.abs(px - pdl)
+            nm := "PDL"
+    if gexActive
+        for i = 0 to array.size(gexP) - 1
+            float g = array.get(gexP, i)
+            if math.abs(px - g) <= best
+                best := math.abs(px - g)
+                nm := array.get(gexN, i)
+    [nm != "", nm]
+
+// ── 1. Sida (nollställs vid ny dag, mäts mot dagens max)
+float avgAbsD = ta.sma(math.abs(nz(delta)), 50)
+var float dayMaxAbs = 0.0
+var int side = 0
+if reset
+    dayMaxAbs := 0.0
+    side := 0
+dayMaxAbs := math.max(dayMaxAbs, math.abs(cvd))
+// Golvet på 3 × snittdelta hindrar sidan från att slå om på första baren, när dagens max är
+// samma sak som CVD självt.
+float sideThr = math.max(dayMaxAbs * sideHys, nz(avgAbsD) * 3)
+side := cvd > sideThr ? 1 : cvd < -sideThr ? -1 : side
+sideUp = side == 1
+sideDn = side == -1
+sideChg = ta.change(side) != 0
+
+// ── 2a. Absorption: stort delta i % av volymen, litet spann, stängning mot deltat, vid nivå
+float volAvg = ta.sma(volume, 20)
+float dPct = volume > 0 ? 100 * nz(delta) / volume : 0.0
+bool smallBar = high - low <= atr * absRange
+bool bigVol = volume >= volAvg * absVol
+[nearAbsH, nmAbsH] = f_near(high, lvlDist * atr)
+[nearAbsL, nmAbsL] = f_near(low, lvlDist * atr)
+bool lvlAbsH = not lvlOn or not anyLvl or nearAbsH
+bool lvlAbsL = not lvlOn or not anyLvl or nearAbsL
+absBear = dPct >= absPct and smallBar and bigVol and close <= open and lvlAbsH and inSess
+absBull = dPct <= -absPct and smallBar and bigVol and close >= open and lvlAbsL and inSess
+
+// ── 2b. Divergens vid riktig extrem, inom samma dag
+ph = ta.pivothigh(high, pivL, pivL)
+pl = ta.pivotlow(low, pivL, pivL)
+hh = ta.highest(high, extLen)
+ll = ta.lowest(low, extLen)
+hhP = hh[pivL]
+llP = ll[pivL]
+cvdAtP = cvd[pivL]
+lowP = low[pivL]
+highP = high[pivL]
+[nearPH, nmPH] = f_near(highP, lvlDist * atr)
+[nearPL, nmPL] = f_near(lowP, lvlDist * atr)
+var float lastPH = na
+var float lastPHc = na
+var int lastPHb = na
+var float lastPL = na
+var float lastPLc = na
+var int lastPLb = na
+var int armedBear = 1
+var int armedBull = 1
+lastPH := reset ? na : lastPH
+lastPHc := reset ? na : lastPHc
+lastPL := reset ? na : lastPL
+lastPLc := reset ? na : lastPLc
+armedBear := reset ? 1 : armedBear
+armedBull := reset ? 1 : armedBull
+extremeH = not na(ph) and ph >= hhP
+extremeL = not na(pl) and pl <= llP
+bool lvlPH = not lvlOn or not anyLvl or nearPH
+bool lvlPL = not lvlOn or not anyLvl or nearPL
+bearRaw = extremeH and not na(lastPH) and bar_index - lastPHb <= maxGap and ph > lastPH + atr * minStep and cvdAtP < lastPHc and armedBear == 1 and lvlPH
+bullRaw = extremeL and not na(lastPL) and bar_index - lastPLb <= maxGap and pl < lastPL - atr * minStep and cvdAtP > lastPLc and armedBull == 1 and lvlPL
+lastPH := not na(ph) ? ph : lastPH
+lastPHc := not na(ph) ? cvdAtP : lastPHc
+lastPHb := not na(ph) ? bar_index : lastPHb
+lastPL := not na(pl) ? pl : lastPL
+lastPLc := not na(pl) ? cvdAtP : lastPLc
+lastPLb := not na(pl) ? bar_index : lastPLb
+
+// ── 2c. Bekräftelse: pris ska stänga tillbaka (nollställs vid ny dag)
+var int pendBear = 0
+var float pendBearLvl = na
+var int pendBearBar = 0
+var float pendBearPx = na
+var string pendBearNm = ""
+var int pendBull = 0
+var float pendBullLvl = na
+var int pendBullBar = 0
+var float pendBullPx = na
+var string pendBullNm = ""
+if reset
+    pendBear := 0
+    pendBull := 0
+if bearRaw
+    pendBear := 1
+    pendBearLvl := lowP
+    pendBearBar := bar_index
+    pendBearPx := highP
+    pendBearNm := nmPH
+if bullRaw
+    pendBull := 1
+    pendBullLvl := highP
+    pendBullBar := bar_index
+    pendBullPx := lowP
+    pendBullNm := nmPL
+bearConf = pendBear == 1 and close < pendBearLvl and bar_index - pendBearBar <= confBars
+bullConf = pendBull == 1 and close > pendBullLvl and bar_index - pendBullBar <= confBars
+bearDiv = (confirmIt ? bearConf : bearRaw) and inSess
+bullDiv = (confirmIt ? bullConf : bullRaw) and inSess
+pendBear := bearConf or bar_index - pendBearBar > confBars ? 0 : pendBear
+pendBull := bullConf or bar_index - pendBullBar > confBars ? 0 : pendBull
+armedBear := bearDiv ? 0 : sideChg ? 1 : armedBear
+armedBull := bullDiv ? 0 : sideChg ? 1 : armedBull
+sinceBear = ta.barssince(bearDiv or absBear)
+sinceBull = ta.barssince(bullDiv or absBull)
+recentBear = sinceBear <= divBars
+recentBull = sinceBull <= divBars
+
+// ── 3. Bränsle
+dEma = ta.ema(nz(delta), emaLen)
+fuel = sideUp ? delta > dEma : sideDn ? delta < dEma : false
+
+// ── 4. Tryck 0–100: RSI på deltat. Andelen köpdelta av allt delta, utjämnat som RSI.
+float upD = ta.rma(math.max(nz(delta), 0), presLen)
+float dnD = ta.rma(math.max(-nz(delta), 0), presLen)
+float pres = upD + dnD > 0 ? 100 * upD / (upD + dnD) : 50
+bool isOB = pres >= obLvl
+bool isOS = pres <= osLvl
+bool obExit = ta.crossunder(pres, obLvl)
+bool osExit = ta.crossover(pres, osLvl)
+
+// ── Rita
+bool showCvd = panel == "CVD"
+bool showPres = not showCvd
+bgcolor(absBear ? color.new(bearCol, 80) : absBull ? color.new(bullCol, 80) : showCvd and sideUp ? color.new(bullCol, 94) : showCvd and sideDn ? color.new(bearCol, 94) : na)
+plot(showCvd ? cvd : na, "CVD", color=sideUp ? bullCol : sideDn ? bearCol : color.gray, linewidth=2)
+plot(showCvd ? 0 : na, "Noll", color=color.new(color.gray, 50), style=plot.style_circles, linewidth=1)
+
+pPres = plot(showPres ? pres : na, "Tryck", color=isOB ? bullCol : isOS ? bearCol : color.new(color.white, 20), linewidth=2)
+pOB   = plot(showPres ? obLvl : na, "Överköpt", color=color.new(bullCol, 50))
+pOS   = plot(showPres ? osLvl : na, "Översålt", color=color.new(bearCol, 50))
+pMid  = plot(showPres ? 50 : na, "Mitt", color=color.new(color.gray, 60), style=plot.style_circles)
+pTop  = plot(showPres ? 100 : na, "Topp", display=display.none)
+pBot  = plot(showPres ? 0 : na, "Botten", display=display.none)
+fill(pOB, pTop, color=color.new(bullCol, 92))
+fill(pBot, pOS, color=color.new(bearCol, 92))
+
+plotshape(bearDiv, "Sälj-div", shape.triangledown, location.top, bearCol, offset=confirmIt ? 0 : -pivL, size=size.small)
+plotshape(bullDiv, "Köp-div", shape.triangleup, location.bottom, bullCol, offset=confirmIt ? 0 : -pivL, size=size.small)
+
+// Etiketter i prisgrafen med nivån signalen kom vid.
+if lblOn and bearDiv
+    int xB = confirmIt ? pendBearBar - pivL : bar_index - pivL
+    label.new(xB, confirmIt ? pendBearPx : highP, (confirmIt ? pendBearNm : nmPH) != "" ? "Div · " + (confirmIt ? pendBearNm : nmPH) : "Div", style=label.style_label_down, color=color.new(color.black, 100), textcolor=bearCol, size=size.small, force_overlay=true)
+if lblOn and bullDiv
+    int xU = confirmIt ? pendBullBar - pivL : bar_index - pivL
+    label.new(xU, confirmIt ? pendBullPx : lowP, (confirmIt ? pendBullNm : nmPL) != "" ? "Div · " + (confirmIt ? pendBullNm : nmPL) : "Div", style=label.style_label_up, color=color.new(color.black, 100), textcolor=bullCol, size=size.small, force_overlay=true)
+if lblOn and absBear
+    label.new(bar_index, high, nmAbsH != "" ? "Abs · " + nmAbsH : "Abs", style=label.style_label_down, color=color.new(color.black, 100), textcolor=bearCol, size=size.tiny, force_overlay=true)
+if lblOn and absBull
+    label.new(bar_index, low, nmAbsL != "" ? "Abs · " + nmAbsL : "Abs", style=label.style_label_up, color=color.new(color.black, 100), textcolor=bullCol, size=size.tiny, force_overlay=true)
+
+var table t = table.new(position.top_right, 2, 4, bgcolor=color.new(color.black, 20), border_width=1, border_color=color.new(color.gray, 70))
+if barstate.islast
+    table.cell(t, 0, 0, "SIDA", text_color=color.gray, text_size=size.small)
+    table.cell(t, 1, 0, sideUp ? "KÖP" : sideDn ? "SÄLJ" : "—", text_color=sideUp ? bullCol : sideDn ? bearCol : color.gray, text_size=size.normal)
+    table.cell(t, 0, 1, "DIV", text_color=color.gray, text_size=size.small)
+    table.cell(t, 1, 1, recentBear ? "SÄLJ" : recentBull ? "KÖP" : "—", text_color=recentBear ? bearCol : recentBull ? bullCol : color.gray, text_size=size.normal)
+    table.cell(t, 0, 2, "BRÄNSLE", text_color=color.gray, text_size=size.small)
+    table.cell(t, 1, 2, fuel ? "ÖKAR" : "AVTAR", text_color=fuel ? color.white : color.gray, text_size=size.normal)
+    table.cell(t, 0, 3, "TRYCK", text_color=color.gray, text_size=size.small)
+    table.cell(t, 1, 3, str.tostring(pres, "#") + (isOB ? " ÖVERKÖPT" : isOS ? " ÖVERSÅLT" : ""), text_color=isOB ? bullCol : isOS ? bearCol : color.white, text_size=size.normal)
+
+// ── Alerts
+alertcondition(bearDiv or absBear, "Grabit CVD – sälj-signal", "Sälj-divergens bekräftad eller absorption")
+alertcondition(bullDiv or absBull, "Grabit CVD – köp-signal", "Köp-divergens bekräftad eller absorption")
+alertcondition(sideChg, "Grabit CVD – sidbyte", "CVD har bytt sida")
+alertcondition(obExit, "Grabit CVD – lämnar överköpt", "Trycket har gått ner under överköpt-nivån")
+alertcondition(osExit, "Grabit CVD – lämnar översålt", "Trycket har gått upp över översålt-nivån")

@@ -146,6 +146,29 @@ approximation, inte riktig bid/ask-data. Siffrorna blir därför något jämnare
 i en riktig footprint, och kan skilja lite från CVD-indikatorn ovan, som räknar
 hela intrabaren åt ett håll.
 
+## Grabit CVD (`pine/grabit_cvd.pine`)
+
+CVD i egen panel med fyra rader i tabellen: SIDA (vem som leder dagen), DIV
+(divergens eller absorption nyligen), BRÄNSLE (om deltat växer åt sidans håll)
+och TRYCK.
+
+- **Tryck 0–100** är en RSI räknad på deltat: andelen köpdelta av allt delta,
+  utjämnat över 14 barer. Över 70 betyder att köparna har dominerat ovanligt
+  mycket, under 30 att säljarna har gjort det. Välj "Panel: Tryck (0–100)" för
+  att se linjen. Vill du se både CVD och Tryck, lägg till indikatorn två gånger.
+  Överköpt betyder starkt flöde, inte automatiskt vändning. Signalen är när
+  trycket lämnar zonen igen, särskilt vid en nivå, och det finns larm för det.
+- **Divergens**: priset gör en ny extrem men CVD gör det inte, och priset stänger
+  sedan tillbaka.
+- **Absorption**: deltat är minst 30 % av barens volym, men baren rör sig lite
+  och stänger åt andra hållet. Någon står emot trycket.
+- **Nivåfilter** (på som förval): signaler ges bara inom 0,5 × ATR från VWAP
+  ±1 SD, PDH/PDL eller en GEX-nivå. GEX-strängen klistras in som i GRABIT GEX
+  Levels och används bara för det senaste dygnet, eftersom det är dagens nivåer.
+  Etiketten i prisgrafen säger vilken nivå signalen kom vid.
+- CVD nollställs som förval vid **RTH-öppningen** (15:30 svensk tid för NQ,
+  COMEX 08:20 New York-tid för guld), så att nattens handel inte ligger med.
+
 ## GRABIT Breakout · strategy (`pine/grabit_breakout_strategy.pine`)
 
 Backtestbar version av den signaltyp som säljs som "Weakness Below X /
