@@ -230,7 +230,9 @@ def rule_sets(df):
 def top_pick(df, rank_fn, mask):
     """En pick per datum (som Top Opportunity): högst rank bland mask."""
     out = []
-    for d, g in df[mask].groupby("date"):
+    # Per vecka: utvärderingsdagarna skiljer sig någon dag mellan aktier.
+    wk = pd.to_datetime(df["date"]).dt.to_period("W").astype(str)
+    for d, g in df[mask].groupby(wk[mask]):
         g = g[g["market"] == "US"]
         if not len(g):
             continue
@@ -259,6 +261,9 @@ def main():
                 print("utvärderat %d/%d aktier, %d rader (%.0f s)" % (k, len(jobs), len(rows), time.time() - t0), flush=True)
     df = pd.DataFrame(rows)
     df = add_rs_rating(df)
+    # RS-rating per vecka (samma skäl som i top_pick).
+    df["rs_rating"] = (df.groupby(pd.to_datetime(df["date"]).dt.to_period("W").astype(str))["rs_raw"]
+                       .rank(pct=True) * 98 + 1).round()
     reg = regime(bench)
     df["regime"] = df["date"].map(reg)
     os.makedirs(OUT, exist_ok=True)
@@ -288,6 +293,8 @@ def main():
     picks = {}
     for name, fn, mask in [("Top pick, gamla reglerna", old_rank, rules["A-läge, gamla reglerna"]),
                            ("Top pick, steg 1-reglerna", new_rank, rules["A-läge + RS>=70 + likviditet (steg 1)"]),
+                           ("Top pick, RS minus setup (appen nu)", lambda g: g["rs_rating"] - g["setup"],
+                            rules["A-läge + RS>=70 + likviditet (steg 1)"]),
                            ("Top pick, högst RS bland RS>=80+EMA50", lambda g: g["rs_rating"],
                             rules["RS>=80 + över EMA50 + inte avsvalnande"])]:
         tp = top_pick(df, fn, mask.fillna(False))
