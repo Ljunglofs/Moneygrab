@@ -120,9 +120,9 @@ Högerprofilen har tre typer:
 
 - **Delta + Volym** (förval), samma upplägg som orderflow-plattformarnas
   profiler, ritad med en tunn linje per prisrad. Till **höger** om mittlinjen
-  står den totala volymen: den gröna delen närmast mitten är köp och den röda
+  står den totala volymen: den cyanfärgade delen närmast mitten är köp och den röda
   delen utanför är sälj, så hela linjens längd är volymen på nivån. Till
-  **vänster** står deltat, köp − sälj på nivån. Linjen är grön när köparna
+  **vänster** står deltat, köp − sälj på nivån. Linjen är cyan när köparna
   ledde och röd när säljarna gjorde det, och längden visar hur stor övervikten
   var. Deltasidan skalas för sig, eftersom deltat alltid är mycket mindre än
   volymen.

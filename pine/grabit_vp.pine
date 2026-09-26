@@ -4,7 +4,7 @@
 //
 // Ändringslogg (senaste):
 //  · NY: Profiltyp "Delta + Volym" (förval), ritad som tunna linjer per rad. Vänster om mittlinjen
-//    är deltat per nivå (grönt = köpare ledde, rött = säljare). Höger är total volym, grön köpdel
+//    är deltat per nivå (cyan = köpare ledde, rött = säljare). Höger är total volym, cyan köpdel
 //    närmast mitten och röd säljdel utanför. Delta och volym står som ren text utan ruta.
 //  · NY: Högerprofilen är delad köp/sälj — säljare åt vänster (röd), köpare åt höger (grön)
 //    runt en mittlinje. Delta i % överst och total volym (köp/sälj) underst. Valfria siffror
@@ -42,8 +42,8 @@ profType  = input.string("Delta + Volym", "Profiltyp (högerläge)", options=["D
 deltaShare= input.int(35, "Deltasidans andel av bredden (%)", minval=15, maxval=60, group=gP)
 showDT    = input.bool(true, "Delta och Total vid profilen", group=gP)
 numGroups = input.int(0, "Siffror per nivå (antal grupper, 0 = av)", minval=0, maxval=40, group=gP, tooltip="Slår ihop raderna till så här många nivåer och skriver köp/sälj-volym vid varje, som en footprint. 15–25 brukar vara läsbart.")
-colBuyP   = input.color(color.new(#26a69a, 10), "Köpare", group=gP)
-colSellP  = input.color(color.new(#ef5350, 10), "Säljare", group=gP)
+colBuyP   = input.color(color.new(#00e5ff, 10), "Köpare", group=gP)
+colSellP  = input.color(color.new(#ff1744, 10), "Säljare", group=gP)
 res       = input.timeframe("D",  "Profilperiod (session)", group=gP)
 rows      = input.int(400, "Rader per profil", minval=20, maxval=400, group=gP)
 vaPct     = input.float(70, "Value Area %", minval=50, maxval=95, group=gP) / 100
