@@ -1147,7 +1147,7 @@ var GRABIT_LANG = (function(){try{return localStorage.getItem("grabit_lang")||"e
 window.GRABIT_LANG = GRABIT_LANG;
 var _I18N_EXACT = {
 "Ny extrem möjlighet":"New extreme opportunity","Rädsla":"Fear","RÄDSLA":"FEAR","Extrem rädsla":"Extreme fear","EXTREM RÄDSLA":"EXTREME FEAR","Girighet":"Greed","GIRIGHET":"GREED","Extrem girighet":"Extreme greed","EXTREM GIRIGHET":"EXTREME GREED","GULD":"GOLD","Guld":"Gold","AI · MARKNADSLÄGE":"AI · MARKET OUTLOOK","MARKNADSLÄGE":"MARKET OUTLOOK","Laddar dagens läge…":"Loading today's outlook…","Laddar dagens läge...":"Loading today's outlook…",
-"Månad":"Month","År":"Year","/mån":"/mo","/år":"/yr","/månad":"/month","3 MÅN GRATIS":"3 MONTHS FREE","Spara 25%":"Save 25%","Fortsätt med PRO":"Continue with PRO","Har du en licensnyckel?":"Have a license key?","Betalningen är inte konfigurerad än.":"Checkout isn't set up yet.",
+"Månad":"Month","År":"Year","/mån":"/mo","/år":"/yr","/månad":"/month","3 MÅN GRATIS":"3 MONTHS FREE","0 kr":"SEK 0","174 kr":"SEK 174","1566 kr":"SEK 1,566","Betalningen sker säkert via Google Play (appen) eller vår betalpartner (webben). Avsluta när som helst. Ingen finansiell rådgivning.":"Payment is handled securely by Google Play (in the app) or our payment partner (on the web). Cancel anytime. Not financial advice.","Spara 25%":"Save 25%","Fortsätt med PRO":"Continue with PRO","Har du en licensnyckel?":"Have a license key?","Betalningen är inte konfigurerad än.":"Checkout isn't set up yet.",
   // Nav
   "Översikt":"Overview","Daytrade":"Daytrade","Signaler":"Signals","Research":"Research",
   "Portfölj":"Portfolio","Smart":"Smart",
@@ -1749,8 +1749,7 @@ else _i18nBoot();
       <div class="pw-restore" onclick="restorePro()">Har du redan PRO? Återställ köp &#8250;</div>
       <div class="pw-code"><input id="pw-code-in" placeholder="Har du en medlemskod?" autocomplete="off" autocapitalize="off" spellcheck="false" onkeydown="if(event.key==='Enter')unlockWithCode()"><button onclick="unlockWithCode()">Lås upp</button></div>
     </div>
-    <div class="pw-fine"><svg viewBox="0 0 24 24" fill="none" stroke="#5b6675" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;flex:none"><path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg><span>Betalningen sker säkert via Google Play (appen) eller vår betalpartner (webben).
-    Avsluta när som helst. Ingen finansiell rådgivning.</span></div>
+    <div class="pw-fine"><svg viewBox="0 0 24 24" fill="none" stroke="#5b6675" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;flex:none"><path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg><span>Betalningen sker säkert via Google Play (appen) eller vår betalpartner (webben). Avsluta när som helst. Ingen finansiell rådgivning.</span></div>
     <div class="pw-links"><a href="/villkor" target="_blank" rel="noopener">Villkor</a> · <a href="/privacy" target="_blank" rel="noopener">Integritetspolicy</a> · <a href="mailto:support@grabitlabs.com">Support</a></div>
   </div>
 </div>
@@ -4287,6 +4286,7 @@ function showPaywall(msg,dismissable){
   if(bi&&!bi.src){var hb=document.querySelector(".brand");if(hb&&hb.src)bi.src=hb.src;}
   if(msg){var su=document.getElementById("pw-sub");if(su)su.textContent=msg;}
   var x=document.getElementById("pw-close");if(x)x.style.display=dismissable?"block":"none";
+  try{syncTrialText(window._proPlan||"monthly");}catch(e){}
   el.style.display="flex";
 }
 function hidePaywall(){var el=document.getElementById("paywall");if(el)el.style.display="none";
