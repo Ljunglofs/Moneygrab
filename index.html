@@ -4502,7 +4502,10 @@ paywallCheck();
     if(_q.get("pw")==="1"&&!isPro()){
       try{sessionStorage.setItem("grabit_pw_seen","1");}catch(e){}
       setTimeout(function(){showPaywall(null,true);
-        if(_q.get("plan")==="annual"){var b=document.querySelector('.pw-plan[data-plan="annual"]');if(b)setProPlan("annual",b);}},400);}
+        if(_q.get("plan")==="annual"){var b=document.querySelector('.pw-plan[data-plan="annual"]');if(b)setProPlan("annual",b);}
+        /* go=1: direkt vidare till kortregistreringen hos Stripe, utan ett extra
+           klick i paywallen. Inte i Android-appen — där gäller Google Play. */
+        if(_q.get("go")==="1"&&!_ANDROID_APP&&window.buyPro)buyPro();},400);}
     if(_q.has("pw")||_q.has("app")||_q.has("plan"))history.replaceState(null,"",location.pathname);
   }catch(e){}
   if(CONFIG.LOCK_TABS){setTimeout(function(){
