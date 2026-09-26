@@ -120,8 +120,7 @@ Högerprofilen har tre typer:
 
 - **Delta + Volym** (förval), samma upplägg som orderflow-plattformarnas
   profiler, ritad med en tunn linje per prisrad. Till **höger** om mittlinjen
-  står den totala volymen: den cyanfärgade delen närmast mitten är köp och den röda
-  delen utanför är sälj, så hela linjens längd är volymen på nivån. Till
+  står den totala volymen på nivån, i en färg. Till
   **vänster** står deltat, köp − sälj på nivån. Linjen är cyan när köparna
   ledde och röd när säljarna gjorde det, och längden visar hur stor övervikten
   var. Deltasidan skalas för sig, eftersom deltat alltid är mycket mindre än
@@ -129,10 +128,11 @@ Högerprofilen har tre typer:
 - **Köp/Sälj (delad)**: säljvolym åt vänster, köpvolym åt höger.
 - **Klassisk**: den gamla enfärgade profilen.
 
-Profilen täcker som förval de **senaste 5 sessionerna** ("Data i
-högerprofil"), så att nivåerna från tidigare dagar syns och inte bara dagens
-range. Antalet går att ändra. "Pågående session" ger bara i dag och "Lookback"
-ett fast antal bars. Högst 1999 bars räknas, vilket på 5-minutersgraf räcker
+Profilen täcker som förval **pågående session** ("Data i högerprofil"). Det
+är dagens nivåer, och tillsammans med gårdagens (dVAH/dVAL, Yesterday POC) är
+det dem man daytradar mot. "Senaste sessioner" (5 som förval) ger en
+flerdagarsprofil för större nivåer och målzoner, och "Lookback" ett fast antal
+bars. Högst 1999 bars räknas, vilket på 5-minutersgraf räcker
 till drygt en vecka men på 1-minutersgraf bara till lite mer än en dag.
 
 Överst står deltat för hela profilen, (köp − sälj) / total i procent och i

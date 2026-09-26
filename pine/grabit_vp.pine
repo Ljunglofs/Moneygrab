@@ -3,6 +3,8 @@
 // Klistra in i TradingView Pine Editor -> Save -> Add to chart.
 //
 // Ändringslogg (senaste):
+//  · ÄNDRAT: Volymsidan i Delta + Volym är en färg (cyan) — den visar bara total volym.
+//    Köp/sälj syns på deltasidan. Högerprofilen räknar åter på pågående session som förval.
 //  · NY: "Senaste sessioner" (förval, 5 st) i högerprofilen, så att den täcker flera dagar och
 //    visar nivåerna från tidigare dagar och inte bara dagens range.
 //  · NY: Profiltyp "Delta + Volym" (förval), ritad som tunna linjer per rad. Vänster om mittlinjen
@@ -40,7 +42,7 @@ colBand   = input.color(color.new(#00e5ff, 92), "Bandfyllnad", group=gV)
 // Volume Profile
 gP = "Volume Profile"
 profMode  = input.string("Höger sida", "Läge", options=["Höger sida", "I sessionerna"], group=gP)
-profType  = input.string("Delta + Volym", "Profiltyp (högerläge)", options=["Delta + Volym", "Köp/Sälj (delad)", "Klassisk"], group=gP, tooltip="Delta + Volym: till vänster om mittlinjen deltat per nivå (grönt = fler köpare, rött = fler säljare), till höger total volym där den gröna delen är köp och den röda sälj.\nKöp/Sälj (delad): säljare åt vänster, köpare åt höger.")
+profType  = input.string("Delta + Volym", "Profiltyp (högerläge)", options=["Delta + Volym", "Köp/Sälj (delad)", "Klassisk"], group=gP, tooltip="Delta + Volym: till vänster om mittlinjen deltat per nivå (cyan = fler köpare, rött = fler säljare), till höger total volym i en färg.\nKöp/Sälj (delad): säljare åt vänster, köpare åt höger.")
 deltaShare= input.int(35, "Deltasidans andel av bredden (%)", minval=15, maxval=60, group=gP)
 showDT    = input.bool(true, "Delta och Total vid profilen", group=gP)
 numGroups = input.int(0, "Siffror per nivå (antal grupper, 0 = av)", minval=0, maxval=40, group=gP, tooltip="Slår ihop raderna till så här många nivåer och skriver köp/sälj-volym vid varje, som en footprint. 15–25 brukar vara läsbart.")
@@ -49,7 +51,7 @@ colSellP  = input.color(color.new(#ff1744, 10), "Säljare", group=gP)
 res       = input.timeframe("D",  "Profilperiod (session)", group=gP)
 rows      = input.int(400, "Rader per profil", minval=20, maxval=400, group=gP)
 vaPct     = input.float(70, "Value Area %", minval=50, maxval=95, group=gP) / 100
-profSrc   = input.string("Senaste sessioner", "Data i högerprofil", options=["Senaste sessioner", "Pågående session", "Lookback (bars)"], group=gP, tooltip="Senaste sessioner: profilen täcker de senaste N dagarna (inklusive i dag), så att nivåer från tidigare dagar syns.\nPågående session: bara i dag.\nLookback: ett fast antal bars.")
+profSrc   = input.string("Pågående session", "Data i högerprofil", options=["Senaste sessioner", "Pågående session", "Lookback (bars)"], group=gP, tooltip="Senaste sessioner: profilen täcker de senaste N dagarna (inklusive i dag), så att nivåer från tidigare dagar syns.\nPågående session: bara i dag.\nLookback: ett fast antal bars.")
 profDays  = input.int(5, "Antal sessioner i högerprofil", minval=1, maxval=30, group=gP)
 lookback  = input.int(240, "Bars i högerprofil (lookback-läge)", minval=50, maxval=1000, group=gP)
 drawStyle = input.string("Streck (TV-look)", "Ritstil", options=["Streck (TV-look)", "Boxar"], group=gP)
@@ -927,11 +929,10 @@ f_sidePoly(array<float> d, int j0, int j1, float lo, float st, int xc, int dir, 
 // Varje färg är en öppen polyline som går ut längs raden och tillbaka till mittlinjen innan den
 // tar nästa rad, så att vägen mellan raderna hamnar på mittlinjen och inte syns. Det ger en linje
 // per rad med bara fyra polylines, där 400 rader × 3 linjer skulle spräcka max_lines_count.
-//  Höger: total volym. Röd linje ut till hela volymen, grön köpdel ovanpå från mittlinjen.
-//  Vänster: deltat (köp − sälj). Grönt när köparna ledde på nivån, rött när säljarna gjorde det.
+//  Höger: total volym, en färg (köpfärgen).
+//  Vänster: deltat (köp − sälj). Köpfärg när köparna ledde på nivån, säljfärg när säljarna gjorde det.
 f_dvPolys(array<float> bb, array<float> ss, int j0, int j1, float lo, float st, int xc, int wV, int wD, float mT, float mD, color cB, color cS) =>
-    pSell = array.new<chart.point>()
-    pBuy  = array.new<chart.point>()
+    pTot  = array.new<chart.point>()
     pPos  = array.new<chart.point>()
     pNeg  = array.new<chart.point>()
     for j = j0 to j1
@@ -940,16 +941,12 @@ f_dvPolys(array<float> bb, array<float> ss, int j0, int j1, float lo, float st, 
         float t = b + s
         float y = lo + (j + 0.5) * st
         int wT = t > 0 and mT > 0 ? math.round(math.min(1.0, f_sc(t) / mT) * wV) : 0
-        int wB = t > 0 ? math.round(wT * b / t) : 0
         int wd = mD > 0 ? math.round(math.min(1.0, f_sc(math.abs(b - s)) / mD) * wD) : 0
         int wP = b >= s ? wd : 0
         int wN = b < s ? wd : 0
-        array.push(pSell, chart.point.from_index(xc, y))
-        array.push(pSell, chart.point.from_index(xc + wT, y))
-        array.push(pSell, chart.point.from_index(xc, y))
-        array.push(pBuy, chart.point.from_index(xc, y))
-        array.push(pBuy, chart.point.from_index(xc + wB, y))
-        array.push(pBuy, chart.point.from_index(xc, y))
+        array.push(pTot, chart.point.from_index(xc, y))
+        array.push(pTot, chart.point.from_index(xc + wT, y))
+        array.push(pTot, chart.point.from_index(xc, y))
         array.push(pPos, chart.point.from_index(xc, y))
         array.push(pPos, chart.point.from_index(xc - wP, y))
         array.push(pPos, chart.point.from_index(xc, y))
@@ -957,8 +954,7 @@ f_dvPolys(array<float> bb, array<float> ss, int j0, int j1, float lo, float st, 
         array.push(pNeg, chart.point.from_index(xc - wN, y))
         array.push(pNeg, chart.point.from_index(xc, y))
     res = array.new<polyline>()
-    array.push(res, polyline.new(pSell, line_color=cS, line_width=1))
-    array.push(res, polyline.new(pBuy, line_color=cB, line_width=1))
+    array.push(res, polyline.new(pTot, line_color=cB, line_width=1))
     array.push(res, polyline.new(pPos, line_color=cB, line_width=1))
     array.push(res, polyline.new(pNeg, line_color=cS, line_width=1))
     res
