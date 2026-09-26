@@ -200,7 +200,28 @@ def revoke_for_keys(keys) -> int:
     return n
 
 
+def _tv_selfcheck():
+    """Vid start: skriv i loggen om TradingView-kopplingen fungerar, så att den
+    kan verifieras i Render-loggen utan att någon behöver testa för hand."""
+    time.sleep(20)
+    if not os.environ.get("TV_SESSIONID", "").strip():
+        print("[community] TradingView: TV_SESSIONID saknas — begäran går till Telegram")
+        return
+    try:
+        ids = [p.strip() for p in os.environ.get("TV_PINE_IDS", "").split(",") if p.strip()]
+        found = _tv_discover() if not ids else [{"id": i, "name": i} for i in ids]
+        if found:
+            print("[community] TradingView kopplad: %d skript — %s"
+                  % (len(found), ", ".join(x["name"] for x in found)))
+        else:
+            print("[community] TradingView: inloggningen hittade inga GRABIT-skript "
+                  "(fel/utgången cookie, eller inga publicerade skript med GRABIT i namnet)")
+    except Exception as e:
+        print("[community] TradingView-kontroll misslyckades:", e)
+
+
 def register(app) -> None:
+    threading.Thread(target=_tv_selfcheck, daemon=True).start()
     from fastapi import Request
     from fastapi.responses import JSONResponse
 
