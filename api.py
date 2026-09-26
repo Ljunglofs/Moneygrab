@@ -992,7 +992,7 @@ def _manifest():
                    headers={"Cache-Control": "no-cache"})
 
 _SW_JS = """
-const V = 'grabit-v3';
+const V = 'grabit-v4';
 const SHELL = ['/', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png', '/icon-180.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(V).then(c => c.addAll(SHELL).catch(()=>{})).then(()=>self.skipWaiting()));
@@ -1016,10 +1016,12 @@ self.addEventListener('fetch', e => {
           fetch(req),
           new Promise((_, rej) => setTimeout(() => rej(new Error('sw-timeout')), 4000))
         ]);
-        if (net && net.status === 200) c.put('/', net.clone());
+        // Varje sida cachas under sin egen adress — tidigare sparades allt som '/',
+        // så en långsam laddning av /start kunde visa appen och tvärtom.
+        if (net && net.status === 200) c.put(url.pathname, net.clone());
         return net;
       } catch (_) {
-        const hit = await c.match('/');                        // offline/segt: cachen som reserv
+        const hit = await c.match(url.pathname);               // offline/segt: samma sida ur cachen
         return hit || fetch(req);
       }
     })());
