@@ -259,9 +259,50 @@ def _rs_ratings(rows):
     _RS_DIST[:] = vals
     for r in rows:
         r["rs_rating"] = rs_rating_of(r.get("rs_raw"))
+        _relabel(r)
 
 
 _RS_DIST: list = []      # senaste skanningens rs_raw, sorterad — för aktiekortet
+
+# Etiketter enligt backtestet (backtest/results/REPORT.md). Den gamla
+# Rocketcase-definitionen (tight nära toppen) gick sämre än marknaden under
+# andra halvåret; RS-ledare nära toppen slog snittet i båda. Etiketterna sätts
+# därför om när RS-ratingen är känd. Ordningen är prioritetsordningen.
+_LABEL_COLORS = {"Rocketcase": "#f5a623", "MOMENTUM": "#b06bff", "BULL": "#21c45d",
+                 "VÄNDNING": "#00c2c2", "AVSVALNING": "#ff6b3d", "BEAR": "#ff4b4b",
+                 "NEUTRAL/BYGGER": "#f5d142", "SVAG": "#ff9f43"}
+
+
+def _relabel(r):
+    """Sätter etikett ur RS-rating + trend. Saknas RS behålls motorns etikett."""
+    rs = r.get("rs_rating")
+    if rs is None:
+        return
+    try:
+        last, e50, e200 = float(r["last"]), float(r["ema50"]), float(r["ema200"])
+    except Exception:
+        return
+    a50, a200 = last > e50, last > e200
+    fh = float(r.get("pct_from_high") or -100)
+    rsi = float(r.get("rsi") or 0)
+    if rs >= 85 and fh >= -5 and a50:
+        lab = "Rocketcase"        # marknadsledare vid toppen
+    elif rs >= 80 and rsi >= 70 and a50:
+        lab = "MOMENTUM"          # ledare med stark fart
+    elif a50 and a200 and rs >= 70:
+        lab = "BULL"
+    elif not a200 and a50 and r.get("rs_up") and float(r.get("rs_20") or 0) > 0:
+        lab = "VÄNDNING"          # tar sig upp under EMA200 och slår index
+    elif r.get("cooling") and a50:
+        lab = "AVSVALNING"
+    elif not a50 and not a200 and rs <= 20:
+        lab = "BEAR"
+    elif a50:
+        lab = "NEUTRAL/BYGGER"
+    else:
+        lab = "SVAG"
+    r["label_engine"] = r.get("label")
+    r["label"], r["color"] = lab, _LABEL_COLORS[lab]
 
 
 def rs_rating_of(v):
@@ -3026,6 +3067,7 @@ def _stock_payload(ticker: str):
     a["theme"] = TICKER_THEME.get(ticker, "")
     a.update(_rs_vs_bench(df, _bench_close()))
     a["rs_rating"] = rs_rating_of(a.get("rs_raw"))
+    _relabel(a)
     a["live_bar"] = _bar_is_live(ticker, df)
     if a["live_bar"] and len(df) > 26:
         rm = _rank_metrics(df.iloc[:-1])
