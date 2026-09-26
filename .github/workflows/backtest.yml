@@ -1,0 +1,44 @@
+# Backtest av scannerns poängmotor mot riktig kursdata (Yahoo).
+# Körs när motorn eller backtestet ändras på branchen, eller manuellt.
+# Resultatet checkas in i backtest/results/ (REPORT.md + summary.json).
+name: Scanner Backtest
+
+on:
+  push:
+    branches: [claude/nice-einstein-xl1arj]
+    paths:
+      - "backtest/run.py"
+      - "backtest/engine/**"
+      - "backtest/universe.py"
+      - ".github/workflows/backtest.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: backtest
+  cancel-in-progress: true
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install "yfinance>=0.2.40" pandas numpy
+      - run: python backtest/run.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backtest-results
+          path: backtest/results/
+      - name: Checka in resultatet
+        run: |
+          git config user.name "grabit-backtest"
+          git config user.email "backtest@users.noreply.github.com"
+          git add backtest/results/REPORT.md backtest/results/summary.json backtest/results/rows.csv.gz
+          git commit -m "Backtest: nya resultat" || exit 0
+          for i in 1 2 3; do git pull --rebase -q && git push && break; sleep 5; done
