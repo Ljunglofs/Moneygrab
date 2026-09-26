@@ -117,6 +117,8 @@ jobs:
           CHAT_ID: ${{ secrets.CHAT_ID }}
           # GRABIT-kanalen på Telegram (PRO-medlemmar). Boten måste vara admin där.
           TELEGRAM_MEMBERS_CHAT_ID: ${{ secrets.TELEGRAM_MEMBERS_CHAT_ID || '-1003509671256' }}
+          # Discord-kanalen #gex-nivåer (webhook). Secret: DISCORD_GEX_WEBHOOK.
+          DISCORD_GEX_WEBHOOK: ${{ secrets.DISCORD_GEX_WEBHOOK }}
           EVENT: ${{ github.event_name }}
           FORCE: ${{ inputs.force }}
         run: |

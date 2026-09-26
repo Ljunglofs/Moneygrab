@@ -20,6 +20,7 @@ ett nytt meddelande om det gick vägen (inga upprepade felmeddelanden).
 """
 import json
 import os
+import re
 import sys
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -152,7 +153,7 @@ def _post(token, chat, text):
     return r
 
 
-def send_telegram(text):
+def send_telegram(text, members_too=True):
     """Skickar till ägarens chatt (CHAT_ID) och, om den är satt, till
     medlemskanalen (TELEGRAM_MEMBERS_CHAT_ID — GRABIT-kanalen för PRO).
     Returvärdet gäller ägarens chatt: den styr låset för dagens fönster."""
@@ -164,12 +165,47 @@ def send_telegram(text):
     ok = r.status_code == 200
     print("Telegram:", "skickat" if ok else f"{r.status_code} {r.text[:200]}")
     members = os.environ.get("TELEGRAM_MEMBERS_CHAT_ID", "").strip()
-    if ok and members and members != chat:
+    if ok and members_too and members and members != chat:
         try:
             m = _post(token, members, text)
             print("Telegram (medlemskanalen):", "skickat" if m.status_code == 200 else f"{m.status_code} {m.text[:200]}")
         except Exception as e:
             print("Telegram (medlemskanalen) fel:", e)
+    return ok
+
+
+def _to_discord(html):
+    """Telegram-HTML -> Discord-markdown (fetstil och kodblock)."""
+    t = html.replace("<b>", "**").replace("</b>", "**")
+    t = re.sub(r"<pre>(.*?)</pre>", lambda m: "```\n" + m.group(1) + "\n```", t, flags=re.S)
+    t = re.sub(r"<[^>]+>", "", t)
+    return t.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
+
+
+def send_discord(text):
+    """Postar nivåerna i Discord-kanalen (webhook DISCORD_GEX_WEBHOOK, t.ex.
+    #gex-nivåer). Discord tillåter 2000 tecken per meddelande, så texten delas
+    upp per instrument."""
+    url = os.environ.get("DISCORD_GEX_WEBHOOK", "").strip()
+    if not url:
+        return False
+    import requests
+    md = _to_discord(text)
+    parts, cur = [], ""
+    for block in md.split("\n\n"):
+        if len(cur) + len(block) + 2 > 1900 and cur:
+            parts.append(cur)
+            cur = ""
+        cur = (cur + "\n\n" + block) if cur else block
+    if cur:
+        parts.append(cur)
+    ok = True
+    for ptxt in parts:
+        r = requests.post(url, json={"content": ptxt[:2000], "username": "GRABIT GEX"}, timeout=20)
+        ok = ok and r.status_code in (200, 204)
+        if r.status_code not in (200, 204):
+            print("Discord:", r.status_code, r.text[:200])
+    print("Discord:", "skickat" if ok else "fel")
     return ok
 
 
@@ -291,7 +327,13 @@ def main(argv):
     print(msg.replace("<b>", "").replace("</b>", "").replace("<pre>", "\n").replace("</pre>", ""))
     if ok or force or not tried_today:
         # lyckade nivåer skickas alltid, felmeddelande bara en gång per fönster och dag
-        sent = send_telegram(msg)
+        # Medlemmarna (kanal + Discord) får bara riktiga nivåer, aldrig felmeddelanden.
+        sent = send_telegram(msg, members_too=ok)
+        if ok and sent:
+            try:
+                send_discord(msg)
+            except Exception as e:
+                print("Discord fel:", e)
     else:
         sent = False
         print("Fel igen i samma fönster — tyst retry, inget nytt Telegram-meddelande.")
