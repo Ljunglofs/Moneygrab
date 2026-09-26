@@ -217,8 +217,8 @@ def register(app) -> None:
         else:
             await asyncio.to_thread(_tell_owner, "\U0001F511 <b>TradingView-access begärd</b>\n"
                         f"Namn: <code>{name}</code>\n"
-                        "Lägg till i GRABIT Flow Profile, GRABIT CVD och GRABIT GEX Levels "
-                        "(skriptet → Manage access).")
+                        "Lägg till i GRABIT CVD 3.0, GRABIT Flow Profile, GRABIT GEX Levels och "
+                        "GRABIT Precision Market Heatmap (skriptet → Manage access).")
         return {"ok": True, "status": entry["status"]}
 
     @app.get("/api/pro/tradingview/status")
