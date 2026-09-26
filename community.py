@@ -102,6 +102,11 @@ def _tv_discover():
         r = _tv_session().get("https://pine-facade.tradingview.com/pine-facade/list/",
                               params={"filter": "published"}, timeout=15)
         items = r.json() if r.status_code == 200 else []
+        if isinstance(items, dict):
+            items = items.get("results") or items.get("scripts") or []
+        print("[community] TradingView listade %d publicerade skript: %s" % (
+            len(items or []), "; ".join("%s (%s)" % (it.get("scriptName") or it.get("scriptTitle"),
+                                                     str(it.get("scriptIdPart") or "")[:4]) for it in (items or [])[:30])))
         for it in items or []:
             pid = str(it.get("scriptIdPart") or "")
             name = str(it.get("scriptName") or it.get("scriptTitle") or "")
@@ -125,7 +130,7 @@ def _tv_cfg():
 
 def _tv_session():
     import requests
-    sid, _ = _tv_cfg()
+    sid = os.environ.get("TV_SESSIONID", "").strip()   # inte _tv_cfg(): den anropar _tv_discover -> hit
     s = requests.Session()
     s.cookies.set("sessionid", sid, domain=".tradingview.com")
     sign = os.environ.get("TV_SESSIONID_SIGN", "").strip()
