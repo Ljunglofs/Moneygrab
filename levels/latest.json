@@ -1,5 +1,5 @@
 {
-  "generated": "2026-09-27T00:19:48+02:00",
+  "generated": "2026-09-27T00:25:29+02:00",
   "levels": [
     {
       "inst": "NQ",
@@ -20,19 +20,19 @@
       "basis": 278.0,
       "ratio_source": "basis 278.0 ur paritet 2026-09-25 16:15 ET",
       "ratio_rth": false,
-      "ratio_at": "2026-09-26T18:19:46-04:00",
+      "ratio_at": "2026-09-26T18:25:28-04:00",
       "n_strikes": 413,
       "call_wall": 31128.0,
       "put_wall": 29778.0,
-      "zero_gamma": 30505.9,
-      "zero_gamma_all": 30509.92,
+      "zero_gamma": 30505.72,
+      "zero_gamma_all": 30509.73,
       "flip_expiries": [
         "2026-09-28",
         "2026-09-29",
         "2026-09-30"
       ],
-      "call_wall_margin": 1.4681597330494862,
-      "put_wall_margin": 2.363686751987553,
+      "call_wall_margin": 1.4674536585400044,
+      "put_wall_margin": 2.3585232308842294,
       "call_wall_weak": true,
       "put_wall_weak": false,
       "hgex": 31128.0,
@@ -47,7 +47,7 @@
       "walls_inverted": false,
       "open": 30819.0,
       "atr_daily": 473.82645089285717,
-      "string": "31128,Call Wall,resw;29778,Put Wall,sup;30748,Put Wall 09-28,sup0;30506,Gamma Flip,flip;30478,Max Pain 09-28,mpain;30678,G+ 1,gpos;31278,G+ 2,gpos;29878,G- 1,gneg;30768,G- 2,gneg;31104.5,EM+,emh;30674,EM-,eml;30996.75,EM +50%,emb;30781.75,EM -50%,emb;31108.5,1D High IV,ivh;30670,1D Low IV,ivl;30819,Open,opo;31056,O +0.5 ATR,opu;30582,O -0.5 ATR,opd;31292.75,O +1 ATR,opu;30345.25,O -1 ATR,opd"
+      "string": "31128,Call Wall,resw;29778,Put Wall,sup;30748,Put Wall 09-28,sup0;30505.75,Gamma Flip,flip;30478,Max Pain 09-28,mpain;30678,G+ 1,gpos;31278,G+ 2,gpos;29878,G- 1,gneg;30768,G- 2,gneg;31104.5,EM+,emh;30674,EM-,eml;30996.75,EM +50%,emb;30781.75,EM -50%,emb;31108.5,1D High IV,ivh;30670,1D Low IV,ivl;30819,Open,opo;31056,O +0.5 ATR,opu;30582,O -0.5 ATR,opd;31292.75,O +1 ATR,opu;30345.25,O -1 ATR,opd"
     },
     {
       "inst": "GC",
@@ -68,19 +68,19 @@
       "basis": null,
       "ratio_source": "live",
       "ratio_rth": false,
-      "ratio_at": "2026-09-26T18:19:47-04:00",
+      "ratio_at": "2026-09-26T18:25:29-04:00",
       "n_strikes": 190,
       "call_wall": 4338.66,
       "put_wall": 4272.76,
-      "zero_gamma": 4306.43,
-      "zero_gamma_all": 4306.9,
+      "zero_gamma": 4306.44,
+      "zero_gamma_all": 4306.91,
       "flip_expiries": [
         "2026-09-28",
         "2026-09-29",
         "2026-09-30"
       ],
-      "call_wall_margin": 1.0305492290477478,
-      "put_wall_margin": 1.1419740467927457,
+      "call_wall_margin": 1.0314505964012384,
+      "put_wall_margin": 1.1425572019657901,
       "call_wall_weak": true,
       "put_wall_weak": true,
       "hgex": 4338.66,
