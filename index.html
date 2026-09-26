@@ -5540,5 +5540,163 @@ async function pfReview(){
   });
 })();
 </script>
+<style id="desk-layout">
+/* ===== DATORLÄGE =====
+   På skärmar från 1024 px blir appen en riktig datorsida: menyn i en sidopanel,
+   Översikt i två kolumner och bredare rutnät. Knappen i headern växlar mellan
+   dator- och mobilvy (grabit_view i localStorage). Mobilen påverkas inte. */
+.viewtoggle{display:none;width:30px;height:30px;border-radius:50%;align-items:center;justify-content:center;background:rgba(0,229,255,.08);border:1px solid rgba(0,229,255,.35);color:var(--neon,#00e5ff);flex:none}
+.viewtoggle svg{width:15px;height:15px}
+body.wide .viewtoggle{display:inline-flex}
+.nav-brand,.nav-foot,.hdr-pg{display:none}
+
+body.desk{max-width:none!important;margin:0;padding-left:248px;box-shadow:none!important;background:transparent!important}
+body.desk .hdr{padding:14px 36px;justify-content:flex-end;gap:16px}
+body.desk .hdr .logo{display:none}
+body.desk .hdr-r{gap:10px}
+body.desk .hdr-pg{display:block;margin-right:auto;font-family:var(--disp);font-weight:700;font-size:20px;letter-spacing:.01em;color:#eaf8fc}
+body.desk .hdr-pg small{display:block;font-size:12px;font-weight:500;color:var(--mut2);letter-spacing:.02em}
+body.desk main{max-width:1320px;margin:0 auto;padding:26px 36px 60px}
+
+/* Sidopanel */
+body.desk .nav{top:0;bottom:0;right:auto;left:0;width:248px;max-width:none;margin:0;display:flex;flex-direction:column;align-items:stretch;gap:4px;
+  padding:24px 16px 20px;border-top:none!important;border-right:1px solid rgba(0,229,255,.12);box-shadow:8px 0 40px rgba(0,0,0,.45)!important;
+  background:linear-gradient(180deg,rgba(4,8,12,.94),rgba(2,3,5,.96))!important}
+body.desk .nav::before{left:auto;right:-1px;top:0;bottom:0;width:1px;height:auto;background:linear-gradient(180deg,transparent,rgba(0,229,255,.6),rgba(255,201,64,.35),transparent)}
+body.desk .nav-brand{display:block;padding:4px 10px 26px}
+body.desk .nav-brand img{height:28px;filter:drop-shadow(0 0 12px rgba(255,201,64,.35))}
+body.desk .nav-brand small{display:block;margin-top:8px;font-size:10.5px;letter-spacing:.22em;color:var(--mut2)}
+body.desk .nav button{flex-direction:row;justify-content:flex-start;gap:13px;padding:12px 14px;border-radius:12px;font-size:14px;font-weight:600;color:#aab6c3;border:1px solid transparent;transition:background .15s,border-color .15s,color .15s}
+body.desk .nav button:hover{background:rgba(0,229,255,.05);color:#e6f6fb}
+body.desk .nav button.on{background:linear-gradient(90deg,rgba(0,229,255,.14),rgba(0,229,255,.03));border-color:rgba(0,229,255,.28);color:var(--neon)!important}
+body.desk .nav button .gi svg{width:20px;height:20px}
+body.desk .nav .badge{position:static;transform:none;margin-left:8px;display:inline-block}
+body.desk .nav-foot{display:block;margin-top:auto;padding:16px 8px 0;border-top:1px solid rgba(0,229,255,.1)}
+body.desk .nav-foot .vt-lbl{font-size:10.5px;letter-spacing:.18em;color:var(--mut2);margin:0 4px 8px}
+.vt-seg{display:flex;background:rgba(255,255,255,.03);border:1px solid rgba(0,229,255,.18);border-radius:11px;padding:3px}
+.vt-seg button{flex:1;padding:8px 6px!important;border-radius:8px!important;font-size:12.5px!important;justify-content:center!important;color:#9aa7b4!important;border:none!important}
+.vt-seg button.on{background:rgba(0,229,255,.16)!important;color:var(--neon)!important;text-shadow:0 0 10px rgba(0,229,255,.6)}
+
+/* Översikt: toppkort i full bredd, sedan huvudkolumn + högerspalt */
+body.desk .hem-top{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-bottom:6px}
+body.desk .hem-top>*{margin:0!important}
+body.desk .hem-top>.promo4{grid-column:1/-1}
+body.desk .hem-cols{display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:28px;align-items:start}
+body.desk .hem-rail>*{margin-left:0!important;margin-right:0!important;margin-bottom:0!important}
+body.desk .hem-rail>*:first-child{margin-top:0!important}
+body.desk .hem-rail>*+*{margin-top:18px!important}
+body.desk .p4-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+
+/* Bredare rutnät i övriga flikar */
+body.desk .picks{grid-template-columns:repeat(3,minmax(0,1fr))}
+body.desk .scr-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+body.desk .catgrid{grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+body.desk #s-marknad #discover,body.desk #s-smart{max-width:none}
+body.desk .dt-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:start}
+body.desk .dt-list>*{margin:0!important}
+body.desk #pf,body.desk #s-signal{max-width:980px;margin-left:auto;margin-right:auto}
+body.desk .legal{max-width:900px;margin-left:auto;margin-right:auto}
+body.desk .search{max-width:720px}
+
+/* Paneler (aktiekort, case, Trump-flödet, AI-chatten) glider in från höger som en låda */
+body.desk .stock,body.desk .aichat{left:auto;right:0;width:min(640px,100vw - 248px);max-width:none;margin:0;
+  border-left:1px solid rgba(0,229,255,.22);box-shadow:-30px 0 80px rgba(0,0,0,.7),0 0 60px -20px rgba(0,229,255,.25)}
+body.desk .aichat{transform:translateX(100%)}
+body.desk .aichat.on{transform:translateX(0)}
+body.desk .notif-cta{left:auto;right:28px;bottom:28px;width:420px}
+body.desk .pw-card{max-width:520px}
+</style>
+<script>
+/* ===== DATORLÄGE: växling och omflyttning av Översikt ===== */
+(function(){
+  var VIEW_KEY="grabit_view";
+  function pref(){try{return localStorage.getItem(VIEW_KEY)||"auto";}catch(e){return "auto";}}
+  function en(){return window.GRABIT_LANG==="en";}
+  var ICON_DESK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>';
+  var ICON_MOB='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg>';
+  var TITLES={hem:["Overview","Översikt","Today's market, levels and signals","Dagens marknad, nivåer och signaler"],
+    daytrade:["GEX levels","GEX-nivåer","Call Wall, Put Wall and Gamma Flip for NQ & Gold","Call Wall, Put Wall och Gamma Flip för NQ & Guld"],
+    signal:["Signals","Signaler","Trump Signal, insiders and alerts","Trump Signal, insiders och larm"],
+    marknad:["Research","Research","Screeners, themes and today's movers","Screeners, teman och dagens rörelser"],
+    portfolj:["Portfolio","Portfölj","Your holdings and watchlist","Dina innehav och din watchlist"],
+    smart:["Smart money","Smart money","Prediction markets and insider flow","Prediktionsmarknader och insiderflöden"]};
+
+  // Översikt: vilka block som flyttas till toppen och till högerspalten.
+  var TOP=[".promo4","#trumpbar","#newsbar"];
+  var RAIL=[".gexnews","#memberhub","#aisummary",".mcase",".askbanner","#insflowbox",".trumphero",".robberbanner"];
+  var moved=[];
+  function layoutHem(on){
+    var s=document.getElementById("s-hem");if(!s)return;
+    if(on){
+      if(document.getElementById("hem-cols"))return;
+      var top=document.createElement("div");top.className="hem-top";top.id="hem-top";
+      var cols=document.createElement("div");cols.className="hem-cols";cols.id="hem-cols";
+      var main=document.createElement("div");main.className="hem-main";
+      var rail=document.createElement("div");rail.className="hem-rail";
+      cols.appendChild(main);cols.appendChild(rail);
+      var kids=Array.prototype.slice.call(s.children);
+      function place(el,dest){var ph=document.createComment("hem");el.parentNode.insertBefore(ph,el);moved.push([el,ph]);dest.appendChild(el);}
+      TOP.forEach(function(q){var el=s.querySelector(":scope > "+q);if(el)place(el,top);});
+      RAIL.forEach(function(q){var el=s.querySelector(":scope > "+q);if(el)place(el,rail);});
+      kids.forEach(function(el){if(el.parentNode===s&&!el.classList.contains("legal"))place(el,main);});
+      var legal=s.querySelector(":scope > .legal");
+      s.insertBefore(top,legal||null);s.insertBefore(cols,legal||null);
+    }else{
+      if(!document.getElementById("hem-cols"))return;
+      moved.forEach(function(p){p[1].parentNode.insertBefore(p[0],p[1]);p[1].remove();});moved=[];
+      ["hem-top","hem-cols"].forEach(function(id){var e=document.getElementById(id);if(e)e.remove();});
+    }
+  }
+
+  function ensureChrome(){
+    var hr=document.querySelector(".hdr-r");
+    if(hr&&!document.getElementById("viewtoggle")){
+      var b=document.createElement("button");b.className="viewtoggle";b.id="viewtoggle";
+      b.onclick=function(){setView(document.body.classList.contains("desk")?"mobile":"desktop");};
+      hr.insertBefore(b,hr.firstChild);
+    }
+    var hdr=document.querySelector(".hdr");
+    if(hdr&&!document.getElementById("hdr-pg")){var t=document.createElement("div");t.className="hdr-pg";t.id="hdr-pg";hdr.insertBefore(t,hdr.querySelector(".hdr-r"));}
+    var nav=document.querySelector(".nav");
+    if(nav&&!nav.querySelector(".nav-brand")){
+      var br=document.createElement("div");br.className="nav-brand";
+      var img=document.querySelector(".hdr .brand");
+      br.innerHTML=(img?'<img src="'+img.getAttribute("src")+'" alt="GRABIT">':'<b>GRABIT</b>')+'<small>SPOT THE SETUP</small>';
+      nav.insertBefore(br,nav.firstChild);
+      var ft=document.createElement("div");ft.className="nav-foot";
+      ft.innerHTML='<div class="vt-lbl" id="vt-lbl"></div><div class="vt-seg"><button data-v="desktop" onclick="event.stopPropagation();grabitSetView(\'desktop\')"></button><button data-v="mobile" onclick="event.stopPropagation();grabitSetView(\'mobile\')"></button></div>';
+      nav.appendChild(ft);
+    }
+  }
+  function curScreen(){var s=document.querySelector(".screen.on");return s?s.id.replace("s-",""):"hem";}
+  function refreshLabels(){
+    var desk=document.body.classList.contains("desk"),E=en();
+    var b=document.getElementById("viewtoggle");
+    if(b){b.innerHTML=desk?ICON_MOB:ICON_DESK;var l=desk?(E?"Switch to mobile view":"Byt till mobilvy"):(E?"Switch to desktop view":"Byt till datorvy");b.title=l;b.setAttribute("aria-label",l);}
+    var vl=document.getElementById("vt-lbl");if(vl)vl.textContent=E?"VIEW":"VY";
+    document.querySelectorAll(".vt-seg button").forEach(function(x){x.classList.toggle("on",(x.dataset.v==="desktop")===desk);
+      x.innerHTML=(x.dataset.v==="desktop"?ICON_DESK:ICON_MOB).replace('<svg ','<svg style="width:14px;height:14px;margin-right:6px;vertical-align:-2px" ')+(x.dataset.v==="desktop"?(E?"Desktop":"Dator"):"Mobil"+(E?"e":""));});
+    var t=TITLES[curScreen()]||TITLES.hem,pg=document.getElementById("hdr-pg");
+    if(pg)pg.innerHTML=(E?t[0]:t[1])+"<small>"+(E?t[2]:t[3])+"</small>";
+  }
+  function apply(){
+    ensureChrome();
+    var wide=window.innerWidth>=1024,p=pref(),desk=wide&&p!=="mobile";
+    document.body.classList.toggle("wide",wide);
+    var was=document.body.classList.contains("desk");
+    document.body.classList.toggle("desk",desk);
+    if(was!==desk)layoutHem(desk);
+    refreshLabels();
+  }
+  function setView(v){try{localStorage.setItem(VIEW_KEY,v);}catch(e){}apply();window.scrollTo(0,0);}
+  window.grabitSetView=setView;window.grabitApplyView=apply;
+  var _go=window.go;
+  if(typeof _go==="function"){window.go=function(s){_go(s);refreshLabels();};}
+  var _tl=window.grabitToggleLang;
+  if(typeof _tl==="function"){window.grabitToggleLang=function(){var r=_tl.apply(this,arguments);setTimeout(refreshLabels,0);return r;};}
+  var rt;window.addEventListener("resize",function(){clearTimeout(rt);rt=setTimeout(apply,120);});
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",apply);else apply();
+})();
+</script>
 </body>
 </html>
