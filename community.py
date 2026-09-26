@@ -90,7 +90,7 @@ _TV_FOUND = {"ts": 0.0, "scripts": []}
 def _tv_discover():
     """Hittar ägarens publicerade skript själv (samma lista som TradingView visar
     under "My scripts"), så TV_PINE_IDS inte behöver fyllas i för hand.
-    Tar skript vars namn innehåller TV_SCRIPT_MATCH (standard "GRABIT").
+    Tar skript vars namn börjar med TV_SCRIPT_MATCH (standard "GRABIT").
     Cachas tio minuter, så nypublicerade skript kommer med snabbt."""
     if time.time() - _TV_FOUND["ts"] < 600 and _TV_FOUND["scripts"]:
         return _TV_FOUND["scripts"]
@@ -110,7 +110,8 @@ def _tv_discover():
         for it in items or []:
             pid = str(it.get("scriptIdPart") or "")
             name = str(it.get("scriptName") or it.get("scriptTitle") or "")
-            if pid.startswith("PUB;") and match in name.lower():
+            # Namnet ska BÖRJA med GRABIT — den gamla "vwap - … by Grabit" ska inte delas ut.
+            if pid.startswith("PUB;") and name.lower().startswith(match):
                 found.append({"id": pid, "name": name})
         if r.status_code != 200:
             print("[community] pine-facade list: %s %s" % (r.status_code, r.text[:200]))
