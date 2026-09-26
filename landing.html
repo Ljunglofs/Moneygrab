@@ -322,11 +322,28 @@ footer .socs{margin-left:auto;margin-right:18px}
 .facts:before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background-image:linear-gradient(rgba(0,229,255,.09) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,.09) 1px,transparent 1px);background-size:56px 56px;
   -webkit-mask-image:linear-gradient(90deg,transparent,#000 20%,#000 80%,transparent);mask-image:linear-gradient(90deg,transparent,#000 20%,#000 80%,transparent)}
 @media (prefers-reduced-transparency:reduce){.gridsec:before,.gridsec:after{display:none}}
+
+/* Lansering: "We're live" — list överst och stort märke i heron */
+.topbar{display:block;text-align:center;font-size:13.5px;padding:8px 16px;color:#fff;text-decoration:none;letter-spacing:.02em;
+  background:linear-gradient(90deg,rgba(255,201,64,.16),rgba(0,229,255,.14) 50%,rgba(255,201,64,.16));border-bottom:1px solid rgba(255,201,64,.28)}
+.topbar b{color:var(--gold2);text-shadow:0 0 12px rgba(255,201,64,.6)}
+.topbar i{font-style:normal;color:var(--neon);text-shadow:0 0 10px rgba(0,229,255,.6);white-space:nowrap}
+.ldot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#ff2e4d;box-shadow:0 0 10px #ff2e4d,0 0 20px #ff2e4d;animation:pulse 1.4s infinite;margin-right:8px;vertical-align:1px}
+.launch{display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px;width:fit-content;max-width:100%;padding:12px 24px 12px 14px;border-radius:18px;margin-bottom:18px;
+  background:linear-gradient(135deg,rgba(255,201,64,.16),rgba(0,229,255,.10));border:1px solid rgba(255,201,64,.6);
+  box-shadow:0 0 34px rgba(255,201,64,.25),0 0 70px -12px rgba(0,229,255,.35) inset;animation:lglow 3.2s ease-in-out infinite}
+@keyframes lglow{50%{box-shadow:0 0 50px rgba(255,201,64,.4),0 0 80px -10px rgba(0,229,255,.5) inset}}
+.lvtag{display:inline-flex;align-items:center;font-weight:800;font-size:13px;letter-spacing:.16em;color:#fff;background:rgba(255,46,77,.18);border:1px solid rgba(255,46,77,.65);border-radius:999px;padding:6px 14px;box-shadow:0 0 18px rgba(255,46,77,.4)}
+.lvtx{font-weight:800;font-size:clamp(20px,2.4vw,30px);line-height:1.15;letter-spacing:.01em;background:linear-gradient(90deg,var(--gold2),#fff 55%,var(--neon2));-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 14px rgba(255,201,64,.35))}
+.hero .pill{margin-top:0}
+.hero-grid>*{min-width:0}
+@media (max-width:560px){.topbar{font-size:12.5px}.launch{padding:10px 16px 10px 10px}}
 </style>
 </head>
 <body>
 
 <header>
+  <a class="topbar" href="#pricing"><span class="ldot"></span><b data-t="tb1">We're live!</b> <span data-t="tb2">Early access is open — half price until 31 Dec.</span> <i data-t="tb3">Claim your spot &rarr;</i></a>
   <div class="wrap hdr">
     <a class="logo" href="/start" aria-label="GRABIT"><img src="/grabit_wordmark.png" alt="GRABIT"></a>
     <nav>
@@ -351,6 +368,7 @@ footer .socs{margin-left:auto;margin-right:18px}
   <video class="hero-vid" id="herobg" muted loop playsinline preload="none" poster="/hero_poster.jpg" aria-hidden="true"></video>
   <div class="wrap hero-grid">
     <div>
+      <div class="launch"><span class="lvtag"><span class="ldot"></span>LIVE</span><span class="lvtx" data-t="lvtx">Early access &mdash; we're live now!</span></div>
       <span class="pill"><b data-t="newb">NEW</b><span data-t="pill">GEX levels for NQ &amp; Gold</span></span>
       <h1>Spot the setup.<br><span class="hl">Ignore the noise.</span></h1>
       <p class="lead" data-t="lead"><b>GEX levels, The Trump Signal, insider buying, the FDA calendar, a screener and AI analysis</b> &mdash; everything a trader needs, in one app. Plus our own TradingView indicators and a community to trade with.</p>
@@ -649,7 +667,7 @@ footer .socs{margin-left:auto;margin-right:18px}
 <script>
 /* Engelska är standard. Svenska texter nedan, nyckel = data-t. Språkvalet
    sparas i grabit_lang, samma nyckel som appen läser. */
-var SV={
+var SV={tb1:"Vi är live!",tb2:"Early access är öppet — halva priset till 31 dec.",tb3:"Säkra din plats &rarr;",lvtx:"Early access &mdash; nu är vi live!",
  n1:"Funktioner",n2:"GEX-nivåer",n3:"Indikatorer",n4:"Priser",n5:"Frågor",openapp:"Logga in",try:"Prova gratis",
  newb:"NYTT",pill:"GEX-nivåer för NQ &amp; Guld",
  lead:"<b>GEX-nivåer, The Trump Signal, insiderköp, FDA-kalender, screener och AI-analys</b> &mdash; allt en trader behöver, samlat i en app. Plus våra egna indikatorer för TradingView och en community att handla med.",
