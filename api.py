@@ -90,12 +90,35 @@ from fastapi.responses import HTMLResponse, FileResponse, Response
 # =====================================================================
 _CACHE: dict = {}
 _CACHE_REFRESHING: set = set()
+_CACHE_TTL: dict = {}             # fn-namn -> ttl, för utrensningen
+_CACHE_SWEEP = {"t": 0.0}
+# Poster som ingen frågat efter på så här länge efter att de blivit inaktuella
+# kastas. Cachen rensade aldrig något tidigare: varje ticker, sökning och graf
+# som någon öppnat låg kvar, och minnet växte med ~300 MB per dygn på Render.
+_CACHE_IDLE = int(os.environ.get("CACHE_IDLE_S", "1800"))
+
+def _cache_sweep(now: float):
+    if now - _CACHE_SWEEP["t"] < 300:
+        return
+    _CACHE_SWEEP["t"] = now
+    try:
+        dead = [k for k, v in list(_CACHE.items())
+                if now - v[0] > _CACHE_TTL.get(k[0], 0) + _CACHE_IDLE]
+    except RuntimeError:          # dicten ändrades av en refresh-tråd — nästa varv
+        return
+    for k in dead:
+        _CACHE.pop(k, None)
+    if dead:
+        import gc
+        gc.collect()
 
 def cached(ttl: int):
     def deco(fn):
+        _CACHE_TTL[fn.__name__] = ttl
         def wrap(*args):
             key = (fn.__name__, args)
             now = time.time()
+            _cache_sweep(now)
             hit = _CACHE.get(key)
             if hit:
                 if now - hit[0] < ttl:
@@ -128,12 +151,15 @@ _fetch_daily = cached(300)(_fetch_daily)
 # ----- BATCH-PREFETCH (för stora universum) --------------------------
 _PREFETCH: dict = {}              # ticker -> df (dagsdata), fylls inför en scan
 
-@cached(600)
+# Ingen @cached här: scan_universe hämtar i bitar och tömmer _PREFETCH efter
+# varje bit för att hålla minnet nere. Med cache låg varje bit kvar i _CACHE
+# ändå — ett års dagsdata för hela universumet, en gång till per tema.
+# scan_universe cachar redan sitt resultat i tio minuter.
 def _batch(tickers_tuple):
     return fetch_many(list(tickers_tuple))
 
 def prefetch(tickers):
-    """Hämtar dagsdata för många tickers i få anrop och cachar i _PREFETCH."""
+    """Hämtar dagsdata för många tickers i få anrop och lägger i _PREFETCH."""
     try:
         _PREFETCH.update(_batch(tuple(tickers)))
     except Exception:
