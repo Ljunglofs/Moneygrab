@@ -1219,6 +1219,8 @@ _STATIC_FILES = {
     "bg_poster.jpg": "image/jpeg",
     "monthly_case.json": "application/json",
     "grabit_wordmark.png": "image/png",
+    "hero.mp4": "video/mp4",
+    "hero_poster.jpg": "image/jpeg",
 }
 
 @app.get("/{fname}")
