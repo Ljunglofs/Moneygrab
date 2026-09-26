@@ -4182,27 +4182,26 @@ async function loadToday3(){
 async function loadTopOp(){
   const el=document.getElementById("topop");if(!el)return;
   const B=CONFIG.API_BASE?CONFIG.API_BASE.replace(/\/$/,""):"";if(!B)return;
-  let p=null;
-  try{const r=await fetch(B+"/api/topop",{cache:"no-store"});const j=await r.json();p=j&&j.pick;}catch(e){}
-  if(!p||!p.ticker){window._topTries=(window._topTries||0)+1;if(window._topTries<=5)setTimeout(loadTopOp,30000);return;}
-  const col=scoreColor((p.score||0)/10);
+  let ps=null;
+  try{const r=await fetch(B+"/api/topop",{cache:"no-store"});const j=await r.json();ps=(j&&j.picks)||(j&&j.pick?[j.pick]:null);}catch(e){}
+  if(!ps||!ps.length){window._topTries=(window._topTries||0)+1;if(window._topTries<=5)setTimeout(loadTopOp,30000);return;}
+  const EN=(window.GRABIT_LANG==="en"),pro=isPro();
   el.style.display="";
-  el.innerHTML=`<div class="to-k">Dagens Top Opportunity${tierBadge(p.tier)}</div>
-   <div class="to-row">${lic(p.ticker,44,col)}<div><div class="to-tk">${p.ticker}</div><div class="to-nm">${NAMES[p.ticker]||""}</div></div>
-     <div class="to-score"><i>AI SCORE</i><b class="num">${p.score}</b></div></div>
-   <div class="to-stats">
-     <div class="to-st"><i>Sannolikhet</i><b>${p.sannolikhet||"–"}</b></div>
-     <div class="to-st"><i>Risk</i><b>${p.risk||"–"}</b></div>
-     <div class="to-st"><i>Väntad rörelse</i><b>${p.vantad_rorelse||"–"}</b></div>
-   </div>
-   ${p.entry!=null?`<div class="to-lvls">
-     <div class="to-lv"><i>ENTRY</i>${fmtPx(p.entry)}</div>
-     ${p.stopp!=null?`<div class="to-lv" style="color:var(--neg)"><i>STOPP</i>${fmtPx(p.stopp)}</div>`:""}
-     ${p.target1!=null?`<div class="to-lv" style="color:var(--pos)"><i>TARGET 1</i>${fmtPx(p.target1)}</div>`:""}
-     ${p.target2!=null?`<div class="to-lv" style="color:var(--pos)"><i>TARGET 2</i>${fmtPx(p.target2)}</div>`:""}
-   </div>`:""}
-   <div class="to-btn" onclick="openStock('${p.ticker}')">VISA SETUP →</div>
-   <div class="to-disc">Teknisk analys — inte finansiell rådgivning.</div>`;
+  /* Topp 3 A-lägen. Rankade på RS-rating minus setup — den enda rankningen
+     som slog S&P i båda halvåren i backtestet (backtest/results/REPORT.md). */
+  const row=(p,i)=>{const col=scoreColor((p.score||0)/10);
+    const lvl=p.entry!=null?`<div class="t3-lv"><span><i>ENTRY</i>${fmtPx(p.entry)}</span>${p.stopp!=null?`<span style="color:var(--neg)"><i>STOPP</i>${fmtPx(p.stopp)}</span>`:""}${p.target2!=null?`<span style="color:var(--pos)"><i>${EN?"TARGET":"MÅL"}</i>${fmtPx(p.target2)}</span>`:""}</div>`:"";
+    const earn=p.earnings_in!=null&&p.earnings_in<=5?`<span class="t3-tag" style="color:#F5C542;border-color:#F5C54266">${EN?"Report":"Rapport"} ${p.earnings_in===0?(EN?"today":"idag"):(EN?"in ":"om ")+p.earnings_in+" d"}</span>`:"";
+    return `<div class="t3-row${!pro&&i>0?" pro-gated":""}"${!pro&&i>0?' data-lock="PRO"':""} onclick="openStock('${p.ticker}')">
+      <span class="t3-n">${i+1}</span>${lic(p.ticker,38,col)}
+      <div class="t3-mid"><div class="t3-tk">${p.ticker}${tierBadge(p.tier)}</div><div class="t3-nm">${NAMES[p.ticker]||p.name||""}</div>
+        <div class="t3-tags">${p.label?`<span class="t3-tag">${p.label}</span>`:""}${p.rs_rating!=null?`<span class="t3-tag">RS ${p.rs_rating}</span>`:""}${earn}</div>${lvl}</div>
+      <span class="t3-go">&#8594;</span></div>`;};
+  el.innerHTML=`<div class="to-k">${EN?"Today's top 3 setups":"Dagens topp 3 lägen"}</div>
+   <div class="t3-list">${ps.slice(0,3).map(row).join("")}</div>
+   <div class="to-disc">${EN?"Backtest Aug 2025–Aug 2026: A setups beat the S&P 500 by +2.2% on average over 10 days. Spread the risk — one pick alone varies a lot. Past results are no guarantee. Not financial advice."
+     :"Backtest aug 2025–aug 2026: A-lägena slog S&P 500 med +2,2 % i snitt på 10 dagar. Sprid risken — en enskild pick varierar mycket. Historik är ingen garanti. Inte finansiell rådgivning."}</div>`;
+  if(window.applyProLocks)applyProLocks(el);
 }
 async function loadWatchrow(){
   const el=document.getElementById("watchrow");if(!el)return;
@@ -5045,6 +5044,18 @@ html,body{overflow-x:clip}
 .rdh-p{margin-left:auto;font-weight:800;font-variant-numeric:tabular-nums}
 .rdh-f{margin-top:7px;font-size:9.5px;color:#69747f;line-height:1.35}
 .rd-disc{margin-top:8px;font-size:10px;color:#69747f;text-align:center}
+.t3-list{display:flex;flex-direction:column;gap:9px;margin-top:12px}
+.t3-row{position:relative;display:flex;align-items:flex-start;gap:11px;padding:11px 12px;border-radius:14px;background:rgba(255,255,255,.03);border:1px solid rgba(0,229,255,.16);cursor:pointer}
+.t3-row:hover{border-color:rgba(0,229,255,.4)}
+.t3-n{font-weight:900;font-size:15px;color:var(--gold2);width:14px;flex:none;margin-top:10px}
+.t3-mid{flex:1;min-width:0}
+.t3-tk{font-size:18px;font-weight:900;letter-spacing:.02em;display:flex;align-items:center;gap:6px}
+.t3-nm{color:var(--mut);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.t3-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.t3-tag{font-size:10px;font-weight:800;letter-spacing:.04em;padding:2px 7px;border-radius:6px;color:var(--neon,#22d3ee);border:1px solid rgba(0,229,255,.35)}
+.t3-lv{display:flex;gap:12px;margin-top:8px;font-size:12.5px;font-weight:700;flex-wrap:wrap}
+.t3-lv i{font-style:normal;display:block;font-size:8.5px;letter-spacing:.1em;color:var(--mut);font-weight:600}
+.t3-go{color:var(--neon,#22d3ee);font-size:18px;margin-top:10px}
 .to-k{display:flex;align-items:center;gap:6px;font-size:10.5px;letter-spacing:.14em;font-weight:800;color:var(--gold2);text-transform:uppercase}
 .to-row{display:flex;align-items:center;gap:12px;margin-top:11px}
 .to-tk{font-size:26px;font-weight:900;letter-spacing:.02em;line-height:1.05}

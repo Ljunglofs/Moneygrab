@@ -4643,6 +4643,8 @@ def _opp_of(r):
         "target1": round(float(r.get("atr_up_05")), 2) if r.get("atr_up_05") is not None else None,
         "target2": round(float(r.get("atr_up_1")), 2) if r.get("atr_up_1") is not None else None,
         "label": r.get("label", ""), "hetta": r.get("hetta", 0),
+        "rs_rating": r.get("rs_rating"), "name": r.get("name"),
+        "earnings_in": r.get("earnings_in"),
         "score10": r.get("score10"), "levels_note": r.get("levels_note") or "",
     }
 
@@ -4794,10 +4796,14 @@ def topop():
     # USA-fokus även här (mixen behåller tier-ordningen, den hoppar bara
     # över utländska bolag när kvoten är fylld).
     rank = _mix_markets(rank, min(len(rank), 12))
-    best = rank[0]
-    out = _opp_of(best)
-    out["tier"] = best.get("tier")
-    return {"pick": out, "regim": reg}
+    # Topp 3 i stället för en enda pick: i backtestet slog listan med A-lägen
+    # S&P i båda halvåren, medan en enskild pick varierar mycket mer.
+    picks = []
+    for r in rank[:3]:
+        o = _opp_of(r)
+        o["tier"] = r.get("tier")
+        picks.append(o)
+    return {"pick": picks[0], "picks": picks, "regim": reg}
 
 
 # =====================================================================
@@ -5103,6 +5109,8 @@ def _facit_log_today():
     bull_like = [r for r in rank if str(r.get("label")) in ("BULL", "MOMENTUM", "Rocketcase")]
     vand_like = [r for r in rank if str(r.get("label")) == "VÄNDNING"]
     val = [("Top Opportunity", rank[0]),
+           ("Topp 2", rank[1] if len(rank) > 1 else None),
+           ("Topp 3", rank[2] if len(rank) > 2 else None),
            ("Dagens Bull", bull_like[0] if bull_like else None),
            ("Veckans Setup", bull_like[1] if len(bull_like) > 1 else None),
            ("Wildcard", vand_like[0] if vand_like else None)]
