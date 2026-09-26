@@ -20,7 +20,7 @@
 //  · FIX: Väntande divergenser nollställs vid ny dag.
 //  · FIX: Lägre tidsram väljs automatiskt efter grafen.
 // ---------------------------------------------------------------------------
-indicator("GRABIT CVD", "GRABIT CVD", overlay=false, format=format.volume, max_labels_count=200)
+indicator("GRABIT CVD 3.0", "GRABIT CVD", overlay=false, format=format.volume, max_labels_count=200)
 import TradingView/ta/8 as tvta
 
 grp = "CVD"
