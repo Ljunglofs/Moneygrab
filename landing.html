@@ -263,9 +263,10 @@ footer .socs{margin-left:auto;margin-right:18px}
 .vidcard:after{content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:0 0 0 1px rgba(255,255,255,.08) inset;background:linear-gradient(180deg,transparent 70%,rgba(2,3,5,.55));pointer-events:none}
 .vc-tag{position:absolute;left:14px;bottom:14px;z-index:2;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;letter-spacing:.1em;color:#fff;background:rgba(2,3,5,.6);border:1px solid rgba(255,201,64,.45);border-radius:999px;padding:6px 12px;backdrop-filter:blur(8px)}
 .vc-live{width:8px;height:8px;border-radius:50%;background:var(--gold);box-shadow:0 0 10px var(--gold);animation:pulse 1.8s infinite}
-.hero-vid{filter:none;opacity:.5;display:none}
+.hero-vid{filter:saturate(1.15) brightness(.8);opacity:.42;object-position:center 40%;
+  -webkit-mask-image:linear-gradient(180deg,#000 55%,transparent);mask-image:linear-gradient(180deg,#000 55%,transparent)}
 @media (max-width:900px){
-  .hero-vid{display:block;opacity:.42}
+  .hero-vid{opacity:.42}
   .hero .vis{display:none}
   .hero{min-height:88vh;display:flex;align-items:center}
 }
@@ -299,9 +300,6 @@ footer .socs{margin-left:auto;margin-right:18px}
 .up{color:#22e38a}.dn{color:#ff4d6d}
 .sc-card.lock .sc-in{filter:blur(7px);opacity:.7}
 .sc-card.lock:after{content:attr(data-lock);position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:var(--gold2);text-shadow:0 0 12px rgba(255,201,64,.6);background:rgba(2,3,5,.25);cursor:pointer}
-.sc-facit{max-width:820px;margin:22px auto 0;text-align:center;font-size:14.5px;color:#d3e0e8;padding:14px 18px;border-radius:16px;background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.22);display:none}
-.sc-facit b{color:var(--neon);text-shadow:0 0 10px rgba(0,229,255,.5)}
-.sc-facit small{display:block;margin-top:4px;color:var(--mut2);font-size:12px}
 @media (max-width:900px){.sc-grid{grid-template-columns:1fr 1fr}}
 @media (max-width:560px){.sc-grid{grid-template-columns:1fr}}
 
@@ -348,9 +346,29 @@ footer .socs{margin-left:auto;margin-right:18px}
       <p class="fine" data-t="fine"><b>Free for 7 days</b> · then SEK 174/month · <span class="campfine">early access price until 31 Dec</span> · cancel anytime</p>
     </div>
     <div class="vis">
-      <div class="vidcard">
-        <video id="herocard" muted loop playsinline preload="none" poster="/hero_poster.jpg" aria-label="GRABIT"></video>
-        <div class="vc-tag"><span class="vc-live"></span>GRABIT PRO</div>
+      <div class="phone">
+        <div class="screen">
+          <div class="scr-top"><img src="/grabit_wordmark.png" alt=""><span>PRO</span></div>
+          <div class="gexcard">
+            <div class="gc-hd"><div><b>NQ</b><i data-t="nqsub">Nasdaq 100 (futures)</i></div><span class="gc-tag">+ GAMMA</span></div>
+            <div class="gc-reg" data-t="posg">Positive gamma · moves tend to be dampened</div>
+            <div class="lv"><i style="background:var(--red)"></i><span>Call Wall</span><b class="red">31 250</b></div>
+            <div class="lv"><i style="background:var(--purp)"></i><span>HGEX</span><b style="color:var(--purp)">31 000</b></div>
+            <div class="lv px"><span data-t="price">Price</span><b style="color:#fff">30 910</b></div>
+            <div class="lv"><i style="background:var(--gold)"></i><span>Gamma Flip</span><b class="gold">30 700</b></div>
+            <div class="lv"><i style="background:#94a3bb"></i><span>Max Pain</span><b style="color:#94a3bb">30 600</b></div>
+            <div class="lv"><i style="background:var(--cyan)"></i><span>Put Wall</span><b class="cyan">30 300</b></div>
+            <div class="ex" data-t="ex">Example</div>
+          </div>
+          <div class="mini">
+            <div><b>Insider Flow</b><i data-t="m1">Politician &amp; CEO buys</i></div>
+            <div><b data-t="m2t">FDA calendar</b><i data-t="m2">Biotech decisions</i></div>
+          </div>
+          <div class="mini">
+            <div><b>Ask Grabit</b><i data-t="m3">AI on every stock</i></div>
+            <div><b>Screener</b><i data-t="m4">660 stocks</i></div>
+          </div>
+        </div>
       </div>
       <div class="float f1"><span class="dot"></span><div><b>The Trump Signal</b><small data-t="f1">Push straight to your phone</small></div></div>
       <div class="float f2"><span class="dot" style="background:var(--cyan);box-shadow:0 0 12px var(--cyan)"></span><div><b data-t="f2t">New GEX levels</b><small>08:00 · 13:05 · 16:05 CET</small></div></div>
@@ -404,7 +422,6 @@ footer .socs{margin-left:auto;margin-right:18px}
       <div class="sc-card sk"></div><div class="sc-card sk"></div><div class="sc-card sk"></div>
       <div class="sc-card sk"></div><div class="sc-card sk"></div><div class="sc-card sk"></div>
     </div>
-    <div class="sc-facit" id="sc-facit"></div>
     <div class="cta-row" style="justify-content:center;margin-top:26px"><a class="btn btn-gold" href="/?pw=1&amp;go=1" data-t="cta5">See the full scan &rarr;</a></div>
   </div>
 </section>
@@ -624,7 +641,7 @@ var SV={
  cta:"Starta 7 dagar gratis &rarr;",explore:"Utforska appen",fine:"<b>0 kr i 7 dagar</b> · sedan 174 kr/mån · <span class=\"campfine\">early access-pris till 31 dec</span> · avsluta när som helst",
  cpill:"EARLY ACCESS-PRIS",ctext:"Halva priset till <b>31 december 2026</b>. Från 1 januari är ordinarie pris 348 kr/mån.",wm:"Från 1 jan 2027: 348 kr/mån",wy:"Från 1 jan 2027: 3 132 kr/år",offt:"−50 % till 31 dec",
  nqsub:"Nasdaq 100 (termin)",posg:"Positiv gamma · rörelser brukar dämpas",price:"Pris",ex:"Exempel",
- m1:"Politiker- &amp; VD-köp",m2t:"FDA-kalender",m2:"Bio-beslut",m3:"AI på alla aktier",m4:"660 aktier",
+ m1:"Politiker- &amp; VD-köp",m2t:"FDA-kalender",nqsub:"Nasdaq 100 (terminer)",m1:"Politiker- &amp; VD-köp",m2:"Bio-beslut",m3:"AI på alla aktier",m4:"660 aktier",
  f1:"Push direkt till mobilen",f2t:"Nya GEX-nivåer",
  fa1:"NQ &amp; Guld",fa1s:"GEX-nivåer varje dag",fa2:"3× per dag",fa2s:"nya nivåer",fa3:"660 aktier",fa3s:"i scannern",fa4:"26 teman",fa4s:"AI, rymd, kärnkraft …",fa5:"7 dagar",fa5s:"gratis att prova",
  e1:"Allt i en app",h2a:"Ett abonnemang. <span class=\"hl\">Hela verktygslådan.</span>",
@@ -708,7 +725,7 @@ function applyLang(l){
 function toggleLang(){var l=(document.documentElement.lang==="sv")?"en":"sv";try{localStorage.setItem("grabit_lang",l);}catch(e){}applyLang(l);}
 (function(){var l="en";try{l=localStorage.getItem("grabit_lang")||"en";}catch(e){}applyLang(l);})();
 
-/* Screener live: riktiga resultat från /api/screen och facit från /api/facit.
+/* Screener live: riktiga resultat från /api/screen.
    Tre fynd visas öppet, tre låsta bakom PRO. Går API:t inte att nå visas
    ingenting falskt — skeletten ersätts av en hänvisning till appen. */
 var SC_LB={"Rocketcase":["Rocketcase","Rocketcase"],"VÄNDNING":["Reversal","Vändning"],"BULL":["Bull trend","Bull-trend"],
@@ -717,9 +734,9 @@ var SC_GOOD=["Rocketcase","VÄNDNING","BULL","MOMENTUM"];
 function _sv(){return document.documentElement.lang==="sv";}
 function _pct(v){if(v==null||isNaN(v))return"–";v=+v;return (v>=0?"+":"")+v.toFixed(1)+"%";}
 function _esc(t){return String(t==null?"":t).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
-var SC_DATA=null,FACIT=null;
+var SC_DATA=null;
 function renderScreener(){
-  var g=document.getElementById("sc-grid"),c=document.getElementById("sc-counts"),f=document.getElementById("sc-facit");if(!g)return;
+  var g=document.getElementById("sc-grid"),c=document.getElementById("sc-counts");if(!g)return;
   var sv=_sv(),i18=sv?1:0;
   if(SC_DATA===false){g.innerHTML='<div class="sc-card" style="grid-column:1/-1;min-height:0;text-align:center;color:var(--mut)">'+(sv?"Dagens resultat visas i appen.":"Today's results are shown in the app.")+'</div>';}
   if(SC_DATA&&SC_DATA.length){
@@ -737,25 +754,16 @@ function renderScreener(){
         +'<span>20d <b class="'+((r.ret_20||0)>=0?"up":"dn")+'">'+_pct(r.ret_20)+'</b></span>'
         +(r.rel_vol?'<span>'+(+r.rel_vol).toFixed(1)+'× vol</span>':'')+'</div></div></div>';}).join("");
   }
-  var st=FACIT&&FACIT.stats;
-  if(st&&st.antal>=5){f.style.display="block";
-    f.innerHTML=(sv?"Facit · senaste <b>"+st.antal+"</b> avslutade lägen: <b>"+st.traffprocent+" %</b> träffar · snitt <b>"+_pct(st.snitt_pct)+"</b>"
-                  :"Track record · last <b>"+st.antal+"</b> closed picks: <b>"+st.traffprocent+"%</b> hit rate · average <b>"+_pct(st.snitt_pct)+"</b>")
-      +(st.slog_mkt_antal?(sv?" · slog S&amp;P i <b>"+st.slog_mkt+"/"+st.slog_mkt_antal+"</b>":" · beat the S&amp;P in <b>"+st.slog_mkt+"/"+st.slog_mkt_antal+"</b>"):"")
-      +'<small>'+(sv?"Mätt fem handelsdagar efter att läget loggades. Historiska resultat är ingen garanti.":"Measured five trading days after each pick was logged. Past results are no guarantee.")+'</small>';}
 }
 (function(){
   function get(u,ms){return Promise.race([fetch(u,{cache:"no-store"}).then(function(r){if(!r.ok)throw 0;return r.json();}),new Promise(function(_,rej){setTimeout(rej,ms);})]);}
   get("/api/screen",15000).then(function(j){SC_DATA=(j&&j.rows)||false;if(SC_DATA&&!SC_DATA.length)SC_DATA=false;renderScreener();})
     .catch(function(){SC_DATA=false;renderScreener();});
-  get("/api/facit",15000).then(function(j){FACIT=j;renderScreener();}).catch(function(){});
   document.addEventListener("click",function(e){if(e.target&&e.target.id==="lang")setTimeout(renderScreener,0);});
 })();
 
-/* Heroviden: stående video. I mobil som bakgrund, på datorn i kortet. Bara den
-   som syns laddas, så mobilen hämtar inte två videor. */
-(function(){var mob=window.matchMedia&&matchMedia("(max-width:900px)").matches;
-  var v=document.getElementById(mob?"herobg":"herocard");if(!v)return;
+/* Heroviden: tonad bakgrund bakom hela heron, i mobil och på datorn. */
+(function(){var v=document.getElementById("herobg");if(!v)return;
   v.src="/hero.mp4";v.setAttribute("autoplay","");var p=v.play();if(p&&p.catch)p.catch(function(){});})();
 
 /* Nedräkning till kampanjens slut (31 dec 2026, 23:59 svensk tid). */
