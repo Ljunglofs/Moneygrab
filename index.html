@@ -941,7 +941,15 @@ body{background:
 .pw-plus{font-size:12px;color:#8a93a3;text-align:center;margin-top:2px}
 .promo4{display:none;margin:10px 0 6px;padding:15px 14px;border-radius:18px;cursor:pointer;background:linear-gradient(150deg,rgba(245,197,66,.16),rgba(34,211,238,.10));border:1px solid rgba(245,197,66,.45);box-shadow:0 0 28px rgba(245,197,66,.12)}
 body.not-pro .promo4{display:block}
-body.not-pro .discordcard{display:none}
+body.not-pro .memberhub{display:none}
+.memberhub{margin:10px 0 4px;padding:14px;border-radius:16px;background:linear-gradient(160deg,rgba(88,101,242,.12),rgba(34,211,238,.06));border:1px solid rgba(88,101,242,.4)}
+.mh-hd{display:flex;align-items:center;gap:9px;margin-bottom:6px}.mh-hd b{font-size:15px}
+.mh-row{display:flex;align-items:center;gap:12px;padding:10px 2px;border-top:1px solid rgba(255,255,255,.07);color:inherit;text-decoration:none;cursor:pointer}
+.dc-ic.tg{background:#229ED9}
+.mh-tv{padding:10px 2px 2px;border-top:1px solid rgba(255,255,255,.07)}
+.mh-form{display:flex;gap:8px;margin-top:9px}
+.mh-form input{flex:1;min-width:0;background:rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.14);border-radius:10px;padding:10px 12px;color:#fff;font:inherit;font-size:14px}
+.mh-form button{background:var(--gold);color:#000;border:0;border-radius:10px;padding:0 16px;font-weight:800;cursor:pointer}
 .p4-hd{display:flex;align-items:center;gap:9px}.p4-hd b{font-size:15.5px;line-height:1.3}
 .p4-pro{font-size:10px;font-weight:800;letter-spacing:.06em;color:#000;background:var(--gold);border-radius:6px;padding:3px 6px;flex:none}
 .p4-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
@@ -1066,7 +1074,7 @@ body.not-pro .discordcard{display:none}
    Retrofit-vänligt: översätter DOM:ens textnoder + placeholder/aria live
    via en ordbok, så även dynamiskt renderat innehåll fångas. Svenska är
    originalet (ingen översättning); EN slår på ordboken + en MutationObserver. */
-var GRABIT_LANG = (function(){try{return localStorage.getItem("grabit_lang")||"sv";}catch(e){return "sv";}})();
+var GRABIT_LANG = (function(){try{return localStorage.getItem("grabit_lang")||"en";}catch(e){return "en";}})();
 window.GRABIT_LANG = GRABIT_LANG;
 var _I18N_EXACT = {
 "Ny extrem möjlighet":"New extreme opportunity","Rädsla":"Fear","RÄDSLA":"FEAR","Extrem rädsla":"Extreme fear","EXTREM RÄDSLA":"EXTREME FEAR","Girighet":"Greed","GIRIGHET":"GREED","Extrem girighet":"Extreme greed","EXTREM GIRIGHET":"EXTREME GREED","GULD":"GOLD","Guld":"Gold","AI · MARKNADSLÄGE":"AI · MARKET OUTLOOK","MARKNADSLÄGE":"MARKET OUTLOOK","Laddar dagens läge…":"Loading today's outlook…","Laddar dagens läge...":"Loading today's outlook…",
@@ -1464,6 +1472,8 @@ var _I18N_RULES = [
   [/^för (\d+) dgr sen$/, "$1 days ago"],
   [/^(⚠️\s*)?Servern svarar inte — detta är EXEMPELDATA, inte live\. Försöker igen… \((\d+)\)$/, "$1The server isn't responding — this is SAMPLE DATA, not live. Retrying… ($2)"]
 ];
+/* Säljsidan, GEX-fliken och medlemskortet */
+Object.assign(_I18N_EXACT,{"Allt en trader behöver — i en app": "Everything a trader needs — in one app", "GEX-nivåer": "GEX levels", "NQ & Guld, varje dag": "NQ & Gold, every day", "Push när han rör marknaden": "Push when he moves markets", "Hela scannern & dagens lägen": "The full scanner & today's setups", "AI-analys på alla aktier": "AI analysis on every stock", "FDA-kalender": "FDA calendar", "Bio-beslut före marknaden": "Biotech decisions ahead of the market", "Politiker- & VD-köp": "Politician & CEO buys", "Community med traders": "Community of traders", "Indikatorer": "Indicators", "GRABIT för TradingView": "GRABIT for TradingView", "Starta 7 dagar gratis →": "Start 7 days free →", "NY": "NEW", "NYHET": "NEW", "GEX-nivåer för NQ & Guld": "GEX levels for NQ & Gold", "Call Wall, Put Wall och Gamma Flip — varje handelsdag": "Call Wall, Put Wall and Gamma Flip — every trading day", "GEX-nivåer NQ & Guld": "GEX levels NQ & Gold", "Call Wall, Put Wall & Gamma Flip varje dag": "Call Wall, Put Wall & Gamma Flip every day", "Push direkt när Trump rör marknaden": "Push the moment Trump moves markets", "Discord-community": "Discord community", "Setups & nivåer med andra traders": "Setups & levels with other traders", "GRABIT-indikatorer": "GRABIT indicators", "Flow Profile, CVD & GEX Levels för TradingView": "Flow Profile, CVD & GEX Levels for TradingView", "+ Screener, Ask Grabit, FDA-kalender, Insider Flow och push-larm": "+ Screener, Ask Grabit, FDA calendar, Insider Flow and push alerts", "7 dagar gratis": "7 days free", "i 7 dagar": "for 7 days", "Starta 7 dagar gratis": "Start 7 days free", "Ditt medlemskap": "Your membership", "Nivåer, setups och NASDAQ Robber": "Levels, setups and NASDAQ Robber", "NASDAQ Robber på Telegram": "NASDAQ Robber on Telegram", "Robotens larm direkt i Telegram": "The robot's alerts straight in Telegram", "GRABIT-indikatorer för TradingView": "GRABIT indicators for TradingView", "Skriv ditt TradingView-namn så lägger vi till dig": "Enter your TradingView username and we'll add you", "TradingView-namn": "TradingView username", "Skicka": "Send", "Villkor": "Terms", "Integritetspolicy": "Privacy"});
 function _i18nTx(str){
   if(GRABIT_LANG!=="en"||!str)return str;
   var lead=(str.match(/^\s*/)||[""])[0], tail=(str.match(/\s*$/)||[""])[0];
@@ -1553,7 +1563,13 @@ else _i18nBoot();
     <div id="newsbar"></div>
     <div id="trumpbar" style="display:none"></div>
     <div class="gexnews" onclick="go('daytrade')" role="button" aria-label="GEX-nivåer för NQ och Guld"><span class="gn-new">NYHET</span><div class="gn-tx"><b>GEX-nivåer för NQ &amp; Guld</b><i>Call Wall, Put Wall och Gamma Flip &mdash; varje handelsdag</i></div><span class="gn-ar">&#8594;</span></div>
-    <a class="discordcard js-discord" target="_blank" rel="noopener" aria-label="Gå med i GRABIT på Discord"><span class="dc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.6A8 8 0 1 1 21 12z"/><circle cx="9" cy="12" r=".9" fill="currentColor"/><circle cx="12.5" cy="12" r=".9" fill="currentColor"/><circle cx="16" cy="12" r=".9" fill="currentColor"/></svg></span><div class="dc-tx"><b>Gå med i vår Discord</b><i>Setups, nivåer och snack med andra traders</i></div><span class="gn-ar">&#8594;</span></a>
+    <div class="memberhub" id="memberhub">
+      <div class="mh-hd"><span class="p4-pro">PRO</span><b>Ditt medlemskap</b></div>
+      <a class="mh-row" id="mh-discord" target="_blank" rel="noopener"><span class="dc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c.6-3.4 3-5.3 6-5.3s5.4 1.9 6 5.3"/><circle cx="17" cy="9" r="2.4"/><path d="M16.5 14.3c2.4.2 4 1.8 4.5 4.7"/></svg></span><div class="dc-tx"><b>Discord-community</b><i>Nivåer, setups och NASDAQ Robber</i></div><span class="gn-ar">&#8594;</span></a>
+      <a class="mh-row" id="mh-tg" target="_blank" rel="noopener" style="display:none"><span class="dc-ic tg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4L3 11l6 2 2 6 3-4 5 4z"/><path d="M9 13l12-9"/></svg></span><div class="dc-tx"><b>NASDAQ Robber på Telegram</b><i>Robotens larm direkt i Telegram</i></div><span class="gn-ar">&#8594;</span></a>
+      <div class="mh-tv"><div class="dc-tx"><b>GRABIT-indikatorer för TradingView</b><i id="mh-tv-sub">Skriv ditt TradingView-namn så lägger vi till dig</i></div>
+        <div class="mh-form"><input id="mh-tv-in" placeholder="TradingView-namn" autocomplete="off" autocapitalize="off" spellcheck="false" onkeydown="if(event.key==='Enter')tvRequest()"><button onclick="tvRequest()">Skicka</button></div></div>
+    </div>
     <div id="aisummary"></div>
     <div class="card aibrief" id="aibrief"></div>
     <div id="heatmap"></div>
@@ -1729,8 +1745,7 @@ else _i18nBoot();
 const CONFIG = { API_BASE: "https://grabit-api-80dh.onrender.com",
   /* Översikt är öppen som skyltfönster; alla andra flikar kräver PRO eller
      provperiod. false = freemium med teasers i alla flikar som förut. */
-  LOCK_TABS: true,
-  DISCORD_URL: "https://discord.com/channels/1528471339038671089/1552014938233376788" };  /* <-- KLISTRA IN din Render-URL här, t.ex. "https://grabit-api.onrender.com". Tom = demo-läge. */
+  LOCK_TABS: true };  /* <-- KLISTRA IN din Render-URL här, t.ex. "https://grabit-api.onrender.com". Tom = demo-läge. */
 /* ORIGIN-LÅS (fixat): tvinga API_BASE till nuvarande origin BARA när appen faktiskt
    serveras från Render (samma server som API:t). På Netlify eller annan host behålls
    Render-URL:en ovan — annars gick alla anrop fel och appen fastnade i demo-läge. */
@@ -3018,6 +3033,7 @@ function refreshProState(){
     Array.prototype.forEach.call(document.querySelectorAll(".pro-gated.locked"),function(e){e.classList.remove("locked");});
   }else{applyProLocks(document);}
   try{loadTrump();}catch(e){}
+  try{loadMemberHub();}catch(e){}
 }
 async function unlockWithCode(){
   var EN=(window.GRABIT_LANG==="en");
@@ -3371,9 +3387,37 @@ async function loadDaytrade(force){
   }catch(e){wrap.innerHTML='<div class="scl-empty">'+(EN?"Couldn't load GEX levels — trying again shortly…":"Kunde inte hämta GEX-nivåer just nu — försöker igen strax…")+'</div>';
     window._dtRetry=(window._dtRetry||0)+1;if(window._dtRetry<=5)setTimeout(function(){loadDaytrade(true);},10000);}
 }
-/* Discord-länkarna hämtar adressen från CONFIG, så den byts på ett ställe. */
-(function(){Array.prototype.forEach.call(document.querySelectorAll(".js-discord"),function(a){a.href=CONFIG.DISCORD_URL;});
-  document.body.classList.toggle("not-pro",!isPro());})();
+/* Medlemskortet (bara PRO): Discord- och Telegram-länkarna lämnas bara ut av
+   servern mot en giltig PRO-token. TradingView-namnet skickas till ägaren,
+   som lägger till det i invite-only-skripten. */
+async function loadMemberHub(){
+  if(!isPro()||!CONFIG.API_BASE)return;
+  try{
+    var tok=encodeURIComponent(localStorage.getItem("grabit_token")||"");
+    var j=await fetch(CONFIG.API_BASE.replace(/\/$/,"")+"/api/pro/community?token="+tok,{cache:"no-store"}).then(function(r){return r.json();});
+    if(!j||!j.pro)return;
+    var d=document.getElementById("mh-discord");if(d&&j.discord)d.href=j.discord;
+    var t=document.getElementById("mh-tg");if(t&&j.telegram){t.href=j.telegram;t.style.display="flex";}
+  }catch(e){}
+  try{var n=localStorage.getItem("grabit_tv");if(n)_tvShow(n);}catch(e){}
+}
+function _tvShow(name){var EN=(window.GRABIT_LANG==="en");var sub=document.getElementById("mh-tv-sub");
+  if(sub)sub.textContent=EN?("Requested for "+name+" — you'll find the scripts under Invite-only scripts in TradingView once we've added you.")
+                           :("Begärt för "+name+" — du hittar skripten under Invite-only scripts i TradingView när vi lagt till dig.");}
+async function tvRequest(){
+  var EN=(window.GRABIT_LANG==="en");var say=window.pToast||window.say||function(m){alert(m);};
+  var inp=document.getElementById("mh-tv-in");var name=inp?inp.value.trim().replace(/^@/,""):"";
+  if(!/^[A-Za-z0-9_.\-]{2,40}$/.test(name)){say(EN?"Enter your TradingView username.":"Skriv ditt TradingView-namn.");return;}
+  try{
+    var r=await fetch(CONFIG.API_BASE.replace(/\/$/,"")+"/api/pro/tradingview",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({token:localStorage.getItem("grabit_token")||"",username:name})});
+    var j=await r.json();
+    if(j&&j.ok){try{localStorage.setItem("grabit_tv",name);}catch(e){}_tvShow(name);if(inp)inp.value="";
+      say(EN?"Sent! We'll add you to the indicators.":"Skickat! Vi lägger till dig i indikatorerna.");}
+    else say(EN?"Couldn't send — is your PRO active?":"Kunde inte skicka — är din PRO aktiv?");
+  }catch(e){say(EN?"Couldn't send right now.":"Kunde inte skicka just nu.");}
+}
+(function(){document.body.classList.toggle("not-pro",!isPro());loadMemberHub();})();
 
 /* ===== Research (försidan) ===== */
 const RS={price15:false,relvol:false,mom:false,news:false,insider:false,lowcap:false,theme:""};

@@ -1549,8 +1549,16 @@ def send_discord(text):
 
 
 def notify(text):
-    """Skickar ett larm till alla kanaler (Telegram + Discord)."""
+    """Skickar ett larm till alla kanaler: ägarens Telegram, medlemmarnas
+    Telegram-kanal (env TELEGRAM_MEMBERS_CHAT_ID, boten måste vara admin där)
+    och Discord (env DISCORD_WEBHOOK_URL)."""
     ok = send_telegram(text)
+    members = os.environ.get("TELEGRAM_MEMBERS_CHAT_ID", "").strip()
+    if members and members != str(Config.CHAT_ID):
+        try:
+            send_telegram(text, chat_id=members)
+        except Exception:
+            pass
     try:
         send_discord(text)
     except Exception:

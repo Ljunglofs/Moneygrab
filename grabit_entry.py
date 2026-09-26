@@ -63,6 +63,13 @@ try:
 except Exception as e:
     print(f"trump_signal kunde inte registreras (grabit kör vidare): {e}")
 
+# 2f) PRO-community: Discord, Telegram-kanalen och TradingView-access.
+try:
+    import community
+    community.register(app)
+except Exception as e:
+    print(f"community kunde inte registreras (grabit kör vidare): {e}")
+
 # 3) TESTENDPOINT — avfyra ett skarpt formaterat (men fejkat) Telegram-larm
 #    på begäran. Ligger på tvåsegments-väg så api.py:s catch-all /{fname}
 #    inte slukar den. Öppna i mobilen:
