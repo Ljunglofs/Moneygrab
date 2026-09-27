@@ -1686,8 +1686,7 @@ else _i18nBoot();
     <div class="sect"><h2>Kalender &amp; bevakning</h2></div>
     <div id="macrocal"></div>
     <div id="fdacal" style="display:none"></div>
-    <div class="sect"><h2>10 hetaste just nu</h2><a onclick="go('marknad')">Mer</a></div>
-    <div class="card" id="hetaste"></div>
+    <div class="card rboard" id="radarboard" style="display:none"></div>
     <div class="sect"><h2>Snabbval</h2></div>
     <div class="menuchips" id="menuchips"></div>
     <div class="demo-flag" id="demo-flag">Ansluter till live-data…</div>
@@ -4129,7 +4128,7 @@ async function loadRadar(){
       +(p.bear?'<div class="rd-case bear"><i>'+(EN?"BEAR CASE":"BEAR CASE")+'</i><p>'+p.bear.replace(/</g,"&lt;")+'</p></div>':"")
       +'</div>' : "";
   el.style.display="";
-  el.innerHTML='<div class="rd-k"><span class="rd-pulse"></span>'+(EN?"GRABIT RADAR":"GRABIT RADAR")
+  el.innerHTML='<div class="rd-k"><span class="rd-pulse"></span>'+(EN?"RADAR ALERT":"RADARLARM")
     +tierBadge(p.tier)+'</div>'
     +'<div class="rd-top">'+lic(p.ticker,44,col)
     +'<div class="rd-nm"><div class="rd-tk">'+p.ticker+'</div><div class="rd-co">'+(p.name||"")+'</div></div>'
@@ -5535,6 +5534,7 @@ async function pfReview(){
     try{loadDaily();}catch(e){}
     try{loadTopOp();}catch(e){}
     try{loadRadar();}catch(e){}
+    try{loadRadarBoard();}catch(e){}
     try{loadToday3();}catch(e){}
     try{loadWatchrow();}catch(e){}
     try{loadMacro();}catch(e){}
@@ -6002,6 +6002,87 @@ html::before{
   box-shadow:0 0 16px -4px rgba(var(--nc),.35),inset 0 0 26px -16px rgba(var(--nc),.5)}
 /* Rubrikernas streck lyser starkare */
 .sect h2::before,.hm-bar{box-shadow:0 0 14px rgba(var(--nc),.9) !important}
+</style>
+<script id="radarboard-js">
+/* ===== GRABIT RADAR — dagens lägen per kategori =====
+   Utbrott, momentum och de heta temana. Gratis ser en aktie, PRO ser allt. */
+var RB_CATS={
+  breakout:["🚀","BREAKOUT","UTBROTT","#00e5ff"],
+  momentum:["📈","MOMENTUM","MOMENTUM","#FFC83D"],
+  ai:["🧠","AI INFRA","AI-INFRA","#00e5ff"],
+  quantum:["⚛️","QUANTUM","KVANT","#00e5ff"],
+  space:["🛰️","SPACE","RYMD","#00e5ff"],
+  rare:["🪨","RARE EARTH","RARE EARTH","#00e5ff"],
+  nuclear:["☢️","NUCLEAR","KÄRNKRAFT","#00e5ff"]};
+function _rbPct(v){return v==null?"—":(v>=0?"+":"")+(+v).toFixed(1)+"%";}
+function _rbWhy(k,it,EN){
+  if(k==="breakout")return (it.rel_vol!=null?it.rel_vol+"× "+(EN?"volume":"volym"):"")+(it.pct_from_high!=null?" · "+Math.abs(+it.pct_from_high).toFixed(1)+(EN?"% from high":" % från toppen"):"");
+  if(k==="momentum")return "RS "+(it.rs_rating!=null?it.rs_rating:"—")+" · "+_rbPct(it.ret_20)+" 20d";
+  return "RS "+(it.rs_rating!=null?it.rs_rating:"—")+" · "+_rbPct(it.ret_5)+" 5d";}
+function _rbRow(k,it,EN){
+  var up=(it.ret_1||0)>=0,col=up?"#00e5ff":"#FF3348";
+  var sp=(it.spark&&it.spark.length>2)?spark(it.spark,col):"";
+  return '<div class="rb-row" onclick="openStock(\''+it.ticker+'\')">'+lic(it.ticker,34,RB_CATS[k][3])
+    +'<div class="rb-mid"><div class="rb-tk">'+it.ticker+'<span>'+String((window.NAMES&&NAMES[it.ticker])||it.name||"").replace(/</g,"&lt;")+'</span></div>'
+    +'<div class="rb-why">'+_rbWhy(k,it,EN)+'</div></div>'
+    +'<div class="rb-sp">'+sp+'</div><div class="rb-ch" style="color:'+col+'">'+_rbPct(it.ret_1)+'</div></div>';}
+async function loadRadarBoard(){
+  var el=document.getElementById("radarboard");if(!el)return;
+  var B=CONFIG.API_BASE?CONFIG.API_BASE.replace(/\/$/,""):"";if(!B)return;
+  var j=null;try{j=await fetch(B+"/api/radar_board",{cache:"no-store"}).then(function(r){return r.json();});}catch(e){}
+  if(!j||!j.cats){return;}
+  var EN=(window.GRABIT_LANG==="en"),pro=isPro(),free=0,html="";
+  j.cats.forEach(function(c){
+    var m=RB_CATS[c.key];if(!m)return;
+    var open=[],locked=[];
+    c.items.forEach(function(it){if(pro||free<1){open.push(_rbRow(c.key,it,EN));free++;}else locked.push(_rbRow(c.key,it,EN));});
+    var rows=c.items.length?open.join("")+(locked.length?'<div class="pro-gated" data-lock="PRO">'+locked.join("")+'</div>':"")
+      :'<div class="rb-empty">'+(EN?"No setup right now":"Inget läge just nu")+'</div>';
+    html+='<div class="rb-cat" style="--rc:'+m[3]+'"><div class="rb-ch2"><span class="rb-em">'+m[0]+'</span><b>'+(EN?m[1]:m[2])+'</b><i>'+c.items.length+'</i></div>'+rows+'</div>';
+  });
+  el.innerHTML='<div class="rb-hd"><span class="rb-radar"><i></i></span><div><div class="rb-h1">GRABIT RADAR</div>'
+    +'<div class="rb-h2">'+(EN?"Today's setups — breakouts, momentum and the hot themes":"Dagens lägen — utbrott, momentum och de heta temana")+'</div></div>'
+    +'<span class="rb-live"><i></i>LIVE</span></div>'+html
+    +(pro?'':'<div class="rb-cta" onclick="showPaywall(null,true)">'+(EN?"Unlock the whole radar — 7 days free":"Lås upp hela radarn — 7 dagar gratis")+' &#8594;</div>');
+  el.style.display="";
+  if(window.applyProLocks)applyProLocks(el);
+}
+try{loadRadarBoard();}catch(e){}
+</script>
+<style id="radarboard-css">
+.rboard{padding:16px 14px 14px !important;margin-top:14px}
+.rb-hd{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.rb-radar{position:relative;flex:none;width:42px;height:42px;border-radius:50%;border:1.5px solid rgba(255,200,61,.8);box-shadow:0 0 16px rgba(255,200,61,.45),inset 0 0 12px rgba(255,200,61,.3);
+  background:repeating-radial-gradient(circle,transparent 0 8px,rgba(255,200,61,.22) 8px 9px);overflow:hidden}
+.rb-radar i{position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg,rgba(255,200,61,.55),transparent 25%);animation:rbSweep 2.6s linear infinite}
+@keyframes rbSweep{to{transform:rotate(360deg)}}
+.rb-h1{font-family:var(--disp);font-weight:800;font-size:22px;letter-spacing:.06em;color:#FFD76A;text-shadow:0 0 16px rgba(255,200,61,.6);line-height:1}
+.rb-h2{font-size:11.5px;color:var(--mut);margin-top:4px}
+.rb-live{margin-left:auto;align-self:flex-start;display:inline-flex;align-items:center;gap:5px;font-size:9px;font-weight:900;letter-spacing:.08em;color:#8ff7ff;border:1px solid rgba(0,229,255,.5);border-radius:7px;padding:4px 8px;background:rgba(0,229,255,.08)}
+.rb-live i{width:6px;height:6px;border-radius:50%;background:#00e5ff;box-shadow:0 0 8px #00e5ff;animation:liveblink 1.1s steps(1,end) infinite}
+.rb-cat{margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.07)}
+.rb-cat:first-of-type{border-top:none;padding-top:0;margin-top:0}
+.rb-ch2{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.rb-em{font-size:17px;filter:drop-shadow(0 0 6px var(--rc))}
+.rb-ch2 b{font-family:var(--disp);font-size:15px;font-weight:800;letter-spacing:.07em;color:var(--rc);text-shadow:0 0 12px var(--rc)}
+.rb-ch2 i{margin-left:auto;font-style:normal;font-size:10px;font-weight:800;color:var(--mut);border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:1px 7px}
+.rb-row{display:flex;align-items:center;gap:10px;padding:9px 10px;margin-top:6px;border-radius:12px;cursor:pointer;
+  background:linear-gradient(90deg,color-mix(in srgb,var(--rc) 9%,transparent),rgba(255,255,255,.015));border:1px solid color-mix(in srgb,var(--rc) 32%,transparent)}
+.rb-row:active{transform:scale(.99)}
+.rb-mid{flex:1;min-width:0}
+.rb-tk{font-weight:800;font-size:15px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rb-tk span{font-weight:600;font-size:11.5px;color:var(--mut);margin-left:7px}
+.rb-why{font-size:11.5px;color:#b8c4d4;margin-top:2px}
+.rb-sp{flex:none;width:52px}
+.rb-sp svg{filter:drop-shadow(0 0 4px currentColor)}
+.rb-ch{flex:none;min-width:58px;text-align:right;font-family:var(--disp);font-weight:800;font-size:15px;text-shadow:0 0 12px currentColor}
+.rb-empty{font-size:12px;color:var(--mut);padding:6px 2px}
+.rb-cta{margin-top:14px;text-align:center;padding:12px;border-radius:12px;font-weight:800;font-size:13.5px;cursor:pointer;color:#001116;
+  background:linear-gradient(180deg,#7ff6ff,#00e5ff 55%,#00b8d4);box-shadow:0 0 0 1px rgba(160,250,255,.6) inset,0 8px 26px rgba(0,229,255,.35)}
+.rboard{border:1px solid rgba(255,200,61,.7) !important;box-shadow:0 0 0 1px rgba(255,200,61,.1) inset,0 0 20px rgba(255,200,61,.3),0 0 54px -14px rgba(255,200,61,.55),inset 0 0 40px -20px rgba(255,200,61,.6) !important;
+  background:linear-gradient(rgba(255,200,61,.055) 1px,transparent 1px) 0 0/26px 26px,linear-gradient(90deg,rgba(255,200,61,.055) 1px,transparent 1px) 0 0/26px 26px,
+    radial-gradient(120% 70% at 0% 0%,rgba(255,200,61,.16),transparent 60%),linear-gradient(170deg,#12100a,#07070a) !important}
+@media (prefers-reduced-motion:reduce){.rb-radar i{animation:none}}
 </style>
 </body>
 </html>

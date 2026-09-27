@@ -322,6 +322,31 @@ footer .socs{margin-left:auto;margin-right:18px}
 .facts:before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background-image:linear-gradient(rgba(0,229,255,.09) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,.09) 1px,transparent 1px);background-size:56px 56px;
   -webkit-mask-image:linear-gradient(90deg,transparent,#000 20%,#000 80%,transparent);mask-image:linear-gradient(90deg,transparent,#000 20%,#000 80%,transparent)}
 @media (prefers-reduced-transparency:reduce){.gridsec:before,.gridsec:after{display:none}}
+/* GRABIT RADAR (en aktie synlig, resten låst) */
+.rdl{max-width:760px;margin:26px auto 0;padding:20px;border-radius:22px;border:1px solid rgba(255,201,64,.7);
+  background:linear-gradient(rgba(255,201,64,.05) 1px,transparent 1px) 0 0/28px 28px,linear-gradient(90deg,rgba(255,201,64,.05) 1px,transparent 1px) 0 0/28px 28px,radial-gradient(120% 70% at 0% 0%,rgba(255,201,64,.16),transparent 60%),linear-gradient(170deg,#12100a,#07070a);
+  box-shadow:0 0 22px rgba(255,201,64,.3),0 0 70px -16px rgba(255,201,64,.55),inset 0 0 44px -22px rgba(255,201,64,.6)}
+.rdl-cat{padding:12px 0;border-top:1px solid rgba(255,255,255,.07)}
+.rdl-cat:first-child{border-top:none;padding-top:0}
+.rdl-ch{display:flex;align-items:center;gap:9px;margin-bottom:8px}
+.rdl-ch .em{font-size:19px;filter:drop-shadow(0 0 6px var(--rc))}
+.rdl-ch b{font-size:16px;font-weight:700;letter-spacing:.08em;color:var(--rc);text-shadow:0 0 12px var(--rc)}
+.rdl-ch i{margin-left:auto;font-style:normal;font-size:11px;font-weight:700;color:var(--mut);border:1px solid rgba(255,255,255,.14);border-radius:7px;padding:1px 8px}
+.rdl-row{display:flex;align-items:center;gap:12px;padding:11px 13px;margin-top:7px;border-radius:14px;border:1px solid rgba(0,229,255,.45);
+  background:linear-gradient(90deg,rgba(0,229,255,.1),rgba(255,255,255,.02));box-shadow:0 0 18px -6px rgba(0,229,255,.5)}
+.rdl-row .lg{flex:none;width:40px;height:40px;border-radius:11px;display:grid;place-items:center;font-weight:700;font-size:13px;color:var(--neon);border:1px solid rgba(0,229,255,.5);background:rgba(0,229,255,.08)}
+.rdl-row .mid{flex:1;min-width:0}.rdl-row .tk{font-weight:700;font-size:17px}.rdl-row .tk span{font-weight:500;font-size:12.5px;color:var(--mut);margin-left:8px}
+.rdl-row .why{font-size:12.5px;color:#b8c4d4;margin-top:1px}
+.rdl-row .ch{font-weight:700;font-size:17px;text-shadow:0 0 12px currentColor}
+.rdl-row .ch.up{color:var(--neon)}.rdl-row .ch.dn{color:#ff3348}
+.rdl-row.ghost{border-color:rgba(255,255,255,.08);background:rgba(255,255,255,.02);box-shadow:none;filter:blur(6px);opacity:.55;user-select:none;pointer-events:none}
+.rdl-lockwrap{position:relative}
+.rdl-lock{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:2}
+.rdl-lock a{font-weight:700;font-size:13px;color:var(--gold2);border:1px solid rgba(255,201,64,.6);background:rgba(10,8,2,.8);padding:7px 14px;border-radius:10px;text-shadow:0 0 10px rgba(255,201,64,.6);box-shadow:0 0 18px rgba(255,201,64,.3)}
+.rdl-empty{font-size:13px;color:var(--mut);padding:4px 2px}
+.rdl-load{height:320px;border-radius:14px;background:linear-gradient(90deg,rgba(255,255,255,.02),rgba(255,255,255,.05),rgba(255,255,255,.02));background-size:200% 100%;animation:rdlSk 1.4s linear infinite}
+@keyframes rdlSk{to{background-position:-200% 0}}
+
 
 /* Lansering: "We're live" — list överst och stort märke i heron */
 .topbar{display:block;text-align:center;font-size:13.5px;padding:8px 16px;color:#fff;text-decoration:none;letter-spacing:.02em;
@@ -347,6 +372,7 @@ footer .socs{margin-left:auto;margin-right:18px}
   <div class="wrap hdr">
     <a class="logo" href="/start" aria-label="GRABIT"><img src="/grabit_wordmark.png" alt="GRABIT"></a>
     <nav>
+      <a href="#radar">Radar</a>
       <a href="#features" data-t="n1">Features</a>
       <a href="#screener" data-t="n6">Screener</a>
       <a href="#gex" data-t="n2">GEX levels</a>
@@ -418,6 +444,18 @@ footer .socs{margin-left:auto;margin-right:18px}
     <div class="fact"><b class="gold" data-t="fa5">7 days</b><span data-t="fa5s">free to try</span></div>
   </div>
 </div>
+
+<section class="gridsec gold" id="radar" style="padding-top:34px">
+  <div class="wrap">
+    <div class="center">
+      <div class="eyebrow">&#128293; GRABIT RADAR</div>
+      <h2 id="rdl-h2">Today's setups. <span class="hl">Before everyone else.</span></h2>
+      <p class="sub" id="rdl-sub">Breakouts, momentum and the hottest themes &mdash; AI infra, quantum, space, rare earth and nuclear. Updated every day from 3,400+ US stocks.</p>
+    </div>
+    <div class="rdl" id="rdl"><div class="rdl-load">&nbsp;</div></div>
+    <div class="cta-row" style="justify-content:center;margin-top:24px"><a class="btn btn-gold" href="/?pw=1&amp;go=1" id="rdl-cta">Unlock the whole radar &mdash; 7 days free &rarr;</a></div>
+  </div>
+</section>
 
 <section class="gridsec" id="features">
   <div class="wrap">
@@ -795,6 +833,46 @@ function renderScreener(){
   document.addEventListener("click",function(e){if(e.target&&e.target.id==="lang")setTimeout(renderScreener,0);});
 })();
 
+
+/* GRABIT RADAR på säljsidan: servern skickar bara EN aktie (teaser=1) —
+   resten av listan finns inte i sidan, bara antalet per kategori. */
+(function(){
+  var CATS={breakout:["🚀","BREAKOUT","UTBROTT"],momentum:["📈","MOMENTUM","MOMENTUM"],ai:["🧠","AI INFRA","AI-INFRA"],
+    quantum:["⚛️","QUANTUM","KVANT"],space:["🛰️","SPACE","RYMD"],rare:["🪨","RARE EARTH","RARE EARTH"],nuclear:["☢️","NUCLEAR","KÄRNKRAFT"]};
+  var COL={breakout:"#00e5ff",momentum:"#FFC940"};
+  var DATA=null;
+  function pct(v){return v==null?"—":(v>=0?"+":"")+(+v).toFixed(1)+"%";}
+  function esc(t){return String(t==null?"":t).replace(/[<>&"]/g,function(c){return{"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[c];});}
+  function why(k,it,sv){
+    if(k==="breakout")return (it.rel_vol!=null?it.rel_vol+"× "+(sv?"volym":"volume"):"")+(it.pct_from_high!=null?" · "+Math.abs(+it.pct_from_high).toFixed(1)+(sv?" % från toppen":"% from high"):"");
+    if(k==="momentum")return "RS "+(it.rs_rating||"—")+" · "+pct(it.ret_20)+" 20d";
+    return "RS "+(it.rs_rating||"—")+" · "+pct(it.ret_5)+" 5d";}
+  function ghost(n){var h="";for(var i=0;i<n;i++)h+='<div class="rdl-row ghost"><span class="lg">••</span><div class="mid"><div class="tk">••••<span>•••••••••</span></div><div class="why">RS •• · +••.•% 5d</div></div><span class="ch up">+•.•%</span></div>';return h;}
+  function render(){
+    var el=document.getElementById("rdl");if(!el)return;
+    var sv=document.documentElement.lang==="sv";
+    var h2=document.getElementById("rdl-h2"),sub=document.getElementById("rdl-sub"),cta=document.getElementById("rdl-cta");
+    if(h2)h2.innerHTML=sv?'Dagens lägen. <span class="hl">Före alla andra.</span>':'Today\'s setups. <span class="hl">Before everyone else.</span>';
+    if(sub)sub.textContent=sv?"Utbrott, momentum och de hetaste temana — AI-infra, kvant, rymd, rare earth och kärnkraft. Uppdateras varje dag från 3 400+ amerikanska aktier.":"Breakouts, momentum and the hottest themes — AI infra, quantum, space, rare earth and nuclear. Updated every day from 3,400+ US stocks.";
+    if(cta)cta.innerHTML=sv?"Lås upp hela radarn — 7 dagar gratis &rarr;":"Unlock the whole radar — 7 days free &rarr;";
+    if(DATA===false){el.style.display="none";return;}
+    if(!DATA)return;
+    var lockTxt=sv?"🔒 Lås upp med PRO":"🔒 Unlock with PRO";
+    el.innerHTML=DATA.cats.map(function(c){
+      var m=CATS[c.key];if(!m)return "";
+      var n=(c.items||[]).length+(c.hidden||0);
+      var rows=(c.items||[]).map(function(it){var up=(it.ret_1||0)>=0;
+        return '<div class="rdl-row"><span class="lg">'+esc(String(it.ticker).slice(0,2))+'</span><div class="mid"><div class="tk">'+esc(it.ticker)+'<span>'+esc(it.name||"")+'</span></div><div class="why">'+why(c.key,it,sv)+'</div></div><span class="ch '+(up?"up":"dn")+'">'+pct(it.ret_1)+'</span></div>';}).join("");
+      var hid=c.hidden?'<div class="rdl-lockwrap">'+ghost((c.items||[]).length?Math.min(c.hidden,2):1)+'<div class="rdl-lock"><a href="/?pw=1&amp;go=1">'+lockTxt+'</a></div></div>':"";
+      if(!n)rows='<div class="rdl-empty">'+(sv?"Inget läge just nu":"No setup right now")+'</div>';
+      return '<div class="rdl-cat" style="--rc:'+(COL[c.key]||"#00e5ff")+'"><div class="rdl-ch"><span class="em">'+m[0]+'</span><b>'+(sv?m[2]:m[1])+'</b><i>'+n+'</i></div>'+rows+hid+'</div>';
+    }).join("");
+  }
+  fetch("/api/radar_board?teaser=1",{cache:"no-store"}).then(function(r){if(!r.ok)throw 0;return r.json();})
+    .then(function(j){DATA=(j&&j.cats&&j.cats.length)?j:false;render();}).catch(function(){DATA=false;render();});
+  render();
+  document.addEventListener("click",function(e){if(e.target&&e.target.id==="lang")setTimeout(render,0);});
+})();
 /* Heroviden: tonad bakgrund bakom hela heron. Datorn får en liggande version
    (utsnitt ur mitten, uppskalad och skärpt), mobilen den stående. */
 (function(){var v=document.getElementById("herobg");if(!v)return;

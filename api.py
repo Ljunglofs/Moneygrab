@@ -3165,6 +3165,82 @@ def screen(themes: Optional[str] = Query(None, description="Komma-separerade tem
             "market": {"asof": _MKT["asof"], "tickers": len(_MKT["rows"])}, "rows": out}
 
 
+# ---- GRABIT RADAR: dagens lägen per kategori ------------------------
+_RADAR_THEMES = [("ai", "AI-infra"), ("quantum", "Quantum"), ("space", "Space"),
+                 ("rare", "Rare earth"), ("nuclear", "Nuclear/Energi")]
+
+
+def _rf(r, k, d=0.0):
+    try:
+        v = r.get(k)
+        return float(v) if v is not None else d
+    except Exception:
+        return d
+
+
+def _radar_ok(r):
+    """Likvid, i upptrend och inte på väg ner."""
+    if r.get("dollar_vol") is not None and _rf(r, "dollar_vol") < 5e6:
+        return False
+    if r.get("ema50") is None or _rf(r, "last") <= _rf(r, "ema50"):
+        return False
+    return not r.get("cooling") and str(r.get("label") or "").upper() not in ("BEAR", "AVSVALNING", "SVAG")
+
+
+def _radar_item(r):
+    rv = r.get("rank_rel_vol") if r.get("rank_rel_vol") is not None else r.get("rel_vol")
+    return {"ticker": r.get("ticker"), "name": r.get("name") or "", "last": r.get("last"),
+            "ret_1": r.get("ret_1"), "ret_5": r.get("ret_5"), "ret_20": r.get("ret_20"),
+            "rs_rating": r.get("rs_rating"), "rel_vol": round(float(rv), 1) if rv is not None else None,
+            "pct_from_high": r.get("pct_from_high"), "label": r.get("label"),
+            "score10": r.get("score10"), "spark": r.get("spark")}
+
+
+@cached(300)
+def _radar_board():
+    rows = [r for r in (scan_universe(None) or []) if _radar_ok(r)]
+    used = set()
+    cats = []
+    # Utbrott: nära 52-veckorstoppen på tydligt förhöjd volym.
+    bo = [r for r in rows if _rf(r, "pct_from_high", -99) >= -3 and _rf(r, "score10") >= 6
+          and _rf(r, "rank_rel_vol", _rf(r, "rel_vol")) >= 1.5]
+    bo.sort(key=lambda r: -_rf(r, "rank_rel_vol", _rf(r, "rel_vol")))
+    cats.append(("breakout", bo[:3]))
+    used |= {r["ticker"] for r in bo[:3]}
+    # Momentum: marknadens starkaste (RS-rating), fortfarande på väg upp.
+    mo = [r for r in rows if r["ticker"] not in used and _rf(r, "rs_rating") >= 85 and _rf(r, "ret_20") > 0]
+    mo.sort(key=lambda r: (-_rf(r, "rs_rating"), -_rf(r, "ret_20")))
+    cats.append(("momentum", mo[:3]))
+    used |= {r["ticker"] for r in mo[:3]}
+    # Teman: starkast relativ styrka inom temat.
+    for key, theme in _RADAR_THEMES:
+        want = set(UNIVERSE.get(theme, []))
+        th = [r for r in rows if r["ticker"] in want and r["ticker"] not in used]
+        th.sort(key=lambda r: (-_rf(r, "rs_rating"), -_rf(r, "ret_5")))
+        cats.append((key, th[:3]))
+    return {"asof": _MKT.get("asof"), "ts": int(time.time()),
+            "cats": [{"key": k, "items": [_radar_item(r) for r in items]} for k, items in cats]}
+
+
+@app.get("/api/radar_board")
+def radar_board(teaser: int = 0):
+    """GRABIT RADAR. teaser=1 (säljsidan): bara EN aktie visas, resten skickas
+    inte alls — bara hur många lägen varje kategori har."""
+    b = _radar_board()
+    if not teaser:
+        return b
+    shown = False
+    cats = []
+    for c in b["cats"]:
+        items = c["items"]
+        if not shown and items:
+            cats.append({"key": c["key"], "items": items[:1], "hidden": len(items) - 1})
+            shown = True
+        else:
+            cats.append({"key": c["key"], "items": [], "hidden": len(items)})
+    return {"asof": b["asof"], "ts": b["ts"], "cats": cats, "teaser": True}
+
+
 @app.get("/api/screener")
 def screener(f: str = "bull", limit: int = 40):
     """Ett screener-kort på hela marknaden: träffarna sorterade som i appen."""
