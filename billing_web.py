@@ -38,6 +38,10 @@ try:
 except Exception:                       # pragma: no cover
     requests = None
 
+# Stripes kundportal: kunden loggar in med sin mejl och kan avsluta, byta kort
+# och se kvitton. Skapad i Stripe (billing_portal.configuration, login_page).
+PORTAL_URL = os.getenv("STRIPE_PORTAL_URL", "https://billing.stripe.com/p/login/dRmdRb0ME5y5cyJ7ei4ZG00")
+
 _CODE_DAYS = int(os.getenv("PRO_CODE_DAYS", "365"))   # give-away/egna koder: 1 år
 _PAID_DAYS = int(os.getenv("PRO_PAID_DAYS", "2"))     # köp: kort, förnyas via status
 
@@ -61,8 +65,13 @@ _PRO_WELCOME_HTML = (
     "på NASDAQ 100 (US100). Han larmar bara när det finns ett riktigt entry-läge — inga låtsas-signaler.</p>"
     "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'><b>Slå på notiser</b> för att få "
     "robotens larm och signaler direkt — samt pris-, nyhets- och rapportlarm på aktierna i din portfölj.</p>"
-    "<p style='color:#8a93a3;font-size:12.5px;margin-top:16px'>Avsluta när som helst. Ingen finansiell "
-    "rådgivning.</p>"
+    "<p style='color:#e8edf5;font-size:14px;line-height:1.6;background:rgba(245,197,66,.08);"
+    "border:1px solid rgba(245,197,66,.35);border-radius:10px;padding:12px 14px'><b>Provperiod:</b> "
+    "de första 7 dagarna är gratis. Säger du inte upp inom 7 dagar <b>förnyas prenumerationen "
+    "automatiskt</b> och det valda priset dras, sedan varje period tills du säger upp. Du får ett "
+    "påminnelsemejl innan första dragningen. <a href='https://billing.stripe.com/p/login/dRmdRb0ME5y5cyJ7ei4ZG00' style='color:#F5C542'>Säg upp eller "
+    "hantera din prenumeration här</a> (logga in med den här mejladressen).</p>"
+    "<p style='color:#8a93a3;font-size:12.5px;margin-top:16px'>Ingen finansiell rådgivning.</p>"
     # --- English ---
     "<div style='border-top:1px solid rgba(255,255,255,.1);margin:20px 0'></div>"
     "<h2 style='color:#F5C542;margin:0 0 10px'>Welcome to GRABIT PRO</h2>"
@@ -79,7 +88,13 @@ _PRO_WELCOME_HTML = (
     "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'><b>Turn on notifications</b> to get the "
     "robot's alerts and signals instantly — plus price, news and earnings alerts on the stocks in your "
     "portfolio.</p>"
-    "<p style='color:#8a93a3;font-size:12.5px;margin-top:16px'>Cancel anytime. Not financial advice.</p>"
+    "<p style='color:#e8edf5;font-size:14px;line-height:1.6;background:rgba(245,197,66,.08);"
+    "border:1px solid rgba(245,197,66,.35);border-radius:10px;padding:12px 14px'><b>Free trial:</b> "
+    "the first 7 days are free. If you don't cancel within 7 days, the subscription <b>renews "
+    "automatically</b> and the selected price is charged, then every period until you cancel. We email "
+    "you a reminder before the first charge. <a href='https://billing.stripe.com/p/login/dRmdRb0ME5y5cyJ7ei4ZG00' style='color:#F5C542'>Cancel or manage your "
+    "subscription here</a> (log in with this email address).</p>"
+    "<p style='color:#8a93a3;font-size:12.5px;margin-top:16px'>Not financial advice.</p>"
     "<p style='color:#F5C542;font-weight:700;margin-top:14px'>Spot the setup. Ignore the noise.</p>"
     "<p style='color:#5b6675;font-size:12px;margin-top:16px;border-top:1px solid rgba(255,255,255,.08);"
     "padding-top:12px'>Frågor / Questions? <a href='mailto:support@grabitlabs.com' "
@@ -234,6 +249,57 @@ def _active_for_email(email: str) -> bool:
     return False
 
 
+def _trial_reminder(sub: dict) -> None:
+    """Påminnelsemejl innan första dragningen: när provperioden slutar, vad
+    som dras och hur man säger upp. Mejladressen sparades vid köpet."""
+    try:
+        sub_id = str(sub.get("id") or "")
+        ent = _load_ent()["subs"].get(sub_id) or {}
+        email = ent.get("email")
+        if not email:
+            print("[billing] provperiods-påminnelse: ingen mejl för", sub_id)
+            return
+        end = int(sub.get("trial_end") or 0)
+        import datetime as _dt
+        day = _dt.datetime.utcfromtimestamp(end).strftime("%Y-%m-%d") if end else ""
+        amt, per = "", ""
+        try:
+            it = ((sub.get("items") or {}).get("data") or [{}])[0]
+            pr = it.get("price") or {}
+            if pr.get("unit_amount") is not None:
+                amt = "%s kr" % format(int(pr["unit_amount"]) // 100, ",").replace(",", " ")
+            per = (pr.get("recurring") or {}).get("interval") or ""
+        except Exception:
+            pass
+        per_sv = {"month": "/mån", "year": "/år"}.get(per, "")
+        per_en = {"month": "/month", "year": "/year"}.get(per, "")
+        html = (
+            "<div style='font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:460px;margin:0 auto;"
+            "padding:24px;background:#0A0E12;color:#e8edf5;border-radius:14px'>"
+            "<h2 style='color:#F5C542;margin:0 0 10px'>Din provperiod slutar snart</h2>"
+            "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'>Din gratis provperiod av GRABIT PRO "
+            "slutar <b>%s</b>. Då förnyas prenumerationen automatiskt och <b>%s%s</b> dras från ditt kort.</p>"
+            "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'>Vill du inte fortsätta? Säg upp före "
+            "%s så dras ingenting: <a href='%s' style='color:#F5C542'>Säg upp eller hantera prenumerationen</a> "
+            "(logga in med den här mejladressen).</p>"
+            "<div style='border-top:1px solid rgba(255,255,255,.1);margin:18px 0'></div>"
+            "<h2 style='color:#F5C542;margin:0 0 10px'>Your trial ends soon</h2>"
+            "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'>Your free GRABIT PRO trial ends on "
+            "<b>%s</b>. The subscription then renews automatically and <b>%s%s</b> is charged to your card.</p>"
+            "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'>Don't want to continue? Cancel before "
+            "%s and nothing is charged: <a href='%s' style='color:#F5C542'>Cancel or manage your subscription</a> "
+            "(log in with this email address).</p>"
+            "<p style='color:#5b6675;font-size:12px;margin-top:16px'>Frågor / Questions? "
+            "<a href='mailto:support@grabitlabs.com' style='color:#F5C542'>support@grabitlabs.com</a></p></div>"
+        ) % (day, amt or "priset", per_sv, day, PORTAL_URL, day, amt.replace(" kr", "").join(["SEK ", ""]) if amt else "the price",
+             per_en, day, PORTAL_URL)
+        import accounts as _acc
+        _acc._send_email(email, "GRABIT PRO: din provperiod slutar %s / your trial ends %s" % (day, day), html)
+        print("[billing] provperiods-påminnelse skickad för", sub_id)
+    except Exception as e:
+        print("[billing] provperiods-påminnelse fel:", e)
+
+
 def _period_end(sub: dict):
     """Periodslut för en prenumeration. Sedan API-versionen 2025-03-31 ligger
     fältet på prenumerationsraderna, inte på själva prenumerationen."""
@@ -381,6 +447,11 @@ def register(app) -> None:
                      period_end=_period_end(obj))
             if str(obj.get("status", "")).lower() not in ("active", "trialing", "past_due"):
                 _revoke_extras(obj.get("id"))
+            handled = True
+
+        elif etype == "customer.subscription.trial_will_end":
+            # Stripe skickar detta 3 dagar innan provperioden slutar.
+            _trial_reminder(obj)
             handled = True
 
         elif etype == "customer.subscription.deleted":

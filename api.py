@@ -1319,9 +1319,12 @@ required to start the trial, but <b>no payment is taken during those 7 days</b>.
 <p>If you do <b>not</b> cancel before the trial ends, the subscription
 <b>automatically converts to a running subscription</b> and the selected price is
 charged — and then at the start of each new period until you cancel. If you cancel
-during the trial you are charged <b>nothing</b>. You can cancel at any time in the
-app or by emailing
-<a href="mailto:support@grabitlabs.com">support@grabitlabs.com</a>.</p>
+during the trial you are charged <b>nothing</b>. <b>You must cancel within 7 days
+yourself</b> if you don't want to continue. We email you a reminder a few days before
+the trial ends.</p>
+<p>You can cancel at any time via <a href="https://billing.stripe.com/p/login/dRmdRb0ME5y5cyJ7ei4ZG00">Stripe's customer portal</a> (log in
+with the email you used at checkout), via "Manage / cancel subscription" in the app,
+or by emailing <a href="mailto:support@grabitlabs.com">support@grabitlabs.com</a>.</p>
 <p>The trial is limited to one per customer.</p>
 
 <h2>4. Payment</h2>
@@ -1400,8 +1403,12 @@ de 7 dagarna</b>.</p>
 <p>Säger du <b>inte</b> upp före provperiodens slut övergår prenumerationen
 <b>automatiskt till ett löpande abonnemang</b> och det valda priset debiteras —
 därefter vid varje ny period tills du säger upp. Avslutar du under provperioden
-debiteras <b>ingenting</b>. Du kan avsluta när som helst i appen eller genom att
-mejla <a href="mailto:support@grabitlabs.com">support@grabitlabs.com</a>.</p>
+debiteras <b>ingenting</b>. <b>Du måste själv säga upp inom 7 dagar</b> om du inte
+vill fortsätta. Du får ett påminnelsemejl några dagar innan provperioden slutar.</p>
+<p>Du säger upp när som helst via <a href="https://billing.stripe.com/p/login/dRmdRb0ME5y5cyJ7ei4ZG00">Stripes kundportal</a> (logga in med
+mejladressen du angav vid köpet), via länken "Hantera / säg upp prenumeration" i
+appen, eller genom att mejla
+<a href="mailto:support@grabitlabs.com">support@grabitlabs.com</a>.</p>
 <p>Provperioden gäller en gång per kund.</p>
 
 <h2>4. Betalning</h2>
