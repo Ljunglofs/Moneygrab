@@ -6050,6 +6050,15 @@ html::before{
   box-shadow:0 0 16px -4px rgba(var(--nc),.35),inset 0 0 26px -16px rgba(var(--nc),.5)}
 /* Rubrikernas streck lyser starkare */
 .sect h2::before,.hm-bar{box-shadow:0 0 14px rgba(var(--nc),.9) !important}
+
+/* Marknadsbild bakom hela appen, kraftigt nedtonad (ligger under rutnätet) */
+html::after{background:
+  radial-gradient(700px 420px at 50% -8%,rgba(0,229,255,.10),transparent 70%),
+  linear-gradient(180deg,rgba(2,3,5,.80) 0%,rgba(2,3,5,.72) 45%,rgba(2,3,5,.84) 100%),
+  url('/market-bg.jpg') center 58%/cover no-repeat,#020305 !important}
+@media (max-width:599px){html::after{background:
+  linear-gradient(180deg,rgba(2,3,5,.86),rgba(2,3,5,.8) 50%,rgba(2,3,5,.9)),
+  url('/market-bg.jpg') 50% 60%/cover no-repeat,#020305 !important}}
 </style>
 <script id="radarboard-js">
 /* ===== GRABIT RADAR — dagens lägen per kategori =====
