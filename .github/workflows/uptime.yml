@@ -54,9 +54,12 @@ jobs:
               for name, url in [("Stripe månad", "https://buy.stripe.com/00w00ldzq9OlaqB6ae4ZG04"),
                                 ("Stripe år", "https://buy.stripe.com/cNifZjcvm1hP56h6ae4ZG05")]:
                   try:
+                      # Stripe svarar 200 för en aktiv länk. (Ordet "deactivated"
+                      # finns i Stripes egen sidkod även för aktiva länkar, så
+                      # det går inte att leta efter — gav falsklarm.)
                       st, body = get(url)
-                      if st != 200 or b"deactivated" in body.lower():
-                          fel.append("%s-länken fungerar inte" % name)
+                      if st != 200:
+                          fel.append("%s-länken svarar %s" % (name, st))
                   except Exception as e:
                       fel.append("%s-länken nås inte (%s)" % (name, str(e)[:60]))
               return fel
