@@ -1148,7 +1148,7 @@ var GRABIT_LANG = (function(){try{return localStorage.getItem("grabit_lang")||"e
 window.GRABIT_LANG = GRABIT_LANG;
 var _I18N_EXACT = {
 "Ny extrem möjlighet":"New extreme opportunity","Rädsla":"Fear","RÄDSLA":"FEAR","Extrem rädsla":"Extreme fear","EXTREM RÄDSLA":"EXTREME FEAR","Girighet":"Greed","GIRIGHET":"GREED","Extrem girighet":"Extreme greed","EXTREM GIRIGHET":"EXTREME GREED","GULD":"GOLD","Guld":"Gold","AI · MARKNADSLÄGE":"AI · MARKET OUTLOOK","MARKNADSLÄGE":"MARKET OUTLOOK","Laddar dagens läge…":"Loading today's outlook…","Laddar dagens läge...":"Loading today's outlook…",
-"Månad":"Month","År":"Year","/mån":"/mo","/år":"/yr","/månad":"/month","3 MÅN GRATIS":"3 MONTHS FREE","0 kr":"SEK 0","250 kr":"SEK 250","2250 kr":"SEK 2,250","Betalningen sker säkert via Google Play (appen) eller vår betalpartner (webben). Avsluta när som helst. Ingen finansiell rådgivning.":"Payment is handled securely by Google Play (in the app) or our payment partner (on the web). Cancel anytime. Not financial advice.","Spara 25%":"Save 25%","Fortsätt med PRO":"Continue with PRO","Har du en licensnyckel?":"Have a license key?","Betalningen är inte konfigurerad än.":"Checkout isn't set up yet.",
+"Månad":"Month","År":"Year","/mån":"/mo","/år":"/yr","/månad":"/month","3 MÅN GRATIS":"3 MONTHS FREE","0 kr":"$0","250 kr":"$24.99","2250 kr":"$224.99","Betalningen sker säkert via Google Play (appen) eller vår betalpartner (webben). Avsluta när som helst. Ingen finansiell rådgivning.":"Payment is handled securely by Google Play (in the app) or our payment partner (on the web). Cancel anytime. Not financial advice.","Spara 25%":"Save 25%","Fortsätt med PRO":"Continue with PRO","Har du en licensnyckel?":"Have a license key?","Betalningen är inte konfigurerad än.":"Checkout isn't set up yet.",
   // Nav
   "Översikt":"Overview","Daytrade":"Daytrade","Signaler":"Signals","Research":"Research",
   "Portfölj":"Portfolio","Smart":"Smart",
@@ -4372,16 +4372,18 @@ function setProPlan(p,btn){window._proPlan=p;var ps=document.querySelectorAll(".
    förnyelse och hur man avslutar. Krav vid abonnemang som förnyas själv. */
 function syncTrialText(p){var EN=(window.GRABIT_LANG==="en");
   var yr=(p==="annual");
-  var pris=yr?(EN?"SEK 2,250/year":"2 250 kr/år"):(EN?"SEK 250/month":"250 kr/mån");
+  var pris=yr?(EN?"$224.99/year":"2 250 kr/år"):(EN?"$24.99/month":"250 kr/mån");
   var a=document.getElementById("pw-after");
   if(a)a.textContent=(EN?("Then "+pris+". Cancel anytime."):("Sedan "+pris+". Avsluta när som helst."));
   var t=document.getElementById("pw-terms");
   if(t)t.innerHTML=EN
     ?("Free for 7 days. <b>Cancel within 7 days</b> if you don't want to continue &mdash; otherwise the subscription "
       +"<b>renews automatically</b> and <b>"+pris+"</b> is charged until you cancel. A payment card is required. "
+      +"You're charged in your local currency: "+(yr?"$224.99 · €206.99 · SEK 2,250/year":"$24.99 · €22.99 · SEK 250/month")+", tax included. "
       +"We email you a reminder before the first charge. <a href=\"https://billing.stripe.com/p/login/dRmdRb0ME5y5cyJ7ei4ZG00\" target=\"_blank\" rel=\"noopener\" style=\"color:inherit;text-decoration:underline\">Cancel anytime here</a>.")
     :("Gratis i 7 dagar. <b>Säg upp inom 7 dagar</b> om du inte vill fortsätta &mdash; annars <b>förnyas prenumerationen "
       +"automatiskt</b> och <b>"+pris+"</b> dras tills du säger upp. Betalkort krävs. "
+      +"Utanför Sverige debiteras du i din valuta ("+(yr?"$224.99 / €206.99 per år":"$24.99 / €22.99 per månad")+"), moms ingår. "
       +"Du får ett påminnelsemejl innan första dragningen. <a href=\"https://billing.stripe.com/p/login/dRmdRb0ME5y5cyJ7ei4ZG00\" target=\"_blank\" rel=\"noopener\" style=\"color:inherit;text-decoration:underline\">Säg upp när som helst här</a>.");}
 function _proSku(){return (window._proPlan==="annual")?"grabit_pro_annual":"grabit_pro_monthly";}
 async function buyPro(){
