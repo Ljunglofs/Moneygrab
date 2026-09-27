@@ -2152,6 +2152,71 @@ async def health():
     return {"status": "ok", "tickers": len(ALL_TICKERS), "yfinance": yf is not None}
 
 
+@app.get("/api/selftest")
+def selftest():
+    """Kontroll av allt som får pengar och inloggning att fungera. Anropas av
+    övervakningen (GitHub Actions) var 10:e minut, som larmar på Telegram om
+    något är fel. Visar bara ja/nej — aldrig själva nycklarna."""
+    chk = {}
+
+    def ok(name, cond, note=""):
+        chk[name] = {"ok": bool(cond), "note": note}
+
+    env = os.environ.get
+    # Betalning
+    pl, pla = env("STRIPE_PAYMENT_LINK", ""), env("STRIPE_PAYMENT_LINK_ANNUAL", "")
+    ok("stripe_link_monthly", pl.startswith("https://buy.stripe.com/"))
+    ok("stripe_link_annual", pla.startswith("https://buy.stripe.com/"))
+    ok("stripe_webhook_secret", env("STRIPE_WEBHOOK_SECRET", "").startswith("whsec_"))
+    ok("pro_token_secret", len(env("PRO_TOKEN_SECRET", "")) >= 16)
+    # Mejl (inloggningskod, välkomst, påminnelse)
+    frm = env("ACCOUNT_EMAIL_FROM", "")
+    ok("resend_key", bool(env("RESEND_API_KEY", "").strip()))
+    ok("email_from_own_domain", bool(frm) and "resend.dev" not in frm,
+       "" if frm and "resend.dev" not in frm else "avsändaren måste vara en verifierad egen domän")
+    try:
+        import accounts as _acc
+        html = _acc._CODE_HTML.replace("%s", "123456")
+        ok("login_code_mail", "123456" in html)
+    except Exception as e:
+        ok("login_code_mail", False, str(e)[:120])
+    try:
+        from billing_web import make_token, verify_token
+        ok("pro_token_roundtrip", bool(verify_token(make_token(days=1))))
+    except Exception as e:
+        ok("pro_token_roundtrip", False, str(e)[:120])
+    # Disk (prenumerationer, konton, besök)
+    try:
+        d = os.environ.get("DATA_DIR", ".")
+        tp = os.path.join(d, ".selftest")
+        with open(tp, "w") as f:
+            f.write(str(time.time()))
+        os.remove(tp)
+        ok("disk_writable", True)
+    except Exception as e:
+        ok("disk_writable", False, str(e)[:120])
+    # Data
+    rows = None
+    for k, v in list(_CACHE.items()):
+        if k[0] == "scan_universe" and k[1] in ((), (None,)):
+            rows = v[1]
+    ok("scanner_rows", rows is not None and len(rows) >= 500, "%s rader" % (len(rows) if rows else 0))
+    try:
+        import datetime as _dt
+        asof = _MKT.get("asof")
+        age = (_dt.date.today() - _dt.date.fromisoformat(asof)).days if asof else 99
+        ok("market_data_fresh", age <= 5, "senaste handelsdag %s" % asof)
+    except Exception as e:
+        ok("market_data_fresh", False, str(e)[:120])
+    rss = _rss_mb()
+    ok("memory", rss is None or rss < 1700, "%.0f MB" % (rss or 0))
+    critical = ("stripe_link_monthly", "stripe_link_annual", "stripe_webhook_secret", "pro_token_secret",
+                "resend_key", "email_from_own_domain", "login_code_mail", "pro_token_roundtrip", "disk_writable")
+    bad = [k for k in critical if not chk[k]["ok"]]
+    warn = [k for k in chk if k not in critical and not chk[k]["ok"]]
+    return {"ok": not bad, "fel": bad, "varningar": warn, "checks": chk, "ts": int(time.time())}
+
+
 @app.get("/api/robber/test")
 def robber_test():
     """Tvingar fram ett Telegram-testmeddelande. Oppna i webblasaren for att
