@@ -17,6 +17,23 @@
 </script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<script>
+/* Telefon med "Datorversion" påslagen i webbläsaren (följer med in i den
+   installerade appen): sidan ritas då 980 px bred och blir en smal remsa.
+   Då skalar vi upp sidan så att den fyller skärmen som vanlig mobilvy. */
+(function(){
+  function fit(){try{
+    var de=document.documentElement,sw=Math.min(screen.width,screen.height);
+    var touch=(navigator.maxTouchPoints||0)>0||(window.matchMedia&&matchMedia("(pointer:coarse)").matches);
+    if(!touch||sw>600){de.style.zoom="";return;}
+    var portrait=screen.height>=screen.width, dev=portrait?screen.width:screen.height;
+    var w=window.innerWidth;
+    if(w>dev*1.3){de.style.zoom=String(Math.round(w/dev*100)/100);de.classList.add("dt-forced");}
+    else{de.style.zoom="";de.classList.remove("dt-forced");}
+  }catch(e){}}
+  fit();window.addEventListener("resize",fit);document.addEventListener("DOMContentLoaded",fit);
+})();
+</script>
 <title>GRABIT</title>
 <meta name="theme-color" content="#000000">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -3732,11 +3749,11 @@ async function loadStockAI(tkr){
   slot.innerHTML="";slot.appendChild(card);
   let html="",_sent=null;
   try{const sR=await fetch(B+"/api/ai_setup/"+encodeURIComponent(tkr)+((window.GRABIT_LANG==="en")?"?lang=en":""),{cache:"no-store"});const sJ=await sR.json();
-    if(sJ&&sJ.text)html+='<div class="st-ai-row"><b>Setup</b><span>'+sJ.text.replace(/</g,"&lt;")+'</span></div>';}catch(e){}
-  try{const nR=await fetch(B+"/api/ai_news/"+encodeURIComponent(tkr)+((window.GRABIT_LANG==="en")?"?lang=en":""),{cache:"no-store"});const nJ=await nR.json();
+    if(sJ&&sJ.text)html+='<div class="st-ai-row"><b>Setup</b><span>'+sJ.text.replace(/^\s*#{1,6}[^\n]*\n+/gm,"").replace(/^\s*#{1,6}\s*/gm,"").replace(/\*\*/g,"").replace(/</g,"&lt;")+'</span></div>';}catch(e){}
+  try{const nR=await fetch(B+"/api/ai_news/"+encodeURIComponent(tkr)+"?name="+encodeURIComponent((NAMES&&NAMES[tkr])||"")+((window.GRABIT_LANG==="en")?"&lang=en":""),{cache:"no-store"});const nJ=await nR.json();
     if(nJ&&nJ.text){const sc=nJ.sentiment,lbl=sc==="pos"?"Positivt":sc==="neg"?"Negativt":sc==="neu"?"Neutralt":"";
       const col=sc==="pos"?"var(--pos)":sc==="neg"?"var(--neg)":"var(--mut)";
-      const clean=nJ.text.replace(/Stämpel:.*/i,"").replace(/Kategori:.*/i,"").replace(/</g,"&lt;").trim();_sent=sc;
+      const clean=nJ.text.replace(/\*\*/g,"").replace(/^\s*#{1,6}\s*/gm,"").replace(/(Stämpel|Stamp):.*/i,"").replace(/(Kategori|Category):.*/i,"").replace(/</g,"&lt;").trim();_sent=sc;
       const katH=nJ.category?' <span class="cat-badge">'+nJ.category.replace(/</g,"&lt;")+'</span>':'';
       html+='<div class="st-ai-row"><b>Nyheter '+(lbl?'<i style="font-style:normal;color:'+col+'">· '+lbl+'</i>':'')+katH+'</b><span>'+clean+'</span></div>';}}catch(e){}
   if(!html){

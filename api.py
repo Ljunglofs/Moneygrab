@@ -4175,14 +4175,35 @@ def _lang_instr(lang: str) -> str:
     return ""
 
 
+# Svar där modellen vägrar eller ställer motfrågor i stället för att skriva texten.
+# Sådant får aldrig visas för en kund — hellre ingen text alls.
+_AI_REFUSAL = _re.compile(
+    r"(I appreciate the request|I need to clarify|[Cc]ould you (please )?(confirm|clarify|provide)|"
+    r"I can(no|')t (help|provide|summari[sz]e)|I'm (not able|unable) to|Once you clarify|"
+    r"[Kk]an du (bekräfta|förtydliga)|[Jj]ag behöver (förtydliga|veta)|[Jj]ag kan inte (sammanfatta|hjälpa))")
+
+
+def _ai_clean(text: str) -> str:
+    """Tar bort markdown (rubriker, fetstil) som appen annars visar som råa tecken."""
+    t = _re.sub(r"(?m)^\s*#{1,6}[^\n]*\n+", "", (text or "") + "\n")
+    t = _re.sub(r"(?m)^\s*#{1,6}\s*", "", t)
+    t = t.replace("**", "").replace("__", "")
+    return _re.sub(r"[ \t]{2,}", " ", t).strip()
+
+
 def _ai_text(cache_key: str, system: str, user: str, max_tokens: int = 220, lang: str = "sv") -> str:
     """Generisk cachad Claude-text. Tom sträng om nyckel saknas/fel."""
     li = _lang_instr(lang)
     if li:
         cache_key = cache_key + ":en"
         system = (system or "") + li
+    system = (system or "") + (" Skriv ren text utan markdown (inga #, ** eller listor). "
+                               "Vägra aldrig och ställ aldrig motfrågor — skriv alltid texten utifrån det du fått.")
     if cache_key in _AI_TEXT_CACHE:
-        return _AI_TEXT_CACHE[cache_key]
+        hit = _AI_TEXT_CACHE[cache_key]
+        if not _AI_REFUSAL.search(hit or ""):
+            return _ai_clean(hit)
+        _AI_TEXT_CACHE.pop(cache_key, None)
     client = _anthropic_client()
     if client is None:
         _AI_LAST_ERR["err"] = "ANTHROPIC_API_KEY saknas eller klienten kunde inte skapas"
@@ -4195,6 +4216,10 @@ def _ai_text(cache_key: str, system: str, user: str, max_tokens: int = 220, lang
         resp = client.messages.create(**kw)
         text = "".join(getattr(b, "text", "") for b in resp.content
                        if getattr(b, "type", "") == "text").strip()
+        if _AI_REFUSAL.search(text):
+            print("AI vägrade/motfrågade, visas inte:", cache_key, text[:120])
+            return ""
+        text = _ai_clean(text)
         if text:
             _AI_TEXT_CACHE[cache_key] = text
             _AI_LAST_ERR["err"] = ""
@@ -4299,7 +4324,7 @@ def ai_daily(lang: str = "sv"):
 
 
 @app.get("/api/ai_news/{ticker}")
-def ai_news(ticker: str, lang: str = "sv"):
+def ai_news(ticker: str, lang: str = "sv", name: str = ""):
     """Svensk sammanfattning + stämpel av bolagets nyheter (kräver Alpaca-nycklar)."""
     tk = ticker.upper().strip()
     heads = []
@@ -4325,9 +4350,13 @@ def ai_news(ticker: str, lang: str = "sv"):
             "'Stämpel: Positivt' eller 'Stämpel: Negativt' eller 'Stämpel: Neutralt'\n"
             "'Kategori: X' där X är EN av: FDA, Kontrakt, Förvärv, Produktlansering, "
             "Rapport, Analytiker, Personal, Marknad, Övrigt — välj den som bäst matchar "
-            "huvudnyheten. Tolka bara rubrikerna, hitta inte på.")
+            "huvudnyheten. Tolka bara rubrikerna, hitta inte på. Rubrikerna är redan "
+            "hämtade för just den här aktien — de kan nämna andra bolag eller bolagets "
+            "fulla namn i stället för tickern. Lita på tickern och bolagsnamnet du får.")
+    nm = (name or "").strip()[:80]
+    who = "%s (%s)" % (tk, nm) if nm else tk
     txt = _ai_text("news:%s:%x" % (tk, hash(tuple(heads[:6])) & 0xffffff),
-                   sysp, "Aktie %s. Rubriker:\n- %s" % (tk, "\n- ".join(heads[:6])), 240, lang=lang)
+                   sysp, "Aktie %s. Rubriker:\n- %s" % (who, "\n- ".join(heads[:6])), 240, lang=lang)
     low = txt.lower()
     senti = "pos" if "positivt" in low else "neg" if "negativt" in low else "neu" if "neutralt" in low else ""
     _CAT_TAXONOMY = ["FDA", "Kontrakt", "Förvärv", "Produktlansering", "Rapport",
