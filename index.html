@@ -216,12 +216,24 @@ main{padding:16px 16px 110px}
 .scr-d{font-size:12px;color:#8a93a3;margin-top:6px;flex:1;line-height:1.35}
 .scr-pill{align-self:flex-start;margin-top:13px;font-size:11px;font-weight:800;letter-spacing:.03em;padding:6px 11px;border-radius:9px;border:1px solid;background:transparent}
 /* hetaste teman-hero (mockup) */
-.theme-hero{position:relative;overflow:hidden;margin-top:18px;padding:20px;min-height:152px;border-radius:18px;background-size:cover;background-position:right center;cursor:pointer;border:1px solid rgba(255,200,61,.2);box-shadow:0 8px 30px rgba(0,0,0,.5)}
+.theme-hero{position:relative;overflow:hidden;margin-top:18px;padding:20px;min-height:152px;border-radius:18px;cursor:pointer;border:1px solid rgba(255,200,61,.35);
+  background:radial-gradient(120% 140% at 100% 0%,rgba(0,229,255,.16),transparent 55%),radial-gradient(90% 120% at 80% 100%,rgba(255,200,61,.14),transparent 60%),
+    linear-gradient(rgba(0,229,255,.07) 1px,transparent 1px) 0 0/22px 22px,linear-gradient(90deg,rgba(0,229,255,.07) 1px,transparent 1px) 0 0/22px 22px,#0A0A0B;
+  box-shadow:0 8px 30px rgba(0,0,0,.5),0 0 26px -10px rgba(255,200,61,.45),inset 0 0 30px -18px rgba(0,229,255,.6);display:flex;align-items:center;gap:14px;transition:transform .15s,box-shadow .2s}
+.theme-hero:hover{box-shadow:0 8px 30px rgba(0,0,0,.5),0 0 34px -8px rgba(255,200,61,.6),inset 0 0 30px -14px rgba(0,229,255,.8)}
 .theme-hero:active{transform:scale(.99)}
-.th-k{font-size:11px;font-weight:800;letter-spacing:.12em;color:var(--gold2);margin-bottom:9px}
-.th-h{font-family:var(--disp);font-weight:700;font-size:30px;letter-spacing:.01em;line-height:1}
-.th-s{font-size:13px;color:#cdd5e1;margin-top:9px;max-width:60%}
-.th-pill{display:inline-block;margin-top:14px;font-size:11.5px;font-weight:800;letter-spacing:.03em;color:var(--gold2);border:1px solid rgba(255,200,61,.5);border-radius:10px;padding:7px 13px}
+.th-main{flex:1;min-width:0}
+.th-k{font-size:11px;font-weight:800;letter-spacing:.12em;color:var(--gold2);margin-bottom:9px;text-shadow:0 0 10px rgba(255,200,61,.55)}
+.th-h{font-family:var(--disp);font-weight:700;font-size:30px;letter-spacing:.01em;line-height:1;text-shadow:0 0 18px rgba(0,229,255,.35)}
+.th-s{font-size:13px;color:#cdd5e1;margin-top:9px}
+.th-pill{display:inline-block;margin-top:14px;font-size:11.5px;font-weight:800;letter-spacing:.03em;color:var(--gold2);border:1px solid rgba(255,200,61,.5);border-radius:10px;padding:7px 13px;box-shadow:0 0 12px -4px rgba(255,200,61,.6)}
+.th-tks{display:flex;flex-direction:column;gap:7px;flex:0 0 auto}
+.th-tk{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:118px;padding:7px 11px;border-radius:10px;border:1px solid rgba(0,229,255,.35);background:rgba(0,229,255,.06);font-weight:800;font-size:12.5px;box-shadow:0 0 12px -6px rgba(0,229,255,.8)}
+.th-tk b{color:#00e5ff;text-shadow:0 0 8px rgba(0,229,255,.7)}
+.th-tk i{font-style:normal;font-weight:700}
+.th-tk i.up{color:#00e5ff}.th-tk i.dn{color:#FF3B30}
+.th-go{flex:0 0 auto;color:var(--gold2);font-size:22px;opacity:.8}
+@media(max-width:420px){.th-tks{display:none}}
 .sm-h{font-weight:800;font-size:11px;letter-spacing:.05em;text-transform:uppercase;margin-bottom:9px}
 .sm-row{display:flex;align-items:center;gap:9px;padding:8px 0;cursor:pointer}
 .sm-t{font-weight:800;font-size:15px}
@@ -2464,6 +2476,17 @@ async function openRocketscan(s){
     ? '<div class="rk-miss">'+(EN?"Not measured: ":"Mäts inte: ")+j.saknas.join(" · ")+'</div>' : "";
   document.getElementById("scr-body").innerHTML=head+risk+krit+list+lock+miss;
 }
+// Hetaste temat: listar temats aktier i samma lista som screenerna.
+function openTheme(name){
+  const EN=window.GRABIT_LANG==="en";
+  const rows=_screenRows().filter(r=>r.theme===name).sort((a,b)=>(+b.score10||0)-(+a.score10||0)).slice(0,40);
+  $("#scr-title").textContent=name;
+  const list=rows.length?rows.map(r=>{const tk=r.ticker,sc=+r.score10||0,v=+r.ret_20||0;
+    return `<div class="scl-row" onclick="closeScreener();openStock('${tk}')">${lic(tk,34,scoreColor(sc))}<div class="scl-nm"><div class="scl-t">${tk} <span class="scl-rs" style="color:${v>=0?"#00e5ff":"#FF3B30"}">${v>=0?"+":""}${v.toFixed(1)}% · 20d</span></div><div class="scl-co">${NAMES[tk]||name}</div></div><div class="scl-sc" style="color:${scoreColor(sc)}">${sc.toFixed(1)}</div></div>`;
+  }).join(""):`<div class="scl-empty">${EN?"The scanner is loading — try again in a moment.":"Skannern laddar — försök igen om en stund."}</div>`;
+  $("#scr-body").innerHTML=`<div class="scl-head" style="border-color:#FFC83D55"><div class="scl-ic" style="color:#FFC83D;background:#FFC83D1a">${I.dot||""}</div><div class="scl-meta"><div class="scl-h">${name}</div><div class="scl-d">${EN?"Stocks in the hottest theme, best setup first":"Aktier i hetaste temat, bäst läge först"}</div></div><div class="scl-cnt" style="color:#FFC83D">${rows.length}</div></div>${list}`;
+  const el=document.getElementById("screener");el.classList.add("on");el.scrollTop=0;
+}
 function closeScreener(){document.getElementById("screener").classList.remove("on");}
 async function askGrabit(tkr,q){if(!q||!q.trim())return;if(!isPro()){if(window.showPaywall)showPaywall(null,true);return;}const ans=$("#ask-ans");ans.classList.add("on");
   ans.innerHTML="Grabit tänker…";
@@ -2846,7 +2869,10 @@ function renderScanner(s){
   const v=_gate(s.volume,1,x=>row(x.tkr,x.x.toFixed(1)+'x','var(--gold2)','var(--gold2)',true));
   window._screeners=s.screeners;
   const scr=s.screeners.map((c,i)=>{var _lk=(!isPro()&&(c.filt==="early"||c.filt==="risk"||c.filt==="rocket"));return `<div class="scr-card card${_lk?" pro-gated":""}"${_lk?" data-lock=\"PRO\"":""} style="--c:${c.c}" onclick="openScreener(${i})"><div class="scr-ic" style="color:${c.c};background:${c.c}1a;border-color:${c.c}55">${I[c.ic]||I.dot}</div><div class="scr-t">${c.n}</div><div class="scr-d">${c.d}</div><div class="scr-pill" style="color:${c.c};border-color:${c.c}66">${c.pill}</div></div>`;}).join("")+`<div class="scr-card card" style="--c:#FFC83D" onclick="openResearch()"><div class="scr-ic" style="color:#FFC83D;background:#FFC83D1a;border-color:#FFC83D55">${I.compass||I.dot}</div><div class="scr-t">Grabit Screen</div><div class="scr-d">Filtrera bolag — kurs, volym, tema</div><div class="scr-pill" style="color:#FFC83D;border-color:#FFC83D66">Egna filter</div></div>`;
-  const hero=!s.hot?"":`<div class="theme-hero" onclick="go('marknad')" style="background-image:linear-gradient(100deg,#0A0A0B 34%,rgba(10,10,11,.55) 58%,rgba(10,10,11,.1) 100%),url('${IMGS.rocket}')"><div class="th-k">HETASTA TEMAT JUST NU</div><div class="th-h">${s.hot.name}</div><div class="th-s">Snitt ${s.hot.avg>=0?"+":""}${s.hot.avg}% på 20 dagar</div><div class="th-pill">${s.hot.b} UTBROTT</div></div>`;
+  const hero=!s.hot?"":(()=>{const EN=window.GRABIT_LANG==="en",nm=String(s.hot.name).replace(/'/g,"\\'");
+    const tops=_screenRows().filter(r=>r.theme===s.hot.name).sort((a,b)=>(+b.ret_20||0)-(+a.ret_20||0)).slice(0,3)
+      .map(r=>{const v=+r.ret_20||0;return `<div class="th-tk"><b>${r.ticker}</b><i class="${v>=0?"up":"dn"}">${v>=0?"+":""}${v.toFixed(1)}%</i></div>`;}).join("");
+    return `<div class="theme-hero" onclick="openTheme('${nm}')"><div class="th-main"><div class="th-k">${EN?"HOTTEST THEME RIGHT NOW":"HETASTA TEMAT JUST NU"}</div><div class="th-h">${s.hot.name}</div><div class="th-s">${EN?"Avg":"Snitt"} ${s.hot.avg>=0?"+":""}${s.hot.avg}% ${EN?"over 20 days":"på 20 dagar"}</div><div class="th-pill">${s.hot.b} ${EN?(s.hot.b===1?"BREAKOUT":"BREAKOUTS"):"UTBROTT"}</div></div>${tops?`<div class="th-tks">${tops}</div>`:""}<div class="th-go">›</div></div>`;})();
   return `<div class="sect"><h2>Populära screeners</h2></div>
     <div class="scr-grid">${scr}</div>
     <div class="card scanner2"><div class="sc2-top"><span class="sc2-title">SEKTORSCANNER</span><span class="sc2-live"><i></i>Live</span></div><div class="sc2-body"><div class="sc2-radar">${radarSVG()}</div><div class="sc2-rows"><div class="sc2-row"><span class="sc2-ic" style="--c:#00e5ff"><svg viewBox="0 0 24 24" fill="none" stroke="#00e5ff" stroke-width="1.9"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.4" fill="#00e5ff" stroke="none"/><line x1="12" y1="2.5" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="21.5"/><line x1="2.5" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="21.5" y2="12"/></svg></span><span class="sc2-lbl">Bekräftade setups</span><b class="sc2-num" style="color:#00e5ff">${s.confirmed??"–"}</b></div><div class="sc2-row"><span class="sc2-ic" style="--c:#00e5ff"><svg viewBox="0 0 24 24" fill="none" stroke="#00e5ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-6 4 12 2-6h6"/></svg></span><span class="sc2-lbl">Tidiga signaler</span><b class="sc2-num" style="color:#00e5ff">${s.early??"–"}</b></div><div class="sc2-row"><span class="sc2-ic" style="--c:#FF3B30"><svg viewBox="0 0 24 24" fill="none" stroke="#FF3B30" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/><line x1="12" y1="8" x2="12" y2="12.5"/><circle cx="12" cy="16" r="0.7" fill="#FF3B30" stroke="none"/></svg></span><span class="sc2-lbl">Risk off</span><b class="sc2-num" style="color:#FF3B30">${s.riskCount??"–"}</b></div></div></div></div>
