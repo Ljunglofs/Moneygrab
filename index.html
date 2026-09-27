@@ -1568,6 +1568,31 @@ var _I18N_RULES = [
 ];
 /* Säljsidan, GEX-fliken och medlemskortet */
 Object.assign(_I18N_EXACT,{"Allt en trader behöver — i en app": "Everything a trader needs — in one app", "GEX-nivåer": "GEX levels", "NQ & Guld, varje dag": "NQ & Gold, every day", "Push när han rör marknaden": "Push when he moves markets", "Hela scannern & dagens lägen": "The full scanner & today's setups", "AI-analys på alla aktier": "AI analysis on every stock", "FDA-kalender": "FDA calendar", "Bio-beslut före marknaden": "Biotech decisions ahead of the market", "Politiker- & VD-köp": "Politician & CEO buys", "Community med traders": "Community of traders", "Indikatorer": "Indicators", "GRABIT för TradingView": "GRABIT for TradingView", "Starta 7 dagar gratis →": "Start 7 days free →", "NY": "NEW", "NYHET": "NEW", "GEX-nivåer för NQ & Guld": "GEX levels for NQ & Gold", "Call Wall, Put Wall och Gamma Flip — varje handelsdag": "Call Wall, Put Wall and Gamma Flip — every trading day", "GEX-nivåer NQ & Guld": "GEX levels NQ & Gold", "Call Wall, Put Wall & Gamma Flip varje dag": "Call Wall, Put Wall & Gamma Flip every day", "Push direkt när Trump rör marknaden": "Push the moment Trump moves markets", "Discord-community": "Discord community", "Setups & nivåer med andra traders": "Setups & levels with other traders", "GRABIT-indikatorer": "GRABIT indicators", "Flow Profile, CVD & GEX Levels för TradingView": "Flow Profile, CVD & GEX Levels for TradingView", "+ Screener, Ask Grabit, FDA-kalender, Insider Flow och push-larm": "+ Screener, Ask Grabit, FDA calendar, Insider Flow and push alerts", "7 dagar gratis": "7 days free", "i 7 dagar": "for 7 days", "Starta 7 dagar gratis": "Start 7 days free", "Ditt medlemskap": "Your membership", "Nivåer, setups och NASDAQ Robber": "Levels, setups and NASDAQ Robber", "NASDAQ Robber på Telegram": "NASDAQ Robber on Telegram", "Robotens larm direkt i Telegram": "The robot's alerts straight in Telegram", "GRABIT-indikatorer för TradingView": "GRABIT indicators for TradingView", "Skriv ditt TradingView-namn så lägger vi till dig": "Enter your TradingView username and we'll add you", "TradingView-namn": "TradingView username", "Skicka": "Send", "Villkor": "Terms", "Integritetspolicy": "Privacy"});
+/* Analysmotorns förklaringar, setups och exit-råd (breakout_engine.py) */
+Object.assign(_I18N_EXACT,{"Tight konsolidering":"Tight consolidation","Hyfsat tight range":"Fairly tight range",
+ "Nära 52v-topp (motstånd)":"Near 52w high (resistance)","Inom 15% från topp":"Within 15% of high",
+ "Volym-dry-up före utbrott":"Volume dry-up before breakout","Expansionsdag på volym":"Expansion day on volume",
+ "RSI i frisk styrkezon":"RSI in healthy strength zone","RSI överköpt":"RSI overbought","MACD stiger":"MACD rising",
+ "Daglig + vecka i linje":"Daily + weekly aligned","Sämre än index":"Weaker than the index","Sammandragen volatilitet":"Contracting volatility",
+ "Svag HTF-trend":"Weak higher-timeframe trend","Bas/flagga under motstånd":"Base/flag below resistance","Tidig vändning":"Early reversal",
+ "Ingen tydlig setup":"No clear setup","Ta hem del av vinst, dra upp stop hårt":"Take partial profit, tighten the stop",
+ "Dra upp stop (ATR-trail)":"Raise the stop (ATR trail)","Behåll, normal ATR-trail":"Hold, normal ATR trail","Rel.styrka":"Rel. strength",
+ "På 3-månadershögsta — leder marknaden":"At a 3-month high — leading the market",
+ "Parabolisk (>5 ATR på en vecka)":"Parabolic (>5 ATR in a week)","Utsträckt rörelse":"Extended move","RSI-divergens":"RSI divergence",
+ "MACD vänder ner":"MACD turning down","Lång övre vek":"Long upper wick","Lägre dagstoppar":"Lower daily highs","Kraftigt överköpt":"Heavily overbought"});
+_I18N_RULES.push(
+  [/^Stark setup( med stigande volym)?(?:\. Nästa nivå (.+?))?\.$/, function(_m,v,n){return "Strong setup"+(v?" with rising volume":"")+(n?". Next level "+n:"")+".";}],
+  [/^Avvakta bättre läge – ej bekräftad\.$/, "Wait for a better setup – not confirmed."],
+  [/^Hög relativ volym (.+)$/, "High relative volume $1"],
+  [/^Stigande volym (.+)$/, "Rising volume $1"],
+  [/^Svag volym (.+)$/, "Weak volume $1"],
+  [/^Nära \((.+)\)$/, "Near ($1)"]
+);
+/* Aktiekortets reservtext när AI:n inte svarar */
+Object.assign(_I18N_EXACT,{"Snabbfakta":"Quick facts","Obs":"Note",
+ "AI-texten kunde inte hämtas just nu – siffrorna ovan är live.":"The AI text couldn't be loaded right now – the numbers above are live.",
+ "AI-analysen kunde inte hämtas just nu – servern kan vara i kallstart. Dra ner för att uppdatera.":"The AI analysis couldn't be loaded right now – the server may be starting up. Pull down to refresh."});
+_I18N_RULES.push([/^(Grabit score .*)$/, function(m){return m.replace(/\bidag\b/,"today").replace("rel.volym","rel.vol").replace(/från 52v-topp/,"from 52w high");}]);
 function _i18nTx(str){
   if(GRABIT_LANG!=="en"||!str)return str;
   var lead=(str.match(/^\s*/)||[""])[0], tail=(str.match(/\s*$/)||[""])[0];
@@ -2027,7 +2052,7 @@ function stockData(tkr,live){live=live||{};
   const expl=(eng&&Array.isArray(eng.explain))?eng.explain:[];
   const bull=expl.filter(x=>+x[1]>0).slice(0,6);
   const risks=expl.filter(x=>+x[1]<0).slice(0,5).concat(((ex&&ex.reasons)||[]).map(t=>[t.charAt(0).toUpperCase()+t.slice(1),null])).slice(0,6);
-  const desc=live.desc||DESC[base]||(((live.name||NAMES[tkr])&&(live.name||NAMES[tkr])!==tkr?(live.name||NAMES[tkr])+" är noterat i "+land+". ":"Bolag noterat i "+land+". ")+(SECT[tkr]?"Verkar inom "+SECT[tkr]+". ":"")+"Fullständig bolagsbeskrivning hämtas…");
+  const desc=live.desc||(window.GRABIT_LANG==="en"?null:DESC[base])||(((live.name||NAMES[tkr])&&(live.name||NAMES[tkr])!==tkr?(live.name||NAMES[tkr])+" är noterat i "+land+". ":"Bolag noterat i "+land+". ")+(SECT[tkr]?"Verkar inom "+SECT[tkr]+". ":"")+"Fullständig bolagsbeskrivning hämtas…");
   const mcap=live.mcap!=null?fmtCap(+live.mcap):(live.mcapM!=null?fmtCap(+live.mcapM*1e6):"—");
   // KÖP kräver även ett bra läge: setup A/B och högst 15 % under 52-veckorstoppen.
   // En stark aktie i fel läge blir AVVAKTA med skälen utskrivna.
