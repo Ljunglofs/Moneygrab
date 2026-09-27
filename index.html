@@ -7,7 +7,7 @@
    Android-appen (referrer android-app://) och installerad app (standalone). */
 (function(){try{
   var q=location.search;
-  if(/[?&](app|pw)=/.test(q)){localStorage.setItem("grabit_seen_start","1");return;}
+  if(/[?&](app|pw|install)=/.test(q)){localStorage.setItem("grabit_seen_start","1");return;}
   if(localStorage.getItem("grabit_pro")==="1"||localStorage.getItem("grabit_seen_start"))return;
   if((document.referrer||"").indexOf("android-app://")===0)return;
   if(window.matchMedia&&matchMedia("(display-mode: standalone)").matches)return;
@@ -1641,6 +1641,7 @@ else _i18nBoot();
       </div>
       <div class="p4-cta">Starta 7 dagar gratis &#8594;</div>
     </div>
+    <div class="instbar" id="instbar" style="display:none"><span class="ib-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M12 7v7M9 11l3 3 3-3"/><path d="M10.5 18.5h3"/></svg></span><div class="ib-tx"><b id="ib-t">Installera GRABIT som app</b><i id="ib-s">Egen ikon på hemskärmen · öppnas i helskärm · push-larm</i></div><button class="ib-go" onclick="installApp()" id="ib-go">Installera</button><button class="ib-x" onclick="dismissInstall()" aria-label="Stäng">&#10005;</button></div>
     <div class="card d3card prem gold" id="today3" style="display:none"></div>
     <div id="newsbar"></div>
     <div id="trumpbar" style="display:none"></div>
@@ -4143,7 +4144,9 @@ async function loadRadarHistory(){
   let j=null;try{const r=await fetch(B+"/api/radar/history?limit=7",{cache:"no-store"});j=await r.json();}catch(e){}
   const rows=(j&&j.rader)||[];const st=(j&&j.stats)||{};
   const done=rows.filter(function(r){return r.utfall_pct!=null;});
-  if(!done.length){box.innerHTML="";return;}
+  // Fyra–fem mätningar säger ingenting statistiskt. Visa facit först när det
+  // finns minst 10 mätta lägen, så att siffran betyder något.
+  if(!done.length||(st.antal!=null&&st.antal<10)){box.innerHTML="";return;}
   const head=(st.traffprocent!=null)
     ? '<span class="rdh-stat">'+st.traffprocent+'% '+(EN?"hits":"träff")
       +' · '+(st.snitt_pct>=0?"+":"")+st.snitt_pct+'% '+(EN?"avg":"snitt")
@@ -6067,6 +6070,69 @@ try{loadRadarBoard();}catch(e){}
   background:linear-gradient(rgba(255,200,61,.055) 1px,transparent 1px) 0 0/26px 26px,linear-gradient(90deg,rgba(255,200,61,.055) 1px,transparent 1px) 0 0/26px 26px,
     radial-gradient(120% 70% at 0% 0%,rgba(255,200,61,.16),transparent 60%),linear-gradient(170deg,#12100a,#07070a) !important}
 @media (prefers-reduced-motion:reduce){.rb-radar i{animation:none}}
+</style>
+<script id="install-js">
+/* ===== Installera som app (PWA) =====
+   Android/Chrome/Edge: webbläsarens egen installationsruta. iPhone: instruktion
+   (Dela → Lägg till på hemskärmen). Visas inte när appen redan är installerad. */
+var _bip=null;
+function _isStandalone(){try{return matchMedia("(display-mode: standalone)").matches||navigator.standalone===true;}catch(e){return false;}}
+function _isIOS(){return /iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);}
+function _instLbl(){var EN=(window.GRABIT_LANG==="en"),t=document.getElementById("ib-t"),s=document.getElementById("ib-s"),g=document.getElementById("ib-go");
+  if(t)t.textContent=EN?"Install GRABIT as an app":"Installera GRABIT som app";
+  if(s)s.textContent=EN?"Own icon on your home screen · full screen · push alerts":"Egen ikon på hemskärmen · öppnas i helskärm · push-larm";
+  if(g)g.textContent=EN?"Install":"Installera";}
+function showInstallBar(force){
+  if(_isStandalone())return;
+  var dis=false;try{dis=localStorage.getItem("grabit_inst_x")==="1";}catch(e){}
+  if(dis&&!force)return;
+  var el=document.getElementById("instbar");if(!el)return;_instLbl();el.style.display="";}
+function dismissInstall(){try{localStorage.setItem("grabit_inst_x","1");}catch(e){}var el=document.getElementById("instbar");if(el)el.style.display="none";}
+window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();_bip=e;showInstallBar();});
+window.addEventListener("appinstalled",function(){_bip=null;var el=document.getElementById("instbar");if(el)el.style.display="none";});
+async function installApp(){
+  var EN=(window.GRABIT_LANG==="en");
+  if(_bip){try{_bip.prompt();await _bip.userChoice;}catch(e){}_bip=null;return;}
+  var ios=_isIOS(),mob=/android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent);
+  var steps=ios
+    ?(EN?["Tap the <b>Share</b> button <span class=\"is-k\">&#x2191;&#xFE0E;</span> at the bottom of Safari","Choose <b>Add to Home Screen</b>","Tap <b>Add</b> — GRABIT is now on your home screen"]
+        :["Tryck på <b>Dela</b>-knappen <span class=\"is-k\">&#x2191;&#xFE0E;</span> längst ner i Safari","Välj <b>Lägg till på hemskärmen</b>","Tryck <b>Lägg till</b> — nu ligger GRABIT på hemskärmen"])
+    :mob
+    ?(EN?["Tap the browser menu <span class=\"is-k\">&#8942;</span> (top right in Chrome)","Choose <b>Install app</b> or <b>Add to Home screen</b>","Confirm — GRABIT opens like an app"]
+        :["Tryck på webbläsarens meny <span class=\"is-k\">&#8942;</span> (uppe till höger i Chrome)","Välj <b>Installera app</b> eller <b>Lägg till på startskärmen</b>","Bekräfta — GRABIT öppnas som en app"])
+    :(EN?["Click the <b>install icon</b> at the right end of the address bar (Chrome/Edge)","Or open the browser menu and choose <b>Install GRABIT</b>","The desktop version opens in its own window"]
+        :["Klicka på <b>installera-ikonen</b> längst till höger i adressfältet (Chrome/Edge)","Eller öppna webbläsarens meny och välj <b>Installera GRABIT</b>","Desktopversionen öppnas i ett eget fönster"]);
+  var ov=document.createElement("div");ov.className="is-ov";ov.onclick=function(e){if(e.target===ov)ov.remove();};
+  ov.innerHTML='<div class="is-card"><div class="is-h">'+(EN?"Install GRABIT":"Installera GRABIT")+'</div>'
+    +'<div class="is-sub">'+(ios?(EN?"On iPhone you install it from Safari:":"På iPhone installerar du från Safari:"):(EN?"Takes 10 seconds:":"Tar 10 sekunder:"))+'</div>'
+    +steps.map(function(t,i){return '<div class="is-st"><span>'+(i+1)+'</span><p>'+t+'</p></div>';}).join("")
+    +'<button class="is-ok" onclick="this.closest(\'.is-ov\').remove()">'+(EN?"Got it":"Uppfattat")+'</button></div>';
+  document.body.appendChild(ov);
+}
+(function(){
+  var mob=/android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent);
+  if(mob)showInstallBar();
+  try{if(new URLSearchParams(location.search).get("install")==="1"){showInstallBar(true);setTimeout(installApp,600);}}catch(e){}
+})();
+</script>
+<style id="install-css">
+.instbar{display:flex;align-items:center;gap:10px;margin:10px 0 4px;padding:11px 12px;border-radius:15px;border:1px solid rgba(0,229,255,.55);
+  background:linear-gradient(rgba(0,229,255,.05) 1px,transparent 1px) 0 0/22px 22px,linear-gradient(90deg,rgba(0,229,255,.05) 1px,transparent 1px) 0 0/22px 22px,linear-gradient(110deg,rgba(0,229,255,.14),rgba(5,8,12,.9));
+  box-shadow:0 0 18px rgba(0,229,255,.25),inset 0 0 26px -14px rgba(0,229,255,.6)}
+.ib-ic{flex:none;width:38px;height:38px;border-radius:11px;display:grid;place-items:center;color:#00e5ff;border:1px solid rgba(0,229,255,.55);background:rgba(0,229,255,.08);box-shadow:0 0 12px rgba(0,229,255,.35)}
+.ib-ic svg{width:21px;height:21px}
+.ib-tx{flex:1;min-width:0}.ib-tx b{display:block;font-size:14px;color:#fff}.ib-tx i{display:block;font-style:normal;font-size:11px;color:var(--mut);margin-top:1px}
+.ib-go{flex:none;border:none;border-radius:10px;padding:9px 13px;font-weight:800;font-size:12.5px;color:#001116;cursor:pointer;background:linear-gradient(180deg,#7ff6ff,#00e5ff 55%,#00b8d4);box-shadow:0 0 14px rgba(0,229,255,.45)}
+.ib-x{flex:none;background:none;border:none;color:var(--mut);font-size:13px;cursor:pointer;padding:4px}
+.is-ov{position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,.72);backdrop-filter:blur(6px);display:flex;align-items:flex-end;justify-content:center}
+.is-card{width:100%;max-width:520px;background:linear-gradient(170deg,#0c141b,#05080c);border:1px solid rgba(0,229,255,.45);border-radius:22px 22px 0 0;padding:22px 20px 26px;box-shadow:0 -10px 50px rgba(0,229,255,.2)}
+.is-h{font-family:var(--disp);font-size:22px;font-weight:800;color:#fff}
+.is-sub{font-size:13px;color:var(--mut);margin:4px 0 14px}
+.is-st{display:flex;gap:12px;align-items:flex-start;margin:10px 0}
+.is-st>span{flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:13px;color:#001116;background:#00e5ff;box-shadow:0 0 10px rgba(0,229,255,.6)}
+.is-st p{font-size:14px;color:#dbe4ee;line-height:1.45;margin-top:3px}
+.is-k{display:inline-block;padding:0 6px;border:1px solid rgba(255,255,255,.25);border-radius:6px;font-weight:800}
+.is-ok{width:100%;margin-top:16px;padding:13px;border:none;border-radius:12px;font-weight:800;font-size:14px;color:#001116;background:linear-gradient(180deg,#7ff6ff,#00e5ff 55%,#00b8d4);cursor:pointer}
 </style>
 </body>
 </html>

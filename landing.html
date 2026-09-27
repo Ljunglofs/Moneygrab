@@ -103,13 +103,13 @@ h1 .hl{display:inline-block}
 
 /* Faktarad */
 .facts{position:relative;border-top:1px solid rgba(0,229,255,.14);border-bottom:1px solid rgba(0,229,255,.14);background:linear-gradient(180deg,rgba(0,229,255,.035),rgba(0,0,0,0))}
-.facts .wrap{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;padding:26px 20px}
+.facts .wrap{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;padding:26px 20px}
 .fact{text-align:center}
 .fact b{display:block;font-size:25px;font-weight:700;background:linear-gradient(180deg,#fff,#9befff);-webkit-background-clip:text;background-clip:text;color:transparent}
 .fact b.cyan{background:none;color:var(--neon);text-shadow:0 0 16px rgba(0,229,255,.55)}
 .fact b.gold{background:none;color:var(--gold);text-shadow:0 0 16px rgba(255,201,64,.5)}
 .fact span{font-size:13px;color:var(--mut)}
-@media (max-width:760px){.facts .wrap{grid-template-columns:repeat(2,1fr);gap:18px}.fact:last-child{grid-column:span 2}}
+@media (max-width:760px){.facts .wrap{grid-template-columns:repeat(2,1fr);gap:18px}}
 
 /* Sektioner */
 section{position:relative;padding:92px 0}
@@ -322,6 +322,20 @@ footer .socs{margin-left:auto;margin-right:18px}
 .facts:before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background-image:linear-gradient(rgba(0,229,255,.09) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,.09) 1px,transparent 1px);background-size:56px 56px;
   -webkit-mask-image:linear-gradient(90deg,transparent,#000 20%,#000 80%,transparent);mask-image:linear-gradient(90deg,transparent,#000 20%,#000 80%,transparent)}
 @media (prefers-reduced-transparency:reduce){.gridsec:before,.gridsec:after{display:none}}
+
+/* Mobil & desktop */
+.dv-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;max-width:900px;margin:26px auto 0}
+@media (max-width:760px){.dv-grid{grid-template-columns:1fr}}
+.dv-card{padding:24px;border-radius:22px;border:1px solid rgba(0,229,255,.55);
+  background:linear-gradient(rgba(0,229,255,.05) 1px,transparent 1px) 0 0/28px 28px,linear-gradient(90deg,rgba(0,229,255,.05) 1px,transparent 1px) 0 0/28px 28px,radial-gradient(120% 80% at 0% 0%,rgba(0,229,255,.14),transparent 60%),#05080c;
+  box-shadow:0 0 22px rgba(0,229,255,.25),inset 0 0 40px -22px rgba(0,229,255,.6);display:flex;flex-direction:column;gap:10px}
+.dv-card.gold{border-color:rgba(255,201,64,.65);background:linear-gradient(rgba(255,201,64,.05) 1px,transparent 1px) 0 0/28px 28px,linear-gradient(90deg,rgba(255,201,64,.05) 1px,transparent 1px) 0 0/28px 28px,radial-gradient(120% 80% at 0% 0%,rgba(255,201,64,.14),transparent 60%),#0a0805;
+  box-shadow:0 0 22px rgba(255,201,64,.25),inset 0 0 40px -22px rgba(255,201,64,.6)}
+.dv-ic{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;color:var(--neon);border:1px solid rgba(0,229,255,.55);background:rgba(0,229,255,.08);box-shadow:0 0 16px rgba(0,229,255,.4)}
+.dv-card.gold .dv-ic{color:var(--gold);border-color:rgba(255,201,64,.6);background:rgba(255,201,64,.08);box-shadow:0 0 16px rgba(255,201,64,.4)}
+.dv-ic svg{width:26px;height:26px}
+.dv-card h3{font-size:21px;margin-top:4px}.dv-card p{color:var(--mut);font-size:14.5px;line-height:1.55;flex:1}
+.dv-card .btn{align-self:flex-start;margin-top:6px}
 /* GRABIT RADAR (en aktie synlig, resten låst) */
 .rdl{max-width:760px;margin:26px auto 0;padding:20px;border-radius:22px;border:1px solid rgba(255,201,64,.7);
   background:linear-gradient(rgba(255,201,64,.05) 1px,transparent 1px) 0 0/28px 28px,linear-gradient(90deg,rgba(255,201,64,.05) 1px,transparent 1px) 0 0/28px 28px,radial-gradient(120% 70% at 0% 0%,rgba(255,201,64,.16),transparent 60%),linear-gradient(170deg,#12100a,#07070a);
@@ -442,6 +456,7 @@ footer .socs{margin-left:auto;margin-right:18px}
     <div class="fact"><b data-t="fa3">3,400+</b><span data-t="fa3s">US stocks scanned daily</span></div>
     <div class="fact"><b data-t="fa4">26 themes</b><span data-t="fa4s">AI, space, nuclear …</span></div>
     <div class="fact"><b class="gold" data-t="fa5">7 days</b><span data-t="fa5s">free to try</span></div>
+    <div class="fact"><a href="#devices" style="display:contents"><b class="cyan" id="fa6">App + Desktop</b><span id="fa6s">iPhone, Android &amp; computer</span></a></div>
   </div>
 </div>
 
@@ -454,6 +469,24 @@ footer .socs{margin-left:auto;margin-right:18px}
     </div>
     <div class="rdl" id="rdl"><div class="rdl-load">&nbsp;</div></div>
     <div class="cta-row" style="justify-content:center;margin-top:24px"><a class="btn btn-gold" href="/?pw=1&amp;go=1" id="rdl-cta">Unlock the whole radar &mdash; 7 days free &rarr;</a></div>
+  </div>
+</section>
+
+<section id="devices" style="padding-top:26px">
+  <div class="wrap">
+    <div class="center">
+      <div class="eyebrow" id="dv-e">Mobile &amp; desktop</div>
+      <h2 id="dv-h2">On your phone. <span class="hl">And on your desk.</span></h2>
+      <p class="sub" id="dv-sub">GRABIT is a real app on your phone and a full desktop version on your computer &mdash; same account, same PRO.</p>
+    </div>
+    <div class="dv-grid">
+      <div class="dv-card"><div class="dv-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M10.5 18.5h3"/></svg></div>
+        <h3 id="dv-m">Mobile app</h3><p id="dv-mp">Install GRABIT on your home screen in 10 seconds &mdash; iPhone and Android. Opens in full screen with push alerts. No app store needed.</p>
+        <a class="btn btn-gold" href="/?install=1" id="dv-mb">Install the mobile app &rarr;</a></div>
+      <div class="dv-card gold"><div class="dv-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="19" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
+        <h3 id="dv-d">Desktop version</h3><p id="dv-dp">A full desktop layout with side menu and more room for charts, screeners and levels. Switch between desktop and mobile view anytime.</p>
+        <a class="btn btn-ghost" href="/?app=1" id="dv-db">Open on desktop &rarr;</a></div>
+    </div>
   </div>
 </section>
 
@@ -834,6 +867,17 @@ function renderScreener(){
 })();
 
 
+
+/* Mobil & desktop-sektionen på svenska/engelska */
+(function(){
+  var T={sv:{"dv-e":"Mobil &amp; desktop","dv-h2":'I mobilen. <span class="hl">Och på skrivbordet.</span>',"dv-sub":"GRABIT är en riktig app i din telefon och en full desktopversion på datorn &mdash; samma konto, samma PRO.",
+    "dv-m":"Mobilapp","dv-mp":"Installera GRABIT på hemskärmen på 10 sekunder &mdash; iPhone och Android. Öppnas i helskärm med push-larm. Ingen appbutik behövs.","dv-mb":"Installera mobilappen &rarr;",
+    "dv-d":"Desktopversion","dv-dp":"En full desktoplayout med sidomeny och mer plats för grafer, screeners och nivåer. Växla mellan desktop- och mobilvy när du vill.","dv-db":"Öppna på datorn &rarr;","fa6":"App + desktop","fa6s":"iPhone, Android &amp; dator"},en:{}};
+  var EN0={};
+  function r(){var sv=document.documentElement.lang==="sv";Object.keys(T.sv).forEach(function(id){var el=document.getElementById(id);if(!el)return;
+    if(EN0[id]==null)EN0[id]=el.innerHTML;el.innerHTML=sv?T.sv[id]:EN0[id];});}
+  r();setTimeout(r,0);window.addEventListener("load",r);document.addEventListener("click",function(e){if(e.target&&e.target.id==="lang")setTimeout(r,0);});
+})();
 /* GRABIT RADAR på säljsidan: servern skickar bara EN aktie (teaser=1) —
    resten av listan finns inte i sidan, bara antalet per kategori. */
 (function(){
