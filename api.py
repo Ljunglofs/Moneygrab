@@ -852,20 +852,31 @@ def _visits_load():
             _VISITS = {}
     return _VISITS
 
-def _visit_note(request):
+_BOT_UA = ("bot", "crawl", "spider", "slurp", "externalhit", "preview", "go-http-client", "python",
+           "curl", "wget", "headless", "palo alto", "scan", "monitor", "playstore-google", "okhttp")
+
+
+def _visit_note(request, page="app"):
     try:
         import datetime as _dt
         ip = ((request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
               or (request.client.host if request.client else "?"))
         if ip.startswith("10.") or ip in ("127.0.0.1", "?"):
             return                       # interna hälsokollar räknas inte
+        ua = (request.headers.get("user-agent") or "").lower()
         day = _dt.date.today().isoformat()
+        if not ua or any(b in ua for b in _BOT_UA):
+            with _VISITS_LOCK:
+                d = _visits_load().setdefault(day, {"visningar": 0, "unika": []})
+                d["robotar"] = d.get("robotar", 0) + 1
+            return
         salt = os.environ.get("ROBBER_ADMIN_KEY", "grabit")
         h = _hashlib.sha256((ip + day + salt).encode()).hexdigest()[:16]
         with _VISITS_LOCK:
             v = _visits_load()
             d = v.setdefault(day, {"visningar": 0, "unika": []})
             d["visningar"] += 1
+            d[page] = d.get(page, 0) + 1          # visningar per sida (app / start)
             if h not in d["unika"]:
                 d["unika"].append(h)
             if len(v) > 60:              # behåll ~2 månader
@@ -1532,8 +1543,9 @@ def push_status():
 # Nya besökare på webben skickas hit från index.html. Måste registreras före
 # /{fname} nedan, annars fångar den routen /start och svarar 404.
 @app.get("/start", response_class=HTMLResponse)
-def start_page():
+def start_page(request: Request):
     import os
+    _visit_note(request, "start")
     p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "landing.html")
     with open(p, encoding="utf-8") as fh:
         return HTMLResponse(fh.read(), headers={"Cache-Control": "no-cache"})
@@ -4682,12 +4694,28 @@ def _malloc_trim():
 MEM_SOFT_MB = float(os.environ.get("MEM_SOFT_MB", "1450"))   # Standard-planen har 2 GB
 
 
+def _visits_log(days=7):
+    try:
+        with _VISITS_LOCK:
+            v = dict(_visits_load())
+        rows = []
+        for day in sorted(v)[-days:]:
+            d = v[day]
+            rows.append("%s: %d unika, %d visningar (app %d, säljsida %d), robotar %d" % (
+                day, len(d.get("unika", [])), d.get("visningar", 0), d.get("app", 0),
+                d.get("start", 0), d.get("robotar", 0)))
+        print("[besök] " + (" | ".join(rows) if rows else "inga besök registrerade än"))
+    except Exception as e:
+        print("[besök] fel:", e)
+
+
 def _mem_guard_loop():
     """Minnesvakt. Lämnar tillbaka frigjort minne till OS:et var 2:a minut
     (pandas och många trådar fragmenterar annars minnet så att det bara växer)
     och tömmer cacharna om processen närmar sig gränsen — hellre en långsammare
     sida en stund än att Render dödar servern (OOM)."""
     last_log = 0
+    last_log_once = [False]
     while True:
         time.sleep(120)
         try:
@@ -4709,6 +4737,8 @@ def _mem_guard_loop():
             elif time.time() - last_log > 1800:
                 last_log = time.time()
                 print("[minne] %.0f MB · %d cacheposter" % (rss, len(_CACHE)))
+                _visits_log(14 if not last_log_once[0] else 1)
+                last_log_once[0] = True
         except Exception as e:
             print("[minne] fel:", e)
 
