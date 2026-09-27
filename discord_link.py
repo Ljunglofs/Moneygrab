@@ -37,14 +37,69 @@ _LOCK = threading.Lock()
 APP_URL = os.environ.get("APP_URL", "https://grabitlabs.com").rstrip("/")
 
 
+_FOUND = {"guild": "", "role": "", "role_name": "", "t": 0.0, "err": ""}
+
+
+def _discover(bot: str) -> None:
+    """Hittar servern (boten är bara med på en) och PRO-rollen själv, så att
+    DISCORD_GUILD_ID och DISCORD_PRO_ROLE_ID inte behöver letas fram. Rollen
+    väljs efter namn: DISCORD_PRO_ROLE_NAME, annars en roll som heter/innehåller
+    "PRO"."""
+    if not bot or requests is None or time.time() - _FOUND["t"] < 300:
+        return
+    _FOUND["t"] = time.time()
+    h = {"Authorization": "Bot " + bot}
+    try:
+        gid = os.environ.get("DISCORD_GUILD_ID", "").strip()
+        if not gid:
+            gs = requests.get(API + "/users/@me/guilds", headers=h, timeout=15).json()
+            if isinstance(gs, list) and gs:
+                gid = str(gs[0]["id"])
+                if len(gs) > 1:
+                    _FOUND["err"] = "boten är med på flera servrar — sätt DISCORD_GUILD_ID"
+        if not gid:
+            _FOUND["err"] = "boten är inte med på någon server — bjud in den"
+            return
+        _FOUND["guild"] = gid
+        roles = requests.get("%s/guilds/%s/roles" % (API, gid), headers=h, timeout=15).json()
+        if not isinstance(roles, list):
+            _FOUND["err"] = "kunde inte läsa rollerna: %s" % str(roles)[:120]
+            return
+        want = os.environ.get("DISCORD_PRO_ROLE_NAME", "").strip().lower()
+        pick = None
+        for r in roles:
+            n = str(r.get("name", "")).strip().lower()
+            if (want and n == want) or (not want and n == "pro"):
+                pick = r
+                break
+        if not pick and not want:
+            cand = [r for r in roles if "pro" in str(r.get("name", "")).lower() and not r.get("managed")]
+            pick = cand[0] if len(cand) == 1 else None
+            if len(cand) > 1:
+                _FOUND["err"] = "flera roller innehåller PRO — sätt DISCORD_PRO_ROLE_NAME"
+        if pick:
+            _FOUND["role"], _FOUND["role_name"], _FOUND["err"] = str(pick["id"]), pick.get("name", ""), ""
+        elif not _FOUND["err"]:
+            _FOUND["err"] = "hittar ingen roll som heter PRO"
+    except Exception as ex:
+        _FOUND["err"] = str(ex)[:160]
+
+
 def _cfg():
     e = os.environ.get
+    bot = e("DISCORD_BOT_TOKEN", "").strip()
+    guild = e("DISCORD_GUILD_ID", "").strip()
+    role = e("DISCORD_PRO_ROLE_ID", "").strip()
+    if bot and not (guild and role):
+        _discover(bot)
+        guild = guild or _FOUND["guild"]
+        role = role or _FOUND["role"]
     return {
         "client_id": e("DISCORD_CLIENT_ID", "").strip(),
         "secret": e("DISCORD_CLIENT_SECRET", "").strip(),
-        "bot": e("DISCORD_BOT_TOKEN", "").strip(),
-        "guild": e("DISCORD_GUILD_ID", "").strip(),
-        "role": e("DISCORD_PRO_ROLE_ID", "").strip(),
+        "bot": bot,
+        "guild": guild,
+        "role": role,
         "redirect": e("DISCORD_REDIRECT_URI", "").strip() or APP_URL + "/api/pro/discord/callback",
     }
 
@@ -199,11 +254,17 @@ def _reconcile_loop():
 def register(app) -> None:
     from fastapi.responses import RedirectResponse
     threading.Thread(target=_reconcile_loop, daemon=True).start()
-    if enabled():
-        print("[discord] Anslut Discord är aktiverat")
-    else:
-        miss = [k for k, v in _cfg().items() if not v and k != "redirect"]
-        print("[discord] Anslut Discord inte aktiverat — saknar: " + ", ".join(miss))
+    def _boot_log():
+        time.sleep(15)
+        c = _cfg()
+        if enabled():
+            print("[discord] Anslut Discord är aktiverat (server %s, roll %s%s)"
+                  % (c["guild"], c["role"], (" '" + _FOUND["role_name"] + "'") if _FOUND["role_name"] else ""))
+        else:
+            miss = [k for k, v in c.items() if not v and k != "redirect"]
+            print("[discord] Anslut Discord inte aktiverat — saknar: " + ", ".join(miss)
+                  + ((" (" + _FOUND["err"] + ")") if _FOUND["err"] else ""))
+    threading.Thread(target=_boot_log, daemon=True).start()
 
     def _back(status: str):
         return RedirectResponse(APP_URL + "/?app=1&discord=" + status, status_code=302)
@@ -262,4 +323,6 @@ def register(app) -> None:
         cnt = {}
         for e in d.values():
             cnt[e.get("status", "?")] = cnt.get(e.get("status", "?"), 0) + 1
-        return {"enabled": enabled(), "links": cnt}
+        c = _cfg()
+        return {"enabled": enabled(), "links": cnt, "guild_found": bool(c["guild"]),
+                "role_found": bool(c["role"]), "role_name": _FOUND["role_name"], "problem": _FOUND["err"]}
