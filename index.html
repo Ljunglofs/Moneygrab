@@ -1553,7 +1553,6 @@ var _I18N_RULES = [
   [/^Perfekt entry-zon – volym ökar, trend upp\. Bevaka (.+)\.$/, "Perfect entry zone – volume rising, trend up. Watch $1."],
   [/^Avvakta bättre läge – ej bekräftad\. Stöd (.+)\.$/, "Wait for a better setup – not confirmed. Support $1."],
   [/^för (\d+) dgr sen$/, "$1 days ago"],
-  [/^(⚠️\s*)?Servern svarar inte — detta är EXEMPELDATA, inte live\. Försöker igen… \((\d+)\)$/, "$1The server isn't responding — this is SAMPLE DATA, not live. Retrying… ($2)"]
 ];
 /* Säljsidan, GEX-fliken och medlemskortet */
 Object.assign(_I18N_EXACT,{"Allt en trader behöver — i en app": "Everything a trader needs — in one app", "GEX-nivåer": "GEX levels", "NQ & Guld, varje dag": "NQ & Gold, every day", "Push när han rör marknaden": "Push when he moves markets", "Hela scannern & dagens lägen": "The full scanner & today's setups", "AI-analys på alla aktier": "AI analysis on every stock", "FDA-kalender": "FDA calendar", "Bio-beslut före marknaden": "Biotech decisions ahead of the market", "Politiker- & VD-köp": "Politician & CEO buys", "Community med traders": "Community of traders", "Indikatorer": "Indicators", "GRABIT för TradingView": "GRABIT for TradingView", "Starta 7 dagar gratis →": "Start 7 days free →", "NY": "NEW", "NYHET": "NEW", "GEX-nivåer för NQ & Guld": "GEX levels for NQ & Gold", "Call Wall, Put Wall och Gamma Flip — varje handelsdag": "Call Wall, Put Wall and Gamma Flip — every trading day", "GEX-nivåer NQ & Guld": "GEX levels NQ & Gold", "Call Wall, Put Wall & Gamma Flip varje dag": "Call Wall, Put Wall & Gamma Flip every day", "Push direkt när Trump rör marknaden": "Push the moment Trump moves markets", "Discord-community": "Discord community", "Setups & nivåer med andra traders": "Setups & levels with other traders", "GRABIT-indikatorer": "GRABIT indicators", "Flow Profile, CVD & GEX Levels för TradingView": "Flow Profile, CVD & GEX Levels for TradingView", "+ Screener, Ask Grabit, FDA-kalender, Insider Flow och push-larm": "+ Screener, Ask Grabit, FDA calendar, Insider Flow and push alerts", "7 dagar gratis": "7 days free", "i 7 dagar": "for 7 days", "Starta 7 dagar gratis": "Start 7 days free", "Ditt medlemskap": "Your membership", "Nivåer, setups och NASDAQ Robber": "Levels, setups and NASDAQ Robber", "NASDAQ Robber på Telegram": "NASDAQ Robber on Telegram", "Robotens larm direkt i Telegram": "The robot's alerts straight in Telegram", "GRABIT-indikatorer för TradingView": "GRABIT indicators for TradingView", "Skriv ditt TradingView-namn så lägger vi till dig": "Enter your TradingView username and we'll add you", "TradingView-namn": "TradingView username", "Skicka": "Send", "Villkor": "Terms", "Integritetspolicy": "Privacy"});
@@ -2089,19 +2088,7 @@ async function aiSend(q){q=q||document.getElementById("ai-q").value;if(!q||!q.tr
     const j=await res.json();aiHist[i]={r:"a",t:j.answer||j.text||JSON.stringify(j)};}
   catch(e){aiHist[i]={r:"a",t:(EN?"Couldn't reach Grabit right now. Please try again.":"Kunde inte nå Grabit just nu. Försök igen.")};}
   renderAI();}
-function demoAnswer(q){const s=q.toLowerCase();const hot=DEMO.hetaste;
-  // jämför två tickers om de nämns
-  const tks=Object.keys(NAMES);const found=q.toUpperCase().split(/[^A-Z.]+/).filter(w=>w.length>=2&&tks.includes(w));
-  if(found.length>=2){const a=stockData(found[0]),b=stockData(found[1]);const win=a.score>=b.score?a:b;
-    return `${a.name} (${found[0]}) har GRABIT-score ${a.score} (${a.verdict}), ${b.name} (${found[1]}) har ${b.score} (${b.verdict}).\n\n${win.name} ser starkare ut just nu – ${win.bos==='Bekräftad ↑'?'bekräftad trend':'bättre struktur'} och R/R 1:2.3.\n\n(Demo – koppla API:t för live-analys.)`;}
-  if(/(sannolik|högst|bäst setup|dagens setup|vilken.*setup|topp)/.test(s))
-    return `Av dagens lägen har ${NAMES[hot[0].tkr]} (${hot[0].tkr}) högst score: ${hot[0].score}, följt av ${NAMES[hot[1].tkr]} (${hot[1].score}) och ${NAMES[hot[2].tkr]} (${hot[2].score}).\n\n${hot[0].tkr}:s setup är bekräftad med R/R 1:2.3 och stigande relativ styrka.\n\n(Demo – koppla API:t så rankar Grabit på riktig scanner-data.)`;
-  if(/r\/r|risk.*reward|reward|3/.test(s))
-    return `Lägen med R/R över 3 i ditt universum (demo): RDW, USAR och ONDS. Övriga starka setups ligger kring 1:2.3.\n\nKoppla API:t så räknar Grabit R/R live på varje aktie utifrån stop och mål.`;
-  if(/(rör sig|idag|vinnare|hetast|marknad)/.test(s))
-    return `Marknaden är risk-off i dag (sentiment 34/100). Det som håller emot bäst: RDW, USAR och OKLO. Svagast: SIVE och QUBT.\n\nFokus på relativ styrka och blankningslägen tills trenden vänder.\n\n(Demo-data.)`;
-  return `Bra fråga! I demo-läge kan jag inte göra live-analys ännu. Koppla API_BASE till din Render-backend så svarar Grabit AI på riktigt – med din scanner, setups, nivåer och nyhetsläge för "${q}".`;}
-
+function demoAnswer(q){return (window.GRABIT_LANG==="en")?"Grabit AI isn't connected right now. Please try again in a moment.":"Grabit AI är inte ansluten just nu. Försök igen om en stund.";}
 let _curStock=null;const _liveStock={};const _liveFail={};
 function scoreGauge(score10){
   var s=Math.max(0,Math.min(10,+score10||0));
@@ -3130,7 +3117,7 @@ async function load(){
     flag.style.display="";
     // Servern svarar inte (deploy/kallstart) -- visa det TYDLIGT och forsok igen automatiskt
     window._loadRetries=(window._loadRetries||0)+1;
-    flag.textContent="\u26A0\uFE0F Servern svarar inte \u2014 detta \u00e4r EXEMPELDATA, inte live. F\u00f6rs\u00f6ker igen\u2026 ("+window._loadRetries+")";
+    flag.textContent=(window.GRABIT_LANG==="en")?"\u26A0\uFE0F Can't reach the server right now \u2014 retrying\u2026":"\u26A0\uFE0F Når inte servern just nu \u2014 f\u00f6rs\u00f6ker igen\u2026";
     flag.style.color="var(--neg)";
     if(window._loadRetries<=10)setTimeout(load,8000);
   }
@@ -4650,12 +4637,8 @@ function applySigFilter(){var box=document.getElementById("feed2");if(!box)retur
 
 /* ===== INSIDER FLOW (politiker + VD/insider + confluence) ===== */
 var IFLOWFILTER="allt";
-var _IFLOW_DEMO={items:[
-  {kind:"politiker",person:"Nancy Pelosi",role:"HOUSE",chamber:"HOUSE",party:"D-CA",ticker:"NVDA",name:"NVIDIA Corp",action:"KÖP",amount:"$1M – $5M",days_ago:2,confluence:true},
-  {kind:"politiker",person:"Tommy Tuberville",role:"SENATOR",chamber:"SENATE",party:"R-AL",ticker:"PLTR",name:"Palantir",action:"KÖP",amount:"$50K – $100K",days_ago:4,confluence:false},
-  {kind:"insider",person:"Jensen Huang",role:"INSIDER",ticker:"NVDA",name:"NVIDIA Corp",action:"KÖP",amount:"$2.1M",days_ago:3,confluence:true},
-  {kind:"politiker",person:"Ro Khanna",role:"HOUSE",chamber:"HOUSE",party:"D-CA",ticker:"AAPL",name:"Apple Inc",action:"SÄLJ",amount:"$15K – $50K",days_ago:6,confluence:false}
-],confluence_tickers:["NVDA"],has_congress:true,has_insider:true,demo:true};
+// Ingen exempeldata: når vi inte servern visas en tom lista, aldrig påhittade affärer.
+var _IFLOW_DEMO={items:[],confluence_tickers:[],has_congress:false,has_insider:false,offline:true};
 function _iflowInitials(n){var p=String(n||"").trim().split(/\s+/);return((p[0]||"")[0]||"")+((p[p.length-1]||"")[0]||"");}
 function _iflowAgo(d){d=+d||0;if(d<=0)return "Idag";if(d===1)return "Igår";return "för "+d+" dgr sen";}
 async function loadInsiderBox(){
@@ -4685,7 +4668,7 @@ async function loadInsiderBox(){
 }
 async function loadInsiderFlow(force){
   var box=document.getElementById("feed2");if(!box)return;
-  if(window.__IFLOW&&!force){renderInsiderFlow();return;}
+  if(window.__IFLOW&&!window.__IFLOW.offline&&!force){renderInsiderFlow();return;}
   if(!CONFIG.API_BASE){window.__IFLOW=_IFLOW_DEMO;renderInsiderFlow();return;}
   box.innerHTML='<div class="scl-empty">Laddar insider flow…</div>';
   try{
