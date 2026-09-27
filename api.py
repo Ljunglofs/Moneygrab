@@ -696,6 +696,18 @@ def _market_rescan():
             time.sleep(0.05)                      # släpp fram andra anrop
     _MKT.update(asof=asof, rows=rows, secs=round(time.time() - t0))
     print("Marknad: %d aktier skannade för %s på %ss" % (len(rows), asof, _MKT["secs"]))
+    # Nödfallback: finns ingen skanning alls än (inget snapshot, första
+    # Yahoo-skanningen pågår) svarar sidan med marknadsdatan i stället för att
+    # vara tom. Den riktiga skanningen ersätter den när den är klar.
+    if not any(k[0] == "scan_universe" and k[1] in ((None,), ()) for k in list(_CACHE)):
+        try:
+            tmp = [dict(r) for r in rows]
+            _rs_ratings(tmp)
+            for args in ((None,), ()):
+                _CACHE[("scan_universe", args)] = (time.time(), tmp)
+            print("[snapshot] nödfallback: %d rader från marknadsdatan tills skanningen är klar" % len(tmp))
+        except Exception as e:
+            print("[snapshot] nödfallback fel:", e)
     # Markera skanningen som inaktuell: nästa anrop får det gamla svaret direkt
     # och en ny skanning (med marknadsdatan) startar i bakgrunden.
     stale = time.time() - _CACHE_TTL.get("scan_universe", 600) - 1
@@ -794,11 +806,11 @@ def _scan_snapshot_load():
             j = json.load(f)
         rows = j.get("rows") or []
         if rows and time.time() - float(j.get("t", 0)) < 4 * 86400:
-            # "Gammal" men inte "död": städningen raderar poster äldre än
-            # TTL + CACHE_IDLE, och då skulle första anropet skanna synkront.
-            stale = time.time() - _CACHE_TTL.get("scan_universe", 600) - 1
+            # Markeras som färsk: uppvärmningen vid start skannar ändå direkt och
+            # ersätter den. (Som "inaktuell" skulle första besöket starta en
+            # andra, parallell skanning.)
             for args in ((None,), ()):
-                _CACHE[("scan_universe", args)] = (stale, rows)
+                _CACHE[("scan_universe", args)] = (time.time(), rows)
             print("[snapshot] %d rader inlästa från disk (%.0f min gamla)" % (len(rows), (time.time() - j["t"]) / 60))
     except FileNotFoundError:
         pass
