@@ -164,12 +164,18 @@ def _send_to(subs, title: str, body: str, url: str = "/", tag: str = "grabit") -
             sent += 1
         except WebPushException as ex:
             code = getattr(getattr(ex, "response", None), "status_code", 0)
-            if code in (404, 410):
+            # 404/410 = avregistrerad. Ogiltiga nycklar (ingen statuskod) går
+            # aldrig att skicka till — rensa dem också i stället för att
+            # försöka igen vid varje utskick.
+            if code in (404, 410) or (not code and "invalid" in str(ex).lower()):
                 dead.append(s.get("endpoint"))
             else:
                 err += 1
                 print(f"[push] fel ({code}): {str(ex)[:120]}")
         except Exception as ex:
+            if "invalid" in str(ex).lower() or "p256dh" in str(ex).lower():
+                dead.append(s.get("endpoint"))
+                continue
             err += 1
             print(f"[push] fel: {str(ex)[:120]}")
     if dead:
