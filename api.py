@@ -2272,6 +2272,11 @@ def selftest():
         ok("market_data_fresh", age <= 5, "senaste handelsdag %s" % asof)
     except Exception as e:
         ok("market_data_fresh", False, str(e)[:120])
+    try:
+        import discord_link
+        ok("discord_connect", discord_link.enabled(), "" if discord_link.enabled() else "Discord-variablerna saknas i Render")
+    except Exception as e:
+        ok("discord_connect", False, str(e)[:120])
     rss = _rss_mb()
     ok("memory", rss is None or rss < 1700, "%.0f MB" % (rss or 0))
     critical = ("stripe_link_monthly", "stripe_link_annual", "stripe_webhook_secret", "pro_token_secret",

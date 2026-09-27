@@ -70,6 +70,13 @@ try:
 except Exception as e:
     print(f"community kunde inte registreras (grabit kör vidare): {e}")
 
+# 2g) Anslut Discord: PRO-rollen delas ut och tas bort automatiskt.
+try:
+    import discord_link
+    discord_link.register(app)
+except Exception as e:
+    print(f"discord_link kunde inte registreras (grabit kör vidare): {e}")
+
 # 3) TESTENDPOINT — avfyra ett skarpt formaterat (men fejkat) Telegram-larm
 #    på begäran. Ligger på tvåsegments-väg så api.py:s catch-all /{fname}
 #    inte slukar den. Öppna i mobilen:

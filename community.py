@@ -236,7 +236,12 @@ def register(app) -> None:
         """Länkarna lämnas bara ut till PRO — utan token ingen inbjudan."""
         if not _is_pro(token):
             return {"pro": False}
-        return {"pro": True,
+        try:
+            import discord_link
+            dc = discord_link.enabled()
+        except Exception:
+            dc = False
+        return {"pro": True, "discord_connect": dc,
                 "discord": os.environ.get("DISCORD_INVITE_URL", _DISCORD_DEFAULT),
                 "telegram": os.environ.get("TELEGRAM_INVITE_URL", "")}
 

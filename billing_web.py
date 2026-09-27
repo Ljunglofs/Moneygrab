@@ -323,10 +323,19 @@ def _revoke_extras(sub_id) -> None:
         d = _load_ent()
         keys = [hashlib.sha256(cid.encode("utf-8")).hexdigest()[:16]
                 for cid, sid in d["cid2sub"].items() if sid == sub_id]
+        # Den som återställt PRO via mejl har en nyckel byggd på mejladressen.
+        em = (d["subs"].get(sub_id) or {}).get("email")
+        if em:
+            keys.append(hashlib.sha256(em.encode("utf-8")).hexdigest()[:16])
         if keys:
             import threading
             import community
             threading.Thread(target=community.revoke_for_keys, args=(keys,), daemon=True).start()
+            try:
+                import discord_link
+                threading.Thread(target=discord_link.revoke_for_keys, args=(keys,), daemon=True).start()
+            except Exception as e:
+                print("[billing] discord-revoke fel:", e)
     except Exception as e:
         print("[billing] revoke-fel:", e)
 

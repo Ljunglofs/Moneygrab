@@ -3523,7 +3523,14 @@ async function loadMemberHub(){
     var tok=encodeURIComponent(localStorage.getItem("grabit_token")||"");
     var j=await fetch(CONFIG.API_BASE.replace(/\/$/,"")+"/api/pro/community?token="+tok,{cache:"no-store"}).then(function(r){return r.json();});
     if(!j||!j.pro)return;
-    var d=document.getElementById("mh-discord");if(d&&j.discord)d.href=j.discord;
+    var d=document.getElementById("mh-discord");
+    if(d&&j.discord_connect){
+      // Anslut Discord: loggar in med Discord och får PRO-rollen direkt.
+      d.href=CONFIG.API_BASE.replace(/\/$/,"")+"/api/pro/discord/connect?token="+tok;d.removeAttribute("target");
+      var EN=(window.GRABIT_LANG==="en"),b=d.querySelector(".dc-tx b"),i=d.querySelector(".dc-tx i");
+      if(b)b.textContent=EN?"Connect Discord":"Anslut Discord";
+      if(i)i.textContent=EN?"Log in with Discord — you get the PRO role and all channels instantly":"Logga in med Discord — du får PRO-rollen och alla kanaler direkt";
+    }else if(d&&j.discord)d.href=j.discord;
     var t=document.getElementById("mh-tg");if(t&&j.telegram){t.href=j.telegram;t.style.display="flex";}
   }catch(e){}
   try{var n=localStorage.getItem("grabit_tv");if(n)_tvShow(n);}catch(e){}
@@ -6137,5 +6144,21 @@ async function installApp(){
 .is-k{display:inline-block;padding:0 6px;border:1px solid rgba(255,255,255,.25);border-radius:6px;font-weight:800}
 .is-ok{width:100%;margin-top:16px;padding:13px;border:none;border-radius:12px;font-weight:800;font-size:14px;color:#001116;background:linear-gradient(180deg,#7ff6ff,#00e5ff 55%,#00b8d4);cursor:pointer}
 </style>
+<script id="discord-return">
+/* Tillbaka från Discord-inloggningen: visa hur det gick. */
+(function(){try{
+  var st=new URLSearchParams(location.search).get("discord");if(!st)return;
+  var EN=(window.GRABIT_LANG==="en");
+  var M={ok:EN?"Discord connected — you now have the PRO role. Open Discord to see the channels.":"Discord anslutet — du har nu PRO-rollen. Öppna Discord för att se kanalerna.",
+    cancel:EN?"Discord connection cancelled.":"Discord-anslutningen avbröts.",
+    pro:EN?"You need active PRO to connect Discord.":"Du behöver aktiv PRO för att ansluta Discord.",
+    expired:EN?"The link expired — please try again.":"Länken hann gå ut — försök igen.",
+    off:EN?"Discord connection isn't switched on yet.":"Discord-anslutningen är inte påslagen än.",
+    error:EN?"Couldn't connect Discord right now — please try again or contact support@grabitlabs.com.":"Kunde inte ansluta Discord just nu — försök igen eller mejla support@grabitlabs.com."};
+  var msg=M[st]||M.error;
+  setTimeout(function(){(window.pToast||window.say||alert)(msg);},900);
+  try{history.replaceState(null,"",location.pathname+"?app=1");}catch(e){}
+}catch(e){}})();
+</script>
 </body>
 </html>
