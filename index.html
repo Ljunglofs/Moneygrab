@@ -840,8 +840,9 @@ body{background:
 .pulsimg{display:block;width:100%;max-width:158px;margin:6px auto 4px;-webkit-mask-image:radial-gradient(circle at 50% 50%,#000 60%,transparent 77%);mask-image:radial-gradient(circle at 50% 50%,#000 60%,transparent 77%)}
 /* AI-kort chip-grafik (foto ur mockup) */
 .aibrief{position:relative;overflow:hidden}
-.aichip-bg{position:absolute;right:0;bottom:0;width:46%;height:82%;background-size:cover;background-position:center right;
-  -webkit-mask-image:linear-gradient(135deg,transparent 28%,#000);mask-image:linear-gradient(135deg,transparent 28%,#000);opacity:.55;pointer-events:none;z-index:0}
+.aichip-bg{position:absolute;inset:0;background-size:cover;background-position:center 60%;opacity:.95;pointer-events:none;z-index:0}
+.aichip-bg::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(7,7,8,.78) 0%,rgba(7,7,8,.5) 50%,rgba(7,7,8,.22) 100%),linear-gradient(180deg,rgba(7,7,8,.35),transparent 35%,rgba(7,7,8,.45))}
+.aibrief>*:not(.aichip-bg){position:relative;z-index:1}
 .aibrief>.ai-h,.aibrief>p{position:relative;z-index:1}
 /* aktievy: sektionsgrafik (foton ur layoutkort-mockup) */
 .secgfx-wrap{position:relative;overflow:hidden}
@@ -2811,7 +2812,7 @@ function render(d){
   if($("#mkt-scroll"))$("#mkt-scroll").innerHTML=d.market.map(m=>{const c=m.chg>=0?"var(--pos)":"var(--neg)";const sc=m.chg>=0?"#00e5ff":"#FF4B4B";const hot=/bitcoin|btc/i.test(m.k)?" mkt-hot":"";
     return `<div class="mkt${hot}">${mktIcon(m.k)}<div class="mk">${m.k}</div><div class="mv num">${m.v}</div><div class="mc" style="color:${c}">${m.chg>=0?"+":""}${m.chg.toFixed(2)}%</div>${m.hist?`<div class="mkspark">${spark(m.hist,sc)}</div>`:""}</div>`;}).join("");
   // AI-sammanfattning
-  if($("#aibrief"))$("#aibrief").innerHTML=`<div class="aichip-bg" style="background-image:url('${IMGS.aichip}')"></div>`+(window._aiBriefHTML||`<div class="ai-h"><span class="dot2"></span>AI · Marknadsläge</div><p>${d.aiSummary}</p>`);
+  if($("#aibrief"))$("#aibrief").innerHTML=`<div class="aichip-bg" style="background-image:url('/market-bg.jpg')"></div>`+(window._aiBriefHTML||`<div class="ai-h"><span class="dot2"></span>AI · Marknadsläge</div><p>${d.aiSummary}</p>`);
   // tempmätare
   if($("#tempg")){const pim=IMGS.outlook;
     let gdiff=null;
@@ -3671,7 +3672,7 @@ async function loadDaily(){
   if(!B||typeof fetch==="undefined")return;
   const el=document.getElementById("aibrief");if(!el)return;
   const head='<div class="ai-h"><span class="dot2"></span>AI · Dagens läge</div>';
-  const chip='<div class="aichip-bg" style="background-image:url(\''+((typeof IMGS!=="undefined"&&IMGS.aichip)||'')+'\')"></div>';
+  const chip='<div class="aichip-bg" style="background-image:url(\'/market-bg.jpg\')"></div>';
   // show(html,true) sparar texten globalt så render() aldrig skriver över den med "Laddar…"
   const show=function(html,remember){if(remember)window._aiBriefHTML=html;el.innerHTML=chip+html;};
   try{

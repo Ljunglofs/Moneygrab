@@ -1051,6 +1051,9 @@ def _trump_label(): return _static_jpg("trump_label.jpg")
 @app.get("/trump-hero.jpg")
 def _trump_hero(): return _static_jpg("trump_hero.jpg")
 
+@app.get("/market-bg.jpg")
+def _market_bg(): return _static_jpg("market_bg.jpg")
+
 _MANIFEST = {
     "id": "/",
     "lang": "sv",
