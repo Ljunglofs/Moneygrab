@@ -898,6 +898,9 @@ def admin_besok(key: str = ""):
 
 # index.html: tillåt cache MEN revalidera varje gång (no-cache + ETag).
 # -> aterbesok = 304 (laddar direkt), efter deploy = ny ETag = farsk fil.
+_INDEX_MEM = {}
+
+
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
     import os
@@ -910,9 +913,17 @@ def index(request: Request):
     etag = f'W/"{int(st.st_mtime)}-{st.st_size}"'
     if request.headers.get("if-none-match") == etag:
         return Response(status_code=304, headers={"ETag": etag, "Cache-Control": "no-cache"})
-    with open(p, encoding="utf-8") as fh:
-        html = fh.read()
-    return HTMLResponse(html, headers={"ETag": etag, "Cache-Control": "no-cache"})
+    # Filen läses och gzip:as en gång per version, inte per besök (1,2 MB).
+    if _INDEX_MEM.get("etag") != etag:
+        import gzip as _gz
+        with open(p, "rb") as fh:
+            raw = fh.read()
+        _INDEX_MEM.update(etag=etag, raw=raw, gz=_gz.compress(raw, 6))
+    hdr = {"ETag": etag, "Cache-Control": "no-cache", "Vary": "Accept-Encoding"}
+    if "gzip" in (request.headers.get("accept-encoding") or ""):
+        return Response(_INDEX_MEM["gz"], media_type="text/html; charset=utf-8",
+                        headers=dict(hdr, **{"Content-Encoding": "gzip"}))
+    return Response(_INDEX_MEM["raw"], media_type="text/html; charset=utf-8", headers=hdr)
 
 
 # =====================================================================
@@ -2105,7 +2116,10 @@ def research(max_price: float = 15.0, min_relvol: float = 1.3,
 
 
 @app.get("/api/health")
-def health():
+async def health():
+    # async: körs direkt på event-loopen, inte i trådpoolen. Är poolen full av
+    # långsamma anrop (Yahoo, AI) svarar hälsokollen ändå, så Render inte
+    # startar om servern mitt i en besökstopp.
     return {"status": "ok", "tickers": len(ALL_TICKERS), "yfinance": yf is not None}
 
 
@@ -4565,14 +4579,74 @@ def _warmup_once():
         scan_universe(None)          # värmer /api/overview och /api/screen
     except Exception:
         pass
+    _gc.collect()
+    _malloc_trim()
 
 def _warmup_loop():
     while True:
         _warmup_once()
         time.sleep(480)              # uppdatera var 8:e min (cache-TTL = 10 min)
 
+def _rss_mb():
+    try:
+        with open("/proc/self/statm") as f:
+            return int(f.read().split()[1]) * os.sysconf("SC_PAGE_SIZE") / 1e6
+    except Exception:
+        return None
+
+
+def _malloc_trim():
+    try:
+        import ctypes
+        ctypes.CDLL("libc.so.6").malloc_trim(0)
+    except Exception:
+        pass
+
+
+MEM_SOFT_MB = float(os.environ.get("MEM_SOFT_MB", "1450"))   # Standard-planen har 2 GB
+
+
+def _mem_guard_loop():
+    """Minnesvakt. Lämnar tillbaka frigjort minne till OS:et var 2:a minut
+    (pandas och många trådar fragmenterar annars minnet så att det bara växer)
+    och tömmer cacharna om processen närmar sig gränsen — hellre en långsammare
+    sida en stund än att Render dödar servern (OOM)."""
+    last_log = 0
+    while True:
+        time.sleep(120)
+        try:
+            _gc.collect()
+            _malloc_trim()
+            rss = _rss_mb()
+            if rss is None:
+                continue
+            if rss > MEM_SOFT_MB:
+                keep = {k: v for k, v in list(_CACHE.items()) if k[0] == "scan_universe"}
+                n = len(_CACHE)
+                _CACHE.clear()
+                _CACHE.update(keep)
+                _PREFETCH.clear()
+                _gc.collect()
+                _malloc_trim()
+                print("[minne] %.0f MB > %.0f — tömde %d cacheposter, nu %.0f MB"
+                      % (rss, MEM_SOFT_MB, n - len(keep), _rss_mb() or -1))
+            elif time.time() - last_log > 1800:
+                last_log = time.time()
+                print("[minne] %.0f MB · %d cacheposter" % (rss, len(_CACHE)))
+        except Exception as e:
+            print("[minne] fel:", e)
+
+
 @app.on_event("startup")
 def _start_warmup():
+    # Fler trådar för vanliga (synkrona) anrop: standard är 40, och ett
+    # långsamt Yahoo- eller AI-anrop håller en tråd i flera sekunder.
+    try:
+        import anyio.to_thread
+        anyio.to_thread.current_default_thread_limiter().total_tokens = int(os.environ.get("THREADS", "100"))
+    except Exception as e:
+        print("Trådpool:", e)
+    _threading.Thread(target=_mem_guard_loop, daemon=True).start()
     _threading.Thread(target=_warmup_loop, daemon=True).start()
     _threading.Thread(target=_mcap_loop, daemon=True).start()
     _threading.Thread(target=_market_loop, daemon=True).start()
