@@ -168,14 +168,17 @@ def evaluate(df, bench_close=None):
         setup = "Ingen tydlig setup"
 
     # ---------- ENTRY ENGINE ----------
-    stop = round(min(low10, last - 1.8 * atr), 2)
+    # Stop under senaste 10 dagarnas botten, men aldrig längre bort än 2 ATR
+    # (efter en snabb uppgång ligger botten långt ner och ger ett orimligt stop)
+    # och aldrig närmare än 1 ATR (då slås man ut av vanligt brus).
+    stop = round(min(max(low10 - 0.1 * atr, last - 2.0 * atr), last - 1.0 * atr), 2)
     aggressive = round(last, 2)
     confirmed = round(resistance * 1.01, 2)
     retest = round(max(ema20, resistance * 0.99), 2)
     t1 = round(last + 2.0 * atr, 2)
     t2 = round(last + 3.5 * atr, 2)
     risk = last - stop
-    rr = round((t1 - last) / risk, 1) if risk > 0 else 0
+    rr = round((t2 - last) / risk, 1) if risk > 0 else 0   # mot slutmålet (mål 2)
 
     # ---------- EXIT ENGINE ----------
     ex = 0
