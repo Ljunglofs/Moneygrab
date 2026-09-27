@@ -1,0 +1,80 @@
+name: GRABIT uptime
+
+# Kollar var 10:e minut att sidan, betalningen och inloggningen fungerar.
+# Något fel -> larm till ägarens Telegram (samma bot som GEX-nivåerna).
+# Varje kontroll görs två gånger med 30 s mellanrum, så en deploy-omstart
+# inte ger falsklarm.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Kolla sidan, betalning och inloggning
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+        run: |
+          python3 - <<'PY'
+          import json, os, time, urllib.request
+
+          SITE = "https://grabitlabs.com"
+          API = "https://grabit-api-80dh.onrender.com"
+
+          def get(url, timeout=25):
+              req = urllib.request.Request(url, headers={"User-Agent": "grabit-uptime/1.0"})
+              with urllib.request.urlopen(req, timeout=timeout) as r:
+                  return r.status, r.read()
+
+          def once():
+              fel = []
+              for name, url, must in [
+                  ("Säljsidan", SITE + "/start", b"GRABIT"),
+                  ("Appen", SITE + "/?app=1", b"GRABIT"),
+                  ("API", API + "/api/health", b"ok"),
+              ]:
+                  try:
+                      st, body = get(url)
+                      if st != 200 or must not in body:
+                          fel.append("%s svarar %s" % (name, st))
+                  except Exception as e:
+                      fel.append("%s nås inte (%s)" % (name, str(e)[:80]))
+              try:
+                  st, body = get(API + "/api/selftest")
+                  j = json.loads(body)
+                  for k in j.get("fel", []):
+                      note = (j.get("checks", {}).get(k) or {}).get("note") or ""
+                      fel.append("Selftest: %s %s" % (k, note))
+              except Exception as e:
+                  fel.append("Selftest nås inte (%s)" % str(e)[:80])
+              for name, url in [("Stripe månad", "https://buy.stripe.com/00w00ldzq9OlaqB6ae4ZG04"),
+                                ("Stripe år", "https://buy.stripe.com/cNifZjcvm1hP56h6ae4ZG05")]:
+                  try:
+                      st, body = get(url)
+                      if st != 200 or b"deactivated" in body.lower():
+                          fel.append("%s-länken fungerar inte" % name)
+                  except Exception as e:
+                      fel.append("%s-länken nås inte (%s)" % (name, str(e)[:60]))
+              return fel
+
+          fel = once()
+          if fel:
+              time.sleep(30)
+              fel = once()           # bara det som är fel två gånger i rad räknas
+          if not fel:
+              print("Allt OK")
+              raise SystemExit(0)
+          msg = "🚨 GRABIT: något är fel\n\n" + "\n".join("• " + f for f in fel)
+          print(msg)
+          tok, chat = os.environ.get("TELEGRAM_TOKEN"), os.environ.get("CHAT_ID")
+          if tok and chat:
+              data = json.dumps({"chat_id": chat, "text": msg}).encode()
+              req = urllib.request.Request("https://api.telegram.org/bot%s/sendMessage" % tok, data=data,
+                                           headers={"Content-Type": "application/json"})
+              urllib.request.urlopen(req, timeout=20)
+          raise SystemExit(1)
+          PY

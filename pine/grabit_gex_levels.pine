@@ -17,7 +17,7 @@
 // runt 30900.
 //
 // SVAGA VÄGGAR: en vägg som knappt vinner över nästa strike på samma sida
-// ritas prickad och dämpad, märks "Call Wall ?" / "Put Wall ?", och ger inga
+// ritas prickad och dämpad, märks "Call Wall (weak)" / "Put Wall (weak)", och ger inga
 // larm. Kryssa ur "Show weak walls" för att dölja dem helt. Den 22 september
 // låg guldets två tyngsta callstrikes båda på 0,01 miljarder — vilken som vann
 // avgjordes av brus, och då ska nivån inte se lika säker ut som de andra.
@@ -155,8 +155,8 @@ f_code(string k, string tag, bool isSec) =>
     switch k
         "res"   => "Call Wall"
         "sup"   => "Put Wall"
-        "resw"  => "Call Wall ?"
-        "supw"  => "Put Wall ?"
+        "resw"  => "Call Wall (weak)"
+        "supw"  => "Put Wall (weak)"
         "res0"  => "Call Wall 0DTE"
         "sup0"  => "Put Wall 0DTE"
         "flip"  => "Zero Gamma"
@@ -295,8 +295,8 @@ if barstate.islast
         float pwS = f_lvl("sup")
         float cw = na(cwS) ? f_lvl("resw") : cwS
         float pw = na(pwS) ? f_lvl("supw") : pwS
-        string cwM = na(cwS) and not na(cw) ? " ?" : ""
-        string pwM = na(pwS) and not na(pw) ? " ?" : ""
+        string cwM = na(cwS) and not na(cw) ? " (weak)" : ""
+        string pwM = na(pwS) and not na(pw) ? " (weak)" : ""
         float zg = f_lvl("flip")
         bool  hasZ = not na(zg)
         bool  pos = hasZ and close > zg
