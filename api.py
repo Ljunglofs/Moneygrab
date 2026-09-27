@@ -789,7 +789,8 @@ def _scan_snapshot_save(rows):
         return
     try:
         import gzip as _gz
-        tmp = _SNAP_FILE + ".tmp"
+        import threading as _th
+        tmp = "%s.%d.%d.tmp" % (_SNAP_FILE, os.getpid(), _th.get_ident())   # unik per tråd
         with _gz.open(tmp, "wt") as f:
             json.dump({"t": time.time(), "rows": rows}, f)
         os.replace(tmp, _SNAP_FILE)
