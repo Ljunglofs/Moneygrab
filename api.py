@@ -4197,7 +4197,7 @@ def _ai_text(cache_key: str, system: str, user: str, max_tokens: int = 220, lang
     if li:
         cache_key = cache_key + ":en"
         system = (system or "") + li
-    system = (system or "") + (" Skriv ren text utan markdown (inga #, ** eller listor). "
+    system = (system or "") + (" Ingen markdown (inga # eller **). "
                                "Vägra aldrig och ställ aldrig motfrågor — skriv alltid texten utifrån det du fått.")
     if cache_key in _AI_TEXT_CACHE:
         hit = _AI_TEXT_CACHE[cache_key]
@@ -4358,11 +4358,13 @@ def ai_news(ticker: str, lang: str = "sv", name: str = ""):
     txt = _ai_text("news:%s:%x" % (tk, hash(tuple(heads[:6])) & 0xffffff),
                    sysp, "Aktie %s. Rubriker:\n- %s" % (who, "\n- ".join(heads[:6])), 240, lang=lang)
     low = txt.lower()
-    senti = "pos" if "positivt" in low else "neg" if "negativt" in low else "neu" if "neutralt" in low else ""
+    _st = _re.search(r"(?:stämpel|stamp|sentiment)\s*:\s*(\w+)", low)
+    _sw = _st.group(1) if _st else low
+    senti = "pos" if "positiv" in _sw else "neg" if "negativ" in _sw else "neu" if "neutral" in _sw else ""
     _CAT_TAXONOMY = ["FDA", "Kontrakt", "Förvärv", "Produktlansering", "Rapport",
                       "Analytiker", "Personal", "Marknad", "Övrigt"]
     _CAT_LOOKUP = {c.lower(): c for c in _CAT_TAXONOMY}
-    kat_m = _re.search(r"Kategori:\s*(\w+)", txt, _re.I)
+    kat_m = _re.search(r"(?:Kategori|Category):\s*(\w+)", txt, _re.I)
     kategori = _CAT_LOOKUP.get(kat_m.group(1).strip().lower(), "") if kat_m else ""
     return {"ticker": tk, "text": txt, "sentiment": senti, "headlines": heads[:6], "category": kategori}
 
