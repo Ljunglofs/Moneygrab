@@ -2132,13 +2132,9 @@ _BOOT = {"t": time.time(), "ready": False}
 
 @app.get("/api/health")
 async def health():
-    # Vid en deploy flyttar Render trafiken till den nya servern först när den
-    # svarar 200 här. Den nya servern svarar därför 503 tills första
-    # skanningen är klar (max 4 min) — så länge sköter den gamla servern alla
-    # besökare, och ingen märker bytet.
-    if not _BOOT["ready"] and time.time() - _BOOT["t"] < 240:
-        from fastapi.responses import JSONResponse
-        return JSONResponse({"status": "starting"}, status_code=503)
+    # OBS: tjänsten har en disk, och då stänger Render den gamla servern
+    # INNAN den nya startar (ingen överlappning). Hälsokollen ska därför svara
+    # direkt — att vänta på skanningen här förlänger bara avbrottet.
     # async: körs direkt på event-loopen, inte i trådpoolen. Är poolen full av
     # långsamma anrop (Yahoo, AI) svarar hälsokollen ändå, så Render inte
     # startar om servern mitt i en besökstopp.

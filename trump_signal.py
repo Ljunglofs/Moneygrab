@@ -88,6 +88,28 @@ def _load_posts() -> list:
         return []
 
 
+_SENT_FILE = os.path.join(_DATA_DIR, "trump_sent.json")
+
+
+def _load_sent() -> set:
+    try:
+        with open(_SENT_FILE) as f:
+            return set(json.load(f) or [])
+    except Exception:
+        return set()
+
+
+def _save_sent(ids) -> None:
+    try:
+        os.makedirs(_DATA_DIR, exist_ok=True)
+        tmp = _SENT_FILE + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(list(ids)[-1000:], f)
+        os.replace(tmp, _SENT_FILE)
+    except Exception as e:
+        print("[trump] kunde inte spara skickade:", e)
+
+
 def _save_posts(posts) -> None:
     try:
         os.makedirs(_DATA_DIR, exist_ok=True)
@@ -187,17 +209,31 @@ def poll_once(push=None) -> int:
         return 0
     with _lock:
         old = _load_posts()
-        seen = {p.get("id") for p in old}
+        sent0 = _load_sent()
+        seen = {p.get("id") for p in old} | sent0
         new = [p for p in fresh if p.get("id") not in seen]
         if new:
-            merged = new + old
+            # Utan sparade id:n (första körningen) är "nya" bara äldre inlägg
+            # som fallit ur listan — lägg dem sist, inte överst i flödet.
+            merged = (old + new) if (not sent0 and old) else (new + old)
             _save_posts(merged)
     if not new:
         return 0
-    # Första körningen (tom historik) -> pusha inte allt bakåt i tiden.
-    # Notis går till ALLA som slagit på notiser (ingen separat opt-in).
+    # Push bara inlägg vi ALDRIG har pushat förut. Historiken ovan håller bara
+    # 40 inlägg — äldre inlägg som föll ur listan såg annars nya ut och
+    # pushades igen och igen. Pushade id:n sparas separat (1000 st), och
+    # högst 2 notiser per varv, så ett fel aldrig kan bli en notisstorm.
+    with _lock:
+        sent = _load_sent()
+        first = not sent
+        to_push = [p for p in new if p.get("id") not in sent]
+        sent.update(p.get("id") for p in fresh)
+        _save_sent(sent)
+    if first:
+        to_push = []                              # första körningen: pusha inget bakåt i tiden
+    to_push = to_push[:2]
     if old:
-        for p in reversed(new):                 # äldsta först
+        for p in reversed(to_push):             # äldsta först
             body = p["text"][:140] + ("…" if len(p["text"]) > 140 else "")
             try:
                 if push:
