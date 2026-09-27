@@ -698,9 +698,10 @@ def _market_rescan():
     print("Marknad: %d aktier skannade för %s på %ss" % (len(rows), asof, _MKT["secs"]))
     # Markera skanningen som inaktuell: nästa anrop får det gamla svaret direkt
     # och en ny skanning (med marknadsdatan) startar i bakgrunden.
+    stale = time.time() - _CACHE_TTL.get("scan_universe", 600) - 1
     for k in [k for k in list(_CACHE) if k[0] == "scan_universe"]:
         try:
-            _CACHE[k] = (0.0, _CACHE[k][1])
+            _CACHE[k] = (stale, _CACHE[k][1])     # inte 0.0 — då raderar städningen posten
         except Exception:
             pass
 
@@ -762,6 +763,49 @@ def _slim(r):
 
 
 import gc as _gc
+
+# Senaste skanningen sparas på disken och läses in direkt vid start. Annars tar
+# det flera minuter efter varje omstart innan Översikt, screener, AI-läget
+# och radarn har data — och under den tiden såg sidan tom ut.
+_SNAP_FILE = os.path.join(os.environ.get("DATA_DIR", "."), "scan_snapshot.json.gz")
+
+
+def _scan_snapshot_save(rows):
+    # En misslyckad skanning (t.ex. när kurskällan är nere) får aldrig skriva
+    # över ett bra snapshot.
+    if not rows or len(rows) < 200:
+        return
+    try:
+        import gzip as _gz
+        tmp = _SNAP_FILE + ".tmp"
+        with _gz.open(tmp, "wt") as f:
+            json.dump({"t": time.time(), "rows": rows}, f)
+        os.replace(tmp, _SNAP_FILE)
+    except Exception as e:
+        print("[snapshot] kunde inte spara:", e)
+
+
+def _scan_snapshot_load():
+    """Lägg senaste skanningen i cachen som 'gammal' — första anropet svarar
+    direkt med den och en ny skanning startar i bakgrunden."""
+    try:
+        import gzip as _gz
+        with _gz.open(_SNAP_FILE, "rt") as f:
+            j = json.load(f)
+        rows = j.get("rows") or []
+        if rows and time.time() - float(j.get("t", 0)) < 4 * 86400:
+            # "Gammal" men inte "död": städningen raderar poster äldre än
+            # TTL + CACHE_IDLE, och då skulle första anropet skanna synkront.
+            stale = time.time() - _CACHE_TTL.get("scan_universe", 600) - 1
+            for args in ((None,), ()):
+                _CACHE[("scan_universe", args)] = (stale, rows)
+            print("[snapshot] %d rader inlästa från disk (%.0f min gamla)" % (len(rows), (time.time() - j["t"]) / 60))
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        print("[snapshot] kunde inte läsa:", e)
+
+
 SCAN_CHUNK = int(os.environ.get("SCAN_CHUNK", "40"))   # Starter 512MB-säkert. Mer RAM? Höj via env SCAN_CHUNK.
 
 @cached(600)
@@ -793,6 +837,7 @@ def scan_universe(theme_key: Optional[str] = None) -> list:
         out += [dict(r) for r in _MKT["rows"]]
     _rs_ratings(out)
     _enrich_rows(out)
+    _scan_snapshot_save(out)
     # Täckning per marknad — Yahoo blockar ibland moln-IP:n, och då tystnar
     # hela USA-delen utan att något syns i appen. Nu står det i loggen.
     try:
@@ -953,6 +998,12 @@ def _png(b64s):
 
 @app.get("/icon-192.png")
 def _icon192(): return _png(_ICON_192)
+
+@app.get("/favicon.ico")
+def _favicon(): return _png(_ICON_192)
+
+@app.get("/logo.png")
+def _logo(): return _png(_ICON_512)
 
 @app.get("/icon-512.png")
 def _icon512(): return _png(_ICON_512)
@@ -4828,6 +4879,7 @@ def _mem_guard_loop():
 
 @app.on_event("startup")
 def _start_warmup():
+    _scan_snapshot_load()
     # Fler trådar för vanliga (synkrona) anrop: standard är 40, och ett
     # långsamt Yahoo- eller AI-anrop håller en tråd i flera sekunder.
     try:

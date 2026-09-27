@@ -1159,7 +1159,7 @@ var _I18N_EXACT = {
   "Kommande event":"Upcoming events","Populära screeners":"Popular screeners","Snabbval":"Quick picks",
   "Sök externt":"Search externally","Teman":"Themes","Vinnare i dag":"Winners today","Nyheter":"News",
   // Förstasidan
-  "Marknadsläge":"Market sentiment","Dagens läge":"Today's outlook","AI · Dagens läge":"AI · Today's outlook",
+  "Marknadsläge":"Market sentiment","Dagens läge":"Today's outlook","AI · Dagens läge":"AI · Today's outlook","Most bullish · 5 dgr":"Most bullish · 5 days","AI · Marknadsläge":"AI · Market outlook","Laddar dagens läge…":"Loading today's outlook…",
   "AI-analys ›":"AI analysis ›","AI-ANALYS ›":"AI ANALYSIS ›","Fråga Grabit →":"Ask Grabit →",
   "Fråga Grabit":"Ask Grabit","Top movers":"Top movers","Vinnare":"Winners","Förlorare":"Losers",
   "Visa alla ›":"View all ›","Dagens Top Opportunity":"Today's Top Opportunity","VISA SETUP →":"SHOW SETUP →",
@@ -2799,7 +2799,7 @@ function render(d){
   if($("#catgrid"))$("#catgrid").innerHTML=THEMES.map((t,i)=>`<div class="cat" style="background-image:linear-gradient(to top,rgba(0,0,0,.97) 6%,rgba(0,0,0,.5) 42%,rgba(0,0,0,.12)),url('${THEME_IMG[t.key]||""}')" onclick="openCat(${i})"><div class="ci" style="color:${t.c}">${ICONS[t.key]||t.ic}</div><div class="cbottom"><div class="cn">${t.key}</div><div class="cc">${t.n} bolag</div><div class="cstatus" style="color:${t.c}">${THEME_STATUS[t.key]||""}</div></div></div>`).join("");
   if($("#winners")){$("#winners").innerHTML=_gate2(d.winners,qlist);if(window.applyProLocks)applyProLocks($("#winners"));}
   if($("#losers")){$("#losers").innerHTML=_gate2(d.losers,qlist);if(window.applyProLocks)applyProLocks($("#losers"));}
-  if($("#mostbullish-full")){var _mbl=d.bullish||[];$("#mostbullish-full").innerHTML=_mbl.length?_gate2(_mbl,qlist):'<div class="scl-empty">Inga aktier ≥5% på 5 dgr just nu.</div>';if(window.applyProLocks)applyProLocks($("#mostbullish-full"));}
+  if($("#mostbullish-full")){var _mbl=d.bullish||[];$("#mostbullish-full").innerHTML=_mbl.length?_gate2(_mbl,qlist):'<div class="scl-empty">'+((window.GRABIT_LANG==="en")?"No stocks up ≥5% over 5 days right now.":"Inga aktier ≥5% på 5 dgr just nu.")+'</div>';if(window.applyProLocks)applyProLocks($("#mostbullish-full"));}
   if($("#scanner")&&d.scanner){$("#scanner").innerHTML=renderScanner(d.scanner);if(window.applyProLocks)applyProLocks($("#scanner"));}
   /* Portföljen renderas nu av initPortfolio() (lokala innehav + live-kurser) */
 }
@@ -6019,7 +6019,8 @@ async function loadRadarBoard(){
   var el=document.getElementById("radarboard");if(!el)return;
   var B=CONFIG.API_BASE?CONFIG.API_BASE.replace(/\/$/,""):"";if(!B)return;
   var j=null;try{j=await fetch(B+"/api/radar_board",{cache:"no-store"}).then(function(r){return r.json();});}catch(e){}
-  if(!j||!j.cats){return;}
+  if(!j||!j.cats){window._rbTries=(window._rbTries||0)+1;if(window._rbTries<=6)setTimeout(loadRadarBoard,20000);return;}
+  window._rbTries=0;
   var EN=(window.GRABIT_LANG==="en"),pro=isPro(),free=0,html="";
   j.cats.forEach(function(c){
     var m=RB_CATS[c.key];if(!m)return;
