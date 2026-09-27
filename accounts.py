@@ -204,7 +204,12 @@ def register(app) -> None:
                         "n": (int(cur.get("n", 0)) + 1 if int(cur.get("h", -1)) == now // 3600 else 1)}
         codes = {k: v for k, v in codes.items() if int((v or {}).get("exp", 0)) > now - 3600}
         _save(_CODE_FILE, codes)
-        _send_email(email, "Din GRABIT-kod: " + code, _CODE_HTML % code)
+        # OBS: mallen innehåller %-tecken i CSS (max-width:80%) — använd replace,
+        # inte %-formatering (det kraschade inloggningen).
+        sent = _send_email(email, "Din GRABIT-kod: " + code, _CODE_HTML.replace("%s", code))
+        if not sent:
+            print("[accounts] kunde inte skicka inloggningskod till", email)
+            return {"ok": False, "error": "Kunde inte skicka mejlet just nu — försök igen om en stund."}
         return {"ok": True}
 
     @app.post("/api/account/verify")
