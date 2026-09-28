@@ -1507,6 +1507,7 @@ var _I18N_EXACT = {
   "Försvar/Drönare":"Defense/Drones",
   "Mjukvara/AI":"Software/AI",
   "Bio/Hälsa":"Bio/Health",
+  "✓ 0 kr i dag":"✓ $0 today","✓ Påminnelse före första dragningen":"✓ Reminder before the first charge","✓ Säg upp när du vill online":"✓ Cancel anytime online",
   "Finans/Betalning":"Finance/Payments","Räntor & betalflöden":"Rates & payment flows",
   "Stark tillväxt":"Strong growth",
   "Starkast nu":"Strongest now",
@@ -1815,6 +1816,7 @@ else _i18nBoot();
         <button type="button" class="pw-plan on" data-plan="monthly" onclick="setProPlan('monthly',this)"><span class="pp-t">Månad</span><span class="pp-p">250 kr<i>/mån</i></span></button>
         <button type="button" class="pw-plan" data-plan="annual" onclick="setProPlan('annual',this)"><span class="pp-badge">3 MÅN GRATIS</span><span class="pp-t">År</span><span class="pp-p">2250 kr<i>/år</i></span><span class="pp-save">Spara 25%</span></button>
       </div>
+      <div class="pw-trust"><span>&#10003; 0 kr i dag</span><span>&#10003; Påminnelse före första dragningen</span><span>&#10003; Säg upp när du vill online</span></div>
       <button class="pw-btn" onclick="buyPro()">Starta 7 dagar gratis <span class="pw-arrow">&#8594;</span></button>
       <div class="pw-terms" id="pw-terms">Gratis i 7 dagar. <b>Säg upp inom 7 dagar</b> om du inte vill fortsätta &mdash; annars
         <b>förnyas prenumerationen automatiskt</b> och 250 kr/mån dras tills du säger upp. Betalkort krävs.
@@ -6563,6 +6565,8 @@ async function installApp(){
 
 <style id="extras-css">
 /* ===== Fed-koll, rapporter, analytiker, hälsa, röst, portföljanalys ===== */
+.pw-trust{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 12px;font-size:11.5px;font-weight:700;color:#9fe9f7;margin:10px 0 8px}
+.pw-trust span{white-space:nowrap}
 .dh-fed{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;padding:8px 10px;border-radius:10px;margin-bottom:10px;
   background:rgba(178,107,255,.08);border:1px solid rgba(178,107,255,.4)}
 .dh-fed b{color:#d9b8ff;letter-spacing:.06em;font-size:10.5px}

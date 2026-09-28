@@ -380,6 +380,10 @@ header nav a{white-space:nowrap}
 .hero .pill{margin-top:0}
 .hero-grid>*{min-width:0}
 @media (max-width:560px){.topbar{font-size:12.5px}.launch{padding:10px 16px 10px 10px}}
+.trust{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;font-weight:700;color:#9fe9f7;margin:0 0 12px}
+.trust span{white-space:nowrap}
+.center .trust,.final .trust{justify-content:center}
+.price .trust{font-size:11.5px;gap:4px 10px;margin:4px 0 10px;color:#9aa4b2}
 </style>
 </head>
 <body>
@@ -415,6 +419,7 @@ header nav a{white-space:nowrap}
       <span class="pill"><b data-t="newb">NEW</b><span data-t="pill">GEX levels for NQ &amp; Gold</span></span>
       <h1>Spot the setup.<br><span class="hl">Ignore the noise.</span></h1>
       <p class="lead" data-t="lead"><b>GEX levels, The Trump Signal, insider buying, the FDA calendar, a screener and AI analysis</b> &mdash; everything a trader needs, in one app. Plus our own TradingView indicators and a community to trade with.</p>
+      <div class="trust" data-t="trust"><span>&#10003; $0 today</span><span>&#10003; Reminder before the first charge</span><span>&#10003; Cancel anytime online</span></div>
       <div class="cta-row">
         <a class="btn btn-gold" href="/?pw=1&amp;go=1" data-t="cta">Start 7 days free &rarr;</a>
         <a class="btn btn-ghost" href="/?pw=1&amp;go=1" data-t="explore">Get the app</a>
@@ -675,6 +680,7 @@ header nav a{white-space:nowrap}
         <div class="was" data-t="wm">From 1 Jan 2027: $49.99/mo</div><div class="amount" data-t="pma">$24.99 <small>/mo</small></div><div class="alt" data-t="pmalt">€22.99 · SEK 250 · billed in your local currency</div>
         
         <div class="trial" data-t="tr">7 days free</div>
+        <div class="trust" data-t="trust"><span>&#10003; $0 today</span><span>&#10003; Reminder before the first charge</span><span>&#10003; Cancel anytime online</span></div>
         <a class="btn btn-ghost" href="/?pw=1&amp;go=1&amp;plan=monthly" data-t="ctab">Start 7 days free</a>
         <ul><li data-t="l1">GEX levels NQ &amp; Gold</li><li>The Trump Signal</li><li data-t="l3">Insider Flow &amp; FDA calendar</li><li data-t="l4">Screener &amp; Ask Grabit</li><li data-t="l5">Indicators, Discord &amp; NASDAQ Robber</li></ul>
       </div>
@@ -684,6 +690,7 @@ header nav a{white-space:nowrap}
         <div class="was" data-t="wy">From 1 Jan 2027: $449.99/yr</div><div class="amount" data-t="pya">$224.99 <small>/yr</small></div><div class="alt" data-t="pyalt">€206.99 · SEK 2,250 · billed in your local currency</div>
         <div class="save" data-t="sv">Save 25% &middot; $18.75/mo</div>
         <div class="trial" data-t="tr">7 days free</div>
+        <div class="trust" data-t="trust"><span>&#10003; $0 today</span><span>&#10003; Reminder before the first charge</span><span>&#10003; Cancel anytime online</span></div>
         <a class="btn btn-gold" href="/?pw=1&amp;go=1&amp;plan=annual" data-t="ctab">Start 7 days free</a>
         <ul><li data-t="l6">Everything in Monthly</li><li data-t="l7">Three months free compared with monthly</li><li data-t="l8">One payment per year</li></ul>
       </div>
@@ -716,7 +723,8 @@ header nav a{white-space:nowrap}
     <div class="final">
       <h2 data-t="h2i">Ready to see the market <span class="hl">like the pros?</span></h2>
       <p class="sub" style="margin:0 auto" data-t="s8">Try GRABIT PRO free for 7 days. Everything included.</p>
-      <div class="cta-row" style="margin-top:26px">
+      <div style="margin-top:22px"><div class="trust" data-t="trust"><span>&#10003; $0 today</span><span>&#10003; Reminder before the first charge</span><span>&#10003; Cancel anytime online</span></div></div>
+      <div class="cta-row" style="margin-top:6px">
         <a class="btn btn-gold" href="/?pw=1&amp;go=1" data-t="cta">Start 7 days free &rarr;</a>
         <a class="btn btn-ghost" href="/?pw=1&amp;go=1" data-t="explore">Get the app</a>
       </div>
@@ -745,6 +753,7 @@ var SV={tb1:"Vi är live!",tb2:"Early access är öppet — halva priset till 31
  n1:"Funktioner",n2:"GEX-nivåer",n3:"Indikatorer",n4:"Priser",n5:"Frågor",openapp:"Logga in",try:"Prova gratis",
  newb:"NYTT",pill:"GEX-nivåer för NQ &amp; Guld",
  lead:"<b>GEX-nivåer, The Trump Signal, insiderköp, FDA-kalender, screener och AI-analys</b> &mdash; allt en trader behöver, samlat i en app. Plus våra egna indikatorer för TradingView och en community att handla med.",
+ trust:'<span>&#10003; 0 kr i dag</span><span>&#10003; Påminnelse före första dragningen</span><span>&#10003; Säg upp när du vill online</span>',
  cta:"Starta 7 dagar gratis &rarr;",explore:"Skaffa appen",fine:"<b>0 kr i 7 dagar</b> · sedan 250 kr/mån · <span class=\"campfine\">early access-pris till 31 dec</span> · förnyas automatiskt om du inte säger upp inom 7 dagar",
  cpill:"EARLY ACCESS-PRIS",ctext:"Halva priset till <b>31 december 2026</b>. Från 1 januari är ordinarie pris 500 kr/mån.",wm:"Från 1 jan 2027: 500 kr/mån",wy:"Från 1 jan 2027: 4 500 kr/år",offt:"−50 % till 31 dec",
  nqsub:"Nasdaq 100 (termin)",posg:"Positiv gamma · rörelser brukar dämpas",price:"Pris",ex:"Exempel",
