@@ -78,6 +78,14 @@ try:
 except Exception as e:
     print(f"daily_hub kunde inte registreras (grabit kör vidare): {e}")
 
+# 2i) Market extras: Fed-räntekoll, rapporthistorik, analytiker, finansiell
+#     hälsa, community-röst, portföljanalys och listor.
+try:
+    import market_extras
+    market_extras.register(app)
+except Exception as e:
+    print(f"market_extras kunde inte registreras (grabit kör vidare): {e}")
+
 # 2g) Anslut Discord: PRO-rollen delas ut och tas bort automatiskt.
 try:
     import discord_link

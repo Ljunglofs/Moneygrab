@@ -3096,7 +3096,13 @@ def breaking():
 @app.get("/api/theme")
 def theme_stocks(key: str = ""):
     """Hela ticker-listan för ett tema (kategori-sidan i Research)."""
-    return {"key": key, "tickers": UNIVERSE.get(key, [])}
+    # "Finans+Fintech/Krypto" = flera listor ihop i samma kategori.
+    out = []
+    for k in (key or "").split("+"):
+        for t in UNIVERSE.get(k.strip(), []):
+            if t not in out:
+                out.append(t)
+    return {"key": key, "tickers": out}
 
 
 # ---- Sektor-heatmap: dagens rörelse per sektor (ETF:er) ----------------------
