@@ -70,6 +70,14 @@ try:
 except Exception as e:
     print(f"community kunde inte registreras (grabit kör vidare): {e}")
 
+# 2h) Daily hub: före öppning, kvällsrapport, makroutfall, optionsflöden,
+#     short squeeze, smarta pengar och teknisk mätare per tidsram.
+try:
+    import daily_hub
+    daily_hub.register(app)
+except Exception as e:
+    print(f"daily_hub kunde inte registreras (grabit kör vidare): {e}")
+
 # 2g) Anslut Discord: PRO-rollen delas ut och tas bort automatiskt.
 try:
     import discord_link

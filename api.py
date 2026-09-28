@@ -3147,7 +3147,12 @@ def sectors():
 
 @app.get("/api/macro")
 def macro():
-    ev = _macro_events()
+    ev = [dict(e) for e in (_macro_events() or [])]
+    try:
+        import daily_hub as _hub
+        _hub.merge_actuals(ev)          # utfall när siffran publicerats
+    except Exception:
+        pass
     out = {"events": ev}
     if not ev and _MACRO_LAST_GOOD.get("err"):
         out["fel"] = _MACRO_LAST_GOOD["err"]
@@ -6219,11 +6224,25 @@ def _morning_push_once():
         p = None
     if p:
         kort += "\nTop Opportunity: %s (%s)" % (p.get("ticker"), p.get("score"))
+    # Premarket-rörelser + egen rad per prenumerant om deras bevakade aktier.
+    try:
+        import daily_hub as _hub
+        pm = _hub.premarket_line()
+        if pm:
+            kort += "\n" + pm
+    except Exception:
+        _hub = None
     if not kort.strip():
         return
-    PN.send_all("GRABIT · Morgonbrief", kort, url="/", tag="grabit-morgon")
     st["morgonbrief"] = today
     _daily_push_save(st)
+    try:
+        if _hub is None:
+            raise RuntimeError("hub saknas")
+        _hub.personal_send("GRABIT · Morgonbrief", kort, tag="grabit-morgon", sess="pre")
+    except Exception as e:
+        print("Personlig morgonbrief föll tillbaka:", e)
+        PN.send_all("GRABIT · Morgonbrief", kort, url="/", tag="grabit-morgon")
 
 
 def _next_earnings_date(tk):

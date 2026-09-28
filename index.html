@@ -1699,6 +1699,7 @@ else _i18nBoot();
     </div>
     <div class="instbar" id="instbar" style="display:none"><span class="ib-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M12 7v7M9 11l3 3 3-3"/><path d="M10.5 18.5h3"/></svg></span><div class="ib-tx"><b id="ib-t">Installera GRABIT som app</b><i id="ib-s">Egen ikon på hemskärmen · öppnas i helskärm · push-larm</i></div><button class="ib-go" onclick="installApp()" id="ib-go">Installera</button><button class="ib-x" onclick="dismissInstall()" aria-label="Stäng">&#10005;</button></div>
     <div class="card d3card prem gold" id="today3" style="display:none"></div>
+    <div id="dailyhub"></div>
     <div id="newsbar"></div>
     <div id="trumpbar" style="display:none"></div>
     <div class="gexnews" onclick="go('daytrade')" role="button" aria-label="GEX-nivåer för NQ och Guld"><span class="gn-new">NYHET</span><div class="gn-tx"><b>GEX-nivåer för NQ &amp; Guld</b><i>Call Wall, Put Wall och Gamma Flip &mdash; varje handelsdag</i></div><span class="gn-ar">&#8594;</span></div>
@@ -1755,6 +1756,7 @@ else _i18nBoot();
     <div id="search-res"></div>
     <div id="discover">
       <div id="scanner"></div>
+      <div id="proscan"></div>
       <div class="sect"><h2>Kategorier</h2></div>
       <div class="catgrid" id="catgrid"></div>
       <div class="sect" id="cat-list-sect" style="display:none"><h2 id="cat-list-title">Tema</h2><a onclick="clearCat()">Rensa</a></div>
@@ -3906,10 +3908,11 @@ function macroRows(rows){
     var impPill=imp?'<span class="mev-imp '+imp+'">'+impLbl+'</span>':'';
     var est=e.forecast?'<span class="mev-v">'+(EN?"Est":"Prog")+'<b>'+String(e.forecast).replace(/</g,"&lt;")+'</b></span>':'';
     var prev=e.previous?'<span class="mev-v">'+(EN?"Prev":"Föreg")+'<b>'+String(e.previous).replace(/</g,"&lt;")+'</b></span>':'';
+    var act=e.actual?'<span class="mev-v act">'+(EN?"Actual":"Utfall")+'<b>'+String(e.actual).replace(/</g,"&lt;")+'</b></span>':'';
     return '<div class="mev"><div class="mev-dt"><b>'+String(e.date||"").toUpperCase()+'</b><span>'+(e.time||"")+'</span></div>'
       +'<div class="mev-body"><div class="mev-top"><span class="mev-flag">'+flagSvg(e.country)+'</span>'
       +'<span class="mev-nm">'+String(e.title||"").replace(/</g,"&lt;")+'</span></div>'
-      +'<div class="mev-meta">'+impPill+est+prev+'</div></div></div>';
+      +'<div class="mev-meta">'+impPill+act+est+prev+'</div></div></div>';
   }).join("");
 }
 function macroPanel(rows){
@@ -6238,5 +6241,303 @@ async function installApp(){
   try{history.replaceState(null,"",location.pathname+"?app=1");}catch(e){}
 }catch(e){}})();
 </script>
+<style id="hub-css">
+/* ===== DAGSNAVET: före öppning · öppet · kvällsrapport ===== */
+#dailyhub{margin-top:14px}
+.dh{position:relative;overflow:hidden;border-radius:18px;padding:15px 15px 13px;
+  background:radial-gradient(120% 90% at 100% 0%,rgba(0,229,255,.10),transparent 60%),
+    linear-gradient(rgba(0,229,255,.05) 1px,transparent 1px) 0 0/22px 22px,linear-gradient(90deg,rgba(0,229,255,.05) 1px,transparent 1px) 0 0/22px 22px,#07080a;
+  border:1px solid rgba(0,229,255,.45);box-shadow:0 0 26px -10px rgba(0,229,255,.55),inset 0 0 26px -18px rgba(0,229,255,.7)}
+.dh.eve{border-color:rgba(255,200,61,.5);box-shadow:0 0 26px -10px rgba(255,200,61,.5),inset 0 0 26px -18px rgba(255,200,61,.6);
+  background:radial-gradient(120% 90% at 100% 0%,rgba(255,200,61,.10),transparent 60%),
+    linear-gradient(rgba(255,200,61,.045) 1px,transparent 1px) 0 0/22px 22px,linear-gradient(90deg,rgba(255,200,61,.045) 1px,transparent 1px) 0 0/22px 22px,#07080a}
+.dh-hd{display:flex;align-items:center;gap:9px;margin-bottom:11px}
+.dh-dot{width:8px;height:8px;border-radius:50%;background:#00e5ff;box-shadow:0 0 10px #00e5ff;animation:dhp 1.6s infinite}
+.dh.eve .dh-dot{background:#FFC83D;box-shadow:0 0 10px #FFC83D}
+@keyframes dhp{50%{opacity:.35}}
+.dh-ttl{font-weight:900;font-size:12.5px;letter-spacing:.12em;color:#fff}
+.dh-sub{margin-left:auto;font-size:11px;font-weight:700;color:#8fe9ff;white-space:nowrap}
+.dh.eve .dh-sub{color:#FFD76A}
+.dh-mk{display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;margin:0 -2px 12px;padding:0 2px}
+.dh-mk::-webkit-scrollbar{display:none}
+.dh-fut{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:10px}
+.dh-fc{padding:10px 12px;border-radius:12px;background:rgba(0,229,255,.06);border:1px solid rgba(0,229,255,.35);box-shadow:inset 0 0 18px -12px rgba(0,229,255,.9)}
+.dh-fc b{display:block;font-size:10px;letter-spacing:.1em;color:#8fe9ff}
+.dh-fc b span{color:#6b7482;margin-left:4px}
+.dh-fp{display:flex;align-items:baseline;gap:8px;margin-top:4px;font-size:20px;font-weight:900;color:#fff}
+.dh-fp em{font-style:normal;font-size:13px;font-weight:800}
+.dh-chip{flex:none;padding:7px 10px;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);min-width:74px}
+.dh-chip b{display:block;font-size:10px;letter-spacing:.08em;color:#9aa4b2}
+.dh-chip i{display:block;font-style:normal;font-weight:800;font-size:13px;margin-top:2px}
+.up{color:#00e5ff}.dn{color:#FF3B30}.flat{color:#cdd5e1}
+.dh-gex{font-size:12px;color:#cdd5e1;background:rgba(255,200,61,.06);border:1px solid rgba(255,200,61,.3);border-radius:10px;padding:8px 10px;margin-bottom:12px}
+.dh-gex b{color:#FFD76A}
+.dh-sec{font-size:10.5px;font-weight:900;letter-spacing:.1em;color:#8a93a3;margin:12px 0 7px;text-transform:uppercase}
+.dh-cols{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:420px){.dh-cols{grid-template-columns:1fr}}
+.dh-mv{display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-top:1px solid rgba(255,255,255,.05);cursor:pointer}
+.dh-mv:first-child{border-top:0}
+.dh-mv .t{font-weight:800;font-size:13px;min-width:48px}
+.dh-mv .p{font-weight:800;font-size:13px;margin-left:auto;white-space:nowrap}
+.dh-mv .n{display:block;font-size:10.5px;color:#8a93a3;line-height:1.3;margin-top:2px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.dh-mvtx{min-width:0;flex:1}
+.dh-ev{display:flex;gap:9px;align-items:center;padding:6px 0;font-size:12.5px;border-top:1px solid rgba(255,255,255,.05)}
+.dh-ev:first-child{border-top:0}
+.dh-ev .tm{font-weight:800;color:#8fe9ff;min-width:42px}
+.dh-ev .nm{flex:1;min-width:0}
+.dh-ev .vl{font-size:11px;color:#9aa4b2;white-space:nowrap}
+.dh-ev .vl b{color:#fff}
+.dh-ev.hi .nm{font-weight:700}
+.dh-act{color:#00e5ff!important;text-shadow:0 0 8px rgba(0,229,255,.6)}
+.dh-tags{display:flex;flex-wrap:wrap;gap:6px}
+.dh-tag{font-size:11.5px;font-weight:800;padding:5px 9px;border-radius:9px;background:rgba(178,107,255,.1);border:1px solid rgba(178,107,255,.45);color:#d9b8ff;cursor:pointer}
+.dh-wl .dh-tag{background:rgba(0,229,255,.06);border-color:rgba(0,229,255,.35);color:#fff}
+.dh-txt{font-size:13px;line-height:1.5;color:#dfe5ee;margin-bottom:10px}
+.dh-facit{display:flex;align-items:center;gap:10px;padding:10px;border-radius:12px;background:rgba(255,200,61,.07);border:1px solid rgba(255,200,61,.35);margin-bottom:4px}
+.dh-facit b{font-size:22px;color:#FFD76A;text-shadow:0 0 12px rgba(255,200,61,.6)}
+.dh-facit span{font-size:12px;color:#dfe5ee;line-height:1.35}
+.dh-idx{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.dh-note{font-size:10.5px;color:#6b7482;margin-top:10px}
+.dh-lockwrap{position:relative;min-height:60px}
+/* ===== PRO-scanners under Research ===== */
+.ps-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+@media(max-width:520px){.ps-grid{grid-template-columns:1fr}}
+.ps-card{position:relative;overflow:hidden;cursor:pointer;border-radius:16px;padding:14px;border:1px solid rgba(0,229,255,.45);
+  background:linear-gradient(rgba(0,229,255,.05) 1px,transparent 1px) 0 0/20px 20px,linear-gradient(90deg,rgba(0,229,255,.05) 1px,transparent 1px) 0 0/20px 20px,#07080a;
+  box-shadow:0 0 22px -12px rgba(0,229,255,.6)}
+.ps-card.g{border-color:rgba(255,200,61,.5);box-shadow:0 0 22px -12px rgba(255,200,61,.6)}
+.ps-card.p{border-color:rgba(178,107,255,.5);box-shadow:0 0 22px -12px rgba(178,107,255,.6)}
+.ps-card b{display:block;font-size:13.5px;font-weight:900;letter-spacing:.03em}
+.ps-card i{display:block;font-style:normal;font-size:11.5px;color:#9aa4b2;margin-top:4px;line-height:1.35}
+.ps-card .ps-n{position:absolute;top:12px;right:12px;font-size:10px;font-weight:900;padding:3px 7px;border-radius:7px;background:rgba(0,229,255,.12);color:#8fe9ff}
+.ps-row{display:flex;align-items:center;gap:10px;padding:11px 2px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer}
+.ps-row .l{flex:1;min-width:0}
+.ps-row .l b{font-size:14px}
+.ps-row .l i{display:block;font-style:normal;font-size:11.5px;color:#8a93a3;margin-top:2px}
+.ps-row .r{text-align:right;font-weight:800;font-size:13px;white-space:nowrap}
+.ps-row .r i{display:block;font-style:normal;font-size:10.5px;color:#8a93a3;font-weight:600}
+.ps-pill{font-size:10px;font-weight:900;padding:2px 6px;border-radius:6px;margin-left:6px;vertical-align:1px}
+.ps-pill.c{background:rgba(0,229,255,.14);color:#00e5ff}.ps-pill.pt{background:rgba(255,59,48,.14);color:#FF6B61}
+.ps-pill.g{background:rgba(255,200,61,.14);color:#FFD76A}
+.ps-up{margin:14px 0;padding:14px;border-radius:14px;text-align:center;border:1px dashed rgba(255,200,61,.5);color:#FFD76A;font-weight:800;cursor:pointer}
+/* ===== Teknisk mätare på aktiekortet ===== */
+.tg-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.tg-c{text-align:center;padding:10px 4px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08)}
+.tg-c b{display:block;font-size:10.5px;letter-spacing:.08em;color:#9aa4b2}
+.tg-c i{display:block;font-style:normal;font-weight:900;font-size:12px;margin-top:5px}
+.tg-bar{height:4px;border-radius:3px;margin-top:7px;background:rgba(255,255,255,.08);overflow:hidden}
+.tg-bar span{display:block;height:100%}
+.tg-sum{font-size:12px;color:#cdd5e1;margin-top:10px}
+.mev-v.act{color:#00e5ff}.mev-v.act b{color:#00e5ff;text-shadow:0 0 8px rgba(0,229,255,.6)}
+</style>
+<script id="hub-js">
+/* ===== DAGSNAVET + PRO-SCANNERS + TEKNISK MÄTARE =====
+   Före öppning (premarket), öppet, kvällsrapport. Data: /api/hub/*. Allt
+   gömmer sig tyst om datan saknas — sidan får aldrig se trasig ut. */
+(function(){
+  function B(){return (window.CONFIG&&CONFIG.API_BASE)?CONFIG.API_BASE.replace(/\/$/,""):"";}
+  function EN(){return window.GRABIT_LANG==="en";}
+  function tok(){try{return encodeURIComponent(localStorage.getItem("grabit_token")||"");}catch(e){return "";}}
+  function pro(){try{return typeof isPro==="function"&&isPro();}catch(e){return false;}}
+  function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
+  function pct(v){if(v==null||!isFinite(v))return"—";var s=(v>0?"+":"")+(+v).toFixed(1)+"%";return EN()?s:s.replace(".",",");}
+  function cls(v){return v>0?"up":(v<0?"dn":"flat");}
+  function num(v,d){if(v==null)return"—";return (+v).toLocaleString(EN()?"en-US":"sv-SE",{maximumFractionDigits:d==null?2:d});}
+  function sessLabel(j){
+    var E=EN(),s=j.session;
+    if(s==="pre"){var m=j.opens_in_min||0,h=Math.floor(m/60),mm=m%60;
+      return[E?"BEFORE THE OPEN":"FÖRE ÖPPNING",(E?"Opens in ":"Öppnar om ")+(h?h+" h ":"")+mm+" min","pre"];}
+    if(s==="open")return[E?"MARKET IS OPEN":"MARKNADEN ÄR ÖPPEN",E?"Closes 4:00 pm ET":"Stänger 22:00","open"];
+    if(s==="post")return[E?"EVENING REPORT":"KVÄLLSRAPPORT",E?"After hours":"Efterhandel pågår","eve"];
+    if(j.weekday>=5)return[E?"WEEKEND":"HELG",E?"Next open Monday 9:30 am ET":"Nästa öppning måndag 15:30","eve"];
+    return[E?"EVENING REPORT":"KVÄLLSRAPPORT",E?"Market closed":"Börsen stängd","eve"];
+  }
+  function mkStrip(mk){
+    if(!mk||!mk.length)return"";
+    var E=EN(),fut=mk.filter(function(m){return m.k==="NQ"||m.k==="ES";}),rest=mk.filter(function(m){return m.k!=="NQ"&&m.k!=="ES";});
+    var big=fut.length?'<div class="dh-fut">'+fut.map(function(m){
+      return '<div class="dh-fc"><b>'+(m.k==="NQ"?(E?"NASDAQ FUTURES":"NASDAQ-TERMIN"):(E?"S&P 500 FUTURES":"S&P 500-TERMIN"))+' <span>'+m.k+'</span></b>'
+        +'<div class="dh-fp">'+num(m.price,m.price>1000?0:2)+'<em class="'+cls(m.chg)+'">'+pct(m.chg)+'</em></div></div>';}).join("")+'</div>':"";
+    mk=rest;if(!mk.length)return big;
+    return big+'<div class="dh-mk">'+mk.map(function(m){
+      var nm=EN()?({GULD:"GOLD",OLJA:"OIL"}[m.k]||m.k):m.k;
+      return '<div class="dh-chip"><b>'+esc(nm)+'</b><i class="'+cls(m.chg)+'">'+pct(m.chg)+'</i></div>';}).join("")+'</div>';
+  }
+  function gexLine(g){
+    var E=EN();
+    if(!g){return pro()?"":'<div class="dh-gex pro-gated" data-lock="PRO" style="position:relative"><b>GEX</b> · '+(E?"NQ distance to Call Wall and Put Wall":"NQ:s avstånd till Call Wall och Put Wall")+'</div>';}
+    var p=[];
+    if(g.above)p.push(esc(g.above.label)+' <b>'+num(g.above.price,0)+'</b> ('+(g.above.dist>0?"+":"")+g.above.dist+')');
+    if(g.below)p.push(esc(g.below.label)+' <b>'+num(g.below.price,0)+'</b> ('+g.below.dist+')');
+    return p.length?'<div class="dh-gex"><b>GEX NQ</b> · '+p.join(" · ")+'</div>':"";
+  }
+  function moverRows(arr,max){
+    return (arr||[]).slice(0,max).map(function(i){
+      return '<div class="dh-mv" onclick="openStock(\''+esc(i.tkr)+'\')"><div class="dh-mvtx"><span class="t">'+esc(i.tkr)+'</span>'
+        +(i.news?'<span class="n">'+esc(i.news)+'</span>':(i.name?'<span class="n">'+esc(i.name)+'</span>':''))
+        +'</div><span class="p '+cls(i.chg)+'">'+pct(i.chg)+'</span></div>';}).join("");
+  }
+  function moversBlock(mv,title){
+    if(!mv||(!(mv.up||[]).length&&!(mv.down||[]).length))return"";
+    var E=EN(),free=!pro();
+    var up=moverRows(mv.up,free?2:5),dn=moverRows(mv.down,free?2:5);
+    var more=free&&((mv.up||[]).length>2||(mv.down||[]).length>2)
+      ?'<div class="dh-lockwrap pro-gated" data-lock="PRO">'+'<div class="dh-cols"><div>'+moverRows((mv.up||[]).slice(2),3)+'</div><div>'+moverRows((mv.down||[]).slice(2),3)+'</div></div></div>':"";
+    return '<div class="dh-sec">'+title+'</div><div class="dh-cols"><div>'+(up||'<div class="dh-note">—</div>')+'</div><div>'+(dn||'<div class="dh-note">—</div>')+'</div></div>'+more;
+  }
+  function eventsBlock(ev,acts){
+    var E=EN(),rows="";
+    (ev||[]).slice(0,6).forEach(function(e){
+      var t=E?(e.time_et?e.time_et+" ET":""):(e.time_se||"");
+      var v="";
+      if(e.actual)v='<span class="vl"><b class="dh-act">'+esc(e.actual)+'</b>'+(e.forecast?' / '+(E?"est ":"väntat ")+esc(e.forecast):'')+'</span>';
+      else if(e.forecast)v='<span class="vl">'+(E?"Est ":"Väntat ")+'<b>'+esc(e.forecast)+'</b></span>';
+      rows+='<div class="dh-ev'+(e.impact==="High"?" hi":"")+'"><span class="tm">'+esc(t)+'</span><span class="nm">'+esc(e.country)+' '+esc(e.title)+'</span>'+v+'</div>';
+    });
+    if(!rows&&acts&&acts.length){
+      acts.slice(0,4).forEach(function(a){rows+='<div class="dh-ev hi"><span class="nm">'+esc(a.name)+'</span><span class="vl"><b class="dh-act">'+esc(a.actual)+'</b>'+(a.forecast?' / '+(E?"est ":"väntat ")+esc(a.forecast):'')+'</span></div>';});
+    }
+    return rows?'<div class="dh-sec">'+(E?"Today's events":"Dagens händelser")+'</div>'+rows:"";
+  }
+  function earnBlock(list,title){
+    if(!list||!list.length)return"";
+    return '<div class="dh-sec">'+title+'</div><div class="dh-tags">'+list.slice(0,8).map(function(e){
+      return '<span class="dh-tag" onclick="openStock(\''+esc(e.tkr)+'\')">'+esc(e.tkr)+'</span>';}).join("")+'</div>';
+  }
+  function wlTickers(){try{return (typeof pfLoad==="function"?pfLoad():[]).map(function(h){return h.tkr;}).filter(Boolean).slice(0,20);}catch(e){return[];}}
+  async function wlBlock(){
+    var tks=wlTickers();if(!tks.length)return"";
+    try{
+      var r=await fetch(B()+"/api/hub/quotes?tickers="+encodeURIComponent(tks.join(",")),{cache:"no-store"});var j=await r.json();
+      var items=(j.items||[]).filter(function(i){return i.chg!=null;});
+      if(!items.length)return"";
+      items.sort(function(a,b){return Math.abs(b.chg)-Math.abs(a.chg);});
+      return '<div class="dh-sec">'+(EN()?"Your stocks":"Dina aktier")+'</div><div class="dh-tags dh-wl">'+items.slice(0,10).map(function(i){
+        return '<span class="dh-tag" onclick="openStock(\''+esc(i.tkr)+'\')">'+esc(i.tkr)+' <b class="'+cls(i.chg)+'">'+pct(i.chg)+'</b>'+(i.earnings_in===0?(EN()?" · earnings":" · rapport"):"")+'</span>';}).join("")+'</div>';
+    }catch(e){return"";}
+  }
+  async function eveBlock(){
+    var E=EN();
+    try{
+      var r=await fetch(B()+"/api/hub/evening"+(E?"?lang=en":""),{cache:"no-store"});var j=await r.json();
+      var h="";
+      if(j.text)h+='<div class="dh-txt">'+esc(j.text)+'</div>';
+      if(j.indices&&j.indices.length)h+='<div class="dh-idx">'+j.indices.slice(0,4).map(function(i){return '<div class="dh-chip"><b>'+esc(i.name)+'</b><i class="'+cls(i.chg)+'">'+pct(i.chg)+'</i></div>';}).join("")+'</div>';
+      var f=j.facit;
+      if(f){h+='<div class="dh-facit '+(pro()?"":"")+'"><b>'+f.green+'/'+f.n+'</b><span>'+(E?"of this morning's setups closed green · avg ":"av morgonens setups stängde grönt · snitt ")+'<b class="'+cls(f.avg)+'" style="font-size:12px">'+pct(f.avg)+'</b></span></div>';}
+      if(j.after)h+=moversBlock(j.after,E?"After hours":"Efterhandel");
+      var tm=j.tomorrow||{};
+      if((tm.events||[]).length){h+='<div class="dh-sec">'+(E?"Tomorrow":"I morgon")+'</div>'+tm.events.map(function(e){
+        var t=E?(e.time_et?e.time_et+" ET":""):(e.time_se||"");
+        return '<div class="dh-ev hi"><span class="tm">'+esc(t)+'</span><span class="nm">'+esc(e.country)+' '+esc(e.title)+'</span>'+(e.forecast?'<span class="vl">'+(E?"Est ":"Väntat ")+'<b>'+esc(e.forecast)+'</b></span>':'')+'</div>';}).join("");}
+      h+=earnBlock(tm.earnings,E?"Earnings tomorrow":"Rapporter i morgon");
+      return h;
+    }catch(e){return"";}
+  }
+  var _busy=false;
+  async function loadHub(){
+    var el=document.getElementById("dailyhub");if(!el||_busy)return;
+    _busy=true;
+    try{
+      var r=await fetch(B()+"/api/hub/premarket?token="+tok(),{cache:"no-store"});
+      if(!r.ok)throw 0;
+      var j=await r.json();
+      var L=sessLabel(j),E=EN();
+      var body=mkStrip(j.markets)+gexLine(j.gex);
+      if(L[2]==="pre"){
+        body+=moversBlock(j.movers,E?"Premarket movers":"Premarket-rörelser")+eventsBlock(j.events,j.actuals)
+          +earnBlock(j.earnings,E?"Earnings today":"Rapporter idag")+await wlBlock();
+      }else if(L[2]==="open"){
+        body+=moversBlock(j.movers,E?"Biggest moves today":"Dagens största rörelser")+eventsBlock(j.events,j.actuals)+await wlBlock();
+      }else{
+        body+=await eveBlock()+await wlBlock();
+      }
+      if(body.replace(/<[^>]+>/g,"").trim().length<3){el.innerHTML="";_busy=false;return;}
+      el.innerHTML='<div class="dh '+(L[2]==="eve"?"eve":"")+'"><div class="dh-hd"><span class="dh-dot"></span><span class="dh-ttl">'+L[0]+'</span><span class="dh-sub">'+L[1]+'</span></div>'+body
+        +'<div class="dh-note">'+(E?"Premarket and after-hours prices from the IEX exchange. Not financial advice.":"Premarket- och efterhandelspriser från IEX-börsen. Inte finansiell rådgivning.")+'</div></div>';
+      try{if(window.applyProLocks)applyProLocks(el);}catch(e){}
+    }catch(e){}
+    _busy=false;
+  }
+  window.loadHub=loadHub;
+  function tick(){if(document.visibilityState!=="hidden")loadHub();}
+  setTimeout(loadHub,1500);
+  setInterval(tick,120000);
+  document.addEventListener("visibilitychange",function(){if(document.visibilityState==="visible")loadHub();});
+
+  /* ---------- PRO-scanners under Research ---------- */
+  var PS=[
+    {k:"options",c:"",sv:["Ovanliga optioner","Stora optionsaffärer: volym långt över öppna kontrakt · fördröjt 15 min"],en:["Unusual options","Big option trades: volume far above open interest · 15 min delayed"]},
+    {k:"squeeze",c:"g",sv:["Short squeeze","Hög blankning + stigande volym + styrka"],en:["Short squeeze","High short interest + rising volume + strength"]},
+    {k:"smart",c:"p",sv:["Smarta pengar + setup","Insider- och politikerköp i aktier med GRABIT-läge"],en:["Smart money + setup","Insider and politician buys in stocks with a GRABIT setup"]}];
+  function renderProscan(){
+    var el=document.getElementById("proscan");if(!el)return;
+    var E=EN();
+    el.innerHTML='<div class="sect"><h2>'+(E?"PRO scanners":"PRO-scanners")+'</h2></div><div class="ps-grid">'+PS.map(function(p){
+      var t=E?p.en:p.sv;return '<div class="ps-card '+p.c+'" onclick="openProScan(\''+p.k+'\')"><span class="ps-n">PRO</span><b>'+t[0]+'</b><i>'+t[1]+'</i></div>';}).join("")+'</div>';
+  }
+  function money(v){if(!v)return"";if(v>=1e6)return"$"+(v/1e6).toFixed(1)+"M";if(v>=1e3)return"$"+Math.round(v/1e3)+"k";return"$"+v;}
+  window.openProScan=async function(k){
+    var p=PS.find(function(x){return x.k===k;});if(!p)return;
+    var E=EN(),t=E?p.en:p.sv;
+    var ov=document.getElementById("screener"),body=document.getElementById("scr-body"),ttl=document.getElementById("scr-title");
+    if(!ov||!body)return;
+    if(ttl)ttl.textContent=t[0];
+    body.innerHTML='<div class="scl-empty">'+(E?"Loading…":"Laddar…")+'</div>';
+    ov.classList.add("on");ov.scrollTop=0;
+    var j={items:[]};
+    try{var r=await fetch(B()+"/api/hub/"+k+"?token="+tok(),{cache:"no-store"});j=await r.json();}catch(e){}
+    var items=j.items||[],rows="";
+    items.forEach(function(i){
+      if(k==="options"){
+        rows+='<div class="ps-row" onclick="closeScreener();openStock(\''+esc(i.tkr)+'\')"><div class="l"><b>'+esc(i.tkr)+'</b><span class="ps-pill '+(i.type==="CALL"?"c":"pt")+'">'+i.type+'</span>'
+          +'<i>'+(E?"Strike ":"Lösen ")+num(i.strike)+' · '+esc(i.exp)+' ('+i.dte+(E?" d":" d")+')'+(i.otm!=null?' · '+(i.otm>0?"+":"")+num(i.otm,1)+'% '+(E?"from price":"från kurs"):"")+'</i></div>'
+          +'<div class="r">'+money(i.premium)+'<i>'+num(i.vol,0)+' '+(E?"contracts":"kontrakt")+' · '+i.ratio+'× OI</i></div></div>';
+      }else if(k==="squeeze"){
+        rows+='<div class="ps-row" onclick="closeScreener();openStock(\''+esc(i.tkr)+'\')"><div class="l"><b>'+esc(i.tkr)+'</b><span class="ps-pill g">'+num(i.short,1)+'% '+(E?"short":"blankat")+'</span><i>'+esc(i.name)+'</i></div>'
+          +'<div class="r '+cls(i.ret_5)+'">'+pct(i.ret_5)+' <span style="color:#8a93a3;font-size:11px">5d</span><i>'+num(i.rel_vol,1)+'× '+(E?"volume":"volym")+'</i></div></div>';
+      }else{
+        rows+='<div class="ps-row" onclick="closeScreener();openStock(\''+esc(i.tkr)+'\')"><div class="l"><b>'+esc(i.tkr)+'</b>'+(i.both?'<span class="ps-pill g">'+(E?"INSIDER + POLITICIAN":"INSIDER + POLITIKER")+'</span>':'')
+          +'<i>'+i.buyers+' '+(E?"buyers":"köpare")+(i.usd?' · '+money(i.usd):'')+' · '+(E?"latest ":"senast ")+i.latest+' d</i></div>'
+          +'<div class="r">'+(i.score!=null?'<span style="color:#FFD76A">'+num(i.score,1)+'</span>':'—')+'<i>GRABIT score</i></div></div>';
+      }
+    });
+    if(!items.length)rows='<div class="scl-empty">'+(E?"Nothing right now — the scan updates during the trading day.":"Inget just nu — skanningen uppdateras under handelsdagen.")+'</div>';
+    if(!j.pro&&(j.total||0)>items.length){
+      rows+='<div class="ps-up" onclick="closeScreener();showPaywall(null,true)">'+(E?"Unlock all ":"Lås upp alla ")+j.total+(E?" with PRO →":" med PRO →")+'</div>';
+    }
+    body.innerHTML='<div class="scl-head"><div class="scl-meta"><div class="scl-h">'+t[0]+'</div><div class="scl-d">'+t[1]+'</div></div><div class="scl-cnt">'+(j.total||items.length)+'</div></div>'+rows
+      +'<div class="dh-note" style="padding:0 4px 16px">'+(E?"Not financial advice.":"Inte finansiell rådgivning.")+'</div>';
+  };
+  setTimeout(renderProscan,800);
+
+  /* ---------- Teknisk mätare per tidsram på aktiekortet ---------- */
+  var VD={STRONG_BUY:["Starkt köp","Strong buy","#00e5ff",100],BUY:["Köp","Buy","#5ef3ff",75],NEUTRAL:["Neutral","Neutral","#FFC83D",50],
+          SELL:["Sälj","Sell","#FF6B61",25],STRONG_SELL:["Starkt sälj","Strong sell","#FF3B30",8]};
+  async function loadTech(tkr){
+    var anchor=document.getElementById("st-tv");if(!anchor||document.getElementById("st-tech"))return;
+    var E=EN();
+    var sec=document.createElement("div");sec.className="st-sec";sec.textContent=E?"Technical gauge":"Teknisk mätare";
+    var box=document.createElement("div");box.className="st-box";box.id="st-tech";box.style.padding="14px";
+    box.innerHTML='<div class="anl-load">'+(E?"Reading timeframes…":"Läser tidsramar…")+'</div>';
+    anchor.parentNode.insertBefore(sec,anchor.nextSibling);sec.parentNode.insertBefore(box,sec.nextSibling);
+    try{
+      var r=await fetch(B()+"/api/hub/tech/"+encodeURIComponent(tkr),{cache:"no-store"});var j=await r.json();
+      if(document.getElementById("st-tech")!==box)return;
+      var tf=j.tf||{},keys=[["15m","15 min"],["1h",E?"1 hour":"1 tim"],["1d",E?"Day":"Dag"],["1w",E?"Week":"Vecka"]],cells="",tot=0,n=0;
+      keys.forEach(function(k){var g=tf[k[0]];if(!g)return;var v=VD[g.verdict]||VD.NEUTRAL;tot+=g.score;n++;
+        cells+='<div class="tg-c"><b>'+k[1]+'</b><i style="color:'+v[2]+'">'+(E?v[1]:v[0])+'</i><div class="tg-bar"><span style="width:'+v[3]+'%;background:'+v[2]+'"></span></div></div>';});
+      if(!n){sec.remove();box.remove();return;}
+      var avg=tot/n,sum=avg>=2?(E?"Buyers in control across timeframes.":"Köparna styr i alla tidsramar."):avg>=0.5?(E?"Leaning positive.":"Lutar åt det positiva."):avg<=-2?(E?"Sellers in control across timeframes.":"Säljarna styr i alla tidsramar."):avg<=-0.5?(E?"Leaning negative.":"Lutar åt det negativa."):(E?"Mixed signals — no clear direction.":"Blandade signaler — ingen tydlig riktning.");
+      box.innerHTML='<div class="tg-grid">'+cells+'</div><div class="tg-sum">'+sum+' <span style="color:#6b7482">'+(E?"(trend, EMA, RSI and MACD per timeframe)":"(trend, EMA, RSI och MACD per tidsram)")+'</span></div>';
+    }catch(e){try{sec.remove();box.remove();}catch(_){}}
+  }
+  if(typeof window.openStock==="function"){
+    var _os=window.openStock;
+    window.openStock=function(t){var r=_os.apply(this,arguments);setTimeout(function(){loadTech(t);},60);return r;};
+  }
+})();
+</script>
+
 </body>
 </html>
