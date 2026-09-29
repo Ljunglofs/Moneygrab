@@ -3032,7 +3032,7 @@ function lookupSearch(q,localHits){
       const j=await r.json();
       const seen=new Set(localHits||[]);
       const rows=(j.results||[]).filter(x=>!seen.has(x.symbol));
-      if(!rows.length){box.innerHTML="";return;}
+      if(!rows.length){box.innerHTML=(localHits&&localHits.length)?"":`<div class="sect"><h2>Globalt</h2></div><div class="card"><div class="empty">${(window.GRABIT_LANG==="en")?"No listed company found. It may be private (not on the stock market) or use a different name.":"Hittade inget noterat bolag. Det kan vara onoterat (inte på börsen) eller heta något annat."}</div></div>`;return;}
       box.innerHTML=`<div class="sect"><h2>Globalt</h2></div><div class="card">`+
         rows.map(x=>{const nm=String(x.name||x.symbol).replace(/'/g,"&#39;").replace(/</g,"&lt;");
           return `<div class="qrow" onclick="openExternal('${x.symbol}','${nm}')">

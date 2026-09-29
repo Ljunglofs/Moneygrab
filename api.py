@@ -2601,23 +2601,38 @@ def universe():
 # och öppnar dem via /api/stock/{ticker} som redan klarar valfri symbol.
 import requests as _rq
 
-@cached(3600)
-def _yahoo_lookup(q: str) -> list:
-    try:
-        r = _rq.get(
-            "https://query1.finance.yahoo.com/v1/finance/search",
-            params={"q": q, "quotesCount": 8, "newsCount": 0,
-                    "listsCount": 0, "enableFuzzyQuery": "true"},
-            headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) "
-                                   "AppleWebKit/537.36 (KHTML, like Gecko) "
-                                   "Chrome/124.0 Safari/537.36"},
-            timeout=8,
-        )
-        r.raise_for_status()
-        quotes = (r.json() or {}).get("quotes") or []
-    except Exception as e:
-        print(f"[lookup] yahoo-sök fel för '{q}': {e}")
-        return []
+_LK_CACHE = {}                 # q -> (ts, results) — bara lyckade svar cachas
+_LK_BLOCK = {"until": 0.0}     # Yahoo svarar 429 -> vila en stund
+_LK_NAMES = {"t": 0.0, "idx": []}
+
+
+def _yahoo_lookup(q: str):
+    """Lista med träffar, eller None om Yahoo inte svarade (429/fel)."""
+    if time.time() < _LK_BLOCK["until"]:
+        return None
+    for host in ("query2", "query1"):
+        try:
+            r = _rq.get(
+                "https://%s.finance.yahoo.com/v1/finance/search" % host,
+                params={"q": q, "quotesCount": 8, "newsCount": 0,
+                        "listsCount": 0, "enableFuzzyQuery": "true"},
+                headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) "
+                                       "AppleWebKit/537.36 (KHTML, like Gecko) "
+                                       "Chrome/124.0 Safari/537.36"},
+                timeout=8,
+            )
+            if r.status_code == 429:
+                continue
+            r.raise_for_status()
+            quotes = (r.json() or {}).get("quotes") or []
+            break
+        except Exception as e:
+            print(f"[lookup] yahoo-sök fel för '{q}': {e}")
+            return None
+    else:
+        _LK_BLOCK["until"] = time.time() + 600
+        print("[lookup] Yahoo 429 — använder egen lista i 10 min")
+        return None
     out = []
     for it in quotes:
         if it.get("quoteType") not in ("EQUITY", "ETF"):
@@ -2634,13 +2649,73 @@ def _yahoo_lookup(q: str) -> list:
     return out[:8]
 
 
+def _squash(x):
+    import re as _re_lk
+    return _re_lk.sub(r"[^a-z0-9]", "", (x or "").lower())
+
+
+def _names_index():
+    """[(ticker, namn, squashat namn)] för alla amerikanska aktier (Polygon)."""
+    if time.time() - _LK_NAMES["t"] > 3600 or not _LK_NAMES["idx"]:
+        try:
+            nm = market_data.names() or {}
+        except Exception:
+            nm = {}
+        idx = [(t.upper(), n, _squash(n)) for t, n in nm.items()]
+        if idx:
+            _LK_NAMES.update(t=time.time(), idx=idx)
+    return _LK_NAMES["idx"]
+
+
+def _local_lookup(q: str) -> list:
+    """Reserv när Yahoo inte svarar: sök i vår egen lista över USA-aktier.
+    'x-energy', 'X Energy' och 'xenergy' hittar alla 'X-Energy, Inc.'."""
+    sq = _squash(q)
+    if len(sq) < 2:
+        return []
+    up = q.strip().upper()
+    exact, pref, name_start, name_in = [], [], [], []
+    for t, n, ns in _names_index():
+        if t == up:
+            exact.append((t, n))
+        elif t.startswith(up) and len(up) >= 2:
+            pref.append((t, n))
+        elif ns.startswith(sq):
+            name_start.append((t, n))
+        elif len(sq) >= 3 and sq in ns:
+            name_in.append((t, n))
+    hits = exact + name_start + pref[:3] + name_in
+    seen, out = set(), []
+    for t, n in hits:
+        if t in seen:
+            continue
+        seen.add(t)
+        out.append({"symbol": t, "name": n, "exch": "US", "type": "EQUITY"})
+        if len(out) >= 8:
+            break
+    return out
+
+
 @app.get("/api/lookup")
 def lookup(q: str = Query(..., min_length=1, max_length=40)):
-    """Sök bolag globalt på namn eller symbol. Cache 1h per fråga."""
+    """Sök bolag globalt på namn eller symbol. Yahoo först (hela världen);
+    svarar Yahoo inte (429) används vår egen lista över alla USA-aktier."""
     q = q.strip()
     if not q:
         return {"results": []}
-    return {"results": _yahoo_lookup(q.lower())}
+    key = q.lower()
+    hit = _LK_CACHE.get(key)
+    if hit and time.time() - hit[0] < 3600:
+        return {"results": hit[1]}
+    res = _yahoo_lookup(key)
+    if res is None:
+        return {"results": _local_lookup(q), "src": "local"}
+    if not res:
+        res = _local_lookup(q)
+    _LK_CACHE[key] = (time.time(), res)
+    if len(_LK_CACHE) > 2000:
+        _LK_CACHE.clear()
+    return {"results": res}
 
 
 # ----- NYHETER (riktig RSS via feedparser) ---------------------------
