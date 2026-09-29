@@ -1755,6 +1755,7 @@ else _i18nBoot();
 
   <section class="screen" id="s-marknad">
     <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" style="width:18px;height:18px;color:#8a93a3;flex:none"><circle cx="11" cy="11" r="7.5"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg><input id="q" placeholder="Sök ticker, bolag eller tema…" oninput="onSearch(this.value)"></div>
+    <div class="scan-note" id="scan-note"></div>
     <div id="search-res"></div>
     <div id="discover">
       <div id="scanner"></div>
@@ -2473,7 +2474,7 @@ function openScreener(i,srvRows,srvCount){
     const extra=s.filt==="micro"&&r.mcap_musd!=null?`<span class="scl-rs">$${Math.round(r.mcap_musd)}M</span>`:(r.earnings_in!=null&&r.earnings_in<=5?`<span class="scl-rs evt-tag">Rapport ${r.earnings_in===0?"idag":"om "+r.earnings_in+" d"}</span>`:"");
     return `<div class="scl-row" onclick="closeScreener();openStock('${tk}')">${lic(tk,34,scoreColor(sc))}<div class="scl-nm"><div class="scl-t">${tk} ${rs}${extra}</div><div class="scl-co">${NAMES[tk]||r.theme||''}</div></div><div class="scl-sc" style="color:${scoreColor(sc)}">${sc.toFixed(1)}</div></div>`;
   }).join(""):`<div class="scl-empty">${(srvRows||all.length)?"Inga träffar just nu.":"Skannern laddar — försök igen om en stund."}</div>`;
-  $("#scr-body").innerHTML=`<div class="scl-head" style="border-color:${c}55"><div class="scl-ic" style="color:${c};background:${c}1a">${I[s.ic]||I.dot}</div><div class="scl-meta"><div class="scl-h">${s.n}</div><div class="scl-d">${s.d}</div></div><div class="scl-cnt" style="color:${c}">${rows.length}</div></div>${list}`;
+  $("#scr-body").innerHTML=`<div class="scl-head" style="border-color:${c}55"><div class="scl-ic" style="color:${c};background:${c}1a">${I[s.ic]||I.dot}</div><div class="scl-meta"><div class="scl-h">${s.n}</div><div class="scl-d">${s.d}</div></div><div class="scl-cnt" style="color:${c}">${rows.length}</div></div>${scanLine()}${list}`;
   const el=document.getElementById("screener");el.classList.add("on");el.scrollTop=0;
 }
 /* ===== ROCKETSCAN — småbolag i tidig fas =====
@@ -3186,7 +3187,7 @@ async function load(){
     J("/api/overview"),J("/api/screen"),J("/api/signals"),J("/api/news"),J("/api/events")
   ]);
   if(ov){mapOverview(ov,d);live=true;}
-  if(sc){window._scrCounts=sc.counts||null;window._mktInfo=sc.market||null;mapScreen(sc.rows||[],d);live=true;}
+  if(sc){window._scrCounts=sc.counts||null;window._mktInfo=sc.market||null;window._scrTotal=sc.total||null;mapScreen(sc.rows||[],d);live=true;}
   if(sg&&Array.isArray(sg.feed)&&sg.feed.length){d.feed=sg.feed;live=true;}
   if(nw&&Array.isArray(nw.news)&&nw.news.length){d.news=nw.news;live=true;}
   if(ev&&Array.isArray(ev.events)&&ev.events.length){d.events=mapEvents(ev.events);live=true;}
@@ -3999,7 +4000,20 @@ async function loadMacro(){
   }
   el.innerHTML=macroPanel(rows);
 }
+function _scanN(){var n=+window._scrTotal||((window._rows||[]).length+((window._mktInfo||{}).tickers||0));
+  return n>=500?n:null;}
+function _fmtN(n){return String(n).replace(/\B(?=(\d{3})+(?!\d))/g,(window.GRABIT_LANG==="en")?",":"\u00a0");}
+function scanLine(){var n=_scanN();if(!n)return"";var EN=(window.GRABIT_LANG==="en");
+  var b=(window._scrCounts||{}).bull;
+  return '<div class="scan-line"><span class="scan-dot"></span>'+(EN?"Scanned today: ":"Skannat i dag: ")+'<b>'+_fmtN(n)+'</b>'+(EN?" stocks":" aktier")
+    +(b!=null?' \u2192 <b>'+b+'</b>'+(EN?" in buy zone":" i köpläge"):"")+'</div>';}
+document.addEventListener("DOMContentLoaded",function(){try{renderScanNote();}catch(e){}});
+function renderScanNote(){var el=document.getElementById("scan-note");if(!el)return;var n=_scanN(),EN=(window.GRABIT_LANG==="en");
+  var N=n?_fmtN(n):(EN?"3,000+":"över 3\u00a0000");
+  el.innerHTML=EN?('<b>Grabit scans '+N+' stocks every day</b> and surfaces the most interesting setups. Missing a stock in the lists? Search for it \u2013 you get a full analysis on any listed stock.')
+    :('<b>Grabit skannar '+N+' aktier varje dag</b> och lyfter fram de mest intressanta lägena. Saknas en aktie i listorna? Sök på den \u2013 du får full analys på vilken noterad aktie som helst.');}
 function renderTopMovers(){
+  try{renderScanNote();}catch(e){}
   const el=document.getElementById("topmovers");if(!el)return;
   const T=window._tmv;if(!T||(!T.g.length&&!T.l.length)){el.style.display="none";return;}
   const tab=window._tmvTab||"g";
@@ -4023,7 +4037,7 @@ function renderTopMovers(){
   el.innerHTML=`<div class="tmv-h"><span>Top movers</span>
     <span class="tmv-tabs"><button class="${tab==="g"?"on":""}" onclick="event.stopPropagation();window._tmvTab='g';renderTopMovers()">${_EN?"Winners":"Vinnare"}</button>
     <button class="${tab==="l"?"on":""}" onclick="event.stopPropagation();window._tmvTab='l';renderTopMovers()">${_EN?"Losers":"Förlorare"}</button>
-    <button class="${tab==="b"?"on":""}" onclick="event.stopPropagation();window._tmvTab='b';renderTopMovers()">Bullish</button></span></div>${rows}
+    <button class="${tab==="b"?"on":""}" onclick="event.stopPropagation();window._tmvTab='b';renderTopMovers()">Bullish</button></span></div>${scanLine()}${rows}
     <div class="tmv-all" onclick="go('marknad')">${_EN?"View all \u203A":"Visa alla \u203A"}</div>`;
   if(window.applyProLocks)applyProLocks(el);
 }
@@ -6589,6 +6603,11 @@ async function installApp(){
 
 <style id="extras-css">
 /* ===== Fed-koll, rapporter, analytiker, hälsa, röst, portföljanalys ===== */
+.scan-note{font-size:11.5px;line-height:1.45;color:#8a93a3;margin:8px 4px 2px}
+.scan-note b{color:#c9d1dc;font-weight:700}
+.scan-line{display:flex;align-items:center;gap:6px;font-size:11.5px;color:#8a93a3;margin:2px 0 8px}
+.scan-line b{color:#e8eaed;font-variant-numeric:tabular-nums}
+.scan-dot{width:6px;height:6px;border-radius:50%;background:#2fd4a3;box-shadow:0 0 6px rgba(47,212,163,.7);flex:none}
 .pw-trust{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 12px;font-size:11.5px;font-weight:700;color:#9fe9f7;margin:10px 0 8px}
 .pw-trust span{white-space:nowrap}
 .dh-fed{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;padding:8px 10px;border-radius:10px;margin-bottom:10px;
