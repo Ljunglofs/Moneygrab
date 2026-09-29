@@ -6295,6 +6295,13 @@ async function installApp(){
 .dh-ev .vl b{color:#fff}
 .dh-ev.hi .nm{font-weight:700}
 .dh-act{color:#00e5ff!important;text-shadow:0 0 8px rgba(0,229,255,.6)}
+.dh-fl{display:flex;gap:9px;align-items:flex-start;padding:7px 0;font-size:12.5px;line-height:1.35;border-top:1px solid rgba(255,255,255,.05)}
+.dh-fl:first-of-type{border-top:0}
+.dh-fl .tm{color:#9aa4b2;font-size:11px;min-width:38px;padding-top:1px;font-variant-numeric:tabular-nums}
+.dh-fl .tx{flex:1;min-width:0;color:#e8eaed}
+.dh-fl .when{display:inline-block;margin-top:4px;font-size:11px;font-weight:700;color:#FFC83D;border:1px solid rgba(255,200,61,.35);border-radius:6px;padding:1px 6px}
+.dh-fl.new .tx{font-weight:700}
+.dh-flb{font-size:10px;font-weight:800;letter-spacing:.04em;color:#FFC83D;margin-right:6px}
 .dh-tags{display:flex;flex-wrap:wrap;gap:6px}
 .dh-tag{font-size:11.5px;font-weight:800;padding:5px 9px;border-radius:9px;background:rgba(178,107,255,.1);border:1px solid rgba(178,107,255,.45);color:#d9b8ff;cursor:pointer}
 .dh-wl .dh-tag{background:rgba(0,229,255,.06);border-color:rgba(0,229,255,.35);color:#fff}
@@ -6399,12 +6406,27 @@ async function installApp(){
       var v="";
       if(e.actual)v='<span class="vl"><b class="dh-act">'+esc(e.actual)+'</b>'+(e.forecast?' / '+(E?"est ":"väntat ")+esc(e.forecast):'')+'</span>';
       else if(e.forecast)v='<span class="vl">'+(E?"Est ":"Väntat ")+'<b>'+esc(e.forecast)+'</b></span>';
-      rows+='<div class="dh-ev'+(e.impact==="High"?" hi":"")+'"><span class="tm">'+esc(t)+'</span><span class="nm">'+esc(e.country)+' '+esc(e.title)+'</span>'+v+'</div>';
+      rows+='<div class="dh-ev'+(e.impact==="High"?" hi":"")+'"><span class="tm">'+esc(t)+'</span><span class="nm">'+esc(e.country)+' '+esc(E&&e.title_en?e.title_en:e.title)+'</span>'+v+'</div>';
     });
     if(!rows&&acts&&acts.length){
       acts.slice(0,4).forEach(function(a){rows+='<div class="dh-ev hi"><span class="nm">'+esc(a.name)+'</span><span class="vl"><b class="dh-act">'+esc(a.actual)+'</b>'+(a.forecast?' / '+(E?"est ":"väntat ")+esc(a.forecast):'')+'</span></div>';});
     }
     return rows?'<div class="dh-sec">'+(E?"Today's events":"Dagens händelser")+'</div>'+rows:"";
+  }
+  function inTxt(m){var E=EN();if(m<=0)return E?"now":"nu";var h=Math.floor(m/60),mm=m%60;
+    return (E?"in ":"om ")+(h?h+" h ":"")+(mm||!h?mm+" min":"");}
+  function flashBlock(list){
+    if(!list||!list.length)return"";
+    var E=EN(),now=Date.now()/1000,free=!pro();
+    var rows=list.slice(0,free?2:5).map(function(f){
+      var tx=E?f.title:(f.sv||f.title);
+      var when="";
+      if(f.at){var m=Math.round((f.at-now)/60);
+        if(m>-30)when='<br><span class="when">'+(E?(f.at_et+" ET"):("kl "+f.at_se+" svensk tid"))+(m>0?" · "+inTxt(m):"")+'</span>';}
+      var tm=E?new Date(f.ts*1000).toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit",hour12:false}):f.time_se;
+      return '<div class="dh-fl'+(now-f.ts<1800?" new":"")+'"><span class="tm">'+esc(tm)+'</span><span class="tx">'+esc(tx)+when+'</span></div>';}).join("");
+    var more=free&&list.length>2?'<div class="dh-lockwrap pro-gated" data-lock="PRO">'+list.slice(2,5).map(function(f){return '<div class="dh-fl"><span class="tm">'+esc(f.time_se)+'</span><span class="tx">'+esc(E?f.title:(f.sv||f.title))+'</span></div>';}).join("")+'</div>':"";
+    return '<div class="dh-sec"><span class="dh-flb">⚡ FLASH</span>'+(E?"Market-moving headlines":"Marknadsflyttande nyheter")+'</div>'+rows+more;
   }
   function earnBlock(list,title){
     if(!list||!list.length)return"";
@@ -6450,7 +6472,7 @@ async function installApp(){
       if(!r.ok)throw 0;
       var j=await r.json();
       var L=sessLabel(j),E=EN();
-      var body=mkStrip(j.markets)+gexLine(j.gex);
+      var body=mkStrip(j.markets)+gexLine(j.gex)+flashBlock(j.flash);
       try{if(window.hubExtras)body+=await window.hubExtras(L[2]);}catch(e){}
       if(L[2]==="pre"){
         body+=moversBlock(j.movers,E?"Premarket movers":"Premarket-rörelser")+eventsBlock(j.events,j.actuals)

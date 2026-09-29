@@ -356,6 +356,11 @@ def _events_today(day=None):
     except Exception as e:
         print("[hub] makro:", e)
     merge_actuals(out)
+    try:
+        import flash_news
+        out += flash_news.scheduled_on(day)
+    except Exception as e:
+        print("[hub] flash:", e)
     out.sort(key=lambda x: x.get("time_et") or "99")
     return out
 
@@ -540,6 +545,11 @@ def premarket(token=""):
     g = _gex_context(token, nq)
     if g:
         out["gex"] = g
+    try:
+        import flash_news
+        out["flash"] = flash_news.recent(6)
+    except Exception:
+        pass
     return out
 
 
@@ -979,10 +989,41 @@ def _macro_push_scan():
     PN.send_all("GRABIT · Makro USA", "\n".join(lines), url="/", tag="grabit-makro")
 
 
+def _mem_report():
+    """En rad i loggen per timme: vad håller minnet? (för att hitta läckor)"""
+    try:
+        import gc
+        A = _A()
+        rss = 0
+        try:
+            with open("/proc/self/status") as f:
+                for ln in f:
+                    if ln.startswith("VmRSS:"):
+                        rss = int(ln.split()[1]) // 1024
+        except Exception:
+            pass
+        by_fn = {}
+        for k in list(getattr(A, "_CACHE", {}).keys()):
+            n = k[0] if isinstance(k, tuple) and k else str(k)
+            by_fn[n] = by_fn.get(n, 0) + 1
+        top = sorted(by_fn.items(), key=lambda kv: -kv[1])[:6]
+        print("[mem] rss=%dMB cache=%d memo=%d ai=%d fh=%d trådar=%d objekt=%d topp=%s" % (
+            rss, len(getattr(A, "_CACHE", {})), len(_MEMO),
+            len(getattr(A, "_AI_TEXT_CACHE", {}) or {}), len(getattr(A, "_FH_CACHE", {}) or {}),
+            threading.active_count(), len(gc.get_objects()),
+            ",".join("%s:%d" % kv for kv in top)))
+    except Exception as e:
+        print("[mem] fel:", e)
+
+
 def _loop():
     time.sleep(300)                 # låt skanning och cache värmas först
     last_opt = last_sq = 0.0
+    last_mem = 0.0
     while True:
+        if time.time() - last_mem > 3600:
+            last_mem = time.time()
+            _mem_report()
         t = now_et()
         sess = session(t)
         for fn in (_open_push_once, _evening_push_once):

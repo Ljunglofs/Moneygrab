@@ -70,6 +70,14 @@ try:
 except Exception as e:
     print(f"community kunde inte registreras (grabit kör vidare): {e}")
 
+# 2g) Flash-nyheter: marknadsflyttande rubriker (Vita huset, Fed, tullar ...)
+#     med svensk tid på schemalagda besked och påminnelse-notis.
+try:
+    import flash_news
+    flash_news.register(app)
+except Exception as e:
+    print(f"flash_news kunde inte registreras (grabit kör vidare): {e}")
+
 # 2h) Daily hub: före öppning, kvällsrapport, makroutfall, optionsflöden,
 #     short squeeze, smarta pengar och teknisk mätare per tidsram.
 try:
