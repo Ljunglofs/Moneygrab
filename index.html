@@ -3094,6 +3094,8 @@ function mapOverview(o,d){
 }
 function mapScreen(rows,d){
   if(!Array.isArray(rows)||!rows.length||!d.scanner)return;
+  // Orimliga hopp (>1000 % på en dag / >2000 % på 5 dgr) = ojusterad split i kursdatan, inte en rörelse.
+  rows=rows.filter(r=>!((+r.ret_1||0)>1000||(+r.ret_5||0)>2000||(+r.ret_1||0)<-95));
   window._rows=rows;
   // Spegling av backendens _mix_markets: USA-fokus i topplistorna. Utan den
   // fylls "Winners/Losers today" av svenska bolag mitt på dagen — Stockholm

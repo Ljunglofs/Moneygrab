@@ -327,6 +327,9 @@ def scan(ticker: str, bench=None):
         a = analyze(df)
     except Exception:
         return None
+    if a.get("data_jump"):
+        print("[scan] %s: hoppar över (ojusterad split i kursdatan)" % ticker)
+        return None
     a["ticker"] = ticker
     a["theme"] = TICKER_THEME.get(ticker, "")
     a.update(_rs_vs_bench(df, bench))
@@ -684,6 +687,8 @@ def _market_rescan():
             a = analyze(df)
         except Exception:
             continue
+        if a.get("data_jump"):
+            continue                              # ojusterad split i kursdatan
         a["ticker"] = t
         a["theme"] = ""
         a["name"] = nm.get(t) or ""
