@@ -78,6 +78,14 @@ try:
 except Exception as e:
     print(f"flash_news kunde inte registreras (grabit kör vidare): {e}")
 
+# 2j) "Varför rör sig X?": katalysator, volym, optioner, insiders, nyhet och
+#     teknik på ett kort + notis när en bevakad aktie rör sig ≥5 %.
+try:
+    import why_moving
+    why_moving.register(app)
+except Exception as e:
+    print(f"why_moving kunde inte registreras (grabit kör vidare): {e}")
+
 # 2h) Daily hub: före öppning, kvällsrapport, makroutfall, optionsflöden,
 #     short squeeze, smarta pengar och teknisk mätare per tidsram.
 try:

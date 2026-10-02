@@ -4282,17 +4282,32 @@ def _ai_clean(text: str) -> str:
     return _re.sub(r"[ \t]{2,}", " ", t).strip()
 
 
+_SV_WORDS = _re.compile(r"\b(och|att|som|för|är|har|med|inte|aktien|bolaget|kursen|efter|också|eller)\b", _re.I)
+
+
+def _looks_swedish(t: str) -> bool:
+    """Grov koll: å/ä/ö eller flera vanliga svenska ord → texten är svensk."""
+    t = t or ""
+    sv_ch = len(_re.findall(r"[åäöÅÄÖ]", t))
+    sv_w = len(_SV_WORDS.findall(t))
+    # Svenska bolagsnamn (t.ex. Industrivärden) i en engelsk text ska inte räknas.
+    return sv_w >= 3 or sv_ch >= 4 or (sv_ch >= 1 and sv_w >= 1)
+
+
 def _ai_text(cache_key: str, system: str, user: str, max_tokens: int = 220, lang: str = "sv") -> str:
     """Generisk cachad Claude-text. Tom sträng om nyckel saknas/fel."""
     li = _lang_instr(lang)
-    if li:
+    en = bool(li)
+    if en:
         cache_key = cache_key + ":en"
-        system = (system or "") + li
+        # Språkkravet först OCH sist — Haiku följer annars den svenska prompten.
+        system = "Write your answer in English." + (system or "") + li
+        user = (user or "") + "\n\n(Answer in English.)"
     system = (system or "") + (" Ingen markdown (inga # eller **). "
                                "Vägra aldrig och ställ aldrig motfrågor — skriv alltid texten utifrån det du fått.")
     if cache_key in _AI_TEXT_CACHE:
         hit = _AI_TEXT_CACHE[cache_key]
-        if not _AI_REFUSAL.search(hit or ""):
+        if not _AI_REFUSAL.search(hit or "") and not (en and _looks_swedish(hit)):
             return _ai_clean(hit)
         _AI_TEXT_CACHE.pop(cache_key, None)
     client = _anthropic_client()
@@ -4307,6 +4322,17 @@ def _ai_text(cache_key: str, system: str, user: str, max_tokens: int = 220, lang
         resp = client.messages.create(**kw)
         text = "".join(getattr(b, "text", "") for b in resp.content
                        if getattr(b, "type", "") == "text").strip()
+        if en and _looks_swedish(text):
+            # Ett nytt försök med enbart engelsk instruktion; annars hellre ingen text än svenska.
+            kw["system"] = "You are Grabit. Reply ONLY in English. " + li
+            kw["messages"] = [{"role": "user", "content": "Rewrite the following in natural English, "
+                               "keeping the same meaning and any final label lines:\n\n" + text}]
+            resp = client.messages.create(**kw)
+            text = "".join(getattr(b, "text", "") for b in resp.content
+                           if getattr(b, "type", "") == "text").strip()
+            if _looks_swedish(text):
+                print("AI svarade på svenska trots lang=en, visas inte:", cache_key)
+                return ""
         if _AI_REFUSAL.search(text):
             print("AI vägrade/motfrågade, visas inte:", cache_key, text[:120])
             return ""
@@ -4455,6 +4481,12 @@ def ai_news(ticker: str, lang: str = "sv", name: str = ""):
     _CAT_TAXONOMY = ["FDA", "Kontrakt", "Förvärv", "Produktlansering", "Rapport",
                       "Analytiker", "Personal", "Marknad", "Övrigt"]
     _CAT_LOOKUP = {c.lower(): c for c in _CAT_TAXONOMY}
+    # Engelska svar (lang=en) mappas till samma kategorier; appen översätter etiketten.
+    _CAT_LOOKUP.update({"contract": "Kontrakt", "contracts": "Kontrakt", "acquisition": "Förvärv",
+                        "merger": "Förvärv", "product": "Produktlansering", "earnings": "Rapport",
+                        "report": "Rapport", "analyst": "Analytiker", "analysts": "Analytiker",
+                        "personnel": "Personal", "management": "Personal", "market": "Marknad",
+                        "other": "Övrigt"})
     kat_m = _re.search(r"(?:Kategori|Category):\s*(\w+)", txt, _re.I)
     kategori = _CAT_LOOKUP.get(kat_m.group(1).strip().lower(), "") if kat_m else ""
     return {"ticker": tk, "text": txt, "sentiment": senti, "headlines": heads[:6], "category": kategori}

@@ -3746,8 +3746,9 @@ var BULL_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-
 var BEAR_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7L9.5 13L13.5 9.5L20.5 17"/><path d="M15 17H20.5V11.5"/></svg>';
 var FLAT_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12H17"/><path d="M14 8.5L17.5 12L14 15.5"/></svg>';
 function sentimentEmblem(sc){
-  var map={pos:['var(--pos)','Bullish',BULL_SVG],neg:['var(--neg)','Bearish',BEAR_SVG]};
-  var m=map[sc]||['var(--mut)','Neutral',FLAT_SVG];
+  var EN=(window.GRABIT_LANG==="en");
+  var map={pos:['var(--pos)',EN?'Positive news':'Positiva nyheter',BULL_SVG],neg:['var(--neg)',EN?'Negative news':'Negativa nyheter',BEAR_SVG]};
+  var m=map[sc]||['var(--mut)',EN?'Neutral news':'Neutrala nyheter',FLAT_SVG];
   return '<div class="ai-emblem"><div class="ai-em-ic" style="color:'+m[0]+';border-color:'+m[0]+'55">'+m[2]+'</div>'
     +'<div class="ai-em-t" style="color:'+m[0]+'">'+m[1]+'</div></div>';
 }
@@ -3762,11 +3763,13 @@ async function loadStockAI(tkr){
   try{const sR=await fetch(B+"/api/ai_setup/"+encodeURIComponent(tkr)+((window.GRABIT_LANG==="en")?"?lang=en":""),{cache:"no-store"});const sJ=await sR.json();
     if(sJ&&sJ.text)html+='<div class="st-ai-row"><b>Setup</b><span>'+sJ.text.replace(/^\s*#{1,6}[^\n]*\n+/gm,"").replace(/^\s*#{1,6}\s*/gm,"").replace(/\*\*/g,"").replace(/</g,"&lt;")+'</span></div>';}catch(e){}
   try{const nR=await fetch(B+"/api/ai_news/"+encodeURIComponent(tkr)+"?name="+encodeURIComponent((NAMES&&NAMES[tkr])||"")+((window.GRABIT_LANG==="en")?"&lang=en":""),{cache:"no-store"});const nJ=await nR.json();
-    if(nJ&&nJ.text){const sc=nJ.sentiment,lbl=sc==="pos"?"Positivt":sc==="neg"?"Negativt":sc==="neu"?"Neutralt":"";
+    if(nJ&&nJ.text){const EN=(window.GRABIT_LANG==="en"),sc=nJ.sentiment,lbl=sc==="pos"?(EN?"Positive":"Positivt"):sc==="neg"?(EN?"Negative":"Negativt"):sc==="neu"?(EN?"Neutral":"Neutralt"):"";
       const col=sc==="pos"?"var(--pos)":sc==="neg"?"var(--neg)":"var(--mut)";
       const clean=nJ.text.replace(/\*\*/g,"").replace(/^\s*#{1,6}\s*/gm,"").replace(/(Stämpel|Stamp):.*/i,"").replace(/(Kategori|Category):.*/i,"").replace(/</g,"&lt;").trim();_sent=sc;
-      const katH=nJ.category?' <span class="cat-badge">'+nJ.category.replace(/</g,"&lt;")+'</span>':'';
-      html+='<div class="st-ai-row"><b>Nyheter '+(lbl?'<i style="font-style:normal;color:'+col+'">· '+lbl+'</i>':'')+katH+'</b><span>'+clean+'</span></div>';}}catch(e){}
+      const _KEN={"Kontrakt":"Contract","Förvärv":"Acquisition","Produktlansering":"Product launch","Rapport":"Earnings","Analytiker":"Analysts","Personal":"Management","Marknad":"Market","Övrigt":"Other"};
+      const katT=nJ.category?(EN?(_KEN[nJ.category]||nJ.category):nJ.category):"";
+      const katH=katT?' <span class="cat-badge">'+katT.replace(/</g,"&lt;")+'</span>':'';
+      html+='<div class="st-ai-row"><b>'+(EN?'News ':'Nyheter ')+(lbl?'<i style="font-style:normal;color:'+col+'">· '+lbl+'</i>':'')+katH+'</b><span>'+clean+'</span></div>';}}catch(e){}
   if(!html){
     // AI:n svarade inte (nyckel saknas/kallstart/yfinance) — bygg faktabaserad
     // sammanfattning av riktiga siffror. Kortet raderas ALDRIG: vänta in live-datan.
@@ -5491,6 +5494,7 @@ body{background:radial-gradient(130% 55% at 50% -12%,rgba(255,200,61,.075),trans
 #pf .pf2-ai .ai-tx{color:#dfe7ee;font-size:13.5px;line-height:1.55;white-space:pre-wrap}
 #pf .pf2-aibtn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:11px;padding:13px;border-radius:12px;background:rgba(255,200,61,.1);border:1px solid rgba(255,200,61,.5);color:#FFC83D;font-weight:800;font-size:13.5px;letter-spacing:.02em}
 #pf .pf2-empty{color:#7c8a9a;font-size:13px;padding:16px;text-align:center}
+#pf .pf2-msg{display:none;color:#FFC83D;font-size:12.5px;margin:-4px 2px 10px}
 </style>
 <script>
 /* ===== Portfölj 2.0 · lokala innehav + live-kurser + Grabit AI-granskning ===== */
@@ -5503,7 +5507,7 @@ var _PF_Q={};
 
 function initPortfolio(skipFetch){
   var el=document.getElementById("pf");if(!el)return;
-  var H=pfLoad();
+  var H=pfLoad(),EN=(window.GRABIT_LANG==="en");
   var rowsH=H.length?H.map(function(h,i){
     var q=_PF_Q[h.tkr]||{},last=q.last,c=pfCcy(h.tkr);
     var val=last?h.qty*last:null;
@@ -5511,10 +5515,10 @@ function initPortfolio(skipFetch){
     var col=pl==null?"#7c8a9a":(pl>=0?"var(--pos)":"var(--neg)");
     return '<div class="qrow"><div style="flex:1;min-width:0" onclick="openStock(\''+h.tkr+'\')">'
       +'<div class="t" style="font-weight:700">'+h.tkr+(q.score!=null?' <span style="color:#8a93a3;font-weight:600;font-size:11px">· '+q.score+'/10</span>':'')+'</div>'
-      +'<div class="s">'+h.qty+' st · GAV '+h.avg+' '+c+'</div></div>'
+      +'<div class="s">'+h.qty+(EN?' sh · avg ':' st · GAV ')+h.avg+' '+c+'</div></div>'
       +'<div style="text-align:right" onclick="openStock(\''+h.tkr+'\')">'
       +'<div class="num" style="font-weight:700">'+(val!=null?pfFmt(val)+' '+c:'–')+'</div>'
-      +'<div style="color:'+col+';font-size:12px;font-variant-numeric:tabular-nums">'+(pl!=null?((pl>=0?"+":"")+pl.toFixed(1)+"%"):(last?"GAV saknas":"hämtar…"))+'</div></div>'
+      +'<div style="color:'+col+';font-size:12px;font-variant-numeric:tabular-nums">'+(pl!=null?((pl>=0?"+":"")+pl.toFixed(1)+"%"):(last?(EN?"no avg price":"GAV saknas"):(EN?"loading…":"hämtar…")))+'</div></div>'
       +'<div class="pf2-del" onclick="pfDel('+i+')">✕</div></div>';
   }).join(""):'<div class="pf2-empty">Inga innehav ännu. Lägg till din första aktie ovan — ticker, antal och GAV.</div>';
 
@@ -5525,15 +5529,16 @@ function initPortfolio(skipFetch){
     if(h.avg){plW+=h.qty*q.last;plB+=h.qty*h.avg;}});
   var totS=Object.keys(tot).map(function(c){return pfFmt(tot[c])+" "+c;}).join(" + ")||"–";
   var totPl=plB?((plW-plB)/plB*100):null;
-  var plS=totPl!=null?'<span style="color:'+(totPl>=0?"var(--pos)":"var(--neg)")+'">'+(totPl>=0?"+":"")+totPl.toFixed(1)+'% totalt</span>':'';
+  var plS=totPl!=null?'<span style="color:'+(totPl>=0?"var(--pos)":"var(--neg)")+'">'+(totPl>=0?"+":"")+totPl.toFixed(1)+(EN?'% total':'% totalt')+'</span>':'';
 
   el.innerHTML='<div class="pf2-head"><div class="pf2-tl">Totalt värde</div><div class="pf2-tot">'+totS+'</div><div class="pf2-sub">'+plS+'</div></div>'
-    +'<div class="pf2-add"><input id="pf-tk" placeholder="Ticker" autocapitalize="characters" autocomplete="off">'
-    +'<input id="pf-qty" placeholder="Antal" inputmode="decimal" style="max-width:78px">'
-    +'<input id="pf-avg" placeholder="GAV" inputmode="decimal" style="max-width:78px">'
+    +'<div class="pf2-add" onkeydown="if(event.key===\'Enter\')pfAdd()"><input id="pf-tk" placeholder="Ticker" autocapitalize="characters" autocomplete="off">'
+    +'<input id="pf-qty" placeholder="'+(EN?'Shares':'Antal')+'" inputmode="decimal" style="max-width:78px">'
+    +'<input id="pf-avg" placeholder="'+(EN?'Avg price':'GAV')+'" inputmode="decimal" style="max-width:90px">'
     +'<button onclick="pfAdd()">+</button></div>'
+    +'<div id="pf-msg" class="pf2-msg"></div>'
     +'<div class="card">'+rowsH+'</div>'
-    +(H.length?'<button class="pf2-aibtn" id="pf-aibtn" onclick="pfReview()">Granska portföljen med Grabit AI</button>':'')
+    +(H.length?'<button class="pf2-aibtn" id="pf-aibtn" onclick="pfReview()">'+(EN?'Review my portfolio with Grabit AI':'Granska portföljen med Grabit AI')+'</button>':'')
     +'<div id="pf-airesult"></div>';
   if(H.length&&!skipFetch)pfRefresh();
 }
@@ -5555,11 +5560,16 @@ async function pfRefresh(){
   }catch(e){}
 }
 
+function pfNum(v){return parseFloat(String(v||"").replace(/[\s\u00a0$€kr]/gi,"").replace(",","."));}
+function pfMsg(t){var m=document.getElementById("pf-msg");if(m){m.textContent=t||"";m.style.display=t?"block":"none";}}
 function pfAdd(){
-  var tk=(document.getElementById("pf-tk").value||"").trim().toUpperCase();
-  var qty=parseFloat(String(document.getElementById("pf-qty").value).replace(",","."));
-  var avg=parseFloat(String(document.getElementById("pf-avg").value).replace(",","."));
-  if(!tk||!(qty>0)){var i=document.getElementById("pf-tk");if(i)i.focus();return;}
+  var EN=(window.GRABIT_LANG==="en");
+  var tk=(document.getElementById("pf-tk").value||"").trim().toUpperCase().replace(/^\$/,"");
+  var qty=pfNum(document.getElementById("pf-qty").value);
+  var avg=pfNum(document.getElementById("pf-avg").value);
+  if(!tk){pfMsg(EN?"Enter a ticker, e.g. NVDA.":"Skriv en ticker, t.ex. NVDA.");document.getElementById("pf-tk").focus();return;}
+  if(!(qty>0)){pfMsg(EN?"Enter how many shares you own.":"Skriv hur många aktier du äger.");document.getElementById("pf-qty").focus();return;}
+  pfMsg("");
   var H=pfLoad();
   var ex=H.find(function(h){return h.tkr===tk;});
   if(ex){var nq=ex.qty+qty;ex.avg=((ex.avg*ex.qty)+((avg||ex.avg)*qty))/nq;ex.avg=Math.round(ex.avg*100)/100;ex.qty=nq;}
@@ -5572,7 +5582,7 @@ async function pfReview(){
   var H=pfLoad();if(!H.length)return;
   var B=CONFIG.API_BASE?CONFIG.API_BASE.replace(/\/$/,""):"";if(!B)return;
   var btn=document.getElementById("pf-aibtn"),box=document.getElementById("pf-airesult");
-  if(btn){btn.disabled=true;btn.textContent="Grabit AI analyserar…";}
+  var EN=(window.GRABIT_LANG==="en");if(btn){btn.disabled=true;btn.textContent=EN?"Grabit AI is analysing…":"Grabit AI analyserar…";}
   try{
     var r=await fetch(B+"/api/ai_portfolio",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({holdings:H,lang:window.GRABIT_LANG||"sv"})});
@@ -5585,7 +5595,7 @@ async function pfReview(){
   }catch(e){
     box.innerHTML='<div class="pf2-ai"><div class="ai-tx" style="color:#7c8a9a">Nätverksfel — försök igen om en stund.</div></div>';
   }
-  if(btn){btn.disabled=false;btn.textContent="Granska portföljen med Grabit AI";}
+  if(btn){btn.disabled=false;btn.textContent=EN?"Review my portfolio with Grabit AI":"Granska portföljen med Grabit AI";}
 }
 
 /* Ladda portföljen när fliken öppnas + direkt vid start */
@@ -6813,5 +6823,84 @@ async function installApp(){
 })();
 </script>
 
+<style id="why-css">
+.why{margin:10px 0 4px;background:#0f1216;border:1px solid #1f242c;border-radius:14px;padding:14px 14px 10px;position:relative}
+.why-hd{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.why-t{font-size:12px;font-weight:800;letter-spacing:.08em;color:#c9d1dc}
+.why-t b{color:#fff}
+.why-chg{font-size:13px;font-weight:800;padding:3px 8px;border-radius:8px;font-variant-numeric:tabular-nums}
+.why-chg.up{color:#2fd4a3;background:rgba(47,212,163,.1)}.why-chg.dn{color:#f0616d;background:rgba(240,97,109,.1)}
+.why-r{display:grid;grid-template-columns:22px 92px 1fr;gap:8px;align-items:start;padding:8px 0;border-top:1px solid #1a1f26;font-size:13px;line-height:1.4}
+.why-r:first-of-type{border-top:0}
+.why-r svg{width:16px;height:16px;margin-top:1px;stroke:#8a93a3;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.why-r .k{color:#8a93a3;font-size:12px}
+.why-r .v{color:#e8eaed;font-weight:600;min-width:0}
+.why-r .v.hot{color:#FFC83D}
+.why-r .v small{display:block;color:#6b7482;font-weight:500;font-size:11px;margin-top:2px}
+.why-r.news .v{font-weight:500}
+.why-sum{margin-top:8px;padding-top:10px;border-top:1px solid #1a1f26;font-size:12.5px;line-height:1.45;color:#b8c0cb}
+.why-none{font-size:12.5px;color:#8a93a3;padding:4px 0 6px}
+.why-lock{position:relative;min-height:70px}
+</style>
+<script id="why-js">
+(function(){
+  function EN(){return window.GRABIT_LANG==="en";}
+  function B(){try{return (CONFIG.API_BASE||"").replace(/\/$/,"");}catch(e){return "";}}
+  function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
+  function pro(){try{return typeof isPro==="function"&&isPro();}catch(e){return false;}}
+  var IC={
+    catalyst:'<svg viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>',
+    volume:'<svg viewBox="0 0 24 24"><path d="M4 20V10M9 20V4M14 20v-7M19 20V8"/></svg>',
+    options:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg>',
+    insiders:'<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>',
+    analyst:'<svg viewBox="0 0 24 24"><path d="M4 19h16M6 15l4-4 3 3 5-6"/></svg>',
+    news:'<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 9h8M8 13h5"/></svg>',
+    tech:'<svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>'};
+  var LBL={catalyst:["Katalysator","Catalyst"],volume:["Volym","Volume"],options:["Optioner","Options"],insiders:["Insiders","Insiders"],
+    analyst:["Analytiker","Analysts"],news:["Nyhet","News"],tech:["Tekniskt","Technical"]};
+  function ago(iso){try{var m=Math.round((Date.now()-new Date(iso).getTime())/60000);if(!(m>=0))return"";var E=EN();
+    if(m<60)return m+" min";var h=Math.round(m/60);return h<24?(h+(E?" h":" tim")):(Math.round(h/24)+(E?" d":" d"));}catch(e){return"";}}
+  function rowHTML(r){var E=EN(),l=LBL[r.k]||[r.k,r.k];
+    var v=esc(E?r.en:r.sv);
+    if(r.k==="news"){var a=ago(r.ts);var at=a==="0 min"?(E?"just now":"nyss"):(a?(E?a+" ago":"för "+a+" sedan"):"");v='“'+v+'”'+(at||r.source?'<small>'+at+(r.source?(at?" · ":"")+esc(r.source):"")+'</small>':"");}
+    return '<div class="why-r '+r.k+'">'+(IC[r.k]||"")+'<span class="k">'+l[E?1:0]+'</span><span class="v'+(r.hot?" hot":"")+'">'+v+'</span></div>';}
+  function cardHTML(j){
+    var E=EN(),up=(j.chg||0)>=0;
+    var chg=j.chg!=null?'<span class="why-chg '+(up?"up":"dn")+'">'+(up?"+":"")+(E?(+j.chg).toFixed(1):(+j.chg).toFixed(1).replace(".",","))+'%</span>':"";
+    var rows=j.rows||[];
+    var body;
+    if(!rows.length){body='<div class="why-none">'+(E?"No clear news. The move is driven by volume and technicals.":"Ingen tydlig nyhet. Rörelsen drivs av volym och teknik.")+'</div>';}
+    else if(pro()||rows.length<=2){body=rows.map(rowHTML).join("");}
+    else{body=rows.slice(0,2).map(rowHTML).join("")+'<div class="why-lock pro-gated" data-lock="PRO">'+rows.slice(2).map(rowHTML).join("")+'</div>';}
+    var sum=(j.summary&&(pro()||rows.length<=2))?'<div class="why-sum">'+esc(j.summary)+'</div>':"";
+    return '<div class="why" id="st-why"><div class="why-hd"><span class="why-t">'+(E?"WHY IS <b>"+esc(j.tkr)+"</b> MOVING?":"VARFÖR RÖR SIG <b>"+esc(j.tkr)+"</b>?")+'</span>'+chg+'</div>'+body+sum+'</div>';
+  }
+  var CUR=null,DATA={};
+  function place(){
+    var body=document.getElementById("st-body");if(!body||!CUR)return;
+    var j=DATA[CUR];if(!j||!j.notable)return;
+    if(document.getElementById("st-why"))return;
+    var anchor=body.querySelector(".st-price2")||body.querySelector(".score-hero");if(!anchor)return;
+    var w=document.createElement("div");w.innerHTML=cardHTML(j);var card=w.firstChild;
+    anchor.parentNode.insertBefore(card,anchor.nextSibling);
+    try{if(window.applyProLocks)applyProLocks(card);}catch(e){}
+  }
+  async function loadWhy(tkr){
+    CUR=tkr;
+    if(!DATA[tkr]||Date.now()-(DATA[tkr]._t||0)>240000){
+      try{var r=await fetch(B()+"/api/why/"+encodeURIComponent(tkr)+(EN()?"?lang=en":""),{cache:"no-store"});
+        var j=await r.json();j._t=Date.now();DATA[tkr]=j;}catch(e){return;}
+    }
+    if(CUR===tkr)place();
+  }
+  // Aktiekortet ritas om när live-datan kommer — lägg tillbaka kortet då.
+  try{var st=document.getElementById("st-body");if(st)new MutationObserver(function(){if(!document.getElementById("st-why"))place();}).observe(st,{childList:true});}catch(e){}
+  if(typeof window.openStock==="function"){
+    var _os=window.openStock;
+    window.openStock=function(t){var r=_os.apply(this,arguments);try{loadWhy(String(t).toUpperCase());}catch(e){}return r;};
+  }
+  window.loadWhy=loadWhy;
+})();
+</script>
 </body>
 </html>

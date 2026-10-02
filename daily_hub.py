@@ -989,6 +989,9 @@ def _macro_push_scan():
     PN.send_all("GRABIT · Makro USA", "\n".join(lines), url="/", tag="grabit-makro")
 
 
+_MEM_PREV = {}
+
+
 def _mem_report():
     """En rad i loggen per timme: vad håller minnet? (för att hitta läckor)"""
     try:
@@ -1007,11 +1010,20 @@ def _mem_report():
             n = k[0] if isinstance(k, tuple) and k else str(k)
             by_fn[n] = by_fn.get(n, 0) + 1
         top = sorted(by_fn.items(), key=lambda kv: -kv[1])[:6]
+        # Vilka objekttyper växer? Jämför mot förra timmen (hittar läckor).
+        import collections
+        cnt = collections.Counter(type(o).__name__ for o in gc.get_objects())
+        prev = _MEM_PREV.get("cnt") or {}
+        grow = sorted(((k, v - prev.get(k, 0)) for k, v in cnt.items()), key=lambda kv: -kv[1])[:8]
+        _MEM_PREV["cnt"] = dict(cnt)
+        cnt = None
         print("[mem] rss=%dMB cache=%d memo=%d ai=%d fh=%d trådar=%d objekt=%d topp=%s" % (
             rss, len(getattr(A, "_CACHE", {})), len(_MEMO),
             len(getattr(A, "_AI_TEXT_CACHE", {}) or {}), len(getattr(A, "_FH_CACHE", {}) or {}),
             threading.active_count(), len(gc.get_objects()),
             ",".join("%s:%d" % kv for kv in top)))
+        if prev:
+            print("[mem] växer: " + ", ".join("%s +%d" % kv for kv in grow if kv[1] > 0))
     except Exception as e:
         print("[mem] fel:", e)
 
