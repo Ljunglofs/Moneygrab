@@ -137,6 +137,26 @@ def fetch(ticker):
 #  BATCH-HÄMTNING  →  ett anrop för många tickers
 #  Gör hundratals aktier möjligt utan att spamma Yahoo en-och-en.
 #  Returnerar {ticker: df}  (bara de som har giltig data).
+def prune_yf_threads():
+    """yfinance threads=True kör via paketet multitasking, som sparar varje
+    tråd i config["TASKS"] för evigt (minnesläcka ~2 600 trådar/timme).
+    Ta bort döda trådar; levande (pågående nedladdningar) lämnas orörda."""
+    try:
+        import multitasking
+        tasks = multitasking.config.get("TASKS")
+        if not tasks:
+            return 0
+        dead = [t for t in list(tasks) if not t.is_alive()]
+        for t in dead:
+            try:
+                tasks.remove(t)
+            except ValueError:
+                pass
+        return len(dead)
+    except Exception:
+        return 0
+
+
 # ----------------------------------------------------------
 def fetch_many(tickers, period="1y", interval="1d", chunk=60):
     out = {}
@@ -151,6 +171,8 @@ def fetch_many(tickers, period="1y", interval="1d", chunk=60):
                                threads=True, progress=False)
         except Exception:
             continue
+        finally:
+            prune_yf_threads()
         if data is None or len(data) == 0:
             continue
         if len(part) == 1:                          # platt frame (ej grupperad)

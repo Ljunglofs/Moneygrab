@@ -1017,6 +1017,13 @@ def _mem_report():
         grow = sorted(((k, v - prev.get(k, 0)) for k, v in cnt.items()), key=lambda kv: -kv[1])[:8]
         _MEM_PREV["cnt"] = dict(cnt)
         cnt = None
+        try:
+            from sok_module import prune_yf_threads
+            pr = prune_yf_threads()
+            if pr:
+                print("[mem] rensade %d döda yfinance-trådar" % pr)
+        except Exception:
+            pass
         print("[mem] rss=%dMB cache=%d memo=%d ai=%d fh=%d trådar=%d objekt=%d topp=%s" % (
             rss, len(getattr(A, "_CACHE", {})), len(_MEMO),
             len(getattr(A, "_AI_TEXT_CACHE", {}) or {}), len(getattr(A, "_FH_CACHE", {}) or {}),
