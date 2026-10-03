@@ -1,59 +1,123 @@
 {
-  "manad": "September 2026",
-  "manad_en": "September 2026",
-  "ticker": "NOK",
-  "name": "Nokia",
-  "tagline": "Från mobiltelefoner till AI-nätens ryggrad – med Nvidia som delägare",
-  "tagline_en": "From mobile phones to the backbone of AI networks – with Nvidia as a shareholder",
-  "score": 8.4,
+  "manad": "Oktober 2026",
+  "manad_en": "October 2026",
+  "ticker": "ORCL",
+  "name": "Oracle",
+  "tagline": "Från databaser till AI-molnet – orderbok på 664 miljarder dollar och nu Tencent som kund",
+  "tagline_en": "From databases to the AI cloud – a $664 billion backlog and now Tencent as a customer",
+  "score": 7.9,
   "verdict": "KÖP",
   "verdict_en": "BUY",
-  "summary": "Nokia har gått från telefontillverkare till en av världens största leverantörer av nätverksutrustning. Med köpet av Infinera blev bolaget en tung aktör inom optiska nät för datacenter, och Nvidia har gått in som delägare med en investering på en miljard dollar för att bygga AI-RAN – nästa generations mobilnät som kör AI direkt i basstationerna. Ett stabilt bolag med utdelning och patentintäkter, som nu får en AI-story.",
-  "summary_en": "Nokia has gone from phone maker to one of the world's largest suppliers of network equipment. With the Infinera acquisition it became a heavy player in optical networking for data centers, and Nvidia has become a shareholder with a one-billion-dollar investment to build AI-RAN – next-generation mobile networks that run AI directly in the base stations. A stable company with a dividend and patent income that now has an AI story.",
+  "summary": "Oracle har på kort tid gått från att vara ett mjukvarubolag med databaser och affärssystem till en av världens största byggare av AI-datacenter. Molninfrastrukturen (OCI) växte 121 % senaste kvartalet, orderboken är uppe i 664 miljarder dollar och bolaget har just enligt Financial Times landat Tencent som kund i en affär värd runt 7 miljarder dollar. Baksidan är priset för utbyggnaden: rekordhöga investeringar, negativt fritt kassaflöde och en kreditrating precis ovanför skräpnivå. Ett case med stor uppsida – och tydliga risker att hålla koll på.",
+  "summary_en": "In a short time Oracle has gone from a software company built on databases and business applications to one of the world's largest builders of AI data centers. Its cloud infrastructure (OCI) grew 121% last quarter, the backlog stands at $664 billion, and according to the Financial Times it has just landed Tencent as a customer in a deal worth around $7 billion. The flip side is the cost of the build-out: record capital spending, negative free cash flow and a credit rating just above junk. A case with big upside – and clear risks to watch.",
   "sektioner": [
     {
       "h": "Vad de gör",
-      "t": "Tre ben: mobilnät (5G-basstationer och på sikt 6G), nätinfrastruktur (optiska nät, IP-routrar och fast bredband – där Infinera ingår) och Nokia Technologies, som licensierar patent med mycket höga marginaler."
+      "t": "Tre ben: (1) Oracle Cloud Infrastructure (OCI) – hyr ut datakraft och Nvidia-GPU:er till AI-bolag, nu den snabbast växande delen; (2) molnbaserade affärssystem som Fusion ERP och NetSuite (SaaS), som växer stadigt med höga marginaler; (3) databasen och licensaffären – kassakon som finansierat bolaget i decennier."
+    },
+    {
+      "h": "Senaste nytt: Tencent-affären",
+      "t": "Enligt Financial Times (30 september) har Tencent skrivit sitt största utlandsavtal någonsin med Oracle: tillgång till cirka 100 000 avancerade AI-chip i Oracles datacenter i Sydostasien under fem år, värt runt 7 miljarder dollar, med ungefär 30 % betalt i förskott. Kinesiska bolag får inte köpa de mest avancerade Nvidia-chippen, men amerikanska regler förbjuder i dag inte att de hyr kapacitet utomlands. Affären är ännu inte bekräftad av bolagen. Förskottet hjälper finansieringen, och det breddar kundbasen bort från OpenAI."
+    },
+    {
+      "h": "Siffrorna (Q1, aug 2026)",
+      "t": "Intäkter 19,3 miljarder dollar (+30 %), molnintäkter 11,6 miljarder (+62 %) varav molninfrastruktur 7,4 miljarder (+121 %). Justerad vinst per aktie 1,92 dollar mot väntade 1,74. Bolaget tog i drift 850 MW ny datacenterkapacitet under kvartalet och höjde helårsmålet till minst 90 miljarder dollar i intäkter och 8,10 dollar i justerad vinst per aktie."
+    },
+    {
+      "h": "Orderboken",
+      "t": "Kontrakterade men ännu inte levererade intäkter (RPO) uppgick till 664 miljarder dollar, en ökning med 209 miljarder på ett år. Cirka 13 % väntas bli intäkter inom tolv månader och 37 % under år två och tre. Ungefär hälften av orderboken kommer från en enda kund: OpenAI, via Stargate-projektet. Varje ny stor kund som Tencent minskar det beroendet."
+    },
+    {
+      "h": "Kostnaden för tillväxten",
+      "t": "Investeringarna steg 162 % till 55,7 miljarder dollar under räkenskapsåret 2026 och det fria kassaflödet blev −23,7 miljarder. För 2027 räknar finanschefen Hilary Maxson med cirka 70 miljarder i egna investeringar plus 20–25 miljarder som kunder betalar i förskott. Oracle väntas ta in närmare 40 miljarder i ny skuld och eget kapital. S&P sänkte i juli kreditbetyget till BBB-, ett steg över skräpnivå, och Moody's har negativa utsikter."
+    },
+    {
+      "h": "Värdering",
+      "t": "Aktien föll till ett årslägsta runt 131 dollar efter S&P:s sänkning i juli och handlades kring 153–160 dollar efter rapporten i september. Mot bolagets vinstmål på 8,10 dollar per aktie ger det ett P/E runt 19–20 – lågt för ett bolag vars största affär växer över 100 % per år, men skuldbördan förklarar rabatten."
     },
     {
       "h": "Katalysatorer",
-      "t": "Delårsrapport för tredje kvartalet i slutet av oktober. Fältprov med AI-RAN tillsammans med Nvidia och amerikanska operatörer. Fortsatt utbyggnad av datacenter för AI, som behöver snabba optiska förbindelser – just det Infinera-köpet gav Nokia."
+      "t": "Rapport för andra kvartalet i mitten av december. Bekräftelse av Tencent-affären och fler stora kontrakt utanför OpenAI. Nya Stargate-campus och mer datacenterkapacitet som går i drift – det är när kapaciteten levereras som orderboken blir intäkter. Positiva besked om finansieringen eller kreditbetyget kan ge en omvärdering."
     },
     {
       "h": "Ledningen",
-      "t": "VD Justin Hotard kom till Nokia 2025 från Intels datacenter- och AI-verksamhet. Han har styrt om bolaget mot AI och datacenter, som han ser som nätverksbranschens största tillväxtområde."
+      "t": "Sedan hösten 2025 leds Oracle av två vd:ar: Clay Magouyrk, som byggde upp OCI, och Mike Sicilia, med ansvar för branschlösningarna. Grundaren Larry Ellison är kvar som styrelseordförande och teknikchef och är fortfarande största ägare."
+    },
+    {
+      "h": "Risker",
+      "t": "(1) Skuld och kassaflöde: en sänkning till skräpnivå skulle göra lånen dyrare. (2) Koncentration: om OpenAI får problem att betala eller skalar ner slår det direkt mot orderboken. (3) Politik: Tencent-affären bygger på att USA fortsätter tillåta att kinesiska bolag hyr AI-kapacitet utomlands – reglerna kan ändras. (4) Genomförande: förseningar i datacenterbyggen skjuter upp intäkterna."
     },
     {
       "h": "Tesen",
-      "t": "Västvärlden har få betrodda leverantörer av mobilnät – i praktiken Nokia och Ericsson. Nokia kombinerar det läget med en ny AI-exponering via Nvidia och optiska nät. Lägre risk än ett småbolag, med utdelning som stöd. Risker: svag efterfrågan från teleoperatörerna och hård konkurrens."
+      "t": "Oracle är ett av få bolag med både kapacitet och kontrakt i AI-molnet i den här skalan. Orderboken ger synlighet flera år framåt och värderingen är inte ansträngd. Marknaden prisar redan in mycket av skuldrisken. Om bolaget visar att investeringarna börjar bära sig – och fortsätter vinna kunder som Tencent – finns gott om utrymme uppåt. Passar den som tål svängningar; positionsstorleken bör spegla balansräkningsrisken."
     }
   ],
   "sektioner_en": [
     {
       "h": "What they do",
-      "t": "Three legs: mobile networks (5G base stations and eventually 6G), network infrastructure (optical networks, IP routers and fixed broadband – where Infinera sits) and Nokia Technologies, which licenses patents at very high margins."
+      "t": "Three legs: (1) Oracle Cloud Infrastructure (OCI) – renting compute and Nvidia GPUs to AI companies, now the fastest-growing part; (2) cloud business applications such as Fusion ERP and NetSuite (SaaS), growing steadily at high margins; (3) the database and license business – the cash cow that has funded the company for decades."
+    },
+    {
+      "h": "Latest: the Tencent deal",
+      "t": "According to the Financial Times (September 30), Tencent has signed its largest-ever overseas deal with Oracle: access to about 100,000 advanced AI chips in Oracle's Southeast Asian data centers over five years, worth around $7 billion, with roughly 30% paid upfront. Chinese companies can't buy Nvidia's most advanced chips, but US rules don't currently forbid them from renting capacity abroad. The companies have not yet confirmed the deal. The prepayment helps the financing, and it diversifies the customer base away from OpenAI."
+    },
+    {
+      "h": "The numbers (Q1, Aug 2026)",
+      "t": "Revenue $19.3 billion (+30%), cloud revenue $11.6 billion (+62%), of which cloud infrastructure $7.4 billion (+121%). Adjusted EPS $1.92 vs. $1.74 expected. The company brought 850 MW of new data center capacity online in the quarter and raised its full-year target to at least $90 billion in revenue and $8.10 in adjusted EPS."
+    },
+    {
+      "h": "The backlog",
+      "t": "Contracted but not yet delivered revenue (RPO) reached $664 billion, up $209 billion in a year. About 13% is expected to become revenue within twelve months and 37% in years two and three. Roughly half of the backlog comes from a single customer: OpenAI, through the Stargate project. Every new large customer like Tencent reduces that dependence."
+    },
+    {
+      "h": "The cost of growth",
+      "t": "Capital spending rose 162% to $55.7 billion in fiscal 2026 and free cash flow came in at −$23.7 billion. For fiscal 2027, CFO Hilary Maxson expects about $70 billion of its own capex plus $20–25 billion that customers prepay. Oracle is expected to raise close to $40 billion in new debt and equity. S&P cut the credit rating to BBB- in July, one notch above junk, and Moody's has a negative outlook."
+    },
+    {
+      "h": "Valuation",
+      "t": "The stock fell to a 52-week low around $131 after S&P's downgrade in July and traded around $153–160 after the September report. Against the company's EPS target of $8.10 that is a P/E around 19–20 – low for a company whose biggest business is growing over 100% a year, but the debt load explains the discount."
     },
     {
       "h": "Catalysts",
-      "t": "Third-quarter report in late October. AI-RAN field trials with Nvidia and US carriers. The continued build-out of AI data centers, which need fast optical links – exactly what the Infinera deal gave Nokia."
+      "t": "Second-quarter report in mid-December. Confirmation of the Tencent deal and more large contracts outside OpenAI. New Stargate campuses and more data center capacity going live – delivered capacity is what turns the backlog into revenue. Positive news on financing or the credit rating could trigger a re-rating."
     },
     {
       "h": "Leadership",
-      "t": "CEO Justin Hotard joined Nokia in 2025 from Intel's data center and AI business. He has steered the company toward AI and data centers, which he sees as the networking industry's biggest growth area."
+      "t": "Since autumn 2025 Oracle has been run by two co-CEOs: Clay Magouyrk, who built OCI, and Mike Sicilia, responsible for industry applications. Founder Larry Ellison remains chairman and CTO and is still the largest shareholder."
+    },
+    {
+      "h": "Risks",
+      "t": "(1) Debt and cash flow: a cut to junk would make borrowing more expensive. (2) Concentration: if OpenAI struggles to pay or scales back, it hits the backlog directly. (3) Politics: the Tencent deal relies on the US continuing to let Chinese companies rent AI capacity abroad – the rules could change. (4) Execution: delays in data center construction push revenue out."
     },
     {
       "h": "The thesis",
-      "t": "The West has few trusted mobile network suppliers – in practice Nokia and Ericsson. Nokia combines that position with new AI exposure through Nvidia and optical networking. Lower risk than a small cap, with a dividend as support. Risks: weak demand from telecom operators and fierce competition."
+      "t": "Oracle is one of very few companies with both the capacity and the contracts in the AI cloud at this scale. The backlog gives visibility several years out and the valuation isn't stretched. The market already prices in much of the debt risk. If the company shows the investments are starting to pay off – and keeps winning customers like Tencent – there is plenty of upside. Suits investors who can handle volatility; position size should reflect the balance-sheet risk."
     }
   ],
   "nyckeltal": [
     {
       "k": "Sektor",
-      "v": "Nätverk / AI"
+      "v": "Moln / AI-infrastruktur"
     },
     {
       "k": "Börs",
-      "v": "NYSE · Helsingfors"
+      "v": "NYSE"
+    },
+    {
+      "k": "Orderbok (RPO)",
+      "v": "664 mdr USD"
+    },
+    {
+      "k": "Molninfra-tillväxt",
+      "v": "+121 %"
+    },
+    {
+      "k": "Helårsmål intäkter",
+      "v": "≥ 90 mdr USD"
+    },
+    {
+      "k": "Kreditbetyg",
+      "v": "BBB- (S&P)"
     },
     {
       "k": "Utdelning",
@@ -61,17 +125,33 @@
     },
     {
       "k": "Risk",
-      "v": "Medel"
+      "v": "Medel–hög"
     }
   ],
   "nyckeltal_en": [
     {
       "k": "Sector",
-      "v": "Networks / AI"
+      "v": "Cloud / AI infrastructure"
     },
     {
       "k": "Listing",
-      "v": "NYSE · Helsinki"
+      "v": "NYSE"
+    },
+    {
+      "k": "Backlog (RPO)",
+      "v": "$664B"
+    },
+    {
+      "k": "Cloud infra growth",
+      "v": "+121%"
+    },
+    {
+      "k": "FY revenue target",
+      "v": "≥ $90B"
+    },
+    {
+      "k": "Credit rating",
+      "v": "BBB- (S&P)"
     },
     {
       "k": "Dividend",
@@ -79,7 +159,7 @@
     },
     {
       "k": "Risk",
-      "v": "Medium"
+      "v": "Medium–high"
     }
   ]
 }
