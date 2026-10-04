@@ -468,6 +468,46 @@ header nav a{white-space:nowrap}
   </div>
 </div>
 
+<section style="padding-top:26px" id="case">
+  <div class="wrap">
+    <a href="/analys/oracle-oktober-2026" onclick="return openCase(event)" class="case-card">
+      <img src="/analys/bild/oracle-oktober-2026.jpg" alt="Oracle" loading="lazy">
+      <div class="case-tx">
+        <div class="eyebrow" style="color:var(--gold)" data-t="cs1">Free to read &middot; NYSE: ORCL</div>
+        <h2 data-t="cs2">Grabit's October Case &ndash; Oracle</h2>
+        <p class="sub" data-t="cs3">The AI cloud nobody is talking about enough. From databases to AI infrastructure &mdash; a $664B backlog, the Tencent deal and the one question that decides everything.</p>
+        <span class="btn btn-gold" data-t="cs4">Read the case &rarr;</span>
+      </div>
+    </a>
+  </div>
+</section>
+<div id="case-ov" class="case-ov" onclick="if(event.target===this)closeCase()">
+  <div class="case-box"><button class="case-x" onclick="closeCase()" aria-label="Stäng">&times;</button>
+    <iframe id="case-fr" title="Grabit's October Case – Oracle"></iframe></div>
+</div>
+<style>
+.case-card{display:grid;grid-template-columns:minmax(0,280px) 1fr;gap:22px;align-items:center;text-decoration:none;color:inherit;
+  border:1px solid rgba(255,201,64,.45);border-radius:20px;padding:18px;background:linear-gradient(180deg,rgba(255,201,64,.09),rgba(255,201,64,.02))}
+.case-card img{width:100%;border-radius:14px;display:block}
+.case-card h2{margin:8px 0}.case-card .btn{margin-top:12px;display:inline-block}
+@media(max-width:720px){.case-card{grid-template-columns:1fr}}
+.case-ov{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.78);display:none;align-items:center;justify-content:center;padding:16px}
+.case-ov.on{display:flex}
+.case-box{position:relative;width:100%;max-width:800px;height:100%;max-height:94vh;border-radius:18px;overflow:hidden;border:1px solid rgba(255,201,64,.4);background:#020305}
+.case-box iframe{width:100%;height:100%;border:0;display:block;background:#020305}
+.case-x{position:absolute;top:10px;right:12px;z-index:2;width:38px;height:38px;border-radius:50%;border:1px solid rgba(255,255,255,.25);
+  background:rgba(0,0,0,.7);color:#fff;font-size:24px;line-height:1;cursor:pointer}
+</style>
+<script>
+function openCase(e){try{var f=document.getElementById("case-fr");
+  if(!f.src)f.src="/analys/oracle-oktober-2026?embed=1";
+  document.getElementById("case-ov").classList.add("on");document.body.style.overflow="hidden";
+  if(e)e.preventDefault();return false;}catch(x){return true;}}
+function closeCase(){document.getElementById("case-ov").classList.remove("on");document.body.style.overflow="";}
+document.addEventListener("keydown",function(e){if(e.key==="Escape")closeCase();});
+if(location.hash==="#case")setTimeout(openCase,300);
+</script>
+
 <section class="gridsec gold" id="radar" style="padding-top:34px">
   <div class="wrap">
     <div class="center">
@@ -738,7 +778,7 @@ header nav a{white-space:nowrap}
     <div class="row">
       <img src="/grabit_wordmark.png" alt="GRABIT">
       <span class="socs"><a class="soc" href="https://x.com/Grabitlabs" target="_blank" rel="noopener" aria-label="GRABIT on X"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.8 3h3.1l-6.8 7.7L22 21h-6.2l-4.9-6.3L5.3 21H2.2l7.3-8.3L2 3h6.4l4.4 5.8zm-1.1 16.2h1.7L7.4 4.7H5.6z"/></svg></a><a class="soc" href="https://www.instagram.com/grabitlabs" target="_blank" rel="noopener" aria-label="GRABIT on Instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r="1" fill="currentColor" stroke="none"/></svg></a></span>
-      <nav><a href="/villkor" data-t="ft1">Terms</a><a href="/privacy" data-t="ft2">Privacy</a><a href="mailto:support@grabitlabs.com">Support</a><a href="/?pw=1" data-t="openapp">Log in</a></nav>
+      <nav><a href="/villkor" data-t="ft1">Terms</a><a href="/privacy" data-t="ft2">Privacy</a><a href="/analys" data-t="ftan">Analysis</a><a href="mailto:support@grabitlabs.com">Support</a><a href="/?pw=1" data-t="openapp">Log in</a></nav>
     </div>
     <p class="disc" data-t="disc">GRABIT provides technical analysis and information &mdash; not financial advice. Trading securities involves risk and can lead to losses. Past performance is no guarantee of future results. Levels and examples on this page are illustrations.</p>
   </div>
@@ -825,7 +865,7 @@ var SV={tb1:"Vi är live!",tb2:"Early access är öppet — halva priset till 31
  fq7:"Fungerar GRABIT i mobilen?",fa7a:"Ja. GRABIT fungerar i webbläsaren på dator och mobil, och finns som app för Android. Samma konto fungerar överallt &mdash; välj \"Återställ köp\" på en ny enhet.",
  fq8:"Är det här finansiell rådgivning?",fa8a:"Nej. GRABIT tillhandahåller teknisk analys och information. Alla beslut om köp och sälj är dina egna, och handel med värdepapper innebär risk.",
  h2i:"Redo att se marknaden <span class=\"hl\">som proffsen?</span>",s8:"Prova GRABIT PRO gratis i 7 dagar. Allt ingår.",
- ft1:"Villkor",ft2:"Integritetspolicy",
+ ft1:"Villkor",ft2:"Integritetspolicy",cs1:"Gratis att läsa · NYSE: ORCL",cs2:"Grabits Oktober Case – Oracle",cs3:"AI-molnet som ingen pratar tillräckligt om. Från databaser till AI-infrastruktur – en orderbok på 664 miljarder dollar, Tencent-affären och frågan som avgör allt.",cs4:"Läs caset →",ftan:"Analyser",
  disc:"GRABIT tillhandahåller teknisk analys och information &mdash; inte finansiell rådgivning. Handel med värdepapper innebär risk och kan leda till förluster. Historisk avkastning är ingen garanti för framtida resultat. Nivåer och exempel på den här sidan är illustrationer."
 };
 var EN_ORIG={};

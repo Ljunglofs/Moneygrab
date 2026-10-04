@@ -1,0 +1,844 @@
+{
+ "slug": "oracle-oktober-2026",
+ "datum": "2026-10-04",
+ "ticker": "ORCL",
+ "bolag": "Oracle",
+ "serie": "Grabits oktober-case",
+ "titel": "Oracle: AI-molnet som ingen pratar tillräckligt om",
+ "titel_en": "Oracle: the AI cloud nobody is talking about enough",
+ "ingress": "Från databaser till AI-infrastruktur – en orderbok på 664 miljarder dollar, Tencent-affären och frågan som avgör allt: kan Oracle göra om efterfrågan till pengar?",
+ "ingress_en": "From databases to AI infrastructure – a $664 billion backlog, the Tencent deal and the question that decides everything: can Oracle turn demand into cash?",
+ "kallor": [
+  {
+   "t": "Oracle – Q1 FY2027 pressmeddelande (10 sep 2026)",
+   "u": "https://www.oracle.com/news/announcement/q1fy27-earnings-release-2026-09-10/"
+  },
+  {
+   "t": "CNBC – Oracle Q1 earnings report",
+   "u": "https://www.cnbc.com/2026/09/10/oracle-orcl-q1-earnings-report-2027.html"
+  },
+  {
+   "t": "ERP Today – Oracle's $664 billion backlog",
+   "u": "https://erp.today/oracle-q1-fy27-results-664b-backlog-ai-contracts/"
+  },
+  {
+   "t": "US News/Reuters – Tencent leases 100,000 chips from Oracle, FT reports (30 sep 2026)",
+   "u": "https://money.usnews.com/investing/news/articles/2026-09-30/chinas-tencent-leases-100-000-chips-from-oracle-to-accelerate-ai-push-ft-reports"
+  },
+  {
+   "t": "TrendForce – Tencent reportedly signs $7B deal with Oracle",
+   "u": "https://www.trendforce.com/news/2026/10/01/news-tencent-reportedly-signs-7b-deal-to-lease-100000-ai-chips-from-oracle-in-southeast-asia/"
+  },
+  {
+   "t": "heise – S&P downgrades Oracle to BBB-",
+   "u": "https://www.heise.de/en/news/S-P-downgrades-Oracle-to-BBB-only-one-notch-above-junk-level-11363472.html"
+  },
+  {
+   "t": "Converge Digest – Oracle delivers 850 MW and 300,000 GPUs",
+   "u": "https://convergedigest.com/oracle-q1-fy27-oci-850mw-300000-gpus-ai-infrastructure/"
+  },
+  {
+   "t": "Investing.com – Oracle Q1 FY2027 slides (capex, guidance)",
+   "u": "https://www.investing.com/news/company-news/oracle-q1-fy2027-slides-cloud-infrastructure-surges-121-guides-90b-93CH-4897025"
+  },
+  {
+   "t": "CNBC – OpenAI and Oracle add 4.5 gigawatts of Stargate capacity (juli 2025)",
+   "u": "https://www.cnbc.com/2025/07/22/openai-oracle-stargate-texas.html"
+  },
+  {
+   "t": "CSIS – Takeaways from the Trump-Xi White House summit",
+   "u": "https://www.csis.org/analysis/takeaways-trump-xi-white-house-summit"
+  }
+ ],
+ "bild": "oracle-oktober-2026.jpg",
+ "kick": "NYSE: ORCL",
+ "block": [
+  {
+   "p": "Det började inte med AI. Det började med databaser."
+  },
+  {
+   "p": "I decennier byggde Oracle infrastrukturen bakom några av världens största företag. Banker. Flygbolag. Myndigheter. Telekom. Globala koncerner."
+  },
+  {
+   "p": "Men något har förändrats. Oracle bygger inte längre bara systemen som lagrar världens data. Bolaget bygger infrastrukturen som kan driva nästa generation AI."
+  },
+  {
+   "p": "Och ju djupare man gräver, desto intressantare blir historien."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "664 miljarder dollar"
+  },
+  {
+   "p": "Det här är siffran som fick oss att se på Oracle på ett nytt sätt. Vid slutet av senaste kvartalet hade Oracle:"
+  },
+  {
+   "big": "664 mdr USD",
+   "l": "i kontrakterade, ännu ej intäktsförda åtaganden (RPO)"
+  },
+  {
+   "p": "Det är avtalade framtida affärer som ännu inte bokförts som intäkter. Ett år tidigare låg siffran på 455 miljarder dollar. Nu? 664 miljarder."
+  },
+  {
+   "p": "Oracle tecknade dessutom nya AI-molnkontrakt för över 30 miljarder dollar under kvartalet. Och intäkterna från molninfrastrukturen ökade:"
+  },
+  {
+   "big": "+121 %",
+   "l": "jämfört med året innan"
+  },
+  {
+   "p": "Det här är inte ett gammalt mjukvarubolag som försöker hänga med på AI-vågen. Oracle bygger infrastrukturen under den."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Sedan kom Trump och Xi"
+  },
+  {
+   "p": "I slutet av september tog Donald Trump emot Kinas president Xi Jinping i Washington, medan världens två största ekonomier fortsatte att manövrera kring handel, teknik och strategisk konkurrens."
+  },
+  {
+   "p": "Bakom rubrikerna pågår en annan kamp: AI. USA vill skydda sitt tekniska försprång. Kina vill bygga egen AI-förmåga. Och båda behöver samma sak:"
+  },
+  {
+   "strong": "BERÄKNINGSKRAFT."
+  },
+  {
+   "p": "Avancerade AI-chip har blivit en av de strategiskt viktigaste resurserna i världsekonomin. Och amerikanska exportregler gör det allt svårare för kinesiska bolag att komma åt den mest avancerade AI-hårdvaran."
+  },
+  {
+   "p": "Sedan hände något väldigt intressant. Bara dagar efter mötet mellan Trump och Xi kom uppgifter om att Tencent kommit överens om att hyra tillgång till ungefär:"
+  },
+  {
+   "big": "100 000",
+   "l": "avancerade AI-chip i Oracles datacenter i Sydostasien"
+  },
+  {
+   "p": "Affären uppges vara värd runt 7 miljarder dollar över fem år. Reuters rapporterade avtalet den 30 september med Financial Times som källa. Vi har inte sett villkoren bekräftas av Oracle eller Tencent."
+  },
+  {
+   "p": "Men om siffrorna stämmer är det Tencents största AI-infrastrukturavtal utomlands hittills. Och plötsligt blir Oracle-historien mycket större."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Tänk på vad det betyder"
+  },
+  {
+   "p": "Kina behöver beräkningskraft. USA kontrollerar mycket av världens mest avancerade AI-hårdvara. AI-bolag behöver datacenter. Och Oracle har byggt en global molninfrastruktur där den kraften går att nå."
+  },
+  {
+   "p": "Oracle behöver inte nödvändigtvis tillverka chippet. Bolaget kan sälja tillgång till beräkningskraften. Det är en helt annan affär."
+  },
+  {
+   "strong": "NVIDIA säljer acceleratorn. Oracle säljer infrastrukturen runt den."
+  },
+  {
+   "p": "Och i takt med att AI-modellerna växer blir beräkningskraft en av världens mest värdefulla resurser."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "OpenAI"
+  },
+  {
+   "p": "Sedan har vi OpenAI. Oracle är en av de stora infrastrukturpartnerna i Stargate-utbyggnaden. Oracle och OpenAI har kommit överens om att bygga upp till 4,5 GW ytterligare datacenterkapacitet för AI."
+  },
+  {
+   "p": "Det här är inte \"vi bygger ett datacenter till\". Det här är AI-infrastruktur i industriell skala. Och det är där Oracle börjar se väldigt annorlunda ut än det bolag många investerare fortfarande tror att de äger."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Oracles AI-maskin"
+  },
+  {
+   "stats": [
+    {
+     "v": "19,3 mdr USD",
+     "l": "Totala intäkter",
+     "d": "+30 %"
+    },
+    {
+     "v": "11,6 mdr USD",
+     "l": "Molnintäkter totalt",
+     "d": "+62 %"
+    },
+    {
+     "v": "7,4 mdr USD",
+     "l": "Molninfrastruktur",
+     "d": "+121 %"
+    },
+    {
+     "v": "664 mdr USD",
+     "l": "Orderbok (RPO)",
+     "d": "+209 mdr på ett år"
+    },
+    {
+     "v": "+30 mdr USD",
+     "l": "Nya AI-molnkontrakt",
+     "d": "under kvartalet"
+    },
+    {
+     "v": "300 000+",
+     "l": "Levererade GPU:er",
+     "d": "sedan slutet av Q4 FY2026"
+    }
+   ]
+  },
+  {
+   "p": "Oracle räknar också med minst 90 miljarder dollar i intäkter för räkenskapsåret 2027. Det är en helt annan tillväxtprofil än den gamla Oracle-historien."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Och sedan den verkliga vallgraven"
+  },
+  {
+   "p": "Det här är den del av historien som AI-hypen kan få investerare att missa. Oracle har något som många nya AI-bolag saknar:"
+  },
+  {
+   "strong": "DATA."
+  },
+  {
+   "p": "Bolagen som använder Oracle har redan en del av sin mest värdefulla affärsdata i Oracles databaser. Och AI behöver tillgång till den datan. Det skapar en potentiellt mycket stark kedja:"
+  },
+  {
+   "flow": [
+    "Data",
+    "Oracle Database",
+    "Oracle Cloud",
+    "AI-beräkning",
+    "AI-agenter",
+    "AI-tillämpningar"
+   ]
+  },
+  {
+   "p": "Oracle försöker inte bara sälja beräkningskraft. Bolaget sitter redan på decennier av företagsdata och kundrelationer. Det kan bli otroligt värdefullt i AI-eran."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Multimoln-satsningen"
+  },
+  {
+   "p": "Och Oracle gör ett annat intressant drag. Bolaget ber inte nödvändigtvis kunderna att lämna AWS, Azure eller Google Cloud. Oracle vill finnas bredvid dem."
+  },
+  {
+   "list": [
+    "AWS",
+    "Microsoft Azure",
+    "Google Cloud",
+    "Oracle Cloud"
+   ]
+  },
+  {
+   "p": "Det spelar roll. Stora företag vill inte bygga om hela sin teknikplattform varje gång molnmarknaden förändras. Oracle kan bli bryggan mellan olika molnmiljöer. Och när företagen använder fler AI-modeller, fler AI-tjänster och fler typer av beräkningskraft kan den rollen bli ännu viktigare."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Men här är haken"
+  },
+  {
+   "p": "Det här är ingen riskfri AI-raket. Att bygga AI-infrastruktur är extremt dyrt. Oracle investerade ungefär:"
+  },
+  {
+   "big": "28,5 mdr USD",
+   "l": "i investeringar under senaste kvartalet (cirka 18 mdr netto efter kunders förskott och leverantörsfinansiering)"
+  },
+  {
+   "p": "Det fria kassaflödet blev ungefär −5 miljarder dollar. Oracle spenderar enorma summor i dag för att bygga infrastruktur som bolaget räknar med att tjäna pengar på i många år. Det är den största frågan i hela historien."
+  },
+  {
+   "strong": "KAN ORACLE GÖRA OM ALL DEN HÄR EFTERFRÅGAN TILL PENGAR?"
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Det är här jag tycker att historien blir intressant"
+  },
+  {
+   "p": "Jag tror inte att Oracle behöver bli nästa NVIDIA. Det behöver bolaget inte. NVIDIA äger acceleratorlagret. Microsoft har Azure. Amazon har AWS. Google har sitt AI-ekosystem."
+  },
+  {
+   "p": "Oracle behöver äga något annat: infrastrukturlagret som kopplar ihop företagsdata, moln och AI-beräkning. Och om AI-efterfrågan fortsätter växa i något som liknar dagens takt… då blir behovet av beräkningskraft enormt."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Tänk fem år framåt"
+  },
+  {
+   "p": "AI-agenter som jobbar dygnet runt. Företag som automatiserar tusentals processer. AI-modeller som kräver enorma mängder inferens. Kina behöver beräkningskraft. USA behöver beräkningskraft. Europa behöver beräkningskraft. OpenAI behöver beräkningskraft. Och företag behöver koppla sin data till AI."
+  },
+  {
+   "p": "Vem vinner på det? Inte bara bolaget som gör chippet. Inte bara bolaget som bygger AI-modellen. Utan bolaget som står för infrastrukturen mellan dem."
+  },
+  {
+   "strong": "DET ÄR ORACLES SATSNING."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Bull case"
+  },
+  {
+   "p": "Den positiva tesen för Oracle är enkel:"
+  },
+  {
+   "list": [
+    "AI-efterfrågan fortsätter accelerera",
+    "OCI fortsätter växa med tresiffriga tal",
+    "Oracle fortsätter teckna jättelika AI-kontrakt",
+    "Orderboken fortsätter växa",
+    "Ny datacenterkapacitet fortsätter tas i drift",
+    "OpenAI och andra stora kunder fortsätter skala upp",
+    "Multimoln blir allt viktigare"
+   ]
+  },
+  {
+   "p": "Och till slut:"
+  },
+  {
+   "flow": [
+    "Investeringarna toppar",
+    "Utnyttjandet ökar",
+    "Marginalerna förbättras",
+    "Kassaflödet vänder"
+   ]
+  },
+  {
+   "p": "Händer det kan marknaden sluta värdera Oracle som ett gammalt mjukvarubolag – och börja värdera det som en AI-infrastrukturkompounder."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Bear case"
+  },
+  {
+   "p": "Men riskerna är verkliga. AI-infrastruktur kräver enormt mycket kapital. Det fria kassaflödet är negativt just nu. Oracle behöver fortsatt tillgång till finansiering."
+  },
+  {
+   "p": "Konkurrensen är brutal: AWS, Microsoft Azure, Google Cloud, CoreWeave, NVIDIA, AMD – och specialiserade AI-infrastrukturbolag som Cerebras."
+  },
+  {
+   "p": "Det finns också en kundkoncentration. En betydande del av Oracles enorma orderbok är knuten till ett fåtal mycket stora kunder. Om AI-investeringarna saktar in kan Oracle känna av det. Infrastrukturen måste fortfarande betalas."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Siffran jag kommer att bevaka"
+  },
+  {
+   "p": "Glöm hypen en stund. Bevaka:"
+  },
+  {
+   "strong": "FRITT KASSAFLÖDE."
+  },
+  {
+   "p": "Intäkterna kan explodera. Orderboken kan nå hundratals miljarder. AI-kontrakt kan ge spektakulära rubriker. Men till slut måste infrastrukturen generera pengar. Oracle-tesen blir mycket starkare om vi ser:"
+  },
+  {
+   "list": [
+    "Fortsatt stark tillväxt i OCI",
+    "En orderbok som fortsätter växa",
+    "Orderboken som omvandlas till intäkter",
+    "Ökat utnyttjande i datacentren",
+    "Effektivare investeringar",
+    "Fritt kassaflöde som vänder till positivt"
+   ]
+  },
+  {
+   "p": "Det är då historien förändras."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Oracle mot hyperskalarna"
+  },
+  {
+   "stats": [
+    {
+     "v": "AWS",
+     "l": "Skala + marknadsledare"
+    },
+    {
+     "v": "Azure",
+     "l": "Företag + AI + OpenAI"
+    },
+    {
+     "v": "Google Cloud",
+     "l": "AI + egna chip + data"
+    },
+    {
+     "v": "Oracle",
+     "l": "Databas + multimoln + AI-infrastruktur"
+    }
+   ]
+  },
+  {
+   "p": "Oracle behöver inte ersätta AWS. Bolaget behöver inte slå Azure. Det behöver inte bli Google. Det kanske räcker att bli infrastruktur som företagen inte kan ignorera."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Den större AI-historien"
+  },
+  {
+   "p": "Under allt det här finns en ännu större trend. AI rör sig från:"
+  },
+  {
+   "flow": [
+    "Modeller",
+    "Beräkningskraft",
+    "Datacenter",
+    "Energi",
+    "Nätverk",
+    "Databaser",
+    "AI-tillämpningar"
+   ]
+  },
+  {
+   "p": "Oracle sitter mitt i flera av de här lagren. NVIDIA levererar beräkningskraft. AMD utmanar acceleratormarknaden. Energibolagen levererar elen. Datacenterbolagen bygger den fysiska infrastrukturen. Och Oracle försöker bli ett av bolagen som kopplar ihop allt via molnet."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Grabits syn"
+  },
+  {
+   "strong": "ORACLE ÄR INTE NÄSTA NVIDIA. OCH DET ÄR PRECIS DÄRFÖR HISTORIEN ÄR INTRESSANT."
+  },
+  {
+   "p": "NVIDIA dominerar acceleratorlagret. Oracle angriper ett annat lager: AI-molnet. Oracle har redan företagskunder, databaser, OCI, multimoln, AI-kontrakt, exponering mot OpenAI – och nu gigantiska investeringar i AI-infrastruktur."
+  },
+  {
+   "p": "Samtidigt blir den globala kapplöpningen om AI-beräkningskraft allt mer geopolitisk. USA. Kina. Trump. Xi. NVIDIA. AMD. OpenAI. Tencent. Och mitt i allt: Oracle."
+  },
+  {
+   "p": "Därför tycker jag inte att investerare ska se Oracle som \"ett gammalt databasbolag\". Det är gårdagens Oracle. Den nya frågan är:"
+  },
+  {
+   "strong": "KAN ORACLE BLI ETT AV AI-ERANS VIKTIGASTE INFRASTRUKTURBOLAG?"
+  },
+  {
+   "p": "Det är det som gör ORCL intressant för mig. Inte vad Oracle var. Utan vad Oracle håller på att bli."
+  },
+  {
+   "strong": "DEN GAMLA JÄTTEN BYGGER AI-MOLNET."
+  }
+ ],
+ "block_en": [
+  {
+   "p": "It didn't start with AI. It started with databases."
+  },
+  {
+   "p": "For decades, Oracle built the infrastructure behind some of the world's largest companies. Banks. Airlines. Governments. Telecom. Global enterprises."
+  },
+  {
+   "p": "But something has changed. Oracle is no longer just building the systems that store the world's data. It is building the infrastructure that could power the next generation of AI."
+  },
+  {
+   "p": "And the deeper you look, the more interesting the story becomes."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "$664 billion"
+  },
+  {
+   "p": "This is the number that made us look at Oracle differently. At the end of its latest quarter, Oracle had:"
+  },
+  {
+   "big": "$664B",
+   "l": "Remaining Performance Obligations"
+  },
+  {
+   "p": "That's contracted future business that has not yet been recognized as revenue. A year earlier, the number was $455 billion. Now? $664 billion."
+  },
+  {
+   "p": "Oracle also booked more than $30 billion in new AI cloud contracts during the quarter. And Cloud Infrastructure revenue jumped:"
+  },
+  {
+   "big": "+121%",
+   "l": "year over year"
+  },
+  {
+   "p": "This isn't an old software company trying to catch the AI wave. Oracle is building the infrastructure underneath it."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Then came Trump and Xi"
+  },
+  {
+   "p": "In late September, Donald Trump hosted Chinese President Xi Jinping in Washington as the world's two largest economies continued to navigate trade, technology and strategic competition."
+  },
+  {
+   "p": "Behind the headlines sits another battle: AI. The United States wants to protect its technological lead. China wants to build its own AI capabilities. And both sides need the same thing:"
+  },
+  {
+   "strong": "COMPUTE."
+  },
+  {
+   "p": "Advanced AI chips have become one of the most strategically important resources in the global economy. And U.S. export restrictions make access to the most advanced AI hardware increasingly complicated for Chinese companies."
+  },
+  {
+   "p": "Then something very interesting happened. Just days after the Trump–Xi meeting, reports emerged that Tencent had agreed to lease access to approximately:"
+  },
+  {
+   "big": "100,000",
+   "l": "advanced AI chips through Oracle data centers in Southeast Asia"
+  },
+  {
+   "p": "The reported deal is estimated at around $7 billion over five years. Reuters, citing the Financial Times, reported the agreement on September 30. We have not seen the terms confirmed by Oracle or Tencent."
+  },
+  {
+   "p": "But if the numbers are accurate, it would represent Tencent's largest overseas AI infrastructure lease to date. And suddenly, the Oracle story gets much bigger."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Think about what that means"
+  },
+  {
+   "p": "China needs compute. The U.S. controls much of the world's most advanced AI hardware. AI companies need data centers. And Oracle has built a global cloud infrastructure where that compute can be accessed."
+  },
+  {
+   "p": "Oracle doesn't necessarily need to manufacture the chip. It can sell access to the compute. That's a very different business."
+  },
+  {
+   "strong": "NVIDIA sells the accelerator. Oracle sells the infrastructure around it."
+  },
+  {
+   "p": "And as AI models become larger, compute becomes one of the world's most valuable resources."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "OpenAI"
+  },
+  {
+   "p": "Then there is OpenAI. Oracle is a major infrastructure partner in the Stargate buildout. Oracle and OpenAI have agreed to develop up to 4.5 GW of additional AI data-center capacity."
+  },
+  {
+   "p": "This isn't \"let's build another data center.\" This is industrial-scale AI infrastructure. And that's where Oracle starts to look very different from the company many investors still think they own."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "The Oracle AI machine"
+  },
+  {
+   "stats": [
+    {
+     "v": "$19.3B",
+     "l": "Total revenue",
+     "d": "+30%"
+    },
+    {
+     "v": "$11.6B",
+     "l": "Total cloud revenue",
+     "d": "+62%"
+    },
+    {
+     "v": "$7.4B",
+     "l": "Cloud infrastructure",
+     "d": "+121%"
+    },
+    {
+     "v": "$664B",
+     "l": "RPO",
+     "d": "+$209B YoY"
+    },
+    {
+     "v": "+$30B",
+     "l": "New AI cloud contracts",
+     "d": "in the quarter"
+    },
+    {
+     "v": "300,000+",
+     "l": "GPU deliveries",
+     "d": "since end of Q4 FY2026"
+    }
+   ]
+  },
+  {
+   "p": "Oracle is also guiding for at least $90 billion in total revenue for FY2027. That is a very different growth profile from the old Oracle story."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "And then there is the real moat"
+  },
+  {
+   "p": "This is the part of the story that AI hype can make investors overlook. Oracle has something many new AI companies don't:"
+  },
+  {
+   "strong": "DATA."
+  },
+  {
+   "p": "The companies using Oracle already have some of their most valuable business data inside Oracle databases. And AI needs access to that data. That creates a potentially powerful chain:"
+  },
+  {
+   "flow": [
+    "Data",
+    "Oracle Database",
+    "Oracle Cloud",
+    "AI compute",
+    "AI agents",
+    "AI applications"
+   ]
+  },
+  {
+   "p": "Oracle isn't just trying to sell compute. It already sits on top of decades of enterprise data and relationships. That could become incredibly valuable in the AI era."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "The multicloud bet"
+  },
+  {
+   "p": "And Oracle is making another interesting move. It isn't necessarily asking companies to leave AWS, Azure or Google Cloud. It wants Oracle to exist alongside them."
+  },
+  {
+   "list": [
+    "AWS",
+    "Microsoft Azure",
+    "Google Cloud",
+    "Oracle Cloud"
+   ]
+  },
+  {
+   "p": "That matters. Large enterprises don't want to rebuild their entire technology stack every time the cloud market changes. Oracle can potentially become the bridge between different cloud environments. And as companies use more AI models, more AI services and more types of compute, that role could become even more important."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "But here's the catch"
+  },
+  {
+   "p": "This isn't a risk-free AI rocket. Building AI infrastructure is extremely expensive. Oracle spent approximately:"
+  },
+  {
+   "big": "$28.5B",
+   "l": "capital expenditures in the latest quarter (about $18B net after customer prepayments and supplier financing)"
+  },
+  {
+   "p": "Free cash flow was approximately −$5 billion. Oracle is spending enormous amounts of money today to build infrastructure that it expects to monetize for years to come. That's the biggest question in the entire story."
+  },
+  {
+   "strong": "CAN ORACLE TURN ALL THIS DEMAND INTO CASH?"
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "This is where I think the story gets interesting"
+  },
+  {
+   "p": "I don't think Oracle needs to become the next NVIDIA. It doesn't have to. NVIDIA owns the accelerator layer. Microsoft has Azure. Amazon has AWS. Google has its AI ecosystem."
+  },
+  {
+   "p": "Oracle needs to own something different: the infrastructure layer connecting enterprise data, cloud and AI compute. And if AI demand continues growing at anything close to today's pace… the need for compute will be enormous."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Think five years ahead"
+  },
+  {
+   "p": "AI agents working around the clock. Companies automating thousands of processes. AI models requiring enormous amounts of inference. China needing compute. The U.S. needing compute. Europe needing compute. OpenAI needing compute. And enterprises needing to connect their data to AI."
+  },
+  {
+   "p": "Who benefits? Not only the company making the chip. Not only the company building the AI model. But the company providing the infrastructure between them."
+  },
+  {
+   "strong": "THAT IS ORACLE'S BET."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "The bull case"
+  },
+  {
+   "p": "The bullish Oracle thesis is straightforward:"
+  },
+  {
+   "list": [
+    "AI demand keeps accelerating",
+    "OCI keeps growing at triple-digit rates",
+    "Oracle continues signing massive AI contracts",
+    "RPO keeps expanding",
+    "Data-center capacity keeps coming online",
+    "OpenAI and other major customers keep scaling",
+    "Multicloud becomes increasingly important"
+   ]
+  },
+  {
+   "p": "And eventually:"
+  },
+  {
+   "flow": [
+    "Capex peaks",
+    "Utilization rises",
+    "Margins improve",
+    "Free cash flow turns"
+   ]
+  },
+  {
+   "p": "If that happens, the market may stop valuing Oracle as an old enterprise software company. It could start valuing Oracle as an AI infrastructure compounder."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "The bear case"
+  },
+  {
+   "p": "But the risks are real. AI infrastructure requires enormous capital. Free cash flow is currently negative. Oracle needs continued access to financing."
+  },
+  {
+   "p": "Competition is brutal: AWS, Microsoft Azure, Google Cloud, CoreWeave, NVIDIA, AMD — and specialized AI infrastructure companies such as Cerebras."
+  },
+  {
+   "p": "There is also customer concentration. A meaningful portion of Oracle's enormous backlog is tied to a relatively small number of very large customers. If AI spending slows, Oracle could feel it. The infrastructure still has to be paid for."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "The number I will watch"
+  },
+  {
+   "p": "Forget the hype for a moment. Watch:"
+  },
+  {
+   "strong": "FREE CASH FLOW."
+  },
+  {
+   "p": "Revenue can explode. RPO can hit hundreds of billions. AI contracts can create spectacular headlines. But eventually, infrastructure has to produce cash. The Oracle thesis gets much stronger if we see:"
+  },
+  {
+   "list": [
+    "OCI growth staying strong",
+    "RPO continuing to expand",
+    "RPO converting into revenue",
+    "Data-center utilization increasing",
+    "CapEx becoming more efficient",
+    "Free cash flow turning positive"
+   ]
+  },
+  {
+   "p": "That's when the story changes."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Oracle vs the hyperscalers"
+  },
+  {
+   "stats": [
+    {
+     "v": "AWS",
+     "l": "Scale + market leadership"
+    },
+    {
+     "v": "Azure",
+     "l": "Enterprise + AI + OpenAI"
+    },
+    {
+     "v": "Google Cloud",
+     "l": "AI + custom silicon + data"
+    },
+    {
+     "v": "Oracle",
+     "l": "Database + multicloud + AI infrastructure"
+    }
+   ]
+  },
+  {
+   "p": "Oracle doesn't need to replace AWS. It doesn't need to beat Azure. It doesn't need to become Google. It may simply need to become infrastructure that enterprises cannot ignore."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "The bigger AI story"
+  },
+  {
+   "p": "There is an even bigger trend underneath all of this. AI is moving from:"
+  },
+  {
+   "flow": [
+    "Models",
+    "Compute",
+    "Data centers",
+    "Power",
+    "Networking",
+    "Databases",
+    "AI applications"
+   ]
+  },
+  {
+   "p": "Oracle sits directly in the middle of several of these layers. NVIDIA supplies compute. AMD challenges the accelerator market. Energy companies supply the power. Data-center companies build the physical infrastructure. And Oracle is trying to become one of the companies connecting it all through the cloud."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Grabit take"
+  },
+  {
+   "strong": "ORACLE IS NOT THE NEXT NVIDIA. AND THAT'S EXACTLY WHY THE STORY IS INTERESTING."
+  },
+  {
+   "p": "NVIDIA dominates the accelerator layer. Oracle is attacking a different layer: the AI cloud. Oracle already has enterprise customers, databases, OCI, multicloud, AI contracts, OpenAI exposure — and now massive AI infrastructure investments."
+  },
+  {
+   "p": "At the same time, the global race for AI compute is becoming increasingly geopolitical. The U.S. China. Trump. Xi. NVIDIA. AMD. OpenAI. Tencent. And right in the middle: Oracle."
+  },
+  {
+   "p": "That's why I don't think investors should look at Oracle as \"an old database company.\" That's yesterday's Oracle. The new question is:"
+  },
+  {
+   "strong": "CAN ORACLE BECOME ONE OF THE MOST IMPORTANT INFRASTRUCTURE COMPANIES OF THE AI ERA?"
+  },
+  {
+   "p": "That's what makes ORCL interesting to me. Not what Oracle was. But what Oracle is becoming."
+  },
+  {
+   "strong": "THE OLD GIANT IS BUILDING THE AI CLOUD."
+  }
+ ],
+ "serie_en": "Grabit's October case"
+}

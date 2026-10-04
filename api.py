@@ -1672,6 +1672,46 @@ def start_page(request: Request):
         return HTMLResponse(fh.read(), headers={"Cache-Control": "no-cache"})
 
 
+# ---- Analyser (publika artiklar) ------------------------------------
+# Gratis att läsa; betyg och nivåer finns bara i appen. Måste ligga före
+# /{fname} nedan, annars svarar den routen 404 på /analys.
+import articles as _articles
+
+
+@app.get("/analys", response_class=HTMLResponse)
+def analys_index(request: Request):
+    _visit_note(request, "analys")
+    return HTMLResponse(_articles.render_index(), headers={"Cache-Control": "public, max-age=300"})
+
+
+@app.get("/analys/bild/{name}")
+def analys_bild(name: str):
+    p = _articles.image_path(name)
+    if not p:
+        raise HTTPException(404, "Bilden finns inte")
+    media = "image/png" if p.endswith(".png") else ("image/webp" if p.endswith(".webp") else "image/jpeg")
+    return FileResponse(p, media_type=media, headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/analys/{slug}", response_class=HTMLResponse)
+def analys_article(slug: str, request: Request, embed: int = 0):
+    a = _articles.get(slug)
+    if not a:
+        raise HTTPException(404, "Artikeln finns inte")
+    _visit_note(request, "analys")
+    return HTMLResponse(_articles.render_article(a, embed=bool(embed)),
+                        headers={"Cache-Control": "public, max-age=300"})
+
+
+@app.get("/api/articles/latest")
+def articles_latest():
+    a = _articles.latest()
+    if not a:
+        return {"article": None}
+    return {"article": {k: a.get(k) for k in ("slug", "datum", "ticker", "bolag", "titel", "titel_en",
+                                              "ingress", "ingress_en", "serie")}}
+
+
 # ---- Statiska assets (hero-video + poster) -------------------------
 _STATIC_FILES = {
     "bg_1280-1.mp4": "video/mp4",
