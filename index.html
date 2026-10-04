@@ -888,6 +888,12 @@ body{background:
 .scl-h{font-weight:800;font-size:17px;line-height:1.15}
 .scl-d{font-size:12px;color:#8a93a3;margin-top:3px}
 .scl-cnt{margin-left:auto;font-family:var(--disp);font-weight:700;font-size:26px;line-height:1}
+.t3-micro{color:#FFC83D!important;border-color:rgba(255,200,61,.45)!important}
+.scl-size{display:flex;align-items:baseline;gap:8px;margin:16px 2px 4px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,.12)}
+.scl-size b{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#e8edf5}
+.scl-size span{font-size:11px;color:rgba(232,237,245,.55)}
+.scl-size-micro b{color:#FFC83D}
+.scl-cap{color:rgba(232,237,245,.75);border-color:rgba(255,255,255,.18)}
 .scl-row{display:flex;align-items:center;gap:11px;padding:11px 4px;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer}
 .scl-row:active{background:rgba(255,255,255,.03)}
 .scl-nm{min-width:0}
@@ -2451,6 +2457,22 @@ function _scrSort(filt){
   return (a,b)=>(+b.score10||0)-(+a.score10||0);
 }
 function _filterRows(rows,filt){return rows.filter(r=>_scrMatch(filt,r));}
+function _scrPick(sorted,filt){return filt==="micro"?sorted.slice(0,40):_bySizeRows(sorted,40);}
+/* Storleksklass (samma gränser som servern _size_of): storbolag >= $2 mdr,
+   small cap $300M–2 mdr, micro < $300M eller okänt börsvärde. */
+function _sizeOf(r){if(r.size)return r.size;const m=+r.mcap_musd||0;return m>=2000?"large":(m>=300?"small":"micro");}
+function _mcapTxt(m){m=+m||0;if(!m)return"";if(m>=1e6)return"$"+(m/1e6).toFixed(1)+"T";return m>=1000?("$"+(m/1000).toFixed(m>=10000?0:1)+"B"):("$"+Math.round(m)+"M");}
+function _sizeHead(k){const EN=window.GRABIT_LANG==="en";
+  const t={large:EN?["Large & mid caps","over $2B"]:["Storbolag","över $2 mdr"],
+           small:EN?["Small caps","$300M – $2B"]:["Small caps","$300M – 2 mdr"],
+           micro:EN?["Micro caps","under $300M · higher risk"]:["Microcaps","under $300M · högre risk"]}[k];
+  return `<div class="scl-size scl-size-${k}"><b>${t[0]}</b><span>${t[1]}</span></div>`;}
+/* Fallback utan server: samma kvot per storlek som /api/screener. */
+function _bySizeRows(rows,limit){const b={large:[],small:[],micro:[]};rows.forEach(r=>b[_sizeOf(r)].push(r));
+  const q=Math.max(1,Math.floor(limit/3)),take={};let left=limit;
+  ["large","small","micro"].forEach(k=>{take[k]=Math.min(q,b[k].length);left-=take[k];});
+  ["large","small","micro"].forEach(k=>{const x=Math.min(left,b[k].length-take[k]);take[k]+=x;left-=x;});
+  return [].concat(b.large.slice(0,take.large),b.small.slice(0,take.small),b.micro.slice(0,take.micro));}
 function openScreener(i,srvRows,srvCount){
   const s0=(window._screeners||[])[i]; if(!s0)return;
   const s=srvRows?Object.assign({},s0,{_srv:true}):s0;
@@ -2464,15 +2486,18 @@ function openScreener(i,srvRows,srvCount){
     const el0=document.getElementById("screener");el0.classList.add("on");el0.scrollTop=0;
     fetch(B+"/api/screener?f="+encodeURIComponent(s.filt)+"&limit=40",{cache:"no-store"}).then(r=>r.json()).then(j=>{
       (j.rows||[]).forEach(r=>{if(r.name&&!NAMES[r.ticker])NAMES[r.ticker]=r.name;});
-      openScreener(i,j.rows||[],j.count);}).catch(()=>openScreener(i,_filterRows(_screenRows(),s.filt).sort(_scrSort(s.filt)).slice(0,40)));
+      openScreener(i,j.rows||[],j.count);}).catch(()=>openScreener(i,_scrPick(_filterRows(_screenRows(),s.filt).sort(_scrSort(s.filt)),s.filt)));
     return;
   }
   const all=_screenRows();
-  const rows=srvRows||_filterRows(all,s.filt).sort(_scrSort(s.filt)).slice(0,40);
-  const list=rows.length?rows.map(r=>{const tk=r.ticker,sc=+r.score10||0;
+  const rows=srvRows||_scrPick(_filterRows(all,s.filt).sort(_scrSort(s.filt)),s.filt);
+  const grouped=s.filt!=="micro";let cur=null;
+  const list=rows.length?rows.map(r=>{const tk=r.ticker,sc=+r.score10||0,sz=_sizeOf(r);
+    const head=grouped&&sz!==cur?(cur=sz,_sizeHead(sz)):"";
     const rs=r.rs_rating!=null?`<span class="scl-rs">RS ${r.rs_rating}</span>`:"";
-    const extra=s.filt==="micro"&&r.mcap_musd!=null?`<span class="scl-rs">$${Math.round(r.mcap_musd)}M</span>`:(r.earnings_in!=null&&r.earnings_in<=5?`<span class="scl-rs evt-tag">Rapport ${r.earnings_in===0?"idag":"om "+r.earnings_in+" d"}</span>`:"");
-    return `<div class="scl-row" onclick="closeScreener();openStock('${tk}')">${lic(tk,34,scoreColor(sc))}<div class="scl-nm"><div class="scl-t">${tk} ${rs}${extra}</div><div class="scl-co">${NAMES[tk]||r.theme||''}</div></div><div class="scl-sc" style="color:${scoreColor(sc)}">${sc.toFixed(1)}</div></div>`;
+    const mc=_mcapTxt(r.mcap_musd),cap=mc?`<span class="scl-rs scl-cap">${mc}</span>`:"";
+    const earn=r.earnings_in!=null&&r.earnings_in<=5?`<span class="scl-rs evt-tag">Rapport ${r.earnings_in===0?"idag":"om "+r.earnings_in+" d"}</span>`:"";
+    return `${head}<div class="scl-row" onclick="closeScreener();openStock('${tk}')">${lic(tk,34,scoreColor(sc))}<div class="scl-nm"><div class="scl-t">${tk} ${rs}${cap}${earn}</div><div class="scl-co">${NAMES[tk]||r.theme||''}</div></div><div class="scl-sc" style="color:${scoreColor(sc)}">${sc.toFixed(1)}</div></div>`;
   }).join(""):`<div class="scl-empty">${(srvRows||all.length)?"Inga träffar just nu.":"Skannern laddar — försök igen om en stund."}</div>`;
   $("#scr-body").innerHTML=`<div class="scl-head" style="border-color:${c}55"><div class="scl-ic" style="color:${c};background:${c}1a">${I[s.ic]||I.dot}</div><div class="scl-meta"><div class="scl-h">${s.n}</div><div class="scl-d">${s.d}</div></div><div class="scl-cnt" style="color:${c}">${rows.length}</div></div>${scanLine()}${list}`;
   const el=document.getElementById("screener");el.classList.add("on");el.scrollTop=0;
@@ -4332,7 +4357,7 @@ async function loadTopOp(){
     return `<div class="t3-row${!pro&&i>0?" pro-gated":""}"${!pro&&i>0?' data-lock="PRO"':""} onclick="openStock('${p.ticker}')">
       <span class="t3-n">${i+1}</span>${lic(p.ticker,38,col)}
       <div class="t3-mid"><div class="t3-tk">${p.ticker}${tierBadge(p.tier)}</div><div class="t3-nm">${NAMES[p.ticker]||p.name||""}</div>
-        <div class="t3-tags">${p.label?`<span class="t3-tag">${p.label}</span>`:""}${p.rs_rating!=null?`<span class="t3-tag">RS ${p.rs_rating}</span>`:""}${earn}</div>${lvl}</div>
+        <div class="t3-tags">${p.label?`<span class="t3-tag">${p.label}</span>`:""}${p.rs_rating!=null?`<span class="t3-tag">RS ${p.rs_rating}</span>`:""}${p.size?`<span class="t3-tag${p.size==="micro"?" t3-micro":""}">${({large:EN?"Large cap":"Storbolag",small:"Small cap",micro:"Microcap"})[p.size]}${_mcapTxt(p.mcap_musd)?" · "+_mcapTxt(p.mcap_musd):""}</span>`:""}${earn}</div>${lvl}</div>
       <span class="t3-go">&#8594;</span></div>`;};
   el.innerHTML=`<div class="to-k">${EN?"Today's top 3 setups":"Dagens topp 3 lägen"}</div>
    <div class="t3-list">${ps.slice(0,3).map(row).join("")}</div>

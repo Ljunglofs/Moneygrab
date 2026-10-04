@@ -736,6 +736,44 @@ def _market_loop():
         time.sleep(1800)
 
 
+# Storleksklass på börsvärdet (miljoner USD). Okänt börsvärde räknas som micro:
+# det hämtas för de ~2 500 mest omsatta aktierna, så saknas det är bolaget litet.
+_SIZE_LARGE_MUSD = float(os.environ.get("SIZE_LARGE_MUSD", "2000"))
+_SIZE_SMALL_MUSD = float(os.environ.get("SIZE_SMALL_MUSD", "300"))
+_SIZE_ORDER = ("large", "small", "micro")
+
+
+def _size_of(r):
+    try:
+        mc = float(r.get("mcap_musd") or 0)
+    except Exception:
+        mc = 0.0
+    if mc >= _SIZE_LARGE_MUSD:
+        return "large"
+    if mc >= _SIZE_SMALL_MUSD:
+        return "small"
+    return "micro"
+
+
+def _by_size(rows, limit):
+    """Sorterade rader -> grupperade storbolag, small caps, microcaps. Varje
+    grupp får en lika stor kvot så att småbolagens höga RS inte trycker ut
+    storbolagen; tomma kvoter fylls från de andra grupperna."""
+    buckets = {k: [] for k in _SIZE_ORDER}
+    for r in rows:
+        buckets[_size_of(r)].append(r)
+    quota = max(1, limit // len(_SIZE_ORDER))
+    take = {k: min(quota, len(v)) for k, v in buckets.items()}
+    left = limit - sum(take.values())
+    for k in _SIZE_ORDER:
+        if left <= 0:
+            break
+        extra = min(left, len(buckets[k]) - take[k])
+        take[k] += extra
+        left -= extra
+    return [(k, buckets[k][:take[k]]) for k in _SIZE_ORDER]
+
+
 # Samma regler som screener-korten i appen (index.html _scrMatch).
 def _scr_match(f, r):
     lab = str(r.get("label") or "").upper()
@@ -3514,7 +3552,19 @@ def screener(f: str = "bull", limit: int = 40):
     """Ett screener-kort på hela marknaden: träffarna sorterade som i appen."""
     rows = [r for r in (scan_universe(None) or []) if _scr_match(f, r)]
     rows.sort(key=_scr_sort_key(f))
-    return {"f": f, "count": len(rows), "rows": [_slim(r) for r in rows[:max(1, min(limit, 100))]]}
+    limit = max(1, min(limit, 100))
+    if f == "micro":
+        groups = [("micro", rows[:limit])]
+    else:
+        groups = _by_size(rows, limit)
+    out = []
+    for size, grp in groups:
+        for r in grp:
+            d = _slim(r)
+            d["size"] = size
+            out.append(d)
+    sizes = {k: sum(1 for r in rows if _size_of(r) == k) for k in _SIZE_ORDER}
+    return {"f": f, "count": len(rows), "sizes": sizes, "rows": out}
 
 
 @app.get("/api/market/status")
@@ -5442,6 +5492,8 @@ def topop():
     for r in rank[:3]:
         o = _opp_of(r)
         o["tier"] = r.get("tier")
+        o["size"] = _size_of(r)
+        o["mcap_musd"] = r.get("mcap_musd")
         picks.append(o)
     return {"pick": picks[0], "picks": picks, "regim": reg}
 
