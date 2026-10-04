@@ -102,8 +102,8 @@ function setL(l){document.documentElement.lang=l;
 document.querySelectorAll('.L').forEach(e=>e.classList.toggle('on',e.classList.contains('L-'+l)));
 document.querySelectorAll('.lang button').forEach(b=>b.classList.toggle('on',b.dataset.l===l));
 try{localStorage.setItem('grabit_lang',l)}catch(e){}}
-(function(){var s=null;try{s=localStorage.getItem('grabit_lang')}catch(e){}
-setL(s||((navigator.language||'sv').toLowerCase().indexOf('sv')===0?'sv':'en'))})();
+(function(){var q=(location.search.match(/[?&]lang=(sv|en)/)||[])[1];var s=null;try{s=localStorage.getItem('grabit_lang')}catch(e){}
+setL(q||s||((navigator.language||'sv').toLowerCase().indexOf('sv')===0?'sv':'en'))})();
 </script>"""
 
 

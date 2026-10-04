@@ -500,7 +500,9 @@ header nav a{white-space:nowrap}
 </style>
 <script>
 function openCase(e){try{var f=document.getElementById("case-fr");
-  if(!f.src)f.src="/analys/oracle-oktober-2026?embed=1";
+  var l=(document.documentElement.lang==="sv")?"sv":"en";   /* samma språk som sidan */
+  var u="/analys/oracle-oktober-2026?embed=1&lang="+l;
+  if(f.getAttribute("src")!==u)f.setAttribute("src",u);
   document.getElementById("case-ov").classList.add("on");document.body.style.overflow="hidden";
   if(e)e.preventDefault();return false;}catch(x){return true;}}
 function closeCase(){document.getElementById("case-ov").classList.remove("on");document.body.style.overflow="";}
