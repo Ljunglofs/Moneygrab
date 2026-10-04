@@ -3092,9 +3092,21 @@ def _macro_events():
     return out or _MACRO_LAST_GOOD["events"]
 
 
-_FDA_ORD = ("fda", "pdufa", "crl", "approval", "approved", "clearance", "510(k)",
-            "advisory committee", "adcomm", "breakthrough therapy", "fast track",
-            "phase 3", "phase iii", "topline", "nda ", " bla ", "ind ")
+# Hela ord (\b) – gamla substrängsmatchningen släppte igenom t.ex. "beh-IND " och
+# "age-NDA ". Starka termer räcker ensamma; svaga (approves, phase 3 ...) kräver
+# även ett läkemedelsord så att "board approves buyback" inte hamnar i FDA-flödet.
+import re
+_FDA_STARK = re.compile(r"\b(fda|pdufa|crl|complete response|s?nda|s?bla|adcomm|advisory committee|"
+                        r"breakthrough therapy|fast track|priority review|orphan drug|510\(k\)|ema|chmp)\b")
+_FDA_SVAG = re.compile(r"\b(approv\w*|clearance|phase (3|iii|2b)|topline|pivotal|ind)\b")
+_FDA_KONTEXT = re.compile(r"\b(drug|therap\w*|treatment|trial|patients?|study|vaccine|indication|"
+                          r"biologic\w*|dose|cancer|tumou?r|disease|candidate)\b")
+
+
+def _is_fda(h: str) -> bool:
+    hl = (h or "").lower()
+    return bool(_FDA_STARK.search(hl) or (_FDA_SVAG.search(hl) and _FDA_KONTEXT.search(hl)))
+
 
 @cached(1800)
 def _fda_news():
@@ -3114,8 +3126,7 @@ def _fda_news():
         out = []
         for n in (r.json().get("news") or []):
             h = (n.get("headline") or "").strip()
-            hl = " " + h.lower() + " "
-            if not h or not any(w in hl for w in _FDA_ORD):
+            if not h or not _is_fda(h):
                 continue
             syms = [x for x in (n.get("symbols") or []) if x in bio]
             out.append({"rubrik": h, "ticker": (syms[0] if syms else ""),

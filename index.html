@@ -3938,9 +3938,14 @@ function macroPanel(rows){
 }
 function fdaCat(rubrik){
   var s=(rubrik||"").toLowerCase();
-  if(/crl|complete response|rejects?|failed|discontinu/.test(s))return["crl","CRL","high"];
-  if(/\bapprov|approved|clearance|510\(k\)/.test(s))return["approved","APPROVED","high"];
-  if(/nda accepted|accepts nda|\bnda\b|\bbla\b|priority review|pdufa|fast track|breakthrough/.test(s))return["nda","NDA ACCEPTED","high"];
+  if(/\bcrl\b|complete response|rejects?|failed|discontinu/.test(s))return["crl","CRL","high"];
+  // Förseningar före "approved": "approval delayed", "review still ongoing", "no new timeline"
+  if(/delay|postpone|extend|extension|still ongoing|no new timeline|pushe[sd]? back/.test(s))return["crl","FDA DELAY","high"];
+  if(/\bapprov|clearance|510\(k\)/.test(s))return["approved","APPROVED","high"];
+  if(/\b(s?nda|s?bla)\b.*\b(accept|filing|filed|submi)|\b(accept|filing|filed|submi)\w*\b.*\b(s?nda|s?bla)\b/.test(s))return["nda","NDA/BLA FILED","high"];
+  if(/priority review|fast track|breakthrough|orphan drug/.test(s))return["nda","DESIGNATION","high"];
+  if(/pdufa/.test(s))return["nda","PDUFA DATE","high"];
+  if(/advisory committee|adcomm/.test(s))return["nda","ADCOMM","high"];
   if(/phase 3|phase iii|topline|pivotal/.test(s))return["phase","PHASE 3","med"];
   return["reg","REGULATORY","med"];
 }
