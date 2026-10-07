@@ -2799,7 +2799,7 @@ def quotes(tickers: str = ""):
     return {"quotes": out}
 
 
-# ---------- JÄTTARNA: de största bolagen, för den som vill ha trygghet ----------
+# ---------- JÄTTARNA: USA:s största bolag, för den som vill ha trygghet ----------
 # Ungefärlig ordning efter börsvärde. Alla finns i UNIVERSE, så warmup-skanningen
 # har dem redan — endpointen läser bara ur snapshoten.
 GIANTS = {
@@ -2810,19 +2810,12 @@ GIANTS = {
            ("WMT", "Walmart"), ("ORCL", "Oracle"), ("MA", "Mastercard"),
            ("NFLX", "Netflix"), ("XOM", "Exxon Mobil"), ("COST", "Costco"),
            ("JNJ", "Johnson & Johnson"), ("HD", "Home Depot")],
-    "se": [("INVE-B.ST", "Investor"), ("ATCO-A.ST", "Atlas Copco"), ("ABB.ST", "ABB"),
-           ("VOLV-B.ST", "Volvo"), ("ASSA-B.ST", "Assa Abloy"), ("SEB-A.ST", "SEB"),
-           ("HEXA-B.ST", "Hexagon"), ("SAND.ST", "Sandvik"), ("SWED-A.ST", "Swedbank"),
-           ("SHB-A.ST", "Handelsbanken"), ("ERIC-B.ST", "Ericsson"), ("EQT.ST", "EQT"),
-           ("SAAB-B.ST", "Saab"), ("ALFA.ST", "Alfa Laval"), ("EVO.ST", "Evolution"),
-           ("ESSITY-B.ST", "Essity"), ("HM-B.ST", "H&M"), ("TELIA.ST", "Telia"),
-           ("SKF-B.ST", "SKF"), ("BOL.ST", "Boliden")],
 }
 
 
 @app.get("/api/giants")
-def giants(market: str = "us"):
-    lst = GIANTS.get((market or "us").lower(), GIANTS["us"])
+def giants():
+    lst = GIANTS["us"]
     snap = {r.get("ticker"): r for r in scan_universe(None)}
     rows = []
     for tk, name in lst:
@@ -2840,7 +2833,7 @@ def giants(market: str = "us"):
         })
     up = sum(1 for r in rows if r["ret_1"] > 0)
     avg = round(sum(r["ret_1"] for r in rows) / len(rows), 2) if rows else 0.0
-    return {"market": market, "rows": rows, "up": up, "n": len(rows), "avg": avg}
+    return {"rows": rows, "up": up, "n": len(rows), "avg": avg}
 
 
 class PfPayload(BaseModel):
