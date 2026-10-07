@@ -246,6 +246,30 @@ def company_info(ticker: str) -> dict:
         return {}
 
 
+# yfinance .info är seg (och ofta blockerad) på Render — kunde hålla aktiekortet
+# i flera sekunder. Vänta max ~2,5 s; blir den klar senare hamnar svaret i
+# company_info-cachen och nästa öppning av kortet får det direkt.
+from concurrent.futures import ThreadPoolExecutor as _TPE, TimeoutError as _FutTimeout
+_CI_POOL = _TPE(max_workers=4)
+_CI_PENDING: dict = {}
+
+
+def company_info_fast(ticker: str, timeout: float = 2.5) -> dict:
+    if ("company_info", (ticker,)) in _CACHE:
+        return company_info(ticker)
+    fut = _CI_PENDING.get(ticker)
+    if fut is None:
+        fut = _CI_POOL.submit(company_info, ticker)
+        _CI_PENDING[ticker] = fut
+        fut.add_done_callback(lambda _f, t=ticker: _CI_PENDING.pop(t, None))
+    try:
+        return fut.result(timeout=timeout)
+    except _FutTimeout:
+        return {}
+    except Exception:
+        return {}
+
+
 def ai_score_components(a):
     tech = 0
     tech += 3 if a["last"] > a["ema50"] else 0
@@ -1812,14 +1836,23 @@ def screen(themes: Optional[str] = Query(None, description="Komma-separerade tem
 @app.get("/api/stock/{ticker}")
 def stock(ticker: str):
     ticker = ticker.upper()
+    # Aktiekortet anropar den här 2–3 gånger per öppning (kurs, graf, sök);
+    # analys + breakout-motor cachas kort så bara första anropet räknar.
+    payload = _stock_core(ticker)
+    if payload is None:
+        raise HTTPException(404, f"Ingen data för {ticker}")
+    return dict(payload, company=company_info_fast(ticker))
+
+
+@cached(90)
+def _stock_core(ticker: str):
     a = scan(ticker)
     if not a:
-        raise HTTPException(404, f"Ingen data för {ticker}")
+        return None
     payload = {
         "analysis": _jsonable(a),
         "ai_score": ai_score_components(a),
         "trade_motor": trade_motor_v2(a),
-        "company": company_info(ticker),
         "engine": None,
     }
     # Breakout-motor (ringar + entry/exit) om modulen finns
@@ -2023,7 +2056,7 @@ def _num(v, dec=2, suf="", sign=False):
 
 def _fmt_stock_ctx(a: dict) -> str:
     """En kompakt kontextrad per aktie ur analyze()-datan."""
-    name = company_info(a.get("ticker", "")).get("name") or a.get("ticker", "")
+    name = company_info_fast(a.get("ticker", ""), 1.5).get("name") or a.get("ticker", "")
     last = a.get("last", 0) or 0
     ema50 = "över" if last > (a.get("ema50") or 9e9) else "under"
     ema200 = "över" if last > (a.get("ema200") or 9e9) else "under"
@@ -2130,6 +2163,17 @@ _QUOTA_MSG = ("Du har nått dagens gräns för AI-frågor. "
               "fungerar som vanligt under tiden.")
 
 
+_WEB_RX = _re.compile(
+    r"NYHET|NEWS|VARFÖR|WHY|IDAG|TODAY|IGÅR|YESTERDAY|SENASTE|LATEST|RAPPORT|EARNINGS|"
+    r"KVARTAL|QUARTER|IPO|NOTERING|FÖRVÄRV|UPPKÖP|ACQUI|MERGER|ÄGER|OWNS|INSIDER|"
+    r"ANALYTIKER|ANALYST|RIKTKURS|TARGET|UTDELNING|DIVIDEND|FED|RÄNTA|INFLATION|KPI|CPI|"
+    r"VAL\b|ELECTION|TULL|TARIFF|HÄNDE|HAPPEN|JUST NU|RIGHT NOW|20\d\d")
+
+
+def _needs_web(question: str) -> bool:
+    return bool(_WEB_RX.search(question.upper()))
+
+
 @app.post("/api/ai")
 def ai(payload: AiPayload, request: Request):
     q = (payload.question or "").strip()
@@ -2167,20 +2211,30 @@ def ai(payload: AiPayload, request: Request):
 
     import datetime as _dt
     _today = _dt.date.today().isoformat()
-    sys_live = (SYSTEM_PROMPT +
-                f"\n\nDagens datum är {_today}. Du har tillgång till webbsökning. "
-                "Använd den för aktuella fakta (kurser, IPO:er, bolagsnyheter, vem som äger vad) "
-                "istället för att svara från minnet, eftersom din träningsdata kan vara inaktuell. "
+    # Webbsökning var påslagen för ALLA frågor (upp till 4 sökningar) och stod
+    # för det mesta av väntetiden. Nu bara när frågan gäller färska händelser;
+    # kurser och tekniska lägen finns redan i live-datan från scannern.
+    search = _needs_web(q)
+    sys_live = (SYSTEM_PROMPT + f"\n\nDagens datum är {_today}. "
+                + ("Du har tillgång till webbsökning. Använd den för aktuella fakta "
+                   "(nyheter, rapporter, IPO:er, vem som äger vad) istället för att svara "
+                   "från minnet, eftersom din träningsdata kan vara inaktuell. "
+                   if search else
+                   "Svara utifrån live-datan och din kunskap. Gäller frågan färska "
+                   "händelser du inte känner till — säg det kort i stället för att gissa. ")
                 + ("Respond ONLY in natural English." if str(getattr(payload,"lang","sv")).lower().startswith("en") else "Svara alltid på svenska."))
 
     try:
         try:
+            kw = {}
+            if search:
+                kw["tools"] = [{"type": "web_search_20250305", "name": "web_search", "max_uses": 2}]
             resp = client.messages.create(
                 model=AI_MODEL_SMART,
                 max_tokens=_SMART_MAXTOK,
                 system=sys_live,
                 messages=msgs,
-                tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 4}],
+                **kw,
             )
         except Exception:
             # SDK/modell stödjer kanske inte web_search -> kör utan, så AI:n aldrig dör
@@ -2743,6 +2797,50 @@ def quotes(tickers: str = ""):
             "ret_5": round(float(a.get("ret_5") or 0), 1),   # 5 dagar
         }
     return {"quotes": out}
+
+
+# ---------- JÄTTARNA: de största bolagen, för den som vill ha trygghet ----------
+# Ungefärlig ordning efter börsvärde. Alla finns i UNIVERSE, så warmup-skanningen
+# har dem redan — endpointen läser bara ur snapshoten.
+GIANTS = {
+    "us": [("NVDA", "Nvidia"), ("MSFT", "Microsoft"), ("AAPL", "Apple"),
+           ("GOOGL", "Alphabet"), ("AMZN", "Amazon"), ("META", "Meta"),
+           ("AVGO", "Broadcom"), ("TSLA", "Tesla"), ("BRK-B", "Berkshire Hathaway"),
+           ("JPM", "JPMorgan"), ("LLY", "Eli Lilly"), ("V", "Visa"),
+           ("WMT", "Walmart"), ("ORCL", "Oracle"), ("MA", "Mastercard"),
+           ("NFLX", "Netflix"), ("XOM", "Exxon Mobil"), ("COST", "Costco"),
+           ("JNJ", "Johnson & Johnson"), ("HD", "Home Depot")],
+    "se": [("INVE-B.ST", "Investor"), ("ATCO-A.ST", "Atlas Copco"), ("ABB.ST", "ABB"),
+           ("VOLV-B.ST", "Volvo"), ("ASSA-B.ST", "Assa Abloy"), ("SEB-A.ST", "SEB"),
+           ("HEXA-B.ST", "Hexagon"), ("SAND.ST", "Sandvik"), ("SWED-A.ST", "Swedbank"),
+           ("SHB-A.ST", "Handelsbanken"), ("ERIC-B.ST", "Ericsson"), ("EQT.ST", "EQT"),
+           ("SAAB-B.ST", "Saab"), ("ALFA.ST", "Alfa Laval"), ("EVO.ST", "Evolution"),
+           ("ESSITY-B.ST", "Essity"), ("HM-B.ST", "H&M"), ("TELIA.ST", "Telia"),
+           ("SKF-B.ST", "SKF"), ("BOL.ST", "Boliden")],
+}
+
+
+@app.get("/api/giants")
+def giants(market: str = "us"):
+    lst = GIANTS.get((market or "us").lower(), GIANTS["us"])
+    snap = {r.get("ticker"): r for r in scan_universe(None)}
+    rows = []
+    for tk, name in lst:
+        a = snap.get(tk) or scan(tk)
+        if not a:
+            continue
+        rows.append({
+            "ticker": tk, "name": name,
+            "last": a.get("last"),
+            "ret_1": round(float(a.get("ret_1") or 0), 2),
+            "ret_5": round(float(a.get("ret_5") or 0), 2),
+            "ret_20": round(float(a.get("ret_20") or 0), 2),
+            "score": a.get("score10"),
+            "label": a.get("label", ""),
+        })
+    up = sum(1 for r in rows if r["ret_1"] > 0)
+    avg = round(sum(r["ret_1"] for r in rows) / len(rows), 2) if rows else 0.0
+    return {"market": market, "rows": rows, "up": up, "n": len(rows), "avg": avg}
 
 
 class PfPayload(BaseModel):
