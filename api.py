@@ -1712,6 +1712,18 @@ def articles_latest():
                                               "ingress", "ingress_en", "serie")}}
 
 
+# Alla artiklar, nyast först – /start visar den senaste stort och resten
+# i arkivet "Grabits Deep Dives". Bara kortfält, aldrig brödtexten.
+_ART_CARD = ("slug", "datum", "ticker", "bolag", "kick", "bild", "manad", "manad_en",
+             "titel", "titel_en", "ingress", "ingress_en", "kort_titel", "kort_titel_en",
+             "kort_text", "kort_text_en")
+
+
+@app.get("/api/articles")
+def articles_list():
+    return {"articles": [{k: a.get(k) for k in _ART_CARD} for a in _articles.all_articles()]}
+
+
 # ---- Statiska assets (hero-video + poster) -------------------------
 _STATIC_FILES = {
     "bg_1280-1.mp4": "video/mp4",

@@ -470,15 +470,19 @@ header nav a{white-space:nowrap}
 
 <section style="padding-top:26px" id="case">
   <div class="wrap">
-    <a href="/analys/oracle-oktober-2026" onclick="return openCase(event)" class="case-card">
-      <img src="/analys/bild/oracle-oktober-2026.jpg" alt="Oracle" loading="lazy">
+    <a href="/analys/oracle-oktober-2026" data-slug="oracle-oktober-2026" onclick="return openCase(event,this.getAttribute('data-slug'))" class="case-card" id="case-main">
+      <img src="/analys/bild/oracle-oktober-2026.jpg" alt="Oracle" loading="lazy" id="case-img">
       <div class="case-tx">
-        <div class="eyebrow" style="color:var(--gold)" data-t="cs1">Free to read &middot; NYSE: ORCL</div>
-        <h2 data-t="cs2">Grabit's October Case &ndash; Oracle</h2>
-        <p class="sub" data-t="cs3">The AI cloud nobody is talking about enough. From databases to AI infrastructure &mdash; a $664B backlog, the Tencent deal and the one question that decides everything.</p>
+        <div class="eyebrow" style="color:var(--gold)" data-t="cs1" id="case-kick">Free to read &middot; NYSE: ORCL</div>
+        <h2 data-t="cs2" id="case-h">Grabit's October Case &ndash; Oracle</h2>
+        <p class="sub" data-t="cs3" id="case-p">The AI cloud nobody is talking about enough. From databases to AI infrastructure &mdash; a $664B backlog, the Tencent deal and the one question that decides everything.</p>
         <span class="btn btn-gold" data-t="cs4">Read the case &rarr;</span>
       </div>
     </a>
+    <div id="dd" class="dd" hidden>
+      <div class="dd-hd"><h3 data-t="dd1">Grabit's Deep Dives</h3><span data-t="dd2">Earlier cases &middot; still free to read</span></div>
+      <div class="dd-grid" id="dd-grid"></div>
+    </div>
   </div>
 </section>
 <div id="case-ov" class="case-ov" onclick="if(event.target===this)closeCase()">
@@ -491,6 +495,16 @@ header nav a{white-space:nowrap}
 .case-card img{width:100%;border-radius:14px;display:block}
 .case-card h2{margin:8px 0}.case-card .btn{margin-top:12px;display:inline-block}
 @media(max-width:720px){.case-card{grid-template-columns:1fr}}
+.dd{margin-top:26px}
+.dd-hd{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.dd-hd h3{margin:0;font-size:20px;color:#fff}.dd-hd span{color:var(--mut2);font-size:13px}
+.dd-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+.dd-c{display:flex;flex-direction:column;text-decoration:none;color:inherit;border:1px solid rgba(255,201,64,.25);border-radius:16px;overflow:hidden;
+  background:rgba(255,201,64,.03);transition:border-color .2s,transform .2s}
+.dd-c:hover{border-color:rgba(255,201,64,.6);transform:translateY(-2px)}
+.dd-c img{width:100%;aspect-ratio:16/10;object-fit:cover;object-position:top;display:block;background:#0b0f14}
+.dd-c div{padding:12px 14px 14px}.dd-c small{color:var(--gold);font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+.dd-c b{display:block;margin:5px 0 4px;font-size:16px;line-height:1.3}.dd-c p{margin:0;color:var(--mut2);font-size:13px;line-height:1.5}
 .case-ov{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.78);display:none;align-items:center;justify-content:center;padding:16px}
 .case-ov.on{display:flex}
 .case-box{position:relative;width:100%;max-width:800px;height:100%;max-height:94vh;border-radius:18px;overflow:hidden;border:1px solid rgba(255,201,64,.4);background:#020305}
@@ -499,15 +513,36 @@ header nav a{white-space:nowrap}
   background:rgba(0,0,0,.7);color:#fff;font-size:24px;line-height:1;cursor:pointer}
 </style>
 <script>
-function openCase(e){try{var f=document.getElementById("case-fr");
+function openCase(e,slug){try{var f=document.getElementById("case-fr");
   var l=(document.documentElement.lang==="sv")?"sv":"en";   /* samma språk som sidan */
-  var u="/analys/oracle-oktober-2026?embed=1&lang="+l;
+  slug=slug||document.getElementById("case-main").getAttribute("data-slug");
+  var u="/analys/"+encodeURIComponent(slug)+"?embed=1&lang="+l;
   if(f.getAttribute("src")!==u)f.setAttribute("src",u);
   document.getElementById("case-ov").classList.add("on");document.body.style.overflow="hidden";
   if(e)e.preventDefault();return false;}catch(x){return true;}}
 function closeCase(){document.getElementById("case-ov").classList.remove("on");document.body.style.overflow="";}
 document.addEventListener("keydown",function(e){if(e.key==="Escape")closeCase();});
 if(location.hash==="#case")setTimeout(openCase,300);
+/* Senaste caset visas stort, alla tidigare ligger kvar i "Grabits Deep Dives".
+   Ny artikel = ny JSON-fil i articles/ – sidan uppdaterar sig själv. */
+var CASES=null;
+function _ce(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
+function renderCases(){if(!CASES||!CASES.length)return;var sv=document.documentElement.lang==="sv",k=sv?"":"_en";
+  function t(a,f){return a[f+k]||a[f]||"";}
+  var a=CASES[0],m=document.getElementById("case-main");
+  m.setAttribute("href","/analys/"+a.slug);m.setAttribute("data-slug",a.slug);
+  if(a.bild){var im=document.getElementById("case-img");im.src="/analys/bild/"+a.bild;im.alt=a.bolag||"";}
+  document.getElementById("case-kick").innerHTML=(sv?"Gratis att läsa":"Free to read")+(a.kick?" &middot; "+_ce(a.kick):"");
+  document.getElementById("case-h").textContent=t(a,"kort_titel")||t(a,"titel");
+  document.getElementById("case-p").textContent=t(a,"kort_text")||t(a,"ingress");
+  var rest=CASES.slice(1),g=document.getElementById("dd-grid");
+  document.getElementById("dd").hidden=!rest.length;
+  g.innerHTML=rest.map(function(b){return '<a class="dd-c" href="/analys/'+_ce(b.slug)+'" data-slug="'+_ce(b.slug)+'" onclick="return openCase(event,this.getAttribute(\'data-slug\'))">'
+    +(b.bild?'<img src="/analys/bild/'+_ce(b.bild)+'" alt="'+_ce(b.bolag)+'" loading="lazy">':"")
+    +'<div><small>'+_ce(t(b,"manad")||b.datum)+(b.ticker?" &middot; "+_ce(b.ticker):"")+'</small><b>'+_ce(t(b,"kort_titel")||t(b,"titel"))+'</b><p>'+_ce(t(b,"ingress"))+'</p></div></a>';}).join("");}
+document.addEventListener("DOMContentLoaded",function(){if(typeof applyLang!=="function")return;   /* språkbyte ritar om korten */
+  var al=applyLang;applyLang=function(l){al(l);renderCases();};renderCases();});
+fetch("/api/articles").then(function(r){return r.json();}).then(function(d){CASES=(d&&d.articles)||[];renderCases();}).catch(function(){});
 </script>
 
 <section class="gridsec gold" id="radar" style="padding-top:34px">
@@ -867,7 +902,7 @@ var SV={tb1:"Vi är live!",tb2:"Early access är öppet — halva priset till 31
  fq7:"Fungerar GRABIT i mobilen?",fa7a:"Ja. GRABIT fungerar i webbläsaren på dator och mobil, och finns som app för Android. Samma konto fungerar överallt &mdash; välj \"Återställ köp\" på en ny enhet.",
  fq8:"Är det här finansiell rådgivning?",fa8a:"Nej. GRABIT tillhandahåller teknisk analys och information. Alla beslut om köp och sälj är dina egna, och handel med värdepapper innebär risk.",
  h2i:"Redo att se marknaden <span class=\"hl\">som proffsen?</span>",s8:"Prova GRABIT PRO gratis i 7 dagar. Allt ingår.",
- ft1:"Villkor",ft2:"Integritetspolicy",cs1:"Gratis att läsa · NYSE: ORCL",cs2:"Grabits Oktober Case – Oracle",cs3:"AI-molnet som ingen pratar tillräckligt om. Från databaser till AI-infrastruktur – en orderbok på 664 miljarder dollar, Tencent-affären och frågan som avgör allt.",cs4:"Läs caset →",ftan:"Analyser",
+ ft1:"Villkor",ft2:"Integritetspolicy",cs1:"Gratis att läsa · NYSE: ORCL",cs2:"Grabits Oktober Case – Oracle",cs3:"AI-molnet som ingen pratar tillräckligt om. Från databaser till AI-infrastruktur – en orderbok på 664 miljarder dollar, Tencent-affären och frågan som avgör allt.",cs4:"Läs caset →",ftan:"Analyser",dd1:"Grabits Deep Dives",dd2:"Tidigare case · fortfarande gratis att läsa",
  disc:"GRABIT tillhandahåller teknisk analys och information &mdash; inte finansiell rådgivning. Handel med värdepapper innebär risk och kan leda till förluster. Historisk avkastning är ingen garanti för framtida resultat. Nivåer och exempel på den här sidan är illustrationer."
 };
 var EN_ORIG={};

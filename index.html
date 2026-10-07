@@ -7,7 +7,7 @@
    Android-appen (referrer android-app://) och installerad app (standalone). */
 (function(){try{
   var q=location.search;
-  if(/[?&](app|pw|install|case)=/.test(q)){localStorage.setItem("grabit_seen_start","1");return;}
+  if(/[?&](app|pw|install|case|stock)=/.test(q)){localStorage.setItem("grabit_seen_start","1");return;}
   if(localStorage.getItem("grabit_pro")==="1"||localStorage.getItem("grabit_seen_start"))return;
   if((document.referrer||"").indexOf("android-app://")===0)return;
   if(window.matchMedia&&matchMedia("(display-mode: standalone)").matches)return;
@@ -4731,7 +4731,12 @@ paywallCheck();
       try{localStorage.setItem("grabit_seen_start","1");sessionStorage.setItem("grabit_pw_seen","1");}catch(e){}
       var _ct=0;(function _openCase(){var _mc=(typeof _MCASE!=="undefined")&&_MCASE;if(_mc||_ct>40){if(_mc){openMonthly();if(!isPro())setTimeout(function(){showPaywall(null,true);},700);}return;}
         _ct++;setTimeout(_openCase,250);})();}
-    if(_q.has("pw")||_q.has("app")||_q.has("plan")||_q.has("case"))history.replaceState(null,"",location.pathname);
+    /* Från en artikel: ?stock=VST öppnar aktiekortet direkt (nivåerna är PRO-låsta som vanligt). */
+    var _st=(_q.get("stock")||"").toUpperCase();
+    if(/^[A-Z][A-Z.\-]{0,5}$/.test(_st)){
+      try{localStorage.setItem("grabit_seen_start","1");sessionStorage.setItem("grabit_pw_seen","1");}catch(e){}
+      setTimeout(function(){openStock(_st);if(!isPro())setTimeout(function(){showPaywall(null,true);},1500);},300);}
+    if(_q.has("pw")||_q.has("app")||_q.has("plan")||_q.has("case")||_q.has("stock"))history.replaceState(null,"",location.pathname);
   }catch(e){}
   if(CONFIG.LOCK_TABS){setTimeout(function(){
     try{if(isPro()||sessionStorage.getItem("grabit_pw_seen"))return;sessionStorage.setItem("grabit_pw_seen","1");}catch(e){}

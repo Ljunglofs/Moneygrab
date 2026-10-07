@@ -1,0 +1,1064 @@
+{
+ "slug": "ai-power-oktober-2026",
+ "datum": "2026-10-06",
+ "ticker": "VST & XE",
+ "bolag": "Vistra · X-energy",
+ "kick": "NYSE: VST · NASDAQ: XE",
+ "serie": "Grabits Bottleneck Take",
+ "serie_en": "Grabit's Bottleneck Take",
+ "titel": "The Next AI Bottleneck: Power",
+ "titel_en": "The Next AI Bottleneck: Power",
+ "ingress": "AI kan inte växa utan el. Rekordhög elförbrukning, datacenter och kärnkraftens comeback – därför tror vi att energi kan bli nästa stora AI-tema. Vistra är Power Today, X-energy är Power Tomorrow.",
+ "ingress_en": "AI can't expand without electricity. Record power demand, data centers and a nuclear comeback – why we believe energy could become the next major AI investment theme. Vistra is Power Today, X-energy is Power Tomorrow.",
+ "kort_titel": "Grabits Bottleneck Take – Power",
+ "kort_titel_en": "Grabit's Bottleneck Take – Power",
+ "kort_text": "AI:s nästa flaskhals är el. Kärnkraftens comeback, Vistra som Power Today, X-energy som Power Tomorrow – och hela kedjan från kraftverk till datacenter.",
+ "kort_text_en": "AI's next bottleneck is electricity. The nuclear comeback, Vistra as Power Today, X-energy as Power Tomorrow – and the full chain from power plant to data center.",
+ "manad": "Oktober 2026",
+ "manad_en": "October 2026",
+ "bild": "ai-power-oktober-2026.jpg",
+ "aktier": [
+  {
+   "t": "VST",
+   "n": "Vistra"
+  },
+  {
+   "t": "XE",
+   "n": "X-energy"
+  }
+ ],
+ "kallor": [
+  {
+   "t": "Reuters/The Star – US power use to beat record highs in 2026 and 2027, EIA says",
+   "u": "https://www.thestar.com.my/tech/tech-news/2026/07/08/us-power-use-to-beat-record-highs-in-2026-and-2027-as-ai-use-surges-eia-says"
+  },
+  {
+   "t": "Google & Constellation – 890 MW of new nuclear capacity (6 okt 2026)",
+   "u": "https://www.googlecloudpresscorner.com/2026-10-06-Google-and-Constellation-Announce-Landmark-Agreement-to-Bring-890-MW-of-New-Nuclear-Capacity-to-PJM-Grid-as-Part-of-Long-Term-Power-Deal"
+  },
+  {
+   "t": "Constellation & Amazon – 20-year PPA at Calvert Cliffs",
+   "u": "https://www.constellationenergy.com/news/2026/09/constellation-and-amazon-announce-20-year-power-purchase-agreement-at-calvert-cliffs.html"
+  },
+  {
+   "t": "Power Engineering – Vistra and Meta ink PPA for 2.6 GW of nuclear power",
+   "u": "https://www.power-eng.com/nuclear/vistra-and-meta-ink-ppa-for-2-6-gw-of-nuclear-power-in-pjm-region/"
+  },
+  {
+   "t": "POWER Magazine – Amazon's Cascade Xe-100 SMR project with Energy Northwest",
+   "u": "https://www.powermag.com/amazon-unveils-cascade-energy-northwests-xe-100-smr-project-targeting-construction-by-2030/"
+  },
+  {
+   "t": "X-energy – joins Project Prometheus with INL, NVIDIA and AWS",
+   "u": "https://x-energy.com/news/x-energy-joins-project-prometheus-for-ai-accelerated-advanced-nuclear-deployment/"
+  }
+ ],
+ "block": [
+  {
+   "p": "AI-racet har gått in i sin nästa fas."
+  },
+  {
+   "p": "Vi pratar ständigt om GPU:er, datacenter, Nvidia, hyperscalers och mer beräkningskraft."
+  },
+  {
+   "p": "Men ju mer jag tittar på vad som faktiskt händer i USA, desto mer övertygad blir jag av en sak."
+  },
+  {
+   "strong": "AI kan inte fortsätta växa i den här takten utan mer el."
+  },
+  {
+   "p": "Och därför tror vi på Grabit att el kan bli nästa stora flaskhals för AI."
+  },
+  {
+   "p": "Det här handlar inte längre om en teoretisk möjlighet."
+  },
+  {
+   "p": "USA förväntar sig rekordhög elförbrukning 2026 och 2027, och datacenter pekas ut som en viktig drivkraft."
+  },
+  {
+   "p": "Och det är då det börjar bli riktigt intressant."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Kärnkraftens comeback"
+  },
+  {
+   "p": "Kärnkraft har en egenskap som plötsligt är väldigt värdefull igen."
+  },
+  {
+   "strong": "Den kan leverera stabil elektricitet dygnet runt."
+  },
+  {
+   "p": "AI-datacenter kan inte stängas av bara för att solen gått i moln eller vinden slutat blåsa."
+  },
+  {
+   "p": "Det betyder inte att sol och vind är oviktiga. Tvärtom kommer energimixen sannolikt bestå av flera olika energikällor."
+  },
+  {
+   "p": "Men när världen bygger datacenter som ska köra AI-modeller 24 timmar om dygnet blir tillgången på stabil och pålitlig elektricitet extremt viktig."
+  },
+  {
+   "p": "Och marknaden börjar se samma sak."
+  },
+  {
+   "p": "Googles nya samarbete med Constellation Energy innebär ytterligare 890 megawatt kärnkraft till nätet, samtidigt som det totala avtalet uppgår till 3,59 gigawatt."
+  },
+  {
+   "big": "890 MW",
+   "l": "ny kärnkraft via Googles avtal med Constellation – 3,59 GW totalt"
+  },
+  {
+   "p": "Constellation planerar dessutom att investera över 4,3 miljarder dollar för att öka kapaciteten vid befintliga kärnkraftverk."
+  },
+  {
+   "p": "Och det här är inte längre en teoretisk framtid."
+  },
+  {
+   "p": "Amazon har också tecknat ett 20-årigt kraftavtal som stödjer utbyggnaden av kärnkraftverket Calvert Cliffs i Maryland."
+  },
+  {
+   "p": "Det här är verkliga signaler från några av världens största techbolag."
+  },
+  {
+   "strong": "De behöver mer power."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Power Today — Vistra"
+  },
+  {
+   "p": "Därför gillar jag Vistra i det här caset."
+  },
+  {
+   "list": [
+    "De har redan kapacitet.",
+    "De har redan befintliga kraftverk.",
+    "De har redan kärnkraft.",
+    "Och de har redan stora kunder som vill säkra långsiktig tillgång till elektricitet."
+   ]
+  },
+  {
+   "p": "Ett tydligt exempel är avtalet med Meta på över 2,6 gigawatt från tre kärnkraftverk."
+  },
+  {
+   "big": "2,6 GW",
+   "l": "kärnkraft från tre Vistra-verk till Meta – 20-åriga avtal"
+  },
+  {
+   "p": "Vistra har dessutom möjlighet att öka produktionen från befintliga anläggningar genom så kallade uprates."
+  },
+  {
+   "p": "Det är precis den typen av tillgångar som plötsligt blir strategiska när efterfrågan på elektricitet exploderar."
+  },
+  {
+   "p": "För oss representerar Vistra:"
+  },
+  {
+   "strong": "POWER TODAY."
+  },
+  {
+   "p": "De behöver inte vänta på att en helt ny energiteknik ska bli kommersiell."
+  },
+  {
+   "p": "De sitter redan på infrastrukturen."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Power Tomorrow — X-energy"
+  },
+  {
+   "p": "Men om Vistra representerar Power Today, så är X-energy enligt oss ett av de mest intressanta casen på andra sidan av ekvationen:"
+  },
+  {
+   "strong": "POWER TOMORROW."
+  },
+  {
+   "p": "X-energy försöker inte bara bygga ännu ett traditionellt kärnkraftverk."
+  },
+  {
+   "p": "Bolaget utvecklar en ny generation små modulära reaktorer, så kallade SMR, genom sin Xe-100-teknik."
+  },
+  {
+   "p": "Xe-100 är designad som en högtemperatur-gasreaktor och använder helium som kylmedel tillsammans med TRISO-X-bränsle."
+  },
+  {
+   "p": "En Xe-100-reaktor är designad för cirka 80 MW elektrisk effekt och kan kombineras i större anläggningar."
+  },
+  {
+   "big": "~80 MW",
+   "l": "elektrisk effekt per Xe-100-reaktor – byggs ihop i större anläggningar"
+  },
+  {
+   "p": "Det intressanta här är inte bara siffrorna."
+  },
+  {
+   "strong": "Det är riktningen."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Det här är inte 80-talet"
+  },
+  {
+   "p": "Jag tror att många fortfarande associerar kärnkraft med 1980-talet."
+  },
+  {
+   "p": "Gamla reaktorer. Gamla säkerhetssystem. Gamla bilder."
+  },
+  {
+   "p": "Men det här är inte 80-talet längre."
+  },
+  {
+   "list": [
+    "Tekniken har utvecklats.",
+    "Reaktordesigner har utvecklats.",
+    "Bränsletekniken har utvecklats."
+   ]
+  },
+  {
+   "p": "Och framför allt har behovet förändrats."
+  },
+  {
+   "p": "För 20 år sedan handlade mycket av energidebatten om utsläpp och energisäkerhet."
+  },
+  {
+   "p": "Nu har vi fått ytterligare en enorm efterfrågedrivare:"
+  },
+  {
+   "strong": "AI."
+  },
+  {
+   "p": "Vi bygger datacenter som kräver enorma mängder elektricitet."
+  },
+  {
+   "p": "Och den här efterfrågan kommer inte försvinna om AI fortsätter utvecklas."
+  },
+  {
+   "p": "Tvärtom."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Amazon + NVIDIA"
+  },
+  {
+   "p": "Det som gör X-energy extra intressant för oss är vilka som står bakom utvecklingen."
+  },
+  {
+   "p": "Amazon har investerat i X-energy och bolagen arbetar mot en potentiell utbyggnad av flera gigawatt avancerad kärnkraft."
+  },
+  {
+   "p": "Amazon har dessutom kopplat X-energy till sin plan för Energy Northwest i Washington."
+  },
+  {
+   "p": "Men sedan händer något ännu mer intressant."
+  },
+  {
+   "p": "X-energy är en del av Project Prometheus, tillsammans med bland andra NVIDIA, Amazon Web Services och Idaho National Laboratory."
+  },
+  {
+   "p": "Projektet handlar om att använda AI för att accelerera utvecklingen av avancerad kärnkraft."
+  },
+  {
+   "strong": "Läs det en gång till."
+  },
+  {
+   "p": "AI ska hjälpa till att bygga nästa generations kärnkraft."
+  },
+  {
+   "p": "Och nästa generations kärnkraft ska i sin tur ge energi till AI."
+  },
+  {
+   "p": "Det skapar en väldigt intressant feedback-loop."
+  },
+  {
+   "flow": [
+    "AI",
+    "Nuclear",
+    "Power",
+    "AI"
+   ]
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Amazon och NVIDIA ser något"
+  },
+  {
+   "p": "Här kommer en av de saker jag tycker är mest intressanta."
+  },
+  {
+   "p": "Amazon och NVIDIA är två av de bolag som sitter längst fram i AI-revolutionen."
+  },
+  {
+   "list": [
+    "De bygger infrastrukturen.",
+    "De säljer beräkningskraften.",
+    "De bygger datacenter."
+   ]
+  },
+  {
+   "p": "De vet bättre än de flesta hur mycket elektricitet som kommer att krävas."
+  },
+  {
+   "p": "Och ändå väljer de att lägga kapital, resurser och teknisk kompetens på nästa generations kärnkraft."
+  },
+  {
+   "strong": "Vi tror inte att det är en slump."
+  },
+  {
+   "p": "Det betyder självklart inte att X-energy automatiskt blir en vinnare. Det finns fortfarande stora risker:"
+  },
+  {
+   "list": [
+    "Reglering",
+    "Byggkostnader",
+    "Tidsplaner",
+    "Kommersialisering",
+    "Konkurrens från andra energikällor"
+   ]
+  },
+  {
+   "p": "Men signalen är svår att ignorera."
+  },
+  {
+   "p": "De som bygger AI-framtiden börjar investera i infrastrukturen som ska ge AI-framtiden energi."
+  },
+  {
+   "p": "Det är exakt den typen av signaler vi letar efter på Grabit."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Men det finns ett ännu större problem"
+  },
+  {
+   "p": "Det räcker inte att producera mer el."
+  },
+  {
+   "strong": "Du måste kunna få elektriciteten dit där den behövs."
+  },
+  {
+   "p": "Och här kommer USA:s elnät in."
+  },
+  {
+   "p": "USA:s elnät byggdes inte för en värld där hundratals nya datacenter samtidigt kräver enorma mängder elektricitet."
+  },
+  {
+   "p": "Mycket av den amerikanska infrastrukturen är dessutom gammal och byggdes för helt andra belastningsmönster."
+  },
+  {
+   "p": "Nu förändras allt. AI. Datacenter. Elektrifiering. Ny amerikansk industri. Tillverkning som flyttar tillbaka till USA."
+  },
+  {
+   "p": "Allt detta kräver mer power. Och det kräver ett nät som klarar det."
+  },
+  {
+   "p": "Det betyder att USA måste investera enorma summor i:"
+  },
+  {
+   "list": [
+    "Transmission",
+    "Distribution",
+    "Transformatorer",
+    "Substationer",
+    "Switchgear",
+    "Grid infrastructure"
+   ]
+  },
+  {
+   "p": "Det är nästa lager i vår tes."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Power är inte bara kärnkraft"
+  },
+  {
+   "p": "Det är här jag tycker att marknaden kan missa något."
+  },
+  {
+   "p": "När man pratar om AI och energi tänker många direkt: Nuclear."
+  },
+  {
+   "p": "Men vår tes är större än så."
+  },
+  {
+   "strong": "Vi tror på hela power-stacken."
+  },
+  {
+   "p": "Först måste elektriciteten produceras. Sedan måste den transporteras. Sedan måste den distribueras. Och slutligen måste den hanteras inne i datacentret."
+  },
+  {
+   "p": "Det öppnar upp en helt annan grupp av bolag."
+  },
+  {
+   "img": "ai-power-kedjan.jpg",
+   "alt": "Hela AI-kedjan för el: produktion, transmission, distribution, datacenter och AI",
+   "cap": "Illustration: GRABIT (AI-genererad bild)"
+  },
+  {
+   "p": "Det här är bolag som på olika sätt bygger infrastrukturen runt den ökande elektrifieringen."
+  },
+  {
+   "list": [
+    "Eaton – en viktig spelare inom elektrisk distribution och power management.",
+    "Quanta Services – bygger och underhåller kritisk energi- och transmissionsinfrastruktur.",
+    "GE Vernova – arbetar både inom kraftproduktion och elektrifiering.",
+    "Hubbell – levererar komponenter till elnätet.",
+    "Vertiv – sitter närmare själva datacentret och arbetar med power management och kylning."
+   ]
+  },
+  {
+   "p": "De är inte samma case."
+  },
+  {
+   "p": "Men de har en gemensam nämnare:"
+  },
+  {
+   "strong": "AI behöver deras produkter och infrastruktur för att kunna växa."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Och det är det som gör tesen så intressant"
+  },
+  {
+   "p": "Vi behöver inte veta exakt vilket AI-bolag som vinner. Det är det fina."
+  },
+  {
+   "p": "Vi behöver inte veta om nästa stora AI-modell kommer från Nvidia, Google, Microsoft, Amazon eller någon helt ny aktör."
+  },
+  {
+   "p": "För oavsett vem som vinner kommer de behöva mer elektricitet."
+  },
+  {
+   "p": "Och det är där vi börjar tänka annorlunda på AI-investeringar."
+  },
+  {
+   "p": "Tidigare var frågan: Vem bygger den bästa GPU:n?"
+  },
+  {
+   "p": "Sedan blev frågan: Vem bygger datacentren?"
+  },
+  {
+   "p": "Nu börjar frågan bli: Varifrån kommer elektriciteten?"
+  },
+  {
+   "p": "Och ännu viktigare:"
+  },
+  {
+   "strong": "Hur får vi elektriciteten till datacentren?"
+  },
+  {
+   "p": "Det är där vi tror att nästa stora flaskhals kan finnas."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "The Power Stack"
+  },
+  {
+   "flow": [
+    "AI",
+    "More compute",
+    "More data centers",
+    "More electricity",
+    "More power generation",
+    "More transmission",
+    "More grid infrastructure",
+    "More data center power infrastructure",
+    "More AI"
+   ]
+  },
+  {
+   "p": "Det är en enorm investeringskedja."
+  },
+  {
+   "p": "Och den har precis börjat accelerera."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Vår Grabit-take"
+  },
+  {
+   "p": "Det här är varför vi på Grabit tror att Power kan vara nästa stora AI-bottleneck."
+  },
+  {
+   "p": "Vistra ger oss:"
+  },
+  {
+   "strong": "POWER TODAY."
+  },
+  {
+   "p": "X-energy ger oss:"
+  },
+  {
+   "strong": "POWER TOMORROW."
+  },
+  {
+   "p": "Och bolag som Eaton, Quanta Services, GE Vernova, Hubbell och Vertiv ger oss infrastrukturen runt omkring."
+  },
+  {
+   "p": "Vi tror inte att det handlar om att välja mellan kärnkraft, gas, sol eller vind."
+  },
+  {
+   "p": "Vi tror att USA kommer behöva allt. Efterfrågan växer helt enkelt för snabbt."
+  },
+  {
+   "p": "Det viktiga är vem som kan producera elektriciteten, vem som kan transportera den och vem som bygger infrastrukturen som krävs för att hantera den."
+  },
+  {
+   "p": "Och sedan kommer den stora frågan. Titta på vilka som bygger AI-infrastrukturen."
+  },
+  {
+   "list": [
+    "Nvidia behöver power.",
+    "Microsoft behöver power.",
+    "Apple behöver power.",
+    "Amazon behöver power.",
+    "Alphabet behöver power.",
+    "Meta behöver power.",
+    "Tesla behöver power.",
+    "SpaceX behöver power."
+   ]
+  },
+  {
+   "p": "Alla bygger framtiden på mer elektricitet."
+  },
+  {
+   "p": "Och någon måste producera den. Någon måste transportera den. Någon måste distribuera den. Och någon måste bygga infrastrukturen som gör att allt faktiskt fungerar."
+  },
+  {
+   "p": "Det är där vi tror att nästa stora AI-investering kan finnas."
+  },
+  {
+   "p": "AI är inte längre bara en compute-story. AI är en power-story."
+  },
+  {
+   "strong": "POWER ISN’T THE SIDE STORY ANYMORE. POWER IS THE STORY."
+  },
+  {
+   "p": "— GRABIT LABS"
+  }
+ ],
+ "block_en": [
+  {
+   "p": "The AI race has entered its next phase."
+  },
+  {
+   "p": "We constantly talk about GPUs, data centers, Nvidia, hyperscalers and more computing power."
+  },
+  {
+   "p": "But the more I look at what is actually happening across the US, the more convinced I become of one thing."
+  },
+  {
+   "strong": "AI cannot keep growing at this pace without more electricity."
+  },
+  {
+   "p": "And that is why, at Grabit, we believe power could become the next major bottleneck for AI."
+  },
+  {
+   "p": "This is no longer a theoretical possibility."
+  },
+  {
+   "p": "The US is heading toward record electricity consumption in 2026 and 2027, with data centers emerging as an important driver."
+  },
+  {
+   "p": "And that is where things get really interesting."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "The nuclear comeback"
+  },
+  {
+   "p": "Nuclear power has one characteristic that has suddenly become extremely valuable again."
+  },
+  {
+   "strong": "It can deliver stable electricity around the clock."
+  },
+  {
+   "p": "AI data centers cannot simply shut down because the sun is behind a cloud or the wind stops blowing."
+  },
+  {
+   "p": "That does not mean solar and wind are unimportant. Quite the opposite. The future energy mix will likely include multiple sources."
+  },
+  {
+   "p": "But as the world builds data centers that need to run AI workloads 24 hours a day, access to stable and reliable electricity becomes extremely valuable."
+  },
+  {
+   "p": "And the market is starting to see the same thing."
+  },
+  {
+   "p": "Google's new partnership with Constellation Energy adds another 890 megawatts of nuclear power, while the broader arrangement totals 3.59 gigawatts."
+  },
+  {
+   "big": "890 MW",
+   "l": "of new nuclear via Google's deal with Constellation – 3.59 GW in total"
+  },
+  {
+   "p": "Constellation also plans to invest more than $4.3 billion to increase output at existing nuclear plants."
+  },
+  {
+   "p": "And this is no longer a theoretical future."
+  },
+  {
+   "p": "Amazon has also signed a 20-year power agreement supporting the expansion of the Calvert Cliffs nuclear plant in Maryland."
+  },
+  {
+   "p": "These are real signals from some of the world's largest technology companies."
+  },
+  {
+   "strong": "They need more power."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Power Today — Vistra"
+  },
+  {
+   "p": "That is why I like Vistra in this case."
+  },
+  {
+   "list": [
+    "They already have capacity.",
+    "They already have existing power assets.",
+    "They already have nuclear.",
+    "And they already have major customers looking to secure long-term access to electricity."
+   ]
+  },
+  {
+   "p": "A clear example is its agreement with Meta for more than 2.6 gigawatts across three nuclear plants."
+  },
+  {
+   "big": "2.6 GW",
+   "l": "of nuclear from three Vistra plants to Meta – 20-year agreements"
+  },
+  {
+   "p": "Vistra can also increase output from existing facilities through so-called uprates."
+  },
+  {
+   "p": "That is exactly the kind of infrastructure that suddenly becomes strategic when electricity demand starts accelerating."
+  },
+  {
+   "p": "For us, Vistra represents:"
+  },
+  {
+   "strong": "POWER TODAY."
+  },
+  {
+   "p": "They do not have to wait for an entirely new energy technology to become commercial."
+  },
+  {
+   "p": "They already own the infrastructure."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Power Tomorrow — X-energy"
+  },
+  {
+   "p": "But if Vistra represents Power Today, then X-energy is, in our view, one of the most interesting cases on the other side of the equation:"
+  },
+  {
+   "strong": "POWER TOMORROW."
+  },
+  {
+   "p": "X-energy is not simply trying to build another traditional nuclear power plant."
+  },
+  {
+   "p": "The company is developing a new generation of small modular reactors, or SMRs, through its Xe-100 technology."
+  },
+  {
+   "p": "Xe-100 is designed as a high-temperature gas reactor using helium as a coolant and TRISO-X fuel."
+  },
+  {
+   "p": "A Xe-100 reactor is designed for approximately 80 MW of electrical output and can be combined into larger facilities."
+  },
+  {
+   "big": "~80 MW",
+   "l": "of electrical output per Xe-100 reactor – combined into larger plants"
+  },
+  {
+   "p": "What matters here is not just the numbers."
+  },
+  {
+   "strong": "It is the direction."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "This is not the 1980s"
+  },
+  {
+   "p": "I think many people still associate nuclear power with the 1980s."
+  },
+  {
+   "p": "Old reactors. Old safety systems. Old images."
+  },
+  {
+   "p": "But this is not the 1980s anymore."
+  },
+  {
+   "list": [
+    "The technology has evolved.",
+    "Reactor designs have evolved.",
+    "Fuel technology has evolved."
+   ]
+  },
+  {
+   "p": "And above all, the need has changed."
+  },
+  {
+   "p": "Twenty years ago, much of the energy debate was about emissions and energy security."
+  },
+  {
+   "p": "Now we have another enormous demand driver:"
+  },
+  {
+   "strong": "AI."
+  },
+  {
+   "p": "We are building data centers that require enormous amounts of electricity."
+  },
+  {
+   "p": "And if AI continues to develop, that demand is not going away."
+  },
+  {
+   "p": "Quite the opposite."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Amazon + NVIDIA"
+  },
+  {
+   "p": "What makes X-energy particularly interesting to us is who is involved."
+  },
+  {
+   "p": "Amazon has invested in X-energy, and the companies are working toward a potential deployment of several gigawatts of advanced nuclear power."
+  },
+  {
+   "p": "Amazon has also connected X-energy to its Energy Northwest plans in Washington."
+  },
+  {
+   "p": "But then something even more interesting happens."
+  },
+  {
+   "p": "X-energy is part of Project Prometheus, together with companies and institutions including NVIDIA, Amazon Web Services and Idaho National Laboratory."
+  },
+  {
+   "p": "The project is focused on using AI to accelerate the development of advanced nuclear power."
+  },
+  {
+   "strong": "Read that again."
+  },
+  {
+   "p": "AI is being used to help build the next generation of nuclear power."
+  },
+  {
+   "p": "And next-generation nuclear power could, in turn, provide energy for AI."
+  },
+  {
+   "p": "That creates a very interesting feedback loop."
+  },
+  {
+   "flow": [
+    "AI",
+    "Nuclear",
+    "Power",
+    "AI"
+   ]
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Amazon and NVIDIA see something"
+  },
+  {
+   "p": "This is one of the things I find most interesting."
+  },
+  {
+   "p": "Amazon and NVIDIA are two of the companies sitting at the front of the AI revolution."
+  },
+  {
+   "list": [
+    "They build the infrastructure.",
+    "They sell the compute.",
+    "They build data centers."
+   ]
+  },
+  {
+   "p": "They understand better than most how much electricity will be required."
+  },
+  {
+   "p": "And yet they are choosing to put capital, resources and technical expertise behind next-generation nuclear power."
+  },
+  {
+   "strong": "We do not think that is a coincidence."
+  },
+  {
+   "p": "That does not mean X-energy automatically becomes a winner. There are still major risks:"
+  },
+  {
+   "list": [
+    "Regulation",
+    "Construction costs",
+    "Timelines",
+    "Commercialization",
+    "Competition from other energy sources"
+   ]
+  },
+  {
+   "p": "But the signal is difficult to ignore."
+  },
+  {
+   "p": "The companies building the AI future are starting to invest in the infrastructure that will power that AI future."
+  },
+  {
+   "p": "That is exactly the kind of signal we look for at Grabit."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "But there is an even bigger problem"
+  },
+  {
+   "p": "It is not enough to produce more electricity."
+  },
+  {
+   "strong": "You need to be able to get that electricity to where it is needed."
+  },
+  {
+   "p": "And this is where the US power grid comes in."
+  },
+  {
+   "p": "The US grid was not built for a world where hundreds of new data centers could simultaneously demand enormous amounts of electricity."
+  },
+  {
+   "p": "Much of the American infrastructure is also aging and was built for very different load patterns."
+  },
+  {
+   "p": "Now everything is changing. AI. Data centers. Electrification. New American industry. Manufacturing moving back to the US."
+  },
+  {
+   "p": "All of this requires more power. And it requires a grid that can handle it."
+  },
+  {
+   "p": "That means the US needs to invest enormous amounts in:"
+  },
+  {
+   "list": [
+    "Transmission",
+    "Distribution",
+    "Transformers",
+    "Substations",
+    "Switchgear",
+    "Grid infrastructure"
+   ]
+  },
+  {
+   "p": "That is the next layer of our thesis."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Power is not just about nuclear"
+  },
+  {
+   "p": "This is where I think the market may be missing something."
+  },
+  {
+   "p": "When people talk about AI and energy, many immediately think: Nuclear."
+  },
+  {
+   "p": "But our thesis is bigger than that."
+  },
+  {
+   "strong": "We believe in the entire power stack."
+  },
+  {
+   "p": "First, electricity has to be generated. Then it has to be transmitted. Then it has to be distributed. And finally, it has to be managed inside the data center."
+  },
+  {
+   "p": "That opens up a completely different group of companies."
+  },
+  {
+   "img": "ai-power-kedjan.jpg",
+   "alt": "The full AI power chain: generation, transmission, distribution, data centers and AI",
+   "cap": "Illustration: GRABIT (AI-generated image)"
+  },
+  {
+   "p": "These companies are building different parts of the infrastructure around rising electrification."
+  },
+  {
+   "list": [
+    "Eaton – a major player in electrical distribution and power management.",
+    "Quanta Services – builds and maintains critical energy and transmission infrastructure.",
+    "GE Vernova – operates across power generation and electrification.",
+    "Hubbell – supplies components used throughout the electrical grid.",
+    "Vertiv – sits closer to the data center itself, working on power management and cooling."
+   ]
+  },
+  {
+   "p": "They are not the same investment case."
+  },
+  {
+   "p": "But they share one common denominator:"
+  },
+  {
+   "strong": "AI needs their products and infrastructure to scale."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "And that is what makes the thesis so interesting"
+  },
+  {
+   "p": "We do not need to know exactly which AI company wins. That is the beauty of it."
+  },
+  {
+   "p": "We do not need to know whether the next major AI model comes from Nvidia, Google, Microsoft, Amazon or an entirely new player."
+  },
+  {
+   "p": "Because whoever wins will need more electricity."
+  },
+  {
+   "p": "And that is where we start thinking differently about AI investing."
+  },
+  {
+   "p": "The question used to be: Who builds the best GPU?"
+  },
+  {
+   "p": "Then it became: Who builds the data centers?"
+  },
+  {
+   "p": "Now the question is becoming: Where does the electricity come from?"
+  },
+  {
+   "p": "And even more importantly:"
+  },
+  {
+   "strong": "How do we get that electricity to the data centers?"
+  },
+  {
+   "p": "That is where we believe the next major bottleneck could be."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "The Power Stack"
+  },
+  {
+   "flow": [
+    "AI",
+    "More compute",
+    "More data centers",
+    "More electricity",
+    "More power generation",
+    "More transmission",
+    "More grid infrastructure",
+    "More data center power infrastructure",
+    "More AI"
+   ]
+  },
+  {
+   "p": "It is an enormous investment chain."
+  },
+  {
+   "p": "And it has only just started accelerating."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Our Grabit take"
+  },
+  {
+   "p": "This is why, at Grabit, we believe Power could be the next major AI bottleneck."
+  },
+  {
+   "p": "Vistra gives us:"
+  },
+  {
+   "strong": "POWER TODAY."
+  },
+  {
+   "p": "X-energy gives us:"
+  },
+  {
+   "strong": "POWER TOMORROW."
+  },
+  {
+   "p": "And companies such as Eaton, Quanta Services, GE Vernova, Hubbell and Vertiv give us the infrastructure around it."
+  },
+  {
+   "p": "We do not think this is about choosing between nuclear, gas, solar or wind."
+  },
+  {
+   "p": "We think the US will need all of them. Demand is simply growing too quickly."
+  },
+  {
+   "p": "The important question is who can generate the electricity, who can transmit it and who is building the infrastructure required to handle it."
+  },
+  {
+   "p": "And then comes the bigger question. Look at the companies building the AI infrastructure."
+  },
+  {
+   "list": [
+    "Nvidia needs power.",
+    "Microsoft needs power.",
+    "Apple needs power.",
+    "Amazon needs power.",
+    "Alphabet needs power.",
+    "Meta needs power.",
+    "Tesla needs power.",
+    "SpaceX needs power."
+   ]
+  },
+  {
+   "p": "They are all building the future on more electricity."
+  },
+  {
+   "p": "And someone has to produce it. Someone has to transmit it. Someone has to distribute it. And someone has to build the infrastructure that makes all of it work."
+  },
+  {
+   "p": "That is where we believe the next major AI investment opportunity could be."
+  },
+  {
+   "p": "AI is no longer just a compute story. AI is a power story."
+  },
+  {
+   "strong": "POWER ISN’T THE SIDE STORY ANYMORE. POWER IS THE STORY."
+  },
+  {
+   "p": "— GRABIT LABS"
+  }
+ ]
+}

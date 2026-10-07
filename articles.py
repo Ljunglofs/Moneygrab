@@ -13,6 +13,7 @@ Varje siffra ska ha en källa i "kallor".
 
 import os
 import json
+import re
 import html
 
 _DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "articles")
@@ -30,6 +31,10 @@ def _load_all():
         pass
     out.sort(key=lambda a: a.get("datum", ""), reverse=True)
     return out
+
+
+def all_articles():
+    return _load_all()
 
 
 def latest():
@@ -75,7 +80,7 @@ p{margin:0 0 14px}
 .lock ul{margin:12px 0 18px;padding-left:18px;color:var(--mut)}
 .lock .ghost{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0 16px}
 .lock .ghost span{filter:blur(5px);user-select:none;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-weight:700}
-.btn{display:inline-block;background:var(--neon);color:#001116;font-weight:800;text-decoration:none;padding:13px 20px;border-radius:12px}
+.lbtns{display:flex;flex-wrap:wrap;gap:10px}.btn{display:inline-block;background:var(--neon);color:#001116;font-weight:800;text-decoration:none;padding:13px 20px;border-radius:12px}
 .src{margin-top:40px;font-size:13px;color:var(--mut)}.src ol{padding-left:18px}.src li{margin-bottom:4px}
 .disc{margin-top:26px;font-size:12px;color:var(--mut);border-top:1px solid var(--line);padding-top:14px}
 hr{border:0;border-top:1px solid rgba(255,201,64,.35);margin:38px 0 6px}
@@ -145,7 +150,7 @@ def image_path(name):
 
 
 def _blocks(blocks):
-    """Artikeltext i block: h, p, big (+l), strong, list, flow, stats, hr."""
+    """Artikeltext i block: h, p, big (+l), strong, list, flow, stats, img (+alt, cap), hr."""
     out = []
     for b in blocks or []:
         if "h" in b:
@@ -165,9 +170,25 @@ def _blocks(blocks):
                 "<div><b>%s</b><span>%s</span>%s</div>" % (_e(x["v"]), _e(x.get("l")),
                                                           ('<em>%s</em>' % _e(x["d"])) if x.get("d") else "")
                 for x in b["stats"]))
+        elif "img" in b:
+            out.append('<figure class="hero"><img src="/analys/bild/%s" alt="%s" loading="lazy">'
+                       '<figcaption>%s</figcaption></figure>' % (_e(b["img"]), _e(b.get("alt")), _e(b.get("cap"))))
         elif "hr" in b:
             out.append('<hr>')
     return "".join(out)
+
+
+def _lock_btns(a, en):
+    """Knappar i låsrutan. Har artikeln "aktier" går varje knapp direkt till
+    aktiekortet i appen (/?stock=TKR), annars till månadens case (/?case=1)."""
+    st = [x for x in a.get("aktier") or [] if re.match(r"^[A-Z][A-Z.\-]{0,5}$", x.get("t") or "")]
+    if not st:
+        return ('<a class="btn" href="/?case=1">%s</a>' %
+                ("See Grabit's levels – open the case in PRO →" if en else "Se Grabits nivåer – öppna caset i PRO →"))
+    return '<div class="lbtns">%s</div>' % "".join(
+        '<a class="btn" href="/?stock=%s">%s %s (%s) →</a>' % (
+            _e(x["t"]), "See levels for" if en else "Se nivåerna för", _e(x.get("n") or x["t"]), _e(x["t"]))
+        for x in st)
 
 
 def _body(a, en):
@@ -184,7 +205,7 @@ def _body(a, en):
                 '<div class="ghost"><span>Score 0.0/10</span><span>Verdict ●●●</span><span>Entry $000</span><span>Stop $000</span></div>'
                 '<ul><li>Grabit score and verdict</li><li>Entry, stop and target levels</li>'
                 '<li>Our full thesis — and alerts when the setup changes</li></ul><p style="font-size:13px;color:var(--mut)">Not a member? 7 days free, cancel anytime.</p>'
-                '<a class="btn" href="/?case=1">See Grabit\'s levels – open the case in PRO →</a></div>') % (tk, _e(a.get("serie_en") or "monthly case"))
+                '%s</div>') % (tk, _e(a.get("serie_en") or "monthly case"), _lock_btns(a, True))
         meta = "%s · %s" % (_e(a.get("serie_en") or "Monthly case"), _e(a.get("datum")))
         src_h, disc = "Sources", ("Not financial advice. Information only — do your own research. "
                                   "Figures as reported by the company.")
@@ -194,7 +215,7 @@ def _body(a, en):
                 '<div class="ghost"><span>Betyg 0,0/10</span><span>Slutsats ●●●</span><span>Entry $000</span><span>Stopp $000</span></div>'
                 '<ul><li>Grabit-betyg och slutsats</li><li>Nivåer för entry, stopp och mål</li>'
                 '<li>Hela vår tes – och larm när läget ändras</li></ul><p style="font-size:13px;color:var(--mut)">Inte medlem? 7 dagar gratis, avsluta när du vill.</p>'
-                '<a class="btn" href="/?case=1">Se Grabits nivåer – öppna caset i PRO →</a></div>') % (tk, _e(a.get("serie") or "månadens case"))
+                '%s</div>') % (tk, _e(a.get("serie") or "månadens case"), _lock_btns(a, False))
         meta = "%s · %s" % (_e(a.get("serie") or "Analys"), _e(a.get("datum")))
         src_h, disc = "Källor", ("Inte finansiell rådgivning. Endast information – gör din egen analys. "
                                  "Siffror enligt bolaget.")
