@@ -7,7 +7,7 @@
    Android-appen (referrer android-app://) och installerad app (standalone). */
 (function(){try{
   var q=location.search;
-  if(/[?&](app|pw|install|case|stock)=/.test(q)){localStorage.setItem("grabit_seen_start","1");return;}
+  if(/[?&](app|pw|install|case|stock|code)=/.test(q)){localStorage.setItem("grabit_seen_start","1");return;}
   if(localStorage.getItem("grabit_pro")==="1"||localStorage.getItem("grabit_seen_start"))return;
   if((document.referrer||"").indexOf("android-app://")===0)return;
   if(window.matchMedia&&matchMedia("(display-mode: standalone)").matches)return;
@@ -1709,6 +1709,7 @@ else _i18nBoot();
     </div>
     <div class="instbar" id="instbar" style="display:none"><span class="ib-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M12 7v7M9 11l3 3 3-3"/><path d="M10.5 18.5h3"/></svg></span><div class="ib-tx"><b id="ib-t">Installera GRABIT som app</b><i id="ib-s">Egen ikon på hemskärmen · öppnas i helskärm · push-larm</i></div><button class="ib-go" onclick="installApp()" id="ib-go">Installera</button><button class="ib-x" onclick="dismissInstall()" aria-label="Stäng">&#10005;</button></div>
     <div class="card d3card prem gold" id="today3" style="display:none"></div>
+    <div class="card topmv prem blue" id="top50" style="display:none"></div>
     <div id="dailyhub"></div>
     <div id="newsbar"></div>
     <div id="trumpbar" style="display:none"></div>
@@ -3134,6 +3135,7 @@ function mapScreen(rows,d){
   d.scanner.gainers=mixMk([...rows].sort((a,b)=>dchg(b)-dchg(a)),5).map(r=>({tkr:r.ticker,chg:+dchg(r).toFixed(1),px:r.last!=null?+(+r.last).toFixed(2):null}));
   window._tmv={g:d.scanner.gainers,l:mixMk([...rows].sort((a,b)=>dchg(a)-dchg(b)),5).map(r=>({tkr:r.ticker,chg:+dchg(r).toFixed(1),px:r.last!=null?+(+r.last).toFixed(2):null}))};
   renderTopMovers();
+  try{renderTop50();}catch(e){}
   // Most bullish: 10 aktier upp minst 5% över 5 handelsdagar (ret_5)
   window._mb=mixMk([...rows].filter(r=>(+r.ret_5||0)>=5).sort((a,b)=>(+b.ret_5||0)-(+a.ret_5||0)),10)
     .map(r=>({tkr:r.ticker,chg:+(+r.ret_5).toFixed(1),px:r.last!=null?+(+r.last).toFixed(2):null}));
@@ -3270,17 +3272,27 @@ function refreshProState(){
   try{loadTrump();}catch(e){}
   try{loadMemberHub();}catch(e){}
 }
-async function unlockWithCode(){
-  var EN=(window.GRABIT_LANG==="en");
-  var inp=document.getElementById("pw-code-in");var code=inp?inp.value.trim():"";
+async function unlockWithCode(given){
+  var EN=(window.GRABIT_LANG==="en");var say=window.pToast||window.say||function(m){alert(m);};
+  var inp=document.getElementById("pw-code-in");var code=(typeof given==="string"&&given)?given.trim():(inp?inp.value.trim():"");
   if(!code)return;
-  if(!CONFIG.API_BASE){if(window.say)say(EN?"Demo mode — connect the API.":"Demo-läge — koppla API:t.");return;}
+  if(!CONFIG.API_BASE){say(EN?"Demo mode — connect the API.":"Demo-läge — koppla API:t.");return;}
   try{
     var r=await fetch(CONFIG.API_BASE.replace(/\/$/,"")+"/api/pro/activate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key:code}),cache:"no-store"});
     var j=await r.json();
-    if(j&&j.ok){localStorage.setItem("grabit_pro","1");localStorage.setItem("grabit_pro_src","code");if(j.token)localStorage.setItem("grabit_token",j.token);refreshProState();try{if(window.loadInsiderFlow)loadInsiderFlow(true);}catch(e){}if(window.hidePaywall)hidePaywall();if(window.say)say(EN?"✅ PRO unlocked!":"✅ PRO upplåst!");}
-    else{if(window.say)say(EN?"Invalid code.":"Ogiltig kod.");}
-  }catch(e){if(window.say)say(EN?"Couldn't verify the code.":"Kunde inte verifiera koden.");}
+    if(j&&j.ok&&j.trial&&localStorage.getItem("grabit_trial_used")==="1"){
+      say(EN?"You've already used your free trial on this device.":"Du har redan använt din gratisperiod på den här enheten.");
+      if(window.showPaywall)showPaywall(null,true);}
+    else if(j&&j.ok&&j.trial){
+      /* Provkod: PRO i j.days dagar utan kort. proCheckStatus låser igen efter exp. */
+      localStorage.setItem("grabit_pro","1");localStorage.setItem("grabit_pro_src","trial");localStorage.setItem("grabit_pro_exp",String(j.exp||0));localStorage.setItem("grabit_trial_used","1");
+      if(j.token)localStorage.setItem("grabit_token",j.token);refreshProState();try{if(window.loadInsiderFlow)loadInsiderFlow(true);}catch(e){}
+      if(window.hidePaywall)hidePaywall();
+      var _m=EN?("✅ PRO unlocked for "+(j.days||7)+" days — no card needed!"):("✅ PRO upplåst i "+(j.days||7)+" dagar — inget kort behövs!");
+      say(_m);}
+    else if(j&&j.ok){localStorage.setItem("grabit_pro","1");localStorage.setItem("grabit_pro_src","code");if(j.token)localStorage.setItem("grabit_token",j.token);refreshProState();try{if(window.loadInsiderFlow)loadInsiderFlow(true);}catch(e){}if(window.hidePaywall)hidePaywall();say(EN?"✅ PRO unlocked!":"✅ PRO upplåst!");}
+    else{say(EN?"Invalid code.":"Ogiltig kod.");}
+  }catch(e){say(EN?"Couldn't verify the code.":"Kunde inte verifiera koden.");}
 }
 async function proAutoClaim(){
   try{
@@ -3310,6 +3322,17 @@ async function proAutoClaim(){
 async function proCheckStatus(){
   try{
     var src="";try{src=localStorage.getItem("grabit_pro_src")||"";}catch(e){}
+    if(src==="trial"){                      // provkod: lås igen när perioden gått ut
+      var _exp=+(localStorage.getItem("grabit_pro_exp")||0);
+      if(_exp&&Date.now()/1000>_exp){
+        ["grabit_pro","grabit_token","grabit_pro_src","grabit_pro_exp"].forEach(function(k){try{localStorage.removeItem(k);}catch(e){}});
+        if(window.refreshProState)refreshProState();
+        try{if(window.loadInsiderFlow)loadInsiderFlow(true);}catch(e){}
+        var EN=(window.GRABIT_LANG==="en");
+        setTimeout(function(){if(window.showPaywall)showPaywall(EN?"Your free trial has ended — continue with PRO":"Din gratisperiod är slut — fortsätt med PRO",true);},1200);
+      }
+      return;
+    }
     if(src==="code")return;                 // kod-upplåsning styrs av koden
     var pcid="";try{pcid=localStorage.getItem("grabit_pcid")||"";}catch(e){}
     if(!pcid||!CONFIG.API_BASE)return;
@@ -4078,6 +4101,39 @@ function renderTopMovers(){
     <div class="tmv-all" onclick="go('marknad')">${_EN?"View all \u203A":"Visa alla \u203A"}</div>`;
   if(window.applyProLocks)applyProLocks(el);
 }
+/* USA:s 50 största bolag (börsvärde, okt 2026) — kända namn som alla känner igen.
+   Kortet visar de 5 som gått bäst i dag; "Visa alla 50" fäller ut hela listan. */
+const TOP50=[["AAPL","Apple","apple.com"],["MSFT","Microsoft","microsoft.com"],["NVDA","Nvidia","nvidia.com"],["GOOGL","Alphabet (Google)","abc.xyz"],["AMZN","Amazon","amazon.com"],
+  ["META","Meta Platforms","meta.com"],["AVGO","Broadcom","broadcom.com"],["TSLA","Tesla","tesla.com"],["BRK-B","Berkshire Hathaway","berkshirehathaway.com"],["LLY","Eli Lilly","lilly.com"],
+  ["JPM","JPMorgan Chase","jpmorganchase.com"],["WMT","Walmart","walmart.com"],["V","Visa","visa.com"],["ORCL","Oracle","oracle.com"],["MA","Mastercard","mastercard.com"],
+  ["XOM","Exxon Mobil","exxonmobil.com"],["NFLX","Netflix","netflix.com"],["COST","Costco","costco.com"],["JNJ","Johnson & Johnson","jnj.com"],["PG","Procter & Gamble","pg.com"],
+  ["HD","Home Depot","homedepot.com"],["ABBV","AbbVie","abbvie.com"],["BAC","Bank of America","bankofamerica.com"],["PLTR","Palantir","palantir.com"],["KO","Coca-Cola","coca-colacompany.com"],
+  ["AMD","AMD","amd.com"],["CVX","Chevron","chevron.com"],["UNH","UnitedHealth","unitedhealthgroup.com"],["CSCO","Cisco","cisco.com"],["TMUS","T-Mobile US","t-mobile.com"],
+  ["WFC","Wells Fargo","wellsfargo.com"],["PM","Philip Morris","pmi.com"],["IBM","IBM","ibm.com"],["CRM","Salesforce","salesforce.com"],["GE","GE Aerospace","geaerospace.com"],
+  ["MS","Morgan Stanley","morganstanley.com"],["ABT","Abbott","abbott.com"],["QCOM","Qualcomm","qualcomm.com"],["MCD","McDonald's","mcdonalds.com"],["AXP","American Express","americanexpress.com"],
+  ["GS","Goldman Sachs","goldmansachs.com"],["INTU","Intuit","intuit.com"],["NOW","ServiceNow","servicenow.com"],["DIS","Disney","thewaltdisneycompany.com"],["T","AT&T","att.com"],
+  ["MRK","Merck","merck.com"],["PEP","PepsiCo","pepsico.com"],["UBER","Uber","uber.com"],["ISRG","Intuitive Surgical","intuitive.com"],["CAT","Caterpillar","caterpillar.com"]];
+TOP50.forEach(function(x){if(!NAMES[x[0]])NAMES[x[0]]=x[1];if(!DOMAINS[x[0]])DOMAINS[x[0]]=x[2];});
+function renderTop50(){
+  var el=document.getElementById("top50");if(!el)return;
+  var rows=window._rows||[],by={};rows.forEach(function(r){by[r.ticker]=r;});
+  var L=TOP50.map(function(x){var r=by[x[0]];return (r&&r.ret_1!=null)?{tkr:x[0],chg:+(+r.ret_1).toFixed(1),px:r.last!=null?+(+r.last).toFixed(2):null,sp:Array.isArray(r.spark)?r.spark.slice(-18):null}:null;})
+    .filter(Boolean).sort(function(a,b){return b.chg-a.chg;});
+  if(L.length<5){el.style.display="none";return;}
+  var EN=(window.GRABIT_LANG==="en"),all=!!window._t50All;
+  var show=all?L:L.slice(0,5);
+  var html=show.map(function(r,i){
+    var up=r.chg>=0,col=up?"var(--pos)":"var(--neg)",sc=up?"#00e5ff":"#FF4B4B";
+    var sp=(r.sp&&r.sp.length>2)?spark(r.sp,sc):"";
+    return '<div class="tmv-row" onclick="openStock(\''+r.tkr+'\')"><span class="t50-n">'+(i+1)+'</span>'+lic(r.tkr,26,col)
+      +'<div class="tmv-nm"><b>'+r.tkr+'</b><i>'+(NAMES[r.tkr]||"")+'</i></div>'
+      +'<div class="tmv-spark">'+sp+'</div>'
+      +'<div class="tmv-r"><b class="num" style="color:'+col+'">'+(up?"+":"")+r.chg+'%</b>'+(r.px!=null?'<i class="num">'+fmtPx(r.px)+'</i>':'')+'</div></div>';
+  }).join("");
+  el.style.display="";
+  el.innerHTML='<div class="tmv-h"><span>'+(EN?"Top 50 US · best today":"USA:s 50 största · bäst idag")+'</span><span class="tmv-sub">'+(EN?"Largest companies":"Storbolagen")+'</span></div>'
+    +html+'<div class="tmv-all" onclick="window._t50All=!window._t50All;renderTop50()">'+(all?(EN?"Show top 5 \u2039":"Visa topp 5 \u2039"):(EN?"Show all 50 \u203A":"Visa alla 50 \u203A"))+'</div>';
+}
 function renderMostBullish(){
   var el=document.getElementById("mostbullish");if(!el)return;
   var src=window._mb||[];
@@ -4736,7 +4792,12 @@ paywallCheck();
     if(/^[A-Z][A-Z.\-]{0,5}$/.test(_st)){
       try{localStorage.setItem("grabit_seen_start","1");sessionStorage.setItem("grabit_pw_seen","1");}catch(e){}
       setTimeout(function(){openStock(_st);if(!isPro())setTimeout(function(){showPaywall(null,true);},1500);},300);}
-    if(_q.has("pw")||_q.has("app")||_q.has("plan")||_q.has("case")||_q.has("stock"))history.replaceState(null,"",location.pathname);
+    /* Delbar provlänk: /?code=KOD löser in koden direkt (ingen inmatning, inget kort). */
+    var _cd=(_q.get("code")||"").trim();
+    if(_cd&&_cd.length<=64){
+      try{localStorage.setItem("grabit_seen_start","1");sessionStorage.setItem("grabit_pw_seen","1");}catch(e){}
+      if(!isPro())setTimeout(function(){unlockWithCode(_cd);},600);}
+    if(_q.has("pw")||_q.has("app")||_q.has("plan")||_q.has("case")||_q.has("stock")||_q.has("code"))history.replaceState(null,"",location.pathname);
   }catch(e){}
   if(CONFIG.LOCK_TABS){setTimeout(function(){
     try{if(isPro()||sessionStorage.getItem("grabit_pw_seen"))return;sessionStorage.setItem("grabit_pw_seen","1");}catch(e){}
@@ -4748,7 +4809,7 @@ function _devLogoTap(){
   window._logoTapT=now;window._logoTaps=(window._logoTaps||0)+1;
   if(window._logoTaps>=5){
     window._logoTaps=0;
-    ["grabit_pro","grabit_token","grabit_pcid","grabit_cid","grabit_cid_t","grabit_pro_src"].forEach(function(k){try{localStorage.removeItem(k);}catch(e){}});
+    ["grabit_pro","grabit_token","grabit_pcid","grabit_cid","grabit_cid_t","grabit_pro_src","grabit_pro_exp","grabit_trial_used"].forEach(function(k){try{localStorage.removeItem(k);}catch(e){}});
     try{if(window.pToast)pToast(window.GRABIT_LANG==="en"?"PRO reset (test) — reloading…":"PRO nollat (test) — laddar om…");}catch(e){}
     setTimeout(function(){location.reload();},450);
   }
@@ -5380,6 +5441,7 @@ html,body{overflow-x:clip}
 .tmv-r{flex:none;text-align:right}
 .tmv-r b{display:block;font-size:13.5px}
 .tmv-r i{font-style:normal;font-size:11px;color:var(--mut)}
+.t50-n{flex:none;width:16px;font-size:11px;font-weight:800;color:var(--mut);text-align:center}
 .tmv-all{margin-top:9px;text-align:center;color:var(--gold2);font-size:11.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;border:1px solid rgba(255,200,61,.35);border-radius:11px;padding:9px}
 /* ===== BRAND POLISH · ljussättning enligt GRABIT-ID ===== */
 body{background:radial-gradient(130% 55% at 50% -12%,rgba(255,200,61,.075),transparent 55%),radial-gradient(120% 72% at 50% 116%,rgba(0,229,255,.055),transparent 60%),var(--bg)!important}

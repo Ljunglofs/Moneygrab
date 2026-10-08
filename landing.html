@@ -545,6 +545,17 @@ document.addEventListener("DOMContentLoaded",function(){if(typeof applyLang!=="f
 fetch("/api/articles").then(function(r){return r.json();}).then(function(d){CASES=(d&&d.articles)||[];renderCases();}).catch(function(){});
 </script>
 
+<section class="gridsec" id="top50" style="padding-top:34px;display:none">
+  <div class="wrap">
+    <div class="center">
+      <div class="eyebrow" id="t50-e">Live &middot; the 50 largest US companies</div>
+      <h2 id="t50-h2">Big names. <span class="hl">Best today.</span></h2>
+      <p class="sub" id="t50-sub">Apple, Nvidia, Microsoft, JPMorgan, Coca-Cola &mdash; the 5 biggest US companies moving the most today. Tap one to open it in GRABIT.</p>
+    </div>
+    <div class="rdl" id="t50" style="border-color:rgba(0,229,255,.55)"></div>
+  </div>
+</section>
+
 <section class="gridsec gold" id="radar" style="padding-top:34px">
   <div class="wrap">
     <div class="center">
@@ -948,11 +959,38 @@ function renderScreener(){
         +(r.rel_vol?'<span>'+(+r.rel_vol).toFixed(1)+'× vol</span>':'')+'</div></div></div>';}).join("");
   }
 }
+/* USA:s 50 största bolag (samma lista som dashboarden i appen). Använder
+   /api/screen-datan som screener-sektionen redan hämtar. */
+var T50=[["AAPL","Apple"],["MSFT","Microsoft"],["NVDA","Nvidia"],["GOOGL","Alphabet (Google)"],["AMZN","Amazon"],["META","Meta Platforms"],["AVGO","Broadcom"],["TSLA","Tesla"],
+  ["BRK-B","Berkshire Hathaway"],["LLY","Eli Lilly"],["JPM","JPMorgan Chase"],["WMT","Walmart"],["V","Visa"],["ORCL","Oracle"],["MA","Mastercard"],["XOM","Exxon Mobil"],
+  ["NFLX","Netflix"],["COST","Costco"],["JNJ","Johnson & Johnson"],["PG","Procter & Gamble"],["HD","Home Depot"],["ABBV","AbbVie"],["BAC","Bank of America"],["PLTR","Palantir"],
+  ["KO","Coca-Cola"],["AMD","AMD"],["CVX","Chevron"],["UNH","UnitedHealth"],["CSCO","Cisco"],["TMUS","T-Mobile US"],["WFC","Wells Fargo"],["PM","Philip Morris"],["IBM","IBM"],
+  ["CRM","Salesforce"],["GE","GE Aerospace"],["MS","Morgan Stanley"],["ABT","Abbott"],["QCOM","Qualcomm"],["MCD","McDonald's"],["AXP","American Express"],["GS","Goldman Sachs"],
+  ["INTU","Intuit"],["NOW","ServiceNow"],["DIS","Disney"],["T","AT&T"],["MRK","Merck"],["PEP","PepsiCo"],["UBER","Uber"],["ISRG","Intuitive Surgical"],["CAT","Caterpillar"]];
+var T50_ALL=false;
+function renderTop50L(){
+  var sec=document.getElementById("top50"),el=document.getElementById("t50");if(!sec||!el)return;
+  var sv=_sv(),by={};(SC_DATA||[]).forEach(function(r){by[r.ticker]=r;});
+  var L=T50.map(function(x){var r=by[x[0]];return (r&&r.ret_1!=null)?{t:x[0],n:x[1],c:+r.ret_1,px:r.last}:null;})
+    .filter(Boolean).sort(function(a,b){return b.c-a.c;});
+  if(L.length<5){sec.style.display="none";return;}
+  sec.style.display="";
+  var h2=document.getElementById("t50-h2"),sub=document.getElementById("t50-sub"),e=document.getElementById("t50-e");
+  if(e)e.innerHTML=sv?"Live &middot; USA:s 50 största bolag":"Live &middot; the 50 largest US companies";
+  if(h2)h2.innerHTML=sv?'Storbolagen. <span class="hl">Bäst idag.</span>':'Big names. <span class="hl">Best today.</span>';
+  if(sub)sub.textContent=sv?"Apple, Nvidia, Microsoft, JPMorgan, Coca-Cola — de 5 av USA:s största bolag som gått bäst i dag. Tryck på ett för att öppna det i GRABIT.":"Apple, Nvidia, Microsoft, JPMorgan, Coca-Cola — the 5 biggest US companies moving the most today. Tap one to open it in GRABIT.";
+  var show=T50_ALL?L:L.slice(0,5);
+  el.innerHTML=show.map(function(r,i){var up=r.c>=0;
+    return '<a class="rdl-row" style="color:inherit;text-decoration:none" href="/?stock='+encodeURIComponent(r.t)+'"><span class="lg">'+(i+1)+'</span><div class="mid"><div class="tk">'+_esc(r.t)+'<span>'+_esc(r.n)+'</span></div>'
+      +'<div class="why">'+(r.px!=null?"$"+(+r.px).toFixed(2):"")+'</div></div><span class="ch '+(up?"up":"dn")+'">'+_pct(r.c)+'</span></a>';}).join("")
+    +'<div style="text-align:center;margin-top:14px"><a href="#" class="btn btn-ghost" onclick="T50_ALL=!T50_ALL;renderTop50L();return false;">'
+    +(T50_ALL?(sv?"Visa topp 5":"Show top 5"):(sv?"Visa alla 50 &rarr;":"Show all 50 &rarr;"))+'</a></div>';
+}
 (function(){
   function get(u,ms){return Promise.race([fetch(u,{cache:"no-store"}).then(function(r){if(!r.ok)throw 0;return r.json();}),new Promise(function(_,rej){setTimeout(rej,ms);})]);}
-  get("/api/screen",15000).then(function(j){SC_DATA=(j&&j.rows)||false;if(SC_DATA&&!SC_DATA.length)SC_DATA=false;renderScreener();})
-    .catch(function(){SC_DATA=false;renderScreener();});
-  document.addEventListener("click",function(e){if(e.target&&e.target.id==="lang")setTimeout(renderScreener,0);});
+  get("/api/screen",15000).then(function(j){SC_DATA=(j&&j.rows)||false;if(SC_DATA&&!SC_DATA.length)SC_DATA=false;renderScreener();renderTop50L();})
+    .catch(function(){SC_DATA=false;renderScreener();renderTop50L();});
+  document.addEventListener("click",function(e){if(e.target&&e.target.id==="lang")setTimeout(function(){renderScreener();renderTop50L();},0);});
 })();
 
 

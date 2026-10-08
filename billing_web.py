@@ -22,6 +22,8 @@ ENV (Render)
   STRIPE_WEBHOOK_SECRET   whsec_... för webhooken
   PRO_TOKEN_SECRET        lång slumpsträng — signerar tokens (VIKTIG)
   PRO_UNLOCK_CODES        give-away/egna koder (kommaseparerat)
+  PRO_TRIAL_CODES         provkoder utan kort (kommaseparerat), gäller PRO_TRIAL_DAYS
+  PRO_TRIAL_DAYS          provperiodens längd i dagar (standard 7)
 Webhooken måste prenumerera på: checkout.session.completed,
 customer.subscription.updated, customer.subscription.deleted.
 """
@@ -44,6 +46,7 @@ PORTAL_URL = os.getenv("STRIPE_PORTAL_URL", "https://billing.stripe.com/p/login/
 
 _CODE_DAYS = int(os.getenv("PRO_CODE_DAYS", "365"))   # give-away/egna koder: 1 år
 _PAID_DAYS = int(os.getenv("PRO_PAID_DAYS", "2"))     # köp: kort, förnyas via status
+_TRIAL_DAYS = int(os.getenv("PRO_TRIAL_DAYS", "7"))   # provkoder: gratis test utan kort
 
 _PRO_WELCOME_HTML = (
     "<div style='font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:460px;margin:0 auto;"
@@ -156,6 +159,12 @@ def _env_codes() -> list:
 def _valid_code(code: str) -> bool:
     code = (code or "").strip().lower()
     return bool(code) and code in _env_codes()
+
+
+def _valid_trial(code: str) -> bool:
+    code = (code or "").strip().lower()
+    trials = [c.strip().lower() for c in os.getenv("PRO_TRIAL_CODES", "").split(",") if c.strip()]
+    return bool(code) and code in trials
 
 
 # --------------------------------------------------------------------------
@@ -390,6 +399,12 @@ def register(app) -> None:
         if _valid_code(code):
             kh = hashlib.sha256(code.encode("utf-8")).hexdigest()[:16]
             return {"ok": True, "token": make_token(days=_CODE_DAYS, extra={"k": kh, "src": "code"})}
+        if _valid_trial(code):
+            # Provkod: PRO i _TRIAL_DAYS dagar, sedan låser appen igen (exp).
+            kh = hashlib.sha256(code.encode("utf-8")).hexdigest()[:16]
+            exp = int(time.time()) + _TRIAL_DAYS * 86400
+            return {"ok": True, "trial": True, "days": _TRIAL_DAYS, "exp": exp,
+                    "token": make_token(days=_TRIAL_DAYS, extra={"k": kh, "src": "trial"})}
         return {"ok": False}
 
     @app.get("/api/pro/verify")
