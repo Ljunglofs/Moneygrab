@@ -83,7 +83,7 @@ except Exception:
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import HTMLResponse, FileResponse, Response
+from fastapi.responses import HTMLResponse, FileResponse, Response, StreamingResponse
 
 # =====================================================================
 #  ENKEL TTL-CACHE  (ersätter st.cache_data på servern)
@@ -1736,6 +1736,23 @@ _STATIC_FILES = {
     "hero_wide_poster.jpg": "image/jpeg",
 }
 
+# Appens bilder (tidigare inbakade i index.html). Filnamnet är bildens hash,
+# så innehållet ändras aldrig under samma namn -> cachas i ett år.
+_IMG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "img")
+
+
+@app.get("/img/{name}")
+def app_img(name: str):
+    import re as _rimg
+    if not _rimg.fullmatch(r"[0-9a-f]{12}\.(jpg|png|webp|gif)", name or ""):
+        raise HTTPException(404, "Not found")
+    p = os.path.join(_IMG_DIR, name)
+    if not os.path.exists(p):
+        raise HTTPException(404, "Not found")
+    media = {"jpg": "image/jpeg", "png": "image/png", "webp": "image/webp", "gif": "image/gif"}[name.rsplit(".", 1)[1]]
+    return FileResponse(p, media_type=media, headers={"Cache-Control": "public, max-age=31536000, immutable"})
+
+
 @app.get("/{fname}")
 def static_asset(fname: str):
     media = _STATIC_FILES.get(fname)
@@ -1745,7 +1762,7 @@ def static_asset(fname: str):
     p = os.path.join(os.path.dirname(os.path.abspath(__file__)), fname)
     if not os.path.exists(p):
         raise HTTPException(404, "File missing")
-    return FileResponse(p, media_type=media)
+    return FileResponse(p, media_type=media, headers={"Cache-Control": "public, max-age=604800"})
 
 
 # ---- Research / screener (skanner + Alpaca-nyheter + Finnhub) -------
@@ -3682,16 +3699,60 @@ def _stock_payload(ticker: str):
     return a, eng
 
 
+@cached(60)
+def _stock_payload_c(ticker: str):
+    """_stock_payload cachad i 60 s: samma aktie igen (eller nästa besökare)
+    svarar direkt. Misslyckanden kastas och cachas därför inte."""
+    a, eng = _stock_payload(ticker)
+    if not a:
+        raise LookupError(ticker)
+    return a, eng
+
+
+def _stock_payload_fast(ticker: str):
+    try:
+        a, eng = _stock_payload_c(ticker)
+        return dict(a), eng
+    except LookupError:
+        return None, None
+
+
+import concurrent.futures as _cf
+_SLOW_POOL = _cf.ThreadPoolExecutor(max_workers=6, thread_name_prefix="slow")
+_INFLIGHT = {}
+
+
+def _bg(fn, *args):
+    """Starta fn(*args) i bakgrunden; pågår samma anrop redan återanvänds det.
+    Anropet fyller sin cache när det är klart, så nästa besök får svaret direkt."""
+    k = (fn.__name__, args)
+    f = _INFLIGHT.get(k)
+    if f is None or f.done():
+        f = _SLOW_POOL.submit(fn, *args)
+        _INFLIGHT[k] = f
+    return f
+
+
+def _wait(fut, secs, default):
+    try:
+        return fut.result(timeout=max(0.0, secs))
+    except Exception:
+        return default
+
+
 @app.get("/api/stock/{ticker}")
 def stock(ticker: str):
     ticker = ticker.upper()
-    a, eng = _stock_payload(ticker)
+    t0 = time.time()
+    co_fut = _bg(company_info, ticker)          # parallellt med kursdatan
+    a, eng = _stock_payload_fast(ticker)
     if not a and "." not in ticker:
         # Svenska bolag ligger på .ST hos Yahoo (OVZON -> OVZON.ST). Testa den varianten.
         alt = ticker + ".ST"
-        a_alt, eng_alt = _stock_payload(alt)
+        a_alt, eng_alt = _stock_payload_fast(alt)
         if a_alt:
             ticker, a, eng = alt, a_alt, eng_alt
+            co_fut = _bg(company_info, ticker)
     if not a:
         raise HTTPException(404, f"Ingen data för {ticker}")
 
@@ -3717,7 +3778,9 @@ def stock(ticker: str):
         "analysis": _jsonable(a),
         "ai_score": _safe(lambda: ai_score_components(a), None, "ai_score"),
         "trade_motor": _safe(lambda: trade_motor_v2(a), None, "trade_motor"),
-        "company": _safe(lambda: company_info(ticker), {}, "company_info"),
+        # yf.info är ofta seg (flera sekunder). Den har gått parallellt sedan
+        # starten; kortet väntar högst till 1,2 s totalt, sedan visas det utan.
+        "company": _wait(co_fut, 1.2 - (time.time() - t0), {}),
         "engine": eng,
     }
 
@@ -4023,8 +4086,17 @@ _QUOTA_MSG = ("Du har nått dagens gräns för AI-frågor. "
               "fungerar som vanligt under tiden.")
 
 
-@app.post("/api/ai")
-def ai(payload: AiPayload, request: Request, token: str = ""):
+# Webbsökning kostar flera sekunder per sökning. Erbjud den bara när frågan
+# rör färsk information som inte finns i scannerns live-data.
+_AI_SEARCH_RE = _re.compile(
+    r"NYHET|NEWS|IDAG|I DAG|TODAY|IGÅR|YESTERDAY|SENASTE|LATEST|VARFÖR|WHY|RAPPORT|EARNINGS|"
+    r"KVARTAL|QUARTER|IPO|UPPKÖP|ACQUI|AFFÄR|DEAL|VD|CEO|VEM |WHO |NÄR |WHEN |FDA|GUIDANCE|"
+    r"RIKTKURS|PRICE TARGET|ANALYTIKER|ANALYST|FED|RÄNT|RATE|INFLATION|KPI|CPI|JOBB|JOBS|TRUMP|TULL|TARIFF|20[2-9][0-9]")
+
+
+def _ai_prepare(payload, request, token):
+    """Gemensam start för Ask Grabit. Returnerar ({"answer":...}, None) när
+    vi ska svara direkt (låst/kvot/demo), annars (None, kwargs till Anthropic)."""
     q = (payload.question or "").strip()
     if not q:
         raise HTTPException(400, "Tom fråga")
@@ -4039,9 +4111,9 @@ def ai(payload: AiPayload, request: Request, token: str = ""):
         return {"answer": ("\U0001F512 Ask Grabit is a PRO feature - unlock PRO to chat with Grabit AI."
                            if _en else
                            "\U0001F512 Ask Grabit ar en PRO-funktion - las upp PRO for att chatta med Grabit AI."),
-                "locked": True}
+                "locked": True}, None
     if not _quota_ok("chat", request):
-        return {"answer": _QUOTA_MSG, "kvot": True}
+        return {"answer": _QUOTA_MSG, "kvot": True}, None
 
     ctx = _ai_context(q)
 
@@ -4068,33 +4140,43 @@ def ai(payload: AiPayload, request: Request, token: str = ""):
 
     client = _anthropic_client()
     if client is None:
-        return {"answer": _ai_fallback(q, ctx), "demo": True}
+        return {"answer": _ai_fallback(q, ctx), "demo": True}, None
 
     import datetime as _dt
     _today = _dt.date.today().isoformat()
+    search = bool(_AI_SEARCH_RE.search(q.upper()))
     sys_live = (SYSTEM_PROMPT +
-                f"\n\nDagens datum är {_today}. Du har tillgång till webbsökning. "
-                "Använd den för aktuella fakta (kurser, IPO:er, bolagsnyheter, vem som äger vad) "
-                "istället för att svara från minnet, eftersom din träningsdata kan vara inaktuell. "
+                f"\n\nDagens datum är {_today}. "
+                + ("Du har tillgång till webbsökning. Sök bara när frågan kräver färska fakta "
+                   "(nyheter, rapporter, affärer) som inte står i live-datan — högst en eller två "
+                   "sökningar — och svara från minnet för allmän kunskap. "
+                   if search else
+                   "Svara utifrån live-datan och din kunskap; säg till om något kan vara inaktuellt. ")
+                + "Var koncis: kom till saken direkt, korta stycken, inga långa inledningar. "
                 + ("Respond ONLY in natural English." if str(getattr(payload,"lang","sv")).lower().startswith("en") else "Svara alltid på svenska."))
+    kw = dict(model=AI_MODEL_SMART, max_tokens=_SMART_MAXTOK, system=sys_live, messages=msgs)
+    if search:
+        kw["tools"] = [{"type": "web_search_20250305", "name": "web_search", "max_uses": 2}]
+    return None, (client, kw)
 
+
+@app.post("/api/ai")
+def ai(payload: AiPayload, request: Request, token: str = ""):
+    if not (payload.question or "").strip():
+        raise HTTPException(400, "Tom fråga")
+    early, prep = _ai_prepare(payload, request, token)
+    if early is not None:
+        return early
+    client, kw = prep
     try:
         try:
-            resp = client.messages.create(
-                model=AI_MODEL_SMART,
-                max_tokens=_SMART_MAXTOK,
-                system=sys_live,
-                messages=msgs,
-                tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 4}],
-            )
+            resp = client.messages.create(**kw)
         except Exception:
             # SDK/modell stödjer kanske inte web_search -> kör utan, så AI:n aldrig dör
-            resp = client.messages.create(
-                model=AI_MODEL_SMART,
-                max_tokens=_SMART_MAXTOK,
-                system=sys_live,
-                messages=msgs,
-            )
+            if "tools" not in kw:
+                raise
+            kw.pop("tools", None)
+            resp = client.messages.create(**kw)
         text = "".join(getattr(b, "text", "") for b in resp.content
                        if getattr(b, "type", "") == "text").strip()
         if not text:
@@ -4106,12 +4188,72 @@ def ai(payload: AiPayload, request: Request, token: str = ""):
                           f"Försök igen om en stund.", "error": True}
 
 
+@app.post("/api/ai/stream")
+def ai_stream(payload: AiPayload, request: Request, token: str = ""):
+    """Som /api/ai men strömmar svaret som ren text medan det skrivs, så de
+    första orden syns efter någon sekund i stället för när hela svaret är klart.
+    text/event-stream gör att gzip-mellanlagret släpper igenom bitarna direkt."""
+    if not (payload.question or "").strip():
+        raise HTTPException(400, "Tom fråga")
+    early, prep = _ai_prepare(payload, request, token)
+    hdrs = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+    if early is not None:
+        return StreamingResponse(iter([early.get("answer", "")]), media_type="text/event-stream", headers=hdrs)
+    client, kw = prep
+
+    def gen():
+        sent = False
+        for attempt in (0, 1):
+            try:
+                with client.messages.stream(**kw) as st:
+                    for ev in st:
+                        et = getattr(ev, "type", "")
+                        if et == "content_block_start" and getattr(getattr(ev, "content_block", None), "type", "") == "server_tool_use":
+                            yield "\u001e"          # markör: söker på webben (appen visar status)
+                        elif et == "content_block_delta" and getattr(getattr(ev, "delta", None), "type", "") == "text_delta":
+                            sent = True
+                            yield ev.delta.text
+                if not sent:
+                    yield "Jag fick inget svar just nu — försök igen om en stund."
+                return
+            except Exception as e:
+                if attempt == 0 and not sent and "tools" in kw:
+                    kw.pop("tools", None)       # försök igen utan webbsökning
+                    continue
+                yield ("\n\n" if sent else "") + f"Kunde inte nå Grabit AI just nu ({type(e).__name__}). Försök igen om en stund."
+                return
+
+    return StreamingResponse(gen(), media_type="text/event-stream", headers=hdrs)
+
+
 # ----------------------------------------------------------
 #  BOLAGSPROFIL  (svensk sektor + beskrivning)
 #  yfinance .info funkar lokalt men blockas på Render -> AI-fallback.
 #  Cachas per ticker, anropas BARA från detaljvyn (ej i skannern).
 # ----------------------------------------------------------
 _company_blurb_cache: dict = {}
+_BLURB_FILE = os.path.join(os.environ.get("DATA_DIR", "."), "company_blurbs.json")
+
+
+def _blurb_load():
+    try:
+        with open(_BLURB_FILE) as f:
+            _company_blurb_cache.update(json.load(f) or {})
+    except Exception:
+        pass
+
+
+def _blurb_save():
+    try:
+        tmp = _BLURB_FILE + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(_company_blurb_cache, f)
+        os.replace(tmp, _BLURB_FILE)
+    except Exception:
+        pass
+
+
+_blurb_load()
 
 
 def _ai_company(tk: str, name: str = "", lang: str = "sv") -> dict:
@@ -4206,6 +4348,7 @@ def company_blurb(ticker: str, lang: str = "sv"):
            "summary": summary, "country": prof.get("country", "")}
     if sector or summary:
         _company_blurb_cache[ckey] = out
+        _blurb_save()
     return out
 
 
@@ -4461,6 +4604,54 @@ def _ai_text(cache_key: str, system: str, user: str, max_tokens: int = 220, lang
         return ""
 
 
+_WARM_TICKERS = ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "AVGO", "TSLA", "BRK-B", "LLY", "JPM", "WMT",
+                 "V", "ORCL", "MA", "XOM", "NFLX", "COST", "JNJ", "PG", "HD", "ABBV", "BAC", "PLTR", "KO", "AMD",
+                 "CVX", "UNH", "CSCO", "TMUS", "WFC", "PM", "IBM", "CRM", "GE", "MS", "ABT", "QCOM", "MCD",
+                 "AXP", "GS", "INTU", "NOW", "DIS", "T", "MRK", "PEP", "UBER", "ISRG", "CAT", "VST", "XE"]
+
+
+def _warm_stock_notes():
+    """Bakgrund: aktiekorten ska öppnas med texten klar.
+    - Bolagsprofil för ALLA aktier i appen (ALL_TICKERS) — skrivs en gång, sparas på disk.
+    - Setup-notis + Yahoo-bolagsinfo varje dag för det som syns i listorna:
+      USA:s största, dagens hetaste och alla i köpläge. Övriga skrivs vid
+      första öppningen och sparas sedan för dagen."""
+    time.sleep(90)                       # låt skanningen värma upp först
+    while True:
+        try:
+            rows = scan_universe(None) or []
+            hot = [r["ticker"] for r in sorted(rows, key=lambda x: -(x.get("hetta") or 0))[:40]]
+            buy = [r["ticker"] for r in rows if str(r.get("label") or "").upper() in ("BULL", "MOMENTUM", "ROCKETCASE")]
+        except Exception:
+            hot, buy = [], []
+        daily = list(dict.fromkeys(_WARM_TICKERS + hot + buy))
+        for tk in daily:
+            try:
+                if tk not in _company_blurb_cache:
+                    company_blurb(tk)
+                ai_setup(tk)
+                company_info(tk)
+            except Exception as e:
+                print("[warm] %s: %s" % (tk, e))
+            time.sleep(2)
+        for tk in ALL_TICKERS:           # profiler: bara de som saknas
+            if tk in _company_blurb_cache:
+                continue
+            try:
+                company_blurb(tk)
+            except Exception as e:
+                print("[warm] profil %s: %s" % (tk, e))
+            time.sleep(2)
+        time.sleep(3600)
+
+
+@app.on_event("startup")
+def _start_warm_notes():
+    if os.getenv("ANTHROPIC_API_KEY"):
+        import threading
+        threading.Thread(target=_warm_stock_notes, daemon=True).start()
+
+
 @app.get("/api/ai_setup/{ticker}")
 def ai_setup(ticker: str, lang: str = "sv"):
     """En till två meningar på svenska som förklarar bolagets tekniska setup."""
@@ -4472,7 +4663,10 @@ def ai_setup(ticker: str, lang: str = "sv"):
             "till TVÅ korta meningar — vardagligt och konkret utifrån siffrorna. Nämn "
             "det viktigaste (trend, brott, volym, momentum) och en risk om den finns "
             "(överköpt, parabol, tunn likviditet). Inga köp/säljråd. Hitta inte på siffror.")
-    txt = _ai_text("setup:%s:%s:%s" % (tk, a.get("score10"), a.get("last")),
+    import datetime as _dt
+    # Nyckeln innehöll tidigare kursen -> ny AI-text vid varje kursrörelse.
+    # Texten beskriver setupen (trend/brott/volym), så dag + score + etikett räcker.
+    txt = _ai_text("setup:%s:%s:%s:%s" % (tk, _dt.date.today().isoformat(), a.get("score10"), a.get("label")),
                    sysp, "Förklara setupen:\n" + _fmt_stock_ctx(a), 170, lang=lang)
     return {"ticker": tk, "text": txt}
 
@@ -4566,7 +4760,7 @@ def ai_news(ticker: str, lang: str = "sv", name: str = ""):
         if k and s:
             r = requests.get("https://data.alpaca.markets/v1beta1/news",
                              headers={"APCA-API-KEY-ID": k, "APCA-API-SECRET-KEY": s},
-                             params={"symbols": tk, "limit": 6, "sort": "desc"}, timeout=8)
+                             params={"symbols": tk, "limit": 6, "sort": "desc"}, timeout=4)
             for n in (r.json().get("news") or []):
                 h = (n.get("headline") or "").strip()
                 if h:

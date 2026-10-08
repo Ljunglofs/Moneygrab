@@ -22,7 +22,8 @@ ENV (Render)
   STRIPE_WEBHOOK_SECRET   whsec_... för webhooken
   PRO_TOKEN_SECRET        lång slumpsträng — signerar tokens (VIKTIG)
   PRO_UNLOCK_CODES        give-away/egna koder (kommaseparerat)
-  PRO_TRIAL_CODES         provkoder utan kort (kommaseparerat), gäller PRO_TRIAL_DAYS
+  PRO_TRIAL_CODES         provkoder utan kort (kommaseparerat), gäller PRO_TRIAL_DAYS.
+                          KOD:ÅÅÅÅ-MM-DD = länken går att lösa in t.o.m. det datumet.
   PRO_TRIAL_DAYS          provperiodens längd i dagar (standard 7)
 Webhooken måste prenumerera på: checkout.session.completed,
 customer.subscription.updated, customer.subscription.deleted.
@@ -161,10 +162,110 @@ def _valid_code(code: str) -> bool:
     return bool(code) and code in _env_codes()
 
 
-def _valid_trial(code: str) -> bool:
+def _trial_status(code: str) -> str:
+    """"ok", "expired" eller "" (ingen provkod). KOD:ÅÅÅÅ-MM-DD i env sätter
+    sista dagen länken går att lösa in (svensk tid, hela dagen)."""
+    import datetime as _dt
     code = (code or "").strip().lower()
-    trials = [c.strip().lower() for c in os.getenv("PRO_TRIAL_CODES", "").split(",") if c.strip()]
-    return bool(code) and code in trials
+    if not code:
+        return ""
+    for raw in os.getenv("PRO_TRIAL_CODES", "").split(","):
+        name, _, until = raw.strip().partition(":")
+        if name.strip().lower() != code:
+            continue
+        until = until.strip()
+        if until:
+            try:
+                last = _dt.date.fromisoformat(until)
+                today = (_dt.datetime.utcnow() + _dt.timedelta(hours=2)).date()
+                if today > last:
+                    return "expired"
+            except ValueError:
+                pass
+        return "ok"
+    return ""
+
+
+def _valid_trial(code: str) -> bool:
+    return _trial_status(code) == "ok"
+
+
+# --------------------------------------------------------------------------
+#  Provperiodens slutmejl: den som löst in en provkod kan lämna sin mejl och
+#  får då ett mejl när de 7 dagarna är slut ("vill du fortsätta med PRO?").
+# --------------------------------------------------------------------------
+_TRIAL_FILE = os.path.join(os.environ.get("DATA_DIR", "."), "trial_emails.json")
+
+
+def _trial_load() -> dict:
+    try:
+        with open(_TRIAL_FILE) as f:
+            return json.load(f) or {}
+    except Exception:
+        return {}
+
+
+def _trial_save(d: dict) -> None:
+    try:
+        tmp = _TRIAL_FILE + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(d, f)
+        os.replace(tmp, _TRIAL_FILE)
+    except Exception as e:
+        print("[trial] kunde inte spara:", e)
+
+
+def _trial_end_html(en: bool) -> str:
+    url = "https://grabitlabs.com/?pw=1"
+    if en:
+        h, p1, p2, b = ("Your free GRABIT PRO trial has ended",
+                        "Thanks for trying GRABIT PRO. Your 7 free days are over, so the PRO tools are locked again.",
+                        "Want to keep the GEX levels, The Trump Signal, Insider Flow, Ask Grabit and all screeners?",
+                        "Continue with PRO")
+    else:
+        h, p1, p2, b = ("Din gratisperiod av GRABIT PRO är slut",
+                        "Tack för att du testade GRABIT PRO. Dina 7 gratisdagar är över, så PRO-verktygen är låsta igen.",
+                        "Vill du behålla GEX-nivåerna, The Trump Signal, Insider Flow, Ask Grabit och alla screeners?",
+                        "Fortsätt med PRO")
+    return ("<div style='font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:460px;margin:0 auto;"
+            "padding:24px;background:#0A0E12;color:#e8edf5;border-radius:14px'>"
+            "<img src='https://grabitlabs.com/email-logo.jpg' alt='GRABIT' width='220' "
+            "style='width:220px;max-width:80%;display:block;margin:0 auto 18px'>"
+            "<h2 style='color:#F5C542;margin:0 0 10px'>" + h + "</h2>"
+            "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'>" + p1 + "</p>"
+            "<p style='color:#c7d0dc;font-size:14.5px;line-height:1.6'>" + p2 + "</p>"
+            "<p style='text-align:center;margin:22px 0 6px'><a href='" + url + "' style='background:#F5C542;"
+            "color:#0A0E12;font-weight:700;text-decoration:none;padding:12px 22px;border-radius:10px;"
+            "display:inline-block'>" + b + " &rarr;</a></p></div>")
+
+
+def _trial_mail_loop():
+    """Var 30:e minut: mejla dem vars provperiod gått ut och som inte fått mejlet än."""
+    try:
+        from accounts import _send_email
+    except Exception:
+        _send_email = None
+    while True:
+        try:
+            d = _trial_load()
+            now = int(time.time())
+            changed = False
+            for email, e in d.items():
+                if e.get("sent") or int(e.get("exp", 0)) > now:
+                    continue
+                en = str(e.get("lang", "sv")).startswith("en")
+                subj = "Your free GRABIT PRO trial has ended" if en else "Din gratisperiod av GRABIT PRO är slut"
+                ok = bool(_send_email and _send_email(email, subj, _trial_end_html(en)))
+                e["sent"] = now if ok else 0
+                e["tries"] = int(e.get("tries", 0)) + 1
+                if ok or e["tries"] >= 3:
+                    e["sent"] = e["sent"] or -1      # -1 = gav upp efter 3 försök
+                changed = True
+            if changed:
+                _trial_save(d)
+        except Exception as ex:
+            print("[trial] mejlslinga:", ex)
+        time.sleep(1800)
 
 
 # --------------------------------------------------------------------------
@@ -399,6 +500,8 @@ def register(app) -> None:
         if _valid_code(code):
             kh = hashlib.sha256(code.encode("utf-8")).hexdigest()[:16]
             return {"ok": True, "token": make_token(days=_CODE_DAYS, extra={"k": kh, "src": "code"})}
+        if _trial_status(code) == "expired":
+            return {"ok": False, "expired": True}
         if _valid_trial(code):
             # Provkod: PRO i _TRIAL_DAYS dagar, sedan låser appen igen (exp).
             kh = hashlib.sha256(code.encode("utf-8")).hexdigest()[:16]
@@ -406,6 +509,29 @@ def register(app) -> None:
             return {"ok": True, "trial": True, "days": _TRIAL_DAYS, "exp": exp,
                     "token": make_token(days=_TRIAL_DAYS, extra={"k": kh, "src": "trial"})}
         return {"ok": False}
+
+    @app.post("/api/pro/trial_email")
+    async def pro_trial_email(request: Request):
+        """Sparar mejlen för den som löst in en provkod. Kräver provtoken, så
+        bara den som faktiskt har en provperiod kan lägga till sig."""
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        email = str(body.get("email") or "").strip().lower()[:200]
+        p = verify_token(str(body.get("token") or ""))
+        if not p or p.get("src") != "trial" or "@" not in email or "." not in email.split("@")[-1]:
+            return {"ok": False}
+        d = _trial_load()
+        d[email] = {"exp": int(p.get("exp", 0)), "lang": "en" if str(body.get("lang", "")).startswith("en") else "sv",
+                    "sent": 0, "t": int(time.time())}
+        _trial_save(d)
+        return {"ok": True}
+
+    @app.on_event("startup")
+    def _trial_start():
+        import threading
+        threading.Thread(target=_trial_mail_loop, daemon=True).start()
 
     @app.get("/api/pro/verify")
     def pro_verify(token: str = ""):
