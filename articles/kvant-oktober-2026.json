@@ -1,0 +1,1045 @@
+{
+ "slug": "kvant-oktober-2026",
+ "datum": "2026-10-09",
+ "ticker": "IONQ · INFQ · RGTI · QBTS · QUBT · IBM",
+ "bolag": "Kvantdatorer",
+ "kick": "Deep Dive",
+ "serie": "Grabits Deep Dive",
+ "serie_en": "Grabit's Deep Dive",
+ "titel": "The Quantum Race",
+ "titel_en": "The Quantum Race",
+ "ingress": "Vem bygger nästa lager av datorkraft bortom klassiskt kisel? Sex bolag, sex olika tekniska vägar – och frågan om börsen redan tar betalt för vinnarna.",
+ "ingress_en": "Who will build the next computing layer beyond classical silicon? Six companies, six technical routes – and the question of whether the market is already pricing in the winners.",
+ "kort_titel": "Grabits Deep Dive – The Quantum Race",
+ "kort_titel_en": "Grabit's Deep Dive – The Quantum Race",
+ "kort_text": "IonQ, Infleqtion, Rigetti, D-Wave, QUBT och IBM: sex sätt att bygga en kvantdator – vad siffrorna säger och vad som redan är inprisat.",
+ "kort_text_en": "IonQ, Infleqtion, Rigetti, D-Wave, QUBT and IBM: six ways to build a quantum computer – what the numbers say and what is already priced in.",
+ "manad": "Oktober 2026",
+ "manad_en": "October 2026",
+ "bild": "kvant-oktober-2026.jpg",
+ "aktier": [
+  {
+   "t": "IONQ",
+   "n": "IonQ"
+  },
+  {
+   "t": "INFQ",
+   "n": "Infleqtion"
+  },
+  {
+   "t": "RGTI",
+   "n": "Rigetti"
+  },
+  {
+   "t": "QBTS",
+   "n": "D-Wave"
+  },
+  {
+   "t": "QUBT",
+   "n": "Quantum Computing Inc."
+  },
+  {
+   "t": "IBM",
+   "n": "IBM"
+  }
+ ],
+ "kallor": [],
+ "block": [
+  {
+   "p": "Den här rapporten är en investeringsinriktad introduktion till kvantdatorer – inte en förutsägelse om vilket bolag som kommer att vinna. Sektorn är ung, tekniskt komplex och spekulativ. En lovande teknisk arkitektur gör inte automatiskt ett bolag kommersiellt framgångsrikt, och ett starkt bolag är inte automatiskt en attraktiv aktie till vilket pris som helst."
+  },
+  {
+   "p": "Siffrorna bygger på bolagens rapporter för andra kvartalet 2026 (per 30 juni). Börsvärden avser början av oktober 2026 och är avrundade. Bolagens tekniska färdplaner är mål – inte garantier."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Nästa datorrevolution?"
+  },
+  {
+   "p": "I årtionden har datorutvecklingen följt en välbekant väg: mindre transistorer, snabbare chip, effektivare programvara och allt kraftfullare datacenter. Den modellen har gett oss enorma framsteg. Men vissa problem är fortfarande extremt svåra, även för världens bästa klassiska superdatorer."
+  },
+  {
+   "p": "Kvantdatorer angriper beräkningar från ett annat håll. I stället för att enbart använda klassiska bitar utnyttjar de kvanttillstånd, exempelvis superposition och sammanflätning, för att bearbeta information. För vissa specialiserade problem skulle tillräckligt avancerade kvantsystem på sikt kunna överträffa de bästa klassiska alternativen."
+  },
+  {
+   "strong": "Det viktiga är: vissa problem."
+  },
+  {
+   "p": "Kvantdatorer kommer inte att ersätta bärbara datorer, CPU:er eller GPU:er. Troligare är att de blir specialiserade verktyg som används tillsammans med klassisk datorkraft, högpresterande beräkningar och AI-infrastruktur."
+  },
+  {
+   "p": "Möjliga användningsområden omfattar molekylsimulering, materialvetenskap, optimering, kemi, kryptografi och vissa typer av finansiell modellering. Men potential är inte samma sak som bevisat kommersiellt värde. Många tillämpningar kräver hårdvara som är betydligt mer tillförlitlig, skalbar och feltolerant än dagens system."
+  },
+  {
+   "p": "På Grabit är frågan inte om kvantdatorer låter revolutionerande. Frågan är vilka bolag som kan omvandla en svår vetenskaplig utmaning till användbara produkter – och om börsen redan tar betalt för mer framgång än vad som är rimligt."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Varför nu? Testet handlar om felkorrigering"
+  },
+  {
+   "p": "Branschen har under många år visat upp allt mer avancerade kvantenheter. Nästa fas är svårare: att göra kvantdatorer tillräckligt tillförlitliga för att konsekvent utföra användbart arbete."
+  },
+  {
+   "p": "Qubitar är känsliga. Brus och störningar från omgivningen kan skapa fel, och fler fysiska qubitar innebär inte automatiskt en bättre dator. Ett stort system med opålitliga qubitar kan vara mindre användbart än ett mindre system med bättre kontroll."
+  },
+  {
+   "p": "Därför är felkorrigering och logiska qubitar centrala. En logisk qubit byggs med hjälp av flera fysiska qubitar och felkorrigeringstekniker för att skydda kvantinformationen. Utmaningen är att minska felen utan att kostnaden och mängden extra hårdvara blir orimligt stor."
+  },
+  {
+   "p": "När vi utvärderar bolag tittar vi bortom rubriker om antal qubitar. Det som räknas:"
+  },
+  {
+   "list": [
+    "Grindtrohet och felfrekvens",
+    "Kretsdjup",
+    "Prestanda hos logiska qubitar",
+    "Drifttid och reproducerbarhet",
+    "Om kunder kan köra beräkningar som faktiskt spelar roll"
+   ]
+  },
+  {
+   "p": "Oberoende verifiering och resultat som kan upprepas väger tyngre än en enda imponerande demonstration."
+  },
+  {
+   "strong": "Det finns ingen teknisk väg som garanterat vinner. Kapplöpningen är fortfarande öppen."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Sex bolag – sex olika angreppssätt"
+  },
+  {
+   "img": "kvant-aktorerna.jpg",
+   "alt": "The Players: IonQ, Infleqtion, Rigetti, D-Wave, Quantum Computing Inc. och IBM – sex bolag, olika satsningar",
+   "cap": "Illustration: GRABIT (AI-genererad bild)"
+  },
+  {
+   "h": "1. IonQ (IONQ) – fångade joner"
+  },
+  {
+   "p": "IonQ använder elektriskt laddade atomer, så kallade joner, som qubitar. Metoden är attraktiv eftersom den kan erbjuda god koppling mellan qubitar och operationer med hög precision. Utmaningen är att bygga större system utan att tappa hastighet, stabilitet eller rimlig kostnad."
+  },
+  {
+   "p": "IonQ har breddat verksamheten bortom en ren hårdvaruberättelse och arbetar även med nätverk, sensorer och andra kvantrelaterade områden – och köpte i somras chiptillverkaren SkyWater. En bredare plattform kan skapa affärsmöjligheter, men investerare bör granska hur stor del av intäkterna som kommer från själva kvantdatorverksamheten jämfört med närliggande produkter och förvärv."
+  },
+  {
+   "p": "Det positiva scenariot är att IonQ blir en ledande kommersiell kvantplattform med växande kundbas och allt mer kapabla system. Det negativa scenariot är att förväntningar och värdering springer före den tekniska och finansiella verkligheten samtidigt som förluster och integrationskostnader förblir höga."
+  },
+  {
+   "strong": "GRABIT BEDÖMNING: IonQ är en av de starkaste kandidaterna bland de renodlade börsbolagen när det gäller kommersiell skala. Huvudfrågan är om intäktstillväxten så småningom kan ge en mer hållbar ekonomi."
+  },
+  {
+   "h": "2. Infleqtion (INFQ) – neutrala atomer"
+  },
+  {
+   "p": "Infleqtion satsar på kvantteknik med neutrala atomer. Atomerna kan placeras och styras med optiska tekniker, vilket ger en annan väg mot större kvantsystem. Arkitekturen väcker intresse eftersom den kan ha fördelar när systemen skalas upp, men den praktiska prestandan måste bevisas."
+  },
+  {
+   "p": "Bolaget arbetar också med kvantsensorer och närliggande teknik. Det kan skapa kommersiella möjligheter tidigare, men investerare bör skilja intäkter från angränsande verksamheter från bevis på att bolaget har en skalbar och kommersiellt användbar kvantdatorplattform."
+  },
+  {
+   "p": "Infleqtion rapporterade intäkter på 13,5 miljoner dollar för Q2 2026, en ökning med 157 procent jämfört med året före, och uppdaterade sin intäktsprognos för 2026 till cirka 45,1 miljoner dollar. Ändringen berodde på när intäkter från två statliga kontrakt redovisas – motsvarande belopp drogs av från tidigare år. Rörelseförlusterna ökade också."
+  },
+  {
+   "strong": "GRABIT BEDÖMNING: Infleqtion är en intressant utmanare med en annorlunda teknisk väg. Vi vill se konsekvent genomförande, trovärdiga tekniska milstolpar och tecken på att tillväxten kan förbättra bolagets ekonomi."
+  },
+  {
+   "h": "3. Rigetti Computing (RGTI) – supraledande qubitar"
+  },
+  {
+   "p": "Rigetti bygger kvantprocessorer med supraledande kretsar. Tekniken tillverkas med metoder som delvis liknar halvledarproduktion och kräver extremt låga temperaturer. Konkurrensen är hård och omfattar stora forskningsgrupper och etablerade teknikbolag."
+  },
+  {
+   "p": "Möjligheten ligger i att förbättra processorns prestanda och skala upp systemen samtidigt som styrning, kalibrering och felnivåer hålls under kontroll. Utmaningen är att tekniska framsteg måste omvandlas till system som kunder vill och kan betala för."
+  },
+  {
+   "p": "Rigetti rapporterade intäkter på 5,1 miljoner dollar under Q2 2026, en rörelseförlust på 28,1 miljoner dollar och en redovisad nettoförlust på 52,6 miljoner dollar. Den 30 juni 2026 uppgick kassa, likvida medel och investeringar till cirka 541,3 miljoner dollar."
+  },
+  {
+   "strong": "GRABIT BEDÖMNING: Rigetti har finansiella resurser att fortsätta utveckla tekniken, men den kommersiella verksamheten är liten jämfört med kostnadsbasen. Genomförande, intäktstillväxt och risken för framtida utspädning är centrala frågor."
+  },
+  {
+   "h": "4. D-Wave Quantum (QBTS) – kvantannealing och gate-baserad utveckling"
+  },
+  {
+   "p": "D-Wave skiljer sig från flera andra bolag genom sitt etablerade fokus på kvantannealing – en specialiserad metod för optimeringsproblem. Bolaget investerar även i gate-baserad kvantteknik och breddar därmed sina långsiktiga ambitioner."
+  },
+  {
+   "p": "Det positiva scenariot är att D-Wave kan sälja användbara system och molntillgång för specifika problem innan generella, feltoleranta kvantdatorer finns. Det negativa scenariot är att marknaden visar sig vara smalare än de mest optimistiska berättelserna antyder, eller att kundintresse inte blir återkommande intäkter."
+  },
+  {
+   "p": "D-Wave rapporterade intäkter på 3,1 miljoner dollar under Q2 2026. Intäkterna under första halvåret var 5,9 miljoner dollar, jämfört med 18,1 miljoner året före; jämförelsen påverkas av en systemförsäljning på 13,7 miljoner dollar under första halvåret 2025. Bokningarna under första halvåret 2026 var 35,5 miljoner dollar, jämfört med 2,9 miljoner året före – men 20 miljoner av dem kommer från en enda affär: ett Advantage2-system till Florida Atlantic University. Bokningar är inte redovisade intäkter."
+  },
+  {
+   "strong": "GRABIT BEDÖMNING: D-Waves kommersiella strategi förtjänar att tas på allvar, men vi måste följa hur bokningar omvandlas till redovisade intäkter och återkommande kundanvändning."
+  },
+  {
+   "h": "5. Quantum Computing Inc. (QUBT) – fotonik och tillverkning"
+  },
+  {
+   "p": "Quantum Computing Inc. arbetar med fotonikbaserad kvantteknik och bygger även upp kapacitet inom halvledar- och fotoniktillverkning. Fotonik är intressant eftersom ljus kan bära kvantinformation, men ett komplett system kräver betydligt mer än att visa upp en enskild optisk komponent."
+  },
+  {
+   "p": "QUBT rapporterade intäkter på 5,6 miljoner dollar under Q2 2026 och cirka 1,3 miljarder dollar i kassa, likvida medel och investeringar. Intäkterna kom främst från fotonikprodukter för befintliga användningsområden inom flyg- och rymdsektorn, offentlig sektor och industri."
+  },
+  {
+   "p": "Den skillnaden är viktig. Intäkter från närliggande fotonikverksamhet kan stödja bolaget och dess utvecklingsplaner, men de bevisar inte att en skalbar kvantdatorplattform har fått bred kommersiell spridning."
+  },
+  {
+   "strong": "GRABIT BEDÖMNING: QUBT har en stor finansiell buffert i förhållande till dagens intäkter, men investeringscaset är fortfarande mycket riskfyllt. Vi vill se tydliga tekniska framsteg och en trovärdig väg från fotonikkunnande till en särskiljande och skalbar kvantdatorverksamhet."
+  },
+  {
+   "h": "6. IBM (IBM) – den etablerade helhetsplattformen"
+  },
+  {
+   "p": "IBM är inte en renodlad kvantaktie. Det är ett stort teknikbolag med etablerade företagskunder, hårdvara, programvara, molntjänster och forskningsresurser. Kvantekosystemet gör IBM till en viktig referenspunkt för hela sektorn."
+  },
+  {
+   "p": "IBMs supraledande teknik stöds av en bred miljö av programvara och utvecklare. Bolaget har publicerat en färdplan med målet att nå ett feltolerant system kallat Starling år 2029. Det är ett bolagsmål, inte ett garanterat utfall."
+  },
+  {
+   "p": "Det positiva scenariot är att IBM omvandlar forskning och företagsrelationer till en hållbar kvantdatorplattform. Det negativa scenariot är att tekniska och kommersiella milstolpar tar längre tid än väntat, eller att kvantverksamheten under många år förblir för liten för att påverka IBMs totala ekonomi nämnvärt."
+  },
+  {
+   "strong": "GRABIT BEDÖMNING: IBM hör hemma i rapporten som teknisk och kommersiell referenspunkt, inte som direkt jämförbart renodlat kvantbolag. Att köpa IBM innebär att investera i ett diversifierat teknikbolag – inte enbart dess kvantprogram."
+  },
+  {
+   "img": "kvant-teknikerna.jpg",
+   "alt": "The Technologies: fångade joner, neutrala atomer, supraledande, kvantannealing, fotonik och full-stack – sex tekniska vägar",
+   "cap": "Illustration: GRABIT (AI-genererad bild)"
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Konkurrenterna vi inte får ignorera"
+  },
+  {
+   "p": "De sex bolagen på omslaget utgör inte hela kapplöpningen. Viktiga konkurrenter är nynoterade, privata eller delar av större teknikföretag. De kan ha stora forskningsbudgetar, etablerade kunder, tillverkningskompetens och tålamod att utveckla tekniken under många år."
+  },
+  {
+   "h": "Quantinuum (QNT) – den nynoterade utmanaren inom fångade joner"
+  },
+  {
+   "p": "Quantinuum förtjänar en plats i varje seriös diskussion om kvantdatorer. Bolagets teknik med fångade joner konkurrerar direkt med IonQ, samtidigt som programvaruekosystem och arbete med felkorrigering gör verksamheten bredare än enbart hårdvara. Bolaget noterades på Nasdaq i juni 2026 under kortnamnet QNT, med Honeywell kvar som stor ägare. Därmed finns ytterligare en renodlad kvantaktie att jämföra IonQ med."
+  },
+  {
+   "h": "Google Quantum AI – flera tekniska vägar"
+  },
+  {
+   "p": "Google har under flera år utvecklat supraledande kvantprocessorer och rapporterat framsteg inom felkorrigering. I mars 2026 meddelade bolaget också att forskningen skulle breddas till kvantteknik med neutrala atomer. Det är betydelsefullt: Google kan utforska flera arkitekturer med stöd av ett betydligt större forsknings- och datorekosystem än de flesta renodlade kvantbolag."
+  },
+  {
+   "p": "Google är inte en renodlad kvantaktie, så det är svårt att översätta framstegen till en separat investeringsvärdering. Men tekniskt går bolaget inte att ignorera."
+  },
+  {
+   "h": "Microsoft – den ambitiösa topologiska vägen"
+  },
+  {
+   "p": "Microsoft arbetar med topologiska qubitar, en metod som kan ge fördelar om den underliggande fysiken och ingenjörsarbetet fungerar som avsett. Påståenden om topologisk kvanthårdvara har samtidigt granskats vetenskapligt. Vi ska varken avfärda forskningen eller behandla tidiga påståenden som bevis på att tekniken redan har vunnit. Oberoende validering, reproducerbarhet och en trovärdig väg till användbara beräkningar är avgörande."
+  },
+  {
+   "h": "PsiQuantum – utmanaren inom fotonik"
+  },
+  {
+   "p": "PsiQuantum är en stor privat konkurrent som satsar på fotonisk kvantberäkning och feltoleranta system i stor skala med hjälp av halvledartillverkningsprocesser. Ambitionen är enorm, men även genomförandeutmaningen. Att bygga anläggningar, integrera fotoniska komponenter och uppnå tillförlitlig felkorrigering är inte samma sak som att redan ha ett kommersiellt användbart system i drift."
+  },
+  {
+   "strong": "Konkurrensen handlar alltså inte bara om IonQ mot Rigetti eller D-Wave mot QUBT."
+  },
+  {
+   "p": "Det är en kapplöpning mellan olika arkitekturer, affärsmodeller och nivåer av finansiella resurser. Att vara en av de bästa noterade kvantaktierna innebär inte automatiskt att man har en av världens starkaste kvantdatorverksamheter."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Värderingskontrollen"
+  },
+  {
+   "p": "En lovande teknik kan fortfarande vara en dålig investering om priset är fel. Ett kvantbolag kan ha spännande forskning, en stark balansräkning och en potentiellt enorm framtida marknad – och ändå vara värderat som om många års framgång redan vore säkrad."
+  },
+  {
+   "p": "Siffrorna nedan är ögonblicksbilder och inte helt jämförbara: vissa bolag säljer hårdvara och tjänster, andra har intäkter från fotonik eller närliggande verksamheter, och IBM är ett diversifierat teknikbolag."
+  },
+  {
+   "table": {
+    "head": [
+     "Bolag",
+     "Intäkter Q2 2026",
+     "Kassa / investeringar",
+     "Börsvärde ca",
+     "Börsvärde / intäkter i årstakt"
+    ],
+    "rows": [
+     [
+      "IonQ",
+      "80,1 MUSD",
+      "~2,0 md USD pro forma (3,0 md före SkyWater)",
+      "~17 md USD",
+      "~50x"
+     ],
+     [
+      "Infleqtion",
+      "13,5 MUSD",
+      "~582 MUSD",
+      "~3,0 md USD",
+      "~55x"
+     ],
+     [
+      "Rigetti",
+      "5,1 MUSD",
+      "~541 MUSD",
+      "~5,2 md USD",
+      "~250x"
+     ],
+     [
+      "D-Wave",
+      "3,1 MUSD",
+      "546 MUSD",
+      "~6,2 md USD",
+      "~500x"
+     ],
+     [
+      "QUBT",
+      "5,6 MUSD",
+      "~1,3 md USD",
+      "~1,9 md USD",
+      "~85x"
+     ],
+     [
+      "IBM",
+      "Inte jämförbart",
+      "Kvant ingår i en mycket större koncern",
+      "–",
+      "–"
+     ]
+    ]
+   },
+   "note": "Intäkter i årstakt = Q2-intäkterna × 4. Börsvärden avser början av oktober 2026 och är avrundade. IonQ:s börsvärde inkluderar SkyWater, men intäkterna gör det inte."
+  },
+  {
+   "h": "Vad siffrorna faktiskt säger"
+  },
+  {
+   "p": "IonQ har den största intäktsbasen bland de renodlade bolagen i jämförelsen, men förlusterna är fortfarande betydande. Bolaget rapporterade intäkter på 80,1 miljoner dollar för Q2 2026 och höjde helårsprognosen till 280–290 miljoner dollar – exklusive SkyWater, som IonQ köpte för cirka 1,8 miljarder dollar och tog över den 31 juli. Den redovisade nettoförlusten enligt GAAP var cirka 1,87 miljarder dollar, varav cirka 1,65 miljarder var en omvärdering som inte påverkar kassan. Den justerade EBITDA-förlusten var 120,3 miljoner dollar för kvartalet. Snabb tillväxt är inte samma sak som lönsamhet."
+  },
+  {
+   "p": "Infleqtion växer snabbt från en mindre bas. Intäkterna för Q2 var 13,5 miljoner dollar, 157 procent högre än året före, och den uppdaterade intäktsprognosen för 2026 låg på cirka 45,1 miljoner dollar. Samtidigt ökade rörelseförlusterna."
+  },
+  {
+   "p": "Rigetti har kapital att arbeta med, men måste omvandla tekniska framsteg till en större affär. Intäkterna är små i förhållande till rörelsekostnaderna, vilket gör framtida milstolpar, kundernas efterfrågan och kassaförbrukning viktiga."
+  },
+  {
+   "p": "D-Waves bokningar ger en annan bild än de redovisade intäkterna. Bokningarna under första halvåret ökade kraftigt, men till stor del tack vare en enda systemaffär. Hur stor andel som omvandlas till intäkter, när det sker och om orderna återkommer är det viktiga att följa."
+  },
+  {
+   "p": "QUBT:s kassa är stor jämfört med dagens intäkter – den motsvarar ungefär två tredjedelar av börsvärdet. Men intäkternas kvalitet spelar roll. Fotonik- och tillverkningsprodukter kan ha kommersiellt värde, men försäljningen ska inte automatiskt ses som bevis för att bolagets kvantdatorarkitektur har nått skala."
+  },
+  {
+   "strong": "Räknat på intäkterna i årstakt handlas IonQ och Infleqtion till runt 50–55 gånger intäkterna, QUBT runt 85 gånger, Rigetti runt 250 gånger och D-Wave runt 500 gånger."
+  },
+  {
+   "p": "Försäljningsmultiplar kan vara användbara, men bara om vi förstår vad försäljningen består av. Ett bolag med hög värdering och växande kvantintäkter kan inte jämföras rakt av med ett bolag där intäkterna främst kommer från närliggande fotonikprodukter. Bokningar ska inte räknas som försäljning, och en stor kassa är inget bevis för att bolaget kommer att lyckas."
+  },
+  {
+   "p": "En rättvis värderingsjämförelse tittar på börsvärde, intäktsbas, kassa och investeringar, skulder, operativ kassaförbrukning, utspädning och vilken typ av verksamhet som ligger bakom intäkterna – och prognoser är uppskattningar, inte fakta."
+  },
+  {
+   "strong": "Vår regel: vi kallar inte en aktie billig bara för att aktiekursen är låg, kassan stor eller tekniken revolutionerande. Vi behöver en trovärdig väg från forskning till återkommande intäkter – och en värdering som inte redan förutsätter att bolaget har vunnit."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "GRABIT:s jämförelsetabell"
+  },
+  {
+   "p": "Alla kvantaktier förtjänar inte samma uppmärksamhet. Teknik, kommersiella framsteg, finansiella resurser och värdering spelar roll – och de pekar inte nödvändigtvis mot samma vinnare. Bedömningen nedan är kvalitativ, inte en vetenskaplig mätning eller en köprekommendation."
+  },
+  {
+   "table": {
+    "head": [
+     "Bolag",
+     "Teknisk potential",
+     "Kommersiella framsteg",
+     "Finansiella resurser",
+     "Värderingsutrymme",
+     "Total risk"
+    ],
+    "rows": [
+     [
+      "IonQ",
+      "Hög",
+      "Ledande i gruppen",
+      "Starka",
+      "Lågt",
+      "Hög"
+     ],
+     [
+      "Infleqtion",
+      "Hög",
+      "Tidigt skede, växer",
+      "Starka",
+      "Lågt",
+      "Hög"
+     ],
+     [
+      "Rigetti",
+      "Hög",
+      "Tidigt skede",
+      "Starka",
+      "Lågt",
+      "Mycket hög"
+     ],
+     [
+      "D-Wave",
+      "Hög inom nisch",
+      "Kommersiellt fäste; ojämna intäkter",
+      "Starka",
+      "Lågt",
+      "Hög"
+     ],
+     [
+      "QUBT",
+      "Hög potential; skala ej bevisad",
+      "Tidigt skede; intäktsmix viktig",
+      "Mycket starka",
+      "Lågt",
+      "Mycket hög"
+     ],
+     [
+      "IBM",
+      "Hög",
+      "Etablerat företagsekosystem",
+      "Mycket starka på koncernnivå",
+      "Inte direkt jämförbart",
+      "Lägre bolagsrisk; teknisk genomföranderisk kvarstår"
+     ]
+    ]
+   }
+  },
+  {
+   "p": "Så läser du tabellen: hög teknisk potential betyder inte att ett brett kommersiellt kvantövertag redan har uppnåtts. Starka finansiella resurser betyder inte att bolaget är lönsamt. Lågt värderingsutrymme betyder att underlaget ger begränsat stöd för att kalla aktien billig – inte att kursen måste falla."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Vår bedömning just nu"
+  },
+  {
+   "strong": "IonQ – kandidaten med störst kommersiell skala."
+  },
+  {
+   "p": "Bolaget har den tydligaste intäktsbasen bland de renodlade bolagen i jämförelsen och betydande finansiella resurser. Risken är att investerare redan betalar för mycket framtida framgång samtidigt som förlusterna är stora."
+  },
+  {
+   "strong": "Infleqtion – utmanaren med neutrala atomer."
+  },
+  {
+   "p": "Bolaget erbjuder en alternativ väg mot skalbara kvantdatorer och har rapporterat stark intäktstillväxt. Vi vill se konsekvent genomförande, framsteg i teknikplanen och tecken på att tillväxten förbättrar ekonomin."
+  },
+  {
+   "strong": "Rigetti – hårdvarusatsningen med högre risk."
+  },
+  {
+   "p": "Bolaget har en betydande kassabuffert och ett tydligt fokus på supraledande system. Utmaningen är att visa att tekniska milstolpar kan leda till en mycket större affär innan kapitalbehov eller utspädning blir ett större problem."
+  },
+  {
+   "strong": "D-Wave – specialisten med en kommersiell vinkel."
+  },
+  {
+   "p": "Kvantannealing riktar sig redan mot optimeringsproblem och ger bolaget en annan affärsberättelse än bolag som främst fokuserar på generella gate-baserade maskiner. Det avgörande testet är om bokningar och kundanvändning leder till varaktiga, återkommande intäkter."
+  },
+  {
+   "strong": "QUBT – gott om kapital, men grundtesen måste bevisas."
+  },
+  {
+   "p": "Balansräkningen ger utrymme att investera och fotonik- samt tillverkningsverksamheten kan skapa kommersiella vägar framåt. Men vi måste skilja intäkter från närliggande fotonikprodukter från bevis för att bolagets kvantarkitektur kan bli konkurrenskraftig och skalbar."
+  },
+  {
+   "strong": "IBM – den etablerade referenspunkten."
+  },
+  {
+   "p": "IBM har företagskunder, ett brett ekosystem av programvara och hårdvara samt en publicerad färdplan mot feltoleranta system. Det är en värdefull jämförelsepunkt, men IBM-aktien är inte en renodlad kvantinvestering."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Vad skulle få oss att ändra uppfattning?"
+  },
+  {
+   "p": "Vi skulle bli mer positiva till ett bolag som visar oberoende verifierbara tekniska framsteg, återkommande kommersiell efterfrågan, förbättrad intäktskvalitet och en trovärdig väg mot lägre kassaförbrukning."
+  },
+  {
+   "p": "Vi skulle bli mer försiktiga om tidsplaner gång på gång skjuts upp, bokningar inte blir intäkter, utspädningen accelererar eller aktiens värdering stiger betydligt snabbare än de kommersiella bevisen."
+  },
+  {
+   "strong": "GRABIT:s princip är enkel: följ bevisen – inte entusiasmen."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "2030: tre möjliga scenarier"
+  },
+  {
+   "strong": "Positivt scenario"
+  },
+  {
+   "p": "Felkorrigerade system förbättras snabbare än väntat, tidiga kommersiella tillämpningar visar sig värdefulla och kunder börjar betala för beräkningar som klassiska system inte kan utföra lika effektivt. Företag som kombinerar trovärdig hårdvara, programvara, kundrelationer och tillräckligt kapital kan bli viktiga teknikplattformar."
+  },
+  {
+   "strong": "Basscenario"
+  },
+  {
+   "p": "Kvantdatorer gör verkliga framsteg, men införandet blir ojämnt. Vissa specialiserade tillämpningar och forskningsuppgifter skapar intäkter, medan stora feltoleranta system tar längre tid att kommersialisera. Några bolag blir ledande, men många aktier upplever extrem volatilitet och återkommande utspädning."
+  },
+  {
+   "strong": "Negativt scenario"
+  },
+  {
+   "p": "Tekniska milstolpar försenas, praktiska tillämpningar dröjer och börsvärderingar faller innan branschen når meningsfull skala. Vissa bolag kan överleva vetenskapligt men ändå bli dåliga investeringar eftersom de kräver för mycket kapital eller inte lyckas skapa återkommande intäkter."
+  },
+  {
+   "p": "Detta är scenarier, inte kursmål eller sannolikhetsvägda prognoser. Poängen är att framtiden är osäker och att en långsiktig teknisk möjlighet fortfarande kan ge svag avkastning."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "GRABIT:s slutliga slutsats"
+  },
+  {
+   "p": "Kvantdatorer kan bli en av de viktigaste teknikförändringarna under de kommande årtiondena. Men marknaden väntar inte på säkerhet – den försöker redan prissätta vinnarna flera år innan utfallet är känt."
+  },
+  {
+   "p": "Vi fokuserar på bevis: tekniska framsteg som kan verifieras oberoende, kommersiell efterfrågan som blir till intäkter, balansräkningar som klarar resan och värderingar som lämnar utrymme för att verkligheten inte blir lika perfekt som berättelsen."
+  },
+  {
+   "p": "Vi behandlar inte de sex bolagen som likvärdiga. IonQ sticker ut genom sin nuvarande intäktsbas bland de renodlade bolagen. Infleqtion erbjuder en alternativ arkitektur värd att följa. Rigetti är en hårdvarusatsning med högre genomföranderisk. D-Wave har ett särskiljande kommersiellt angreppssätt. QUBT har betydande kapital men måste bevisa kvaliteten och skalbarheten i sitt kvantcase. IBM är den etablerade referenspunkten, men ingen renodlad kvantinvestering."
+  },
+  {
+   "strong": "Det starkaste teknikbolaget, det starkaste företaget och den bästa aktien kan vara tre olika namn."
+  },
+  {
+   "p": "Det är den centrala frågan vi vill hjälpa investerare att undersöka."
+  },
+  {
+   "strong": "KVANTKAPPLÖPNINGEN HAR BÖRJAT. VEM BYGGER NÄSTA GENERATION?"
+  },
+  {
+   "hr": 1
+  },
+  {
+   "p": "Rapporten är avsedd för information och utbildning och utgör inte investeringsrådgivning, en rekommendation att köpa eller sälja värdepapper eller ett löfte om framtida avkastning. Kvantdatorer är en sektor i ett tidigt skede med betydande tekniska, kommersiella, regulatoriska, finansieringsmässiga och värderingsrelaterade risker. Uppgifter och färdplaner kan ändras. Gör alltid din egen research."
+  }
+ ],
+ "block_en": [
+  {
+   "p": "This report is an investment-oriented introduction to quantum computing, not a prediction that any one company will win. The sector is early, technically complex and highly speculative. A promising architecture does not automatically make a company commercially successful, and a strong company does not automatically make its stock attractive at every price."
+  },
+  {
+   "p": "Figures are based on company-reported results for the second quarter of 2026 (as of June 30). Market capitalizations are as of early October 2026 and rounded. Company roadmaps are targets, not guarantees."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "The next computing revolution?"
+  },
+  {
+   "p": "For decades, computing has followed a familiar path: smaller transistors, faster chips, more efficient software and increasingly powerful data centres. That model has delivered extraordinary progress. But some problems remain brutally difficult even for the world’s best classical supercomputers."
+  },
+  {
+   "p": "Quantum computing approaches computation from a different direction. Instead of relying only on classical bits, quantum computers use quantum states such as superposition and entanglement to process information. For certain specialised problems, a sufficiently capable quantum system could eventually outperform the best classical alternatives."
+  },
+  {
+   "strong": "That last phrase matters: for certain problems."
+  },
+  {
+   "p": "Quantum computers will not simply replace laptops, CPUs or GPUs. They are more likely to become specialised tools used alongside classical computing, high-performance computing and AI infrastructure."
+  },
+  {
+   "p": "The potential applications are wide-ranging: molecular simulation, materials science, optimisation, chemistry, cryptography and some areas of financial modelling. But potential is not the same as proven commercial value. Many applications still require hardware that is more reliable, scalable and fault-tolerant than today’s systems."
+  },
+  {
+   "p": "At Grabit, the question is not whether quantum computing sounds revolutionary. The question is which companies can turn a difficult scientific challenge into useful products — and whether public-market investors are paying a sensible price for that possibility."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Why now? The error-correction test"
+  },
+  {
+   "p": "The quantum industry has spent years demonstrating increasingly sophisticated devices. The next phase is harder: making quantum computers reliable enough to perform useful work consistently."
+  },
+  {
+   "p": "Qubits are fragile. Noise and environmental interference can introduce errors, and adding more physical qubits does not automatically produce a more capable computer. A large system with unreliable qubits may be less useful than a smaller system with better control."
+  },
+  {
+   "p": "That is why error correction and logical qubits matter. A logical qubit is built from multiple physical qubits and error-correction techniques, with the goal of protecting useful quantum information. The practical challenge is to reduce errors while keeping the overhead manageable."
+  },
+  {
+   "p": "When we assess a company, we look beyond headline qubit counts. What counts:"
+  },
+  {
+   "list": [
+    "Gate fidelity and error rates",
+    "Circuit depth",
+    "Logical-qubit performance",
+    "Uptime and reproducibility",
+    "Whether customers can run workloads that matter"
+   ]
+  },
+  {
+   "p": "Independent validation and repeatable results carry more weight than a single impressive demonstration."
+  },
+  {
+   "strong": "There is no single technical route guaranteed to win. The race is still open."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Six companies, six different approaches"
+  },
+  {
+   "img": "kvant-aktorerna.jpg",
+   "alt": "The Players: IonQ, Infleqtion, Rigetti, D-Wave, Quantum Computing Inc. and IBM – six companies, different bets",
+   "cap": "Illustration: GRABIT (AI-generated image)"
+  },
+  {
+   "h": "1. IonQ (IONQ) — trapped-ion quantum computing"
+  },
+  {
+   "p": "IonQ uses trapped ions as qubits. The approach is attractive because trapped ions can offer strong qubit connectivity and high-quality operations. The challenge is engineering systems that scale while maintaining speed, stability and practical economics."
+  },
+  {
+   "p": "IonQ has expanded beyond a narrow hardware story into networking, sensing and other quantum-related areas — and this summer it acquired chipmaker SkyWater. That broader platform may create commercial opportunities, but it also means investors should examine how much reported revenue comes from quantum computing itself versus adjacent products and acquisitions."
+  },
+  {
+   "p": "The bull case is that IonQ becomes one of the leading commercial quantum platforms, with a growing customer base and a path toward increasingly capable systems. The bear case is that expectations and valuation move ahead of technical and financial reality, while losses and integration costs remain high."
+  },
+  {
+   "strong": "GRABIT TAKE: IonQ is one of the strongest commercial-scale candidates among the pure-play names in this report. The key question is whether its revenue growth can eventually translate into more sustainable economics."
+  },
+  {
+   "h": "2. Infleqtion (INFQ) — neutral-atom quantum computing"
+  },
+  {
+   "p": "Infleqtion is pursuing neutral-atom quantum technology. Neutral atoms can be arranged and controlled using optical techniques, offering a different path to building larger quantum systems. The architecture has attracted interest because it may offer scalability advantages, although practical performance must still be demonstrated."
+  },
+  {
+   "p": "The company also works across quantum sensing and related technologies. That breadth can create nearer-term commercial opportunities, but investors should distinguish revenue from adjacent activities from evidence of a scalable, commercially useful quantum-computing platform."
+  },
+  {
+   "p": "Infleqtion reported Q2 2026 revenue of $13.5 million, up 157% year over year, and updated its 2026 revenue outlook to approximately $45.1 million. The change reflected the timing of revenue recognition on two government contracts, with corresponding reductions in revenue recognised in earlier years. Operating losses also increased."
+  },
+  {
+   "strong": "GRABIT TAKE: Infleqtion is an interesting challenger with a different technical route. We want to see repeatable execution, credible technical milestones and evidence that growth can improve the underlying economics."
+  },
+  {
+   "h": "3. Rigetti Computing (RGTI) — superconducting qubits"
+  },
+  {
+   "p": "Rigetti builds superconducting quantum processors. This architecture uses circuits fabricated with techniques that have some similarities to semiconductor manufacturing and operates at extremely low temperatures. It is a competitive field that includes major research groups and established technology companies."
+  },
+  {
+   "p": "The opportunity is to improve processor performance and scale while keeping control, calibration and error rates manageable. The challenge is that technical progress must translate into systems customers can use and pay for."
+  },
+  {
+   "p": "Rigetti reported Q2 2026 revenue of $5.1 million, an operating loss of $28.1 million and a GAAP net loss of $52.6 million. It reported approximately $541.3 million in cash, cash equivalents and available-for-sale investments at June 30, 2026."
+  },
+  {
+   "strong": "GRABIT TAKE: Rigetti has financial resources to continue developing its technology, but the commercial business remains small relative to its cost base. Execution, revenue growth and the risk of future dilution remain central."
+  },
+  {
+   "h": "4. D-Wave Quantum (QBTS) — quantum annealing and gate-model development"
+  },
+  {
+   "p": "D-Wave is different from several companies in this report because its established commercial focus is quantum annealing, a specialised approach aimed at optimisation problems. It is also investing in gate-model capabilities, broadening its long-term ambitions."
+  },
+  {
+   "p": "The bull case is that D-Wave can sell useful systems and cloud access for specific workloads before general-purpose, fault-tolerant quantum computers arrive. The bear case is that its addressable market is narrower than the broadest quantum-computing narratives suggest, or that customer interest fails to become recurring revenue."
+  },
+  {
+   "p": "D-Wave reported Q2 2026 revenue of $3.1 million. First-half revenue was $5.9 million, down from $18.1 million a year earlier, a comparison affected by a $13.7 million system sale in the first half of 2025. First-half bookings were $35.5 million, up from $2.9 million — but $20 million of that came from a single deal: an Advantage2 system for Florida Atlantic University. Bookings are not recognised revenue."
+  },
+  {
+   "strong": "GRABIT TAKE: D-Wave’s commercial approach is worth taking seriously, but we need to track how bookings convert into recognised revenue and repeat customer use."
+  },
+  {
+   "h": "5. Quantum Computing Inc. (QUBT) — photonics and manufacturing"
+  },
+  {
+   "p": "Quantum Computing Inc. is pursuing photonics-based quantum technology and has also been developing semiconductor and photonics manufacturing capabilities. Photonics can be attractive because light can carry quantum information, but scaling a complete system requires more than demonstrating an optical component."
+  },
+  {
+   "p": "QUBT reported Q2 2026 revenue of $5.6 million and approximately $1.3 billion in cash, cash equivalents and investments. Its revenue was primarily driven by photonics products serving existing aerospace, government and industrial applications."
+  },
+  {
+   "p": "That distinction is important. Adjacent photonics revenue may support the business and its development plans, but it is not the same as proving that a scalable quantum-computing platform has achieved broad commercial adoption."
+  },
+  {
+   "strong": "GRABIT TAKE: QUBT has a large financial cushion relative to its current revenue, but it remains a high-risk thesis. We want clear evidence of technical progress and a credible route from photonics capabilities to a differentiated quantum-computing business."
+  },
+  {
+   "h": "6. IBM (IBM) — the full-stack enterprise benchmark"
+  },
+  {
+   "p": "IBM is not a pure-play quantum stock. It is a large technology company with established enterprise customers, hardware, software, cloud services and research capabilities. Its quantum ecosystem makes it an important benchmark for the entire sector."
+  },
+  {
+   "p": "IBM’s superconducting approach is supported by a broad software and developer environment. The company has published a roadmap targeting a fault-tolerant system called Starling in 2029. That is a company target, not a guaranteed outcome."
+  },
+  {
+   "p": "The bull case is that IBM converts its research and enterprise relationships into a durable quantum-computing platform. The bear case is that technical and commercial milestones take longer than expected, or that quantum computing remains too small to materially affect IBM’s overall financial performance for many years."
+  },
+  {
+   "strong": "GRABIT TAKE: IBM belongs in this report as a technology benchmark, not as a directly comparable pure-play investment. Buying IBM stock means buying a diversified technology business, not just its quantum programme."
+  },
+  {
+   "img": "kvant-teknikerna.jpg",
+   "alt": "The Technologies: trapped ion, neutral atom, superconducting, quantum annealing, photonic and full-stack – six technical routes",
+   "cap": "Illustration: GRABIT (AI-generated image)"
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "The competitors you can’t ignore"
+  },
+  {
+   "p": "The six companies on our cover are not the entire race. Some important competitors are newly listed, private or part of much larger technology businesses. They can bring deep research budgets, established customers, manufacturing expertise and the patience to develop technology over many years."
+  },
+  {
+   "h": "Quantinuum (QNT) — the newly listed trapped-ion contender"
+  },
+  {
+   "p": "Quantinuum deserves a place in any serious discussion of quantum computing. Its trapped-ion approach puts it in direct technological competition with IonQ, while its software ecosystem and work on error correction make it more than a hardware story. The company listed on Nasdaq in June 2026 under the ticker QNT, with Honeywell remaining a major shareholder — giving investors another pure-play name to compare IonQ against."
+  },
+  {
+   "h": "Google Quantum AI — multiple technical routes"
+  },
+  {
+   "p": "Google has spent years developing superconducting quantum processors and has reported progress in quantum error correction. In March 2026, it also announced that it was expanding its research into neutral-atom quantum computing. That is significant: Google can pursue more than one technical route while drawing on a much larger research and computing ecosystem than most quantum-focused companies."
+  },
+  {
+   "p": "Google is not a pure-play quantum stock, so its quantum progress is difficult to translate into a standalone investment valuation. But from a technology perspective, it is impossible to ignore."
+  },
+  {
+   "h": "Microsoft — an ambitious topological approach"
+  },
+  {
+   "p": "Microsoft is pursuing topological qubits, an approach that could offer advantages if the underlying physics and engineering work as intended. However, claims around topological quantum hardware have faced scientific scrutiny. We should neither dismiss the work nor treat early claims as proof that the technology has already won. Independent validation, reproducibility and a credible path to useful computation are the milestones that matter."
+  },
+  {
+   "h": "PsiQuantum — the photonics challenger"
+  },
+  {
+   "p": "PsiQuantum is a major private competitor pursuing photonic quantum computing and large-scale, fault-tolerant systems using semiconductor manufacturing processes. Its ambition is enormous, but so is the execution challenge. Building facilities, integrating photonic components and achieving reliable error correction are not the same as demonstrating that a commercially useful system is already operating."
+  },
+  {
+   "strong": "The competition is not simply IonQ versus Rigetti, or D-Wave versus QUBT."
+  },
+  {
+   "p": "It is a race between different architectures, business models and levels of financial backing. Being one of the best publicly traded quantum stocks does not automatically mean being one of the world’s strongest quantum-computing businesses."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "The valuation reality check"
+  },
+  {
+   "p": "A promising technology can still be a bad investment at the wrong price. A quantum company can have exciting research, a strong balance sheet and a potentially enormous future market — and still be priced for years of success that have not happened yet."
+  },
+  {
+   "p": "The figures below are snapshots and are not all directly comparable: some companies sell hardware and services, others generate revenue from photonics or adjacent businesses, and IBM is a diversified technology company."
+  },
+  {
+   "table": {
+    "head": [
+     "Company",
+     "Q2 2026 revenue",
+     "Cash / investments",
+     "Market cap approx.",
+     "Market cap / annualised revenue"
+    ],
+    "rows": [
+     [
+      "IonQ",
+      "$80.1M",
+      "~$2.0B pro forma ($3.0B before SkyWater)",
+      "~$17B",
+      "~50x"
+     ],
+     [
+      "Infleqtion",
+      "$13.5M",
+      "~$582M",
+      "~$3.0B",
+      "~55x"
+     ],
+     [
+      "Rigetti",
+      "$5.1M",
+      "~$541M",
+      "~$5.2B",
+      "~250x"
+     ],
+     [
+      "D-Wave",
+      "$3.1M",
+      "$546M",
+      "~$6.2B",
+      "~500x"
+     ],
+     [
+      "QUBT",
+      "$5.6M",
+      "~$1.3B",
+      "~$1.9B",
+      "~85x"
+     ],
+     [
+      "IBM",
+      "Not comparable",
+      "Quantum is part of a much larger group",
+      "–",
+      "–"
+     ]
+    ]
+   },
+   "note": "Annualised revenue = Q2 revenue × 4. Market caps as of early October 2026, rounded. IonQ’s market cap includes SkyWater; its revenue does not."
+  },
+  {
+   "h": "What the numbers actually tell us"
+  },
+  {
+   "p": "IonQ has the strongest revenue scale among the pure-play companies in this comparison, but losses remain substantial. It reported Q2 2026 revenue of $80.1 million and raised full-year guidance to $280–290 million — excluding SkyWater, which IonQ acquired for about $1.8 billion and closed on July 31. Its GAAP net loss was about $1.87 billion, of which about $1.65 billion was a non-cash remeasurement. Adjusted EBITDA loss was $120.3 million for the quarter. Fast growth is not the same as profitability."
+  },
+  {
+   "p": "Infleqtion is growing quickly from a smaller base. Its Q2 revenue was $13.5 million, up 157% year over year, and its updated 2026 revenue outlook was approximately $45.1 million. Operating losses increased at the same time."
+  },
+  {
+   "p": "Rigetti has capital to work with, but needs to convert progress into a larger business. Its revenue remains small relative to operating costs, so future milestones, customer demand and cash burn matter."
+  },
+  {
+   "p": "D-Wave’s bookings tell a different story from its reported revenue. First-half bookings rose sharply, but largely thanks to a single system deal. The conversion rate, timing and repeatability of those orders are what investors need to track."
+  },
+  {
+   "p": "QUBT’s cash position is large relative to current revenue — roughly two thirds of its market cap. But revenue quality matters. Photonics and manufacturing products may be commercially valuable, yet investors should not assume those sales prove that its quantum-computing architecture has achieved scale."
+  },
+  {
+   "strong": "On annualised revenue, IonQ and Infleqtion trade at around 50–55 times sales, QUBT around 85 times, Rigetti around 250 times and D-Wave around 500 times."
+  },
+  {
+   "p": "A price-to-sales ratio can be useful, but only when we understand what the sales represent. A company with a large valuation and growing quantum revenue is not directly comparable to a company whose revenue primarily comes from adjacent photonics products. Nor should bookings be treated as sales, or cash on the balance sheet be treated as proof that a company will succeed."
+  },
+  {
+   "p": "A fair valuation comparison looks at market capitalization, revenue basis, cash and investments, debt, operating cash burn, share dilution and the nature of the underlying business — and forward estimates are estimates, not facts."
+  },
+  {
+   "strong": "Our rule: we will not call a stock cheap simply because its share price is low, its cash balance is large or its technology sounds revolutionary. We need a credible path from research to recurring revenue — and a valuation that does not already assume the company has won."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "The GRABIT scorecard"
+  },
+  {
+   "p": "We do not believe every quantum stock deserves the same level of attention. Technology, commercial progress, financial resources and valuation all matter — and they do not point to the same winner. This scorecard is a qualitative assessment, not a scientific measurement or a buy recommendation."
+  },
+  {
+   "table": {
+    "head": [
+     "Company",
+     "Technology potential",
+     "Commercial progress",
+     "Financial resources",
+     "Valuation comfort",
+     "Overall risk"
+    ],
+    "rows": [
+     [
+      "IonQ",
+      "High",
+      "Leading in this group",
+      "Strong",
+      "Low",
+      "High"
+     ],
+     [
+      "Infleqtion",
+      "High",
+      "Early, growing",
+      "Strong",
+      "Low",
+      "High"
+     ],
+     [
+      "Rigetti",
+      "High",
+      "Early",
+      "Strong",
+      "Low",
+      "Very high"
+     ],
+     [
+      "D-Wave",
+      "High in a specialised approach",
+      "Commercial traction; uneven revenue",
+      "Strong",
+      "Low",
+      "High"
+     ],
+     [
+      "QUBT",
+      "Potential high; scale unproven",
+      "Early; revenue mix matters",
+      "Very strong",
+      "Low",
+      "Very high"
+     ],
+     [
+      "IBM",
+      "High",
+      "Established enterprise ecosystem",
+      "Very strong at group level",
+      "Not directly comparable",
+      "Lower company-level risk; quantum execution risk remains"
+     ]
+    ]
+   }
+  },
+  {
+   "p": "How to read the table: high technology potential does not mean broad commercial quantum advantage has already been achieved. Strong financial resources do not mean the company is profitable. Low valuation comfort means we see limited room to call the stock inexpensive based on the evidence available — not that the share price must fall."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "Our current take"
+  },
+  {
+   "strong": "IonQ — the commercial-scale candidate."
+  },
+  {
+   "p": "It has the clearest revenue scale among the pure-play companies in this comparison and substantial financial resources. The risk is that investors may already be paying for a great deal of future success while losses remain material."
+  },
+  {
+   "strong": "Infleqtion — the neutral-atom challenger."
+  },
+  {
+   "p": "It offers a different route to scalable quantum computing and reported strong revenue growth. We want repeatable execution, progress on its technical roadmap and evidence that growth can eventually translate into better economics."
+  },
+  {
+   "strong": "Rigetti — the higher-risk hardware bet."
+  },
+  {
+   "p": "It has a meaningful cash cushion and a clear focus on superconducting systems. The challenge is proving that technical milestones can lead to a much larger commercial business before capital needs or dilution become a bigger issue."
+  },
+  {
+   "strong": "D-Wave — the specialist with a commercial angle."
+  },
+  {
+   "p": "Its annealing systems target optimisation problems today, giving it a different commercial narrative from companies focused primarily on general-purpose gate-model machines. The key test is whether bookings and customer use translate into durable, recurring revenue."
+  },
+  {
+   "strong": "QUBT — cash-rich, but still needs to prove the core thesis."
+  },
+  {
+   "p": "Its balance sheet gives it room to invest, and its photonics and manufacturing activities may provide routes to commercialisation. But we need to distinguish adjacent photonics sales from evidence that its quantum architecture can become a competitive, scalable platform."
+  },
+  {
+   "strong": "IBM — the established ecosystem benchmark."
+  },
+  {
+   "p": "IBM has an enterprise customer base, a broad software and hardware ecosystem, and a published roadmap toward fault-tolerant systems. It is a valuable benchmark for the sector, but buying IBM stock is not the same as investing in a pure-play quantum company."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "What would change our minds?"
+  },
+  {
+   "p": "We would become more constructive on a company that demonstrates independently credible technical progress, recurring commercial demand, improving revenue quality and a believable path toward lower cash burn."
+  },
+  {
+   "p": "We would become more cautious if roadmap dates repeatedly slip, bookings fail to become revenue, dilution accelerates, or a stock’s valuation rises much faster than its commercial evidence."
+  },
+  {
+   "strong": "The GRABIT principle is simple: follow the evidence, not the excitement."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "2030: three possible scenarios"
+  },
+  {
+   "strong": "Bull case"
+  },
+  {
+   "p": "Error-corrected systems improve faster than expected, early commercial applications prove valuable, and customers begin paying for workloads that classical systems cannot perform as efficiently. Companies that combine credible hardware, software, customer access and sufficient capital could become important technology platforms."
+  },
+  {
+   "strong": "Base case"
+  },
+  {
+   "p": "Quantum computing makes real progress, but adoption is uneven. Some specialised applications and research workloads create revenue, while large-scale fault-tolerant systems take longer to commercialise. A few companies emerge as leaders, but many stocks experience extreme volatility and periodic dilution."
+  },
+  {
+   "strong": "Bear case"
+  },
+  {
+   "p": "Technical milestones slip, practical applications take longer to materialise, and public-market valuations unwind before the industry reaches meaningful scale. Some companies may survive scientifically but fail as investments because they require too much capital or cannot build recurring revenue."
+  },
+  {
+   "p": "These are scenarios, not price targets or probability-weighted forecasts. The point is to acknowledge that the future is uncertain and that a long-term technology opportunity can still produce poor investment returns."
+  },
+  {
+   "hr": 1
+  },
+  {
+   "h": "The GRABIT final take"
+  },
+  {
+   "p": "Quantum computing could become one of the most important technology shifts of the coming decades. But the market is not waiting for certainty — it is already trying to price the winners years before the outcome is clear."
+  },
+  {
+   "p": "Our focus is on evidence: technical progress that can be independently validated, commercial demand that converts into revenue, balance sheets that can support the journey and valuations that leave room for reality to be less perfect than the story."
+  },
+  {
+   "p": "We are not treating all six companies as equal. IonQ stands out for current revenue scale among the pure-play names in this group. Infleqtion offers an alternative architecture worth watching. Rigetti remains a higher-risk hardware execution story. D-Wave has a differentiated commercial approach. QUBT has significant capital but must prove the quality and scalability of its quantum thesis. IBM is the established ecosystem benchmark, but not a pure-play quantum investment."
+  },
+  {
+   "strong": "The strongest technical company, the strongest business and the best stock may be three different names."
+  },
+  {
+   "p": "That is the central question we want this report to help investors investigate."
+  },
+  {
+   "strong": "THE QUANTUM RACE HAS STARTED. WHO WILL BUILD WHAT COMES NEXT?"
+  },
+  {
+   "hr": 1
+  },
+  {
+   "p": "This report is for informational and educational purposes only and does not constitute investment advice, a recommendation to buy or sell securities, or a promise of future performance. Quantum computing is an early-stage sector with substantial technical, commercial, regulatory, financing and valuation risks. Figures and roadmaps can change. Always do your own research."
+  }
+ ]
+}

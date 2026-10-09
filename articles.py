@@ -94,6 +94,13 @@ hr{border:0;border-top:1px solid rgba(255,201,64,.35);margin:38px 0 6px}
 .kt em{display:block;font-style:normal;color:var(--neon);font-weight:700;font-size:13px;margin-top:2px}
 .hero{margin:0 0 22px}.hero img{width:100%;height:auto;display:block;border-radius:14px;border:1px solid var(--line)}
 .hero figcaption{color:var(--mut);font-size:12px;margin-top:6px}
+.tb{overflow-x:auto;margin:14px 0 20px;border:1px solid var(--line);border-radius:12px}
+.tb table{border-collapse:collapse;width:100%;font-size:14px;min-width:520px}
+.tb th,.tb td{padding:9px 11px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}
+.tb th{color:var(--gold);font-size:12px;letter-spacing:.06em;text-transform:uppercase;background:rgba(255,201,64,.05)}
+.tb tr:last-child td{border-bottom:0}.tb td:first-child{font-weight:700;white-space:nowrap}
+.tb td:first-child,.tb th:first-child{position:sticky;left:0;background:#0a0f15;z-index:1}
+.tbn{color:var(--mut);font-size:12px;margin:-12px 0 18px}
 .L{display:none}.L.on{display:block}
 .list a{display:block;text-decoration:none;color:var(--txt);background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin:12px 0}
 .list a b{display:block;font-size:19px;margin:4px 0}.list a span{color:var(--mut);font-size:14px}
@@ -150,7 +157,7 @@ def image_path(name):
 
 
 def _blocks(blocks):
-    """Artikeltext i block: h, p, big (+l), strong, list, flow, stats, img (+alt, cap), hr."""
+    """Artikeltext i block: h, p, big (+l), strong, list, flow, stats, table (head, rows, +note), img (+alt, cap), hr."""
     out = []
     for b in blocks or []:
         if "h" in b:
@@ -173,6 +180,13 @@ def _blocks(blocks):
         elif "img" in b:
             out.append('<figure class="hero"><img src="/analys/bild/%s" alt="%s" loading="lazy">'
                        '<figcaption>%s</figcaption></figure>' % (_e(b["img"]), _e(b.get("alt")), _e(b.get("cap"))))
+        elif "table" in b:
+            t = b["table"]
+            out.append('<div class="tb"><table><tr>%s</tr>%s</table></div>' % (
+                "".join("<th>%s</th>" % _e(x) for x in t.get("head") or []),
+                "".join("<tr>%s</tr>" % "".join("<td>%s</td>" % _e(c) for c in r) for r in t.get("rows") or [])))
+            if b.get("note"):
+                out.append('<p class="tbn">%s</p>' % _e(b["note"]))
         elif "hr" in b:
             out.append('<hr>')
     return "".join(out)
