@@ -1703,6 +1703,68 @@ def analys_article(slug: str, request: Request, embed: int = 0):
                         headers={"Cache-Control": "public, max-age=300"})
 
 
+# ---- Publika aktiesidor (/aktie/TKR) ----------------------------------
+# En sida per aktie i universumet, så att Google kan hitta oss. Bara gratisdata
+# (kurs, utveckling, bolagstext); betyg och nivåer finns i appen. Sidan byggs
+# av skannerns rader och sparade bolagstexter – inga egna anrop per visning.
+import stock_pages as _stock_pages
+from fastapi.responses import PlainTextResponse as _PlainText, RedirectResponse
+
+
+def _scan_rows_nowait():
+    """Senaste skanningen som redan ligger i minnet. Startar aldrig en ny
+    skanning – en sidvisning (eller en robot) ska aldrig behöva vänta på den."""
+    hit = _CACHE.get(("scan_universe", (None,))) or _CACHE.get(("scan_universe", ()))
+    return (hit[1] if hit else None) or []
+
+
+def _scan_row(tk):
+    for r in _scan_rows_nowait():
+        if r.get("ticker") == tk:
+            return r
+    return None
+
+
+@app.get("/aktier", response_class=HTMLResponse)
+def aktier_index(request: Request):
+    _visit_note(request, "aktie")
+    names = {}
+    for r in _scan_rows_nowait():
+        if r.get("name"):
+            names[r["ticker"]] = r["name"]
+    groups = [(g, sorted(ts)) for g, ts in UNIVERSE.items()]
+    return HTMLResponse(_stock_pages.render_index(groups, names),
+                        headers={"Cache-Control": "public, max-age=900"})
+
+
+@app.get("/aktie/{ticker}", response_class=HTMLResponse)
+def aktie_page(ticker: str, request: Request):
+    tk = (ticker or "").upper().strip()
+    if not _stock_pages.valid_ticker(tk) or tk not in TICKER_THEME:
+        raise HTTPException(404, "Aktien finns inte")
+    if ticker != tk:
+        return RedirectResponse("/aktie/" + tk, status_code=301)
+    _visit_note(request, "aktie")
+    theme = TICKER_THEME.get(tk, "")
+    related = [t for t in UNIVERSE.get(theme, []) if t != tk][:12]
+    arts = [a for a in _articles.all_articles()
+            if any((x.get("t") or "").upper() == tk for x in a.get("aktier") or [])]
+    html = _stock_pages.render_stock(tk, _scan_row(tk), _company_blurb_cache.get(tk),
+                                     _company_blurb_cache.get(tk + ":en"), theme, related, arts)
+    return HTMLResponse(html, headers={"Cache-Control": "public, max-age=600"})
+
+
+@app.get("/sitemap.xml")
+def sitemap_xml():
+    xml = _stock_pages.sitemap(ALL_TICKERS, [a["slug"] for a in _articles.all_articles()])
+    return Response(xml, media_type="application/xml", headers={"Cache-Control": "public, max-age=3600"})
+
+
+@app.get("/robots.txt")
+def robots_txt():
+    return _PlainText(_stock_pages.robots(), headers={"Cache-Control": "public, max-age=86400"})
+
+
 @app.get("/api/articles/latest")
 def articles_latest():
     a = _articles.latest()
