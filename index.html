@@ -642,8 +642,22 @@ body.not-pro .trumphero .th-cta.pro{display:inline-block}
 .logo .brand{height:36px;width:auto;display:block;filter:drop-shadow(0 1px 6px rgba(255,200,61,.18))}
 .nav{position:fixed;left:0;right:0;bottom:0;z-index:50;max-width:520px;margin:0 auto;background:rgba(7,7,9,.93);
   backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-top:1px solid var(--line);
-  display:grid;grid-template-columns:repeat(6,1fr);padding:9px 4px max(9px,env(safe-area-inset-bottom))}
+  display:grid;grid-template-columns:repeat(7,1fr);padding:9px 4px max(9px,env(safe-area-inset-bottom))}
 .nav button{display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--mut2);font-size:10px;font-weight:700}
+.nav button{white-space:nowrap;min-width:0}@media(max-width:400px){.nav button{font-size:9px;letter-spacing:-.1px}}
+.nav .badge{top:-30px;right:2px;transform:none}
+#artdetail{display:flex;flex-direction:column}
+.art-sub{color:var(--mut2);font-size:13px;margin:-4px 2px 12px}
+.art-list{display:grid;gap:12px;grid-template-columns:1fr}
+@media(min-width:900px){.art-list{grid-template-columns:repeat(3,1fr);max-width:1150px}.art-top b{font-size:16px}}
+.art-c{display:block;text-decoration:none;color:inherit;border:1px solid rgba(0,229,255,.14);border-radius:16px;overflow:hidden;background:rgba(14,22,30,.6);transition:border-color .15s,transform .15s}
+.art-c:hover{border-color:rgba(0,229,255,.4);transform:translateY(-2px)}
+.art-c img{width:100%;aspect-ratio:16/10;object-fit:cover;object-position:top;display:block;background:#0b0f14}
+@media(max-width:899px){.art-top img{aspect-ratio:16/9}}
+.art-c div{padding:12px 14px 14px}.art-c small{color:var(--gold);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+.art-c b{display:block;margin:5px 0 4px;font-size:16px;line-height:1.3}.art-top b{font-size:19px}
+.art-c p{margin:0;color:var(--mut2);font-size:13px;line-height:1.5}
+.art-empty{color:var(--mut2);font-size:14px;padding:18px 4px}
 .nav button .gi{font-size:21px;line-height:1}.nav button.on{color:var(--gold)}
 .nav .badge{position:absolute;transform:translate(11px,-7px);background:var(--gold);color:#1a1505;font-size:9px;
   font-weight:900;min-width:15px;height:15px;border-radius:8px;display:grid;place-items:center;padding:0 3px}
@@ -1188,7 +1202,7 @@ var _I18N_EXACT = {
 "Ny extrem möjlighet":"New extreme opportunity","Rädsla":"Fear","RÄDSLA":"FEAR","Extrem rädsla":"Extreme fear","EXTREM RÄDSLA":"EXTREME FEAR","Girighet":"Greed","GIRIGHET":"GREED","Extrem girighet":"Extreme greed","EXTREM GIRIGHET":"EXTREME GREED","GULD":"GOLD","Guld":"Gold","AI · MARKNADSLÄGE":"AI · MARKET OUTLOOK","MARKNADSLÄGE":"MARKET OUTLOOK","Laddar dagens läge…":"Loading today's outlook…","Laddar dagens läge...":"Loading today's outlook…",
 "Månad":"Month","År":"Year","/mån":"/mo","/år":"/yr","/månad":"/month","3 MÅN GRATIS":"3 MONTHS FREE","0 kr":"$0","250 kr":"$24.99","2250 kr":"$224.99","Betalningen sker säkert via Google Play (appen) eller vår betalpartner (webben). Avsluta när som helst. Ingen finansiell rådgivning.":"Payment is handled securely by Google Play (in the app) or our payment partner (on the web). Cancel anytime. Not financial advice.","Spara 25%":"Save 25%","Fortsätt med PRO":"Continue with PRO","Har du en licensnyckel?":"Have a license key?","Betalningen är inte konfigurerad än.":"Checkout isn't set up yet.",
   // Nav
-  "Översikt":"Overview","Daytrade":"Daytrade","Signaler":"Signals","Research":"Research",
+  "Översikt":"Overview","Artiklar":"Articles","Daytrade":"Daytrade","Signaler":"Signals","Research":"Research",
   "Portfölj":"Portfolio","Smart":"Smart",
   // Sektionsrubriker
   "10 hetaste just nu":"10 hottest right now","Bolag":"Companies","Dagens lägen":"Today's setups",
@@ -1865,8 +1879,15 @@ else _i18nBoot();
   <button data-s="marknad"><span class="gi">${I.compass}</span>Research</button>
   <button data-s="portfolj"><span class="gi">${I.folio}</span>Portfölj</button>
   <button data-s="smart"><span class="gi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>Smart</button>
+  <button data-s="artiklar"><span class="gi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5z"/><path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H13v16h5.5a1.5 1.5 0 0 0 1.5-1.5z"/></svg></span><span style="position:relative">Artiklar<span class="badge art-new" id="art-new" style="display:none">NY</span></span></button>
 </nav>
 
+<section class="screen" id="s-artiklar">
+  <div class="sect" style="margin-top:4px"><h2 id="art-h">Grabits Deep Dives</h2></div>
+  <p class="art-sub" id="art-sub">Våra analyser – gratis att läsa.</p>
+  <div id="art-list" class="art-list"><div class="art-empty">Laddar…</div></div>
+</section>
+<div class="stock" id="artdetail"><div class="st-hd"><button class="bk" onclick="closeArticle()">&#8592;</button><div class="tk" id="art-tk">Artikel</div><span style="width:38px;display:inline-block"></span></div><iframe id="art-fr" title="Artikel" style="flex:1;width:100%;border:0;display:block;background:#020305"></iframe></div>
 <div class="stock" id="stock"><div class="st-hd">
   <button class="bk" onclick="closeStock()">&#8592;</button>
   <div class="tk" id="st-tk">—</div>
@@ -3279,11 +3300,12 @@ async function load(){
 /* Låsta flikar (CONFIG.LOCK_TABS): utan PRO visas paywallen och man stannar
    på Översikt. Samma väg för nav-knappar och kort som leder till en flik. */
 function go(s){
-  if(CONFIG.LOCK_TABS&&s!=="hem"&&!isPro()){if(window.showPaywall)showPaywall(null,true);s="hem";}
+  if(CONFIG.LOCK_TABS&&s!=="hem"&&s!=="artiklar"&&!isPro()){if(window.showPaywall)showPaywall(null,true);s="hem";}
   document.querySelectorAll(".screen").forEach(x=>x.classList.remove("on"));
   document.getElementById("s-"+s)?.classList.add("on");
   if(s==="daytrade")loadDaytrade();
   if(s==="smart"){loadPoly();loadPolyInsiders();}
+  if(s==="artiklar")loadArticles();
   document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("on",b.dataset.s===s));
   window.scrollTo({top:0,behavior:"instant"});}
 function openInsiderFlow(){go('signal');if(window.setSig)setSig('insider');}
@@ -3661,6 +3683,38 @@ function openMonthly(){const m=_MCASE; if(!m)return;
   document.getElementById("mcdetail").scrollTop=0;
 }
 function closeMonthly(){document.getElementById("mcdetail").classList.remove("on");}
+/* ===== Artiklar: samma artiklar som på /start, läses i appen ===== */
+var _ARTS=null;
+function _ae(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
+function _artSeen(){try{return localStorage.getItem("grabit_art_seen")||"";}catch(e){return "";}}
+function _artBadge(){var b=document.getElementById("art-new");if(!b||!_ARTS||!_ARTS.length)return;
+  b.style.display=(_ARTS[0].slug!==_artSeen())?"":"none";}
+function renderArticles(){var el=document.getElementById("art-list");if(!el)return;
+  var en=window.GRABIT_LANG==="en",k=en?"_en":"";
+  document.getElementById("art-h").textContent=en?"Grabit's Deep Dives":"Grabits Deep Dives";
+  document.getElementById("art-sub").textContent=en?"Our analyses – free to read.":"Våra analyser – gratis att läsa.";
+  if(!_ARTS||!_ARTS.length){el.innerHTML='<div class="art-empty">'+(en?"No articles yet.":"Inga artiklar än.")+'</div>';return;}
+  el.innerHTML=_ARTS.map(function(a,i){var t=function(f){return a[f+k]||a[f]||"";};
+    return '<a class="art-c'+(i===0?' art-top':'')+'" href="/analys/'+encodeURIComponent(a.slug)+'" onclick="return openArticle(event,\''+_ae(a.slug)+'\')">'
+      +(a.bild?'<img loading="lazy" src="/analys/bild/'+encodeURIComponent(a.bild)+'" alt="">':'')
+      +'<div><small>'+(i===0?(en?"Latest":"Senaste")+" &middot; ":"")+_ae(t("manad")||a.datum)+(a.ticker?" &middot; "+_ae(a.ticker):"")+'</small>'
+      +'<b>'+_ae(t("kort_titel")||t("titel"))+'</b><p>'+_ae(t("kort_text")||t("ingress"))+'</p></div></a>';}).join("");}
+function loadArticles(force){
+  if(_ARTS&&!force){renderArticles();return;}
+  var B=(CONFIG.API_BASE||"").replace(/\/$/,"");
+  fetch(B+"/api/articles").then(function(r){return r.json();}).then(function(d){_ARTS=(d&&d.articles)||[];renderArticles();_artBadge();})
+    .catch(function(){var el=document.getElementById("art-list");if(el&&!_ARTS)el.innerHTML='<div class="art-empty">'+(window.GRABIT_LANG==="en"?"Could not load articles.":"Kunde inte ladda artiklarna.")+'</div>';});}
+function openArticle(e,slug){try{
+  var B=(CONFIG.API_BASE||"").replace(/\/$/,""),l=window.GRABIT_LANG==="en"?"en":"sv";
+  var u=B+"/analys/"+encodeURIComponent(slug)+"?embed=1&lang="+l,f=document.getElementById("art-fr");
+  if(f.getAttribute("src")!==u)f.setAttribute("src",u);
+  var a=(_ARTS||[]).filter(function(x){return x.slug===slug;})[0];
+  document.getElementById("art-tk").textContent=a?((l==="en"?a.titel_en:a.titel)||a.titel):"";
+  document.getElementById("artdetail").classList.add("on");
+  if(_ARTS&&_ARTS.length&&_ARTS[0].slug===slug){try{localStorage.setItem("grabit_art_seen",slug);}catch(x){}_artBadge();}
+  if(e)e.preventDefault();return false;}catch(x){return true;}}
+function closeArticle(){document.getElementById("artdetail").classList.remove("on");}
+setTimeout(function(){loadArticles();},2500);
 
 // ---- GEX-nivåer (fliken hette tidigare Daytrade; funktionsnamnet behålls för anropen) ----
 let _dtLoaded=false;
@@ -5997,7 +6051,8 @@ body.desk .pw-card{max-width:520px}
     signal:["Signals","Signaler","Trump Signal, insiders and alerts","Trump Signal, insiders och larm"],
     marknad:["Research","Research","Screeners, themes and today's movers","Screeners, teman och dagens rörelser"],
     portfolj:["Portfolio","Portfölj","Your holdings and watchlist","Dina innehav och din watchlist"],
-    smart:["Smart money","Smart money","Prediction markets and insider flow","Prediktionsmarknader och insiderflöden"]};
+    smart:["Smart money","Smart money","Prediction markets and insider flow","Prediktionsmarknader och insiderflöden"],
+    artiklar:["Articles","Artiklar","Grabit's Deep Dives – free to read","Grabits Deep Dives – gratis att läsa"]};
 
   // Översikt: vilka block som flyttas till toppen och till högerspalten.
   var TOP=[".promo4","#trumpbar","#newsbar"];
