@@ -5077,9 +5077,18 @@ def signals():
         ret5 = a.get("ret_5") or 0
         ret1 = a.get("ret_1") or 0          # dagens % — det som visas vid kursen
         theme = a.get("theme") or "Signal"
+        # Skannern ger topplistan nästan alltid 10/10, så rubriken säger i stället
+        # vad som faktiskt sticker ut: volymen eller trenden.
+        _st = {"HH/HL": "Högre toppar och bottnar", "LH/LL": "Lägre toppar och bottnar",
+               "BLANDAD": "Blandad struktur"}.get(str(struct).strip(), struct or "Stark struktur")
         if sc >= 9:
-            h, ic, c = "Ny extrem möjlighet", "flame", GOLD
-            det = "Score %s/10 · rel.volym %.1fx. %s." % (sc, relv, struct or "stark struktur")
+            if relv >= 2.5:
+                h, ic, c = "Stark volym", "pulse", GOLD
+            elif str(struct).startswith("HH"):
+                h, ic, c = "Stark trend", "trend", GOLD
+            else:
+                h, ic, c = "Toppsetup", "flame", GOLD
+            det = "Rel.volym %.1fx · 5d %s%%. %s." % (relv, _pp(ret5), _st)
         elif "ekräft" in str(bos) or "ekräft" in str(struct):
             h, ic, c = "Setup bekräftad", "trend", GREEN
             det = "%s. Rel.volym %.1fx, 5d %s%%." % (bos or "Trend bekräftad", relv, _pp(ret5))

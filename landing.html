@@ -396,6 +396,10 @@ html:not(#gc)::before, html:not(#gc)::after, body:not(#gc)::before, body:not(#gc
 :is(.dv-card, .rdl):not(#gc) { background-image: none !important; }
 body :not(#gc):not(#gc2):not(svg):not(svg *) { border-color: rgba(242,239,232,0.08) !important; }
 .btn-gold:not(#gc):not(#gc2) { background: linear-gradient(180deg, #FBDF5B, #F1AE0B) !important; color: #05070D !important; border-color: #F5C030 !important; }
+/* Färre brickor: bannern överst säger redan att vi är live. */
+.launch, .feat .new { display: none !important; }
+/* Siffror i rak linje, som i en terminal. */
+body:not(#gc) { font-variant-numeric: tabular-nums; }
 </style>
 </head>
 <body>
