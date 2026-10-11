@@ -268,9 +268,9 @@ _RS_DIST: list = []      # senaste skanningens rs_raw, sorterad — för aktieko
 # Rocketcase-definitionen (tight nära toppen) gick sämre än marknaden under
 # andra halvåret; RS-ledare nära toppen slog snittet i båda. Etiketterna sätts
 # därför om när RS-ratingen är känd. Ordningen är prioritetsordningen.
-_LABEL_COLORS = {"Rocketcase": "#f5a623", "MOMENTUM": "#b06bff", "BULL": "#21c45d",
+_LABEL_COLORS = {"Rocketcase": "#F5C030", "MOMENTUM": "#F5C030", "BULL": "#00E5FF",
                  "VÄNDNING": "#00c2c2", "AVSVALNING": "#ff6b3d", "BEAR": "#ff4b4b",
-                 "NEUTRAL/BYGGER": "#f5d142", "SVAG": "#ff9f43"}
+                 "NEUTRAL/BYGGER": "#F5C030", "SVAG": "#ff9f43"}
 
 
 def _relabel(r):
@@ -1216,16 +1216,16 @@ def assetlinks():
 
 _LEGAL_CSS = """<style>body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#0A0E12;color:#e8edf5;
 max-width:720px;margin:0 auto;padding:30px 20px 60px;line-height:1.62}
-h1{font-size:23px;color:#F5C542;margin:0 0 4px}
+h1{font-size:23px;color:#F5C030;margin:0 0 4px}
 .upd{color:#8891a0;font-size:12.5px;margin:0 0 22px}
-h2{font-size:16px;margin-top:28px;color:#F5C542}
-p,li{font-size:14.5px;color:#c7d0dc}b{color:#e8edf5}a{color:#F5C542}
+h2{font-size:16px;margin-top:28px;color:#F5C030}
+p,li{font-size:14.5px;color:#c7d0dc}b{color:#e8edf5}a{color:#F5C030}
 .nav{margin-top:34px;padding-top:16px;border-top:1px solid rgba(255,255,255,.08);font-size:13px}
-.note{background:rgba(245,197,66,.08);border:1px solid rgba(245,197,66,.3);border-radius:10px;padding:12px 14px;font-size:13px;color:#d9e0ea}
+.note{background:rgba(245,192,48,.08);border:1px solid rgba(245,192,48,.3);border-radius:10px;padding:12px 14px;font-size:13px;color:#d9e0ea}
 .langbar{display:flex;gap:8px;margin:0 0 24px}
 .langbar button{font:inherit;font-size:13px;font-weight:700;cursor:pointer;padding:7px 16px;border-radius:20px;
-border:1px solid rgba(245,197,66,.35);background:transparent;color:#8891a0}
-.langbar button.on{background:#F5C542;color:#0A0E12;border-color:#F5C542}
+border:1px solid rgba(245,192,48,.35);background:transparent;color:#8891a0}
+.langbar button.on{background:#F5C030;color:#0A0E12;border-color:#F5C030}
 .L{display:none}.L.on{display:block}
 </style>"""
 
@@ -5057,7 +5057,7 @@ def signals():
     rows = scan_universe(None) or []
     if not rows:
         return {"feed": []}
-    GOLD, GREEN, CYAN = "#F5C542", "#22c55e", "#22d3ee"
+    GOLD, GREEN, CYAN = "#F5C030", "#00E5FF", "#22d3ee"
     by = sorted(rows, key=lambda x: (x.get("score10", 0), x.get("hetta", 0)), reverse=True)
     feed = []
 

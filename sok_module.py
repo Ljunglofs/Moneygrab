@@ -337,17 +337,17 @@ def analyze(df):
     if (rolling_over or cooling) and (last > ema50 or ret_20 > 0):
         label, emoji, color = "AVSVALNING", "", "#ff6b3d"
     elif (-8 <= pct_from_high <= 1) and tight < 5 and rsi < 72 and last > ema50 and not cooling:
-        label, emoji, color = "Rocketcase", "", "#f5a623"
+        label, emoji, color = "Rocketcase", "", "#F5C030"
     elif turnaround and not cooling:
         label, emoji, color = "VÄNDNING", "", "#00c2c2"
     elif last > ema50 and last > ema200 and momentum > 18 and not cooling:
-        label, emoji, color = "BULL", "", "#21c45d"
+        label, emoji, color = "BULL", "", "#00E5FF"
     elif thrust and not cooling:
-        label, emoji, color = "MOMENTUM", "", "#b06bff"
+        label, emoji, color = "MOMENTUM", "", "#F5C030"
     elif last < ema50 and last < ema200 and ret_20 < -5 and ret_5 <= 0:
         label, emoji, color = "BEAR", "", "#ff4b4b"
     elif last > ema50:
-        label, emoji, color = "NEUTRAL/BYGGER", "", "#f5d142"
+        label, emoji, color = "NEUTRAL/BYGGER", "", "#F5C030"
     else:
         label, emoji, color = "SVAG", "", "#ff9f43"
 
@@ -564,9 +564,9 @@ def render_sok_tab():
     if a.get("levels_note"):
         st.markdown("##### Nivåer & struktur")
         bos = a.get("bos", "INGEN")
-        bos_col = "#21c45d" if bos == "BULLISH" else "#ff4b4b" if bos == "BEARISH" else "#848e9c"
+        bos_col = "#00E5FF" if bos == "BULLISH" else "#ff4b4b" if bos == "BEARISH" else "#848e9c"
         grade = a.get("setup_grade", "C")
-        grade_col = {"A": "#21c45d", "B": "#1199fa", "C": "#f5d142", "D": "#ff6b3d"}.get(grade, "#848e9c")
+        grade_col = {"A": "#00E5FF", "B": "#1199fa", "C": "#F5C030", "D": "#ff6b3d"}.get(grade, "#848e9c")
         lc = st.columns(4)
         lc[0].metric("BOS", bos)
         lc[1].metric("Struktur", a.get("structure", "—"))

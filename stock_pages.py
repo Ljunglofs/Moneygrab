@@ -19,7 +19,7 @@ from articles import _e, _head, _top, _LANG_JS, _SITE
 _TK_RE = re.compile(r"^[A-Z0-9][A-Z0-9.\-]{0,11}$")
 
 _CSS_EXTRA = """<style>
-.kt b.up{color:#2fe39a}.kt b.dn{color:#ff6b7d}
+.kt b.up{color:#00E5FF}.kt b.dn{color:#ff6b7d}
 .rel{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 6px}
 .rel a{text-decoration:none;color:var(--txt);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:7px 11px;font-weight:600;font-size:14px}
 .rel a:hover{border-color:var(--neon)}
