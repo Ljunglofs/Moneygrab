@@ -1190,7 +1190,7 @@ body{background:transparent!important}
 .p4-pro,.gn-new,.pw-badge,.pp-badge{box-shadow:0 0 12px rgba(245,192,48,.5)}
 </style>
 <style id="grabit-clean">
-/* GRABIT clean: ingen glöd, inga neonkanter, inget rutnät. Midnight black-bakgrund, guldknappar.
+/* GRABIT clean, steg 1: ingen glöd, inga neonkanter, inget rutnät.
    Ligger sist i <head> och vinner över neon-lagret. Ta bort hela blocket för att gå tillbaka.
    :not(#gc) höjer specificiteten så att blocket slår de befintliga klassreglerna. */
 :not(#gc):not(#gc2), :not(#gc):not(#gc2)::before, :not(#gc):not(#gc2)::after { box-shadow: none !important; text-shadow: none !important; }
@@ -1200,7 +1200,7 @@ html:not(#gc)::before, html:not(#gc)::after, body:not(#gc)::before, body:not(#gc
 .stock:not(#gc)::before { background-image: none !important; }
 body :not(#gc):not(#gc2):not(svg):not(svg *) { border-color: rgba(242,239,232,0.08) !important; }
 :is(.p4-cta, .gex-unlock, .pw-btn, .to-btn, .mc-go, .mh-form button, .rb-cta, .ib-go):not(#gc):not(#gc2) { background: linear-gradient(180deg, #FBDF5B, #F1AE0B) !important; color: #05070D !important; border-color: #F5C030 !important; }
-/* Undantag: den aktiva fliken i menyn får ett svagt guldsken, så att man ser vilken sida som är öppen. */
+/* Undantag: den aktiva fliken i menyn fÃ¥r ett svagt guldsken, sÃ¥ att man ser vilken sida som Ã¤r Ã¶ppen. */
 nav.nav button.on:not(#gc):not(#gc2):not(#gc3) { color: #F5C030 !important; text-shadow: 0 0 10px rgba(245,192,48,0.55) !important; }
 nav.nav button.on:not(#gc):not(#gc2):not(#gc3) svg { color: #F5C030 !important; filter: drop-shadow(0 0 6px rgba(245,192,48,0.65)) !important; }
 </style>
@@ -1772,7 +1772,7 @@ else _i18nBoot();
       </div>
     </div>
     <div class="robberbanner" onclick="robberQuickScan()" role="button" aria-label="NASDAQ ROBBER — kolla läget" style="background-image:url('/img/e43c15517734.jpg')"><div class="rb-cta"><span class="rb-lock">🔒</span> Kolla läget nu</div></div>
-    <div class="trumphero" onclick="openTrumpFeed()" role="button" aria-label="The Trump Signal"><img src="/trump-hero.jpg" alt="The Trump Signal"><span class="th-live"><i></i>LIVE</span><span class="th-pro">&#F5C030; PRO</span><span class="th-cta">Senaste om Trump &amp; USA &#8594;</span><span class="th-cta pro">Lås upp med PRO &#8594;</span></div>
+    <div class="trumphero" onclick="openTrumpFeed()" role="button" aria-label="The Trump Signal"><img src="/trump-hero.jpg" alt="The Trump Signal"><span class="th-live"><i></i>LIVE</span><span class="th-pro">&#128274; PRO</span><span class="th-cta">Senaste om Trump &amp; USA &#8594;</span><span class="th-cta pro">Lås upp med PRO &#8594;</span></div>
     <div class="sect"><h2>Dagens lägen</h2><a onclick="go('marknad')">Visa alla</a></div>
     <div class="picks" id="picks"></div>
     <div class="sect"><h2>I din watchlist</h2><a onclick="go('portfolj')">Visa alla</a></div>
@@ -1944,17 +1944,17 @@ const UNIVERSE=[{t:"EQIX",n:"Equinix",d:"equinix.com"},{t:"DLR",n:"Digital Realt
 const NAMES={},DOMAINS={};UNIVERSE.forEach(x=>{NAMES[x.t]=x.n;if(x.d)DOMAINS[x.t]=x.d;});
 
 const THEMES = [
-  { key:"AI-infra", uk:"AI-infra",        ic:"&#00E5FF;", c:"#F5C030", n:43, tk:["NVDA","AVGO","AMD","CRDO","SMCI"] },
-  { key:"Halvledare", uk:"Halvledare",      ic:"&#F5C030;", c:"#F5C030", n:45,  tk:["SIVE","MRVL","NVTS"] },
+  { key:"AI-infra", uk:"AI-infra",        ic:"&#129516;", c:"#F5C030", n:43, tk:["NVDA","AVGO","AMD","CRDO","SMCI"] },
+  { key:"Halvledare", uk:"Halvledare",      ic:"&#128268;", c:"#F5C030", n:45,  tk:["SIVE","MRVL","NVTS"] },
   { key:"Quantum", uk:"Quantum",         ic:"&#9883;",   c:"#F5C030", n:8,  tk:["IONQ","QUBT","RGTI"] },
   { key:"Rare earth", uk:"Rare earth",      ic:"&#9935;",   c:"#F5C030", n:17,  tk:["USAR","MP"] },
   { key:"Nuclear/Energi", uk:"Nuclear/Energi",  ic:"&#9889;",   c:"#F5C030", n:33, tk:["OKLO","SMR","VST","CEG"] },
-  { key:"Försvar/Drönare", uk:"Defense/Drone", ic:"&#00E5FF;", c:"#FF3B30", n:33,  tk:["KTOS","AVAV","ONDS"] },
+  { key:"Försvar/Drönare", uk:"Defense/Drone", ic:"&#128737;", c:"#FF3B30", n:33,  tk:["KTOS","AVAV","ONDS"] },
   { key:"Lidar/Phys.AI", uk:"Lidar/Phys.AI",   ic:"&#128663;", c:"#00e5ff", n:17,  tk:["OUST","LAZR","AEVA"] },
-  { key:"Space", uk:"Space",           ic:"&#00E5FF;", c:"#f472b6", n:16,  tk:["RKLB","ASTS","RDW"] },
-  { key:"Mjukvara/AI", uk:"Mjukvara",     ic:"&#F5C030;", c:"#818cf8", n:39,  tk:["PLTR","NVDA","TSLA"] },
-  { key:"Bio/Hälsa", uk:"Bio",       ic:"&#00E5FF;", c:"#FBDF5B", n:41,  tk:["RXRX","HIMS"] },
-  { key:"Finans/Betalning", uk:"Finans+Fintech/Krypto", ic:"&#F5C030;", c:"#F5C030", n:53, tk:["V","MA","JPM","GS","AXP","HOOD","SOFI"] }
+  { key:"Space", uk:"Space",           ic:"&#128640;", c:"#f472b6", n:16,  tk:["RKLB","ASTS","RDW"] },
+  { key:"Mjukvara/AI", uk:"Mjukvara",     ic:"&#128187;", c:"#818cf8", n:39,  tk:["PLTR","NVDA","TSLA"] },
+  { key:"Bio/Hälsa", uk:"Bio",       ic:"&#129516;", c:"#FBDF5B", n:41,  tk:["RXRX","HIMS"] },
+  { key:"Finans/Betalning", uk:"Finans+Fintech/Krypto", ic:"&#127974;", c:"#F5C030", n:53, tk:["V","MA","JPM","GS","AXP","HOOD","SOFI"] }
 ];
 
 const DEMO = {
@@ -3112,7 +3112,7 @@ function onSearch(v){const q=v.trim().toUpperCase();const res=$("#search-res");
   if(qTk.length>=1&&qTk.length<=8&&!hits.includes(qTk)&&CONFIG.API_BASE){
     html+=`<div class="sect"><h2>Sök externt</h2></div><div class="card">
       <div class="qrow" id="ext-search" onclick="externalSearch('${qTk}')">
-        <div class="lic" style="width:36px;height:36px;color:var(--gold);background:rgba(245,192,48,.12)">&#F5C030;</div>
+        <div class="lic" style="width:36px;height:36px;color:var(--gold);background:rgba(245,192,48,.12)">&#128269;</div>
         <div class="nm"><div class="t">${qTk}</div><div class="s">Hämta live-analys från Grabit-servern</div></div>
         <div class="chg" style="color:var(--gold)">Testa &rarr;</div></div></div>`;
   }
@@ -4037,7 +4037,7 @@ async function loadStockChart(tkr){
     const stopp=(a.ob_support!=null?a.ob_support:a.atr_dn_1);
     if(stopp!=null)lv.push({v:+stopp,txt:EN?"STOP":"STOPP",c:"#FF4B4B"});
     if(a.last!=null)lv.push({v:+a.last,txt:"ENTRY",c:"#F5C030"});
-    if(a.atr_up_05!=null)lv.push({v:+a.atr_up_05,txt:"T1",c:"#00e5ff"});
+    if(a.atr_up_05!=null)lv.push({v:+a.atr_up_05,txt:"T1",c:"#F5C030"});
     if(a.atr_up_1!=null)lv.push({v:+a.atr_up_1,txt:"T2",c:"#F5C030"});
   }
   let lo=Math.min.apply(null,cs),hi=Math.max.apply(null,cs);
@@ -4397,8 +4397,8 @@ async function loadTrump(){
   el.style.display="";
   if(!isPro()){
     el.innerHTML='<div class="feat trump" onclick="showPaywall(null,true)"><span class="feat-logo dark">'+_TRUMP_CAP+'</span>'
-      +'<div class="feat-main"><div class="feat-top"><span class="feat-lbl"><small>THE</small>TRUMP SIGNAL</span><span class="feat-pro">&#F5C030; PRO</span><span class="feat-ago">'+featAgo(p.ts,EN)+'</span></div>'
-      +'<div class="feat-hl blur">'+txt+'</div></div><span class="feat-go">&#F5C030;</span></div>';
+      +'<div class="feat-main"><div class="feat-top"><span class="feat-lbl"><small>THE</small>TRUMP SIGNAL</span><span class="feat-pro">&#128274; PRO</span><span class="feat-ago">'+featAgo(p.ts,EN)+'</span></div>'
+      +'<div class="feat-hl blur">'+txt+'</div></div><span class="feat-go">&#128274;</span></div>';
     return;
   }
   var click=p.url?(' onclick="window.open(\''+encodeURI(p.url)+'\',\'_blank\',\'noopener\')"'):' onclick="openTrumpFeed()"';
