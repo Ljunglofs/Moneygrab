@@ -1200,6 +1200,9 @@ html:not(#gc)::before, html:not(#gc)::after, body:not(#gc)::before, body:not(#gc
 .stock:not(#gc)::before { background-image: none !important; }
 body :not(#gc):not(#gc2):not(svg):not(svg *) { border-color: rgba(242,239,232,0.08) !important; }
 :is(.p4-cta, .gex-unlock, .pw-btn, .to-btn, .mc-go, .mh-form button, .rb-cta, .ib-go):not(#gc):not(#gc2) { background: linear-gradient(180deg, #FBDF5B, #F1AE0B) !important; color: #05070D !important; border-color: #F5C030 !important; }
+/* Undantag: den aktiva fliken i menyn får ett svagt guldsken, så att man ser vilken sida som är öppen. */
+nav.nav button.on:not(#gc):not(#gc2):not(#gc3) { color: #F5C030 !important; text-shadow: 0 0 10px rgba(245,192,48,0.55) !important; }
+nav.nav button.on:not(#gc):not(#gc2):not(#gc3) svg { color: #F5C030 !important; filter: drop-shadow(0 0 6px rgba(245,192,48,0.65)) !important; }
 </style>
 </head>
 <body>
