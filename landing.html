@@ -385,6 +385,18 @@ header nav a{white-space:nowrap}
 .center .trust,.final .trust{justify-content:center}
 .price .trust{font-size:11.5px;gap:4px 10px;margin:4px 0 10px;color:#9aa4b2}
 </style>
+<style id="grabit-clean">
+/* GRABIT clean, steg 1: ingen glöd, inga neonkanter, inget rutnät.
+   Ligger sist i <head> och vinner över neon-lagret. Ta bort hela blocket för att gå tillbaka.
+   :not(#gc) höjer specificiteten så att blocket slår de befintliga klassreglerna. */
+:not(#gc):not(#gc2), :not(#gc):not(#gc2)::before, :not(#gc):not(#gc2)::after { box-shadow: none !important; text-shadow: none !important; }
+html:not(#gc), body:not(#gc) { background-image: none !important; background-color: #0A0A0B !important; }
+html:not(#gc)::before, html:not(#gc)::after, body:not(#gc)::before, body:not(#gc)::after { background-image: none !important; }
+:is(.gridsec, .facts, .feat, .panel, .price):not(#gc)::before { background-image: none !important; }
+:is(.dv-card, .rdl):not(#gc) { background-image: none !important; }
+body :not(#gc):not(#gc2):not(svg):not(svg *) { border-color: rgba(255,255,255,0.08) !important; }
+.btn-gold:not(#gc):not(#gc2) { background: #FFC83D !important; color: #141414 !important; border-color: #FFC83D !important; }
+</style>
 </head>
 <body>
 

@@ -1189,6 +1189,18 @@ body{background:transparent!important}
 /* Guld behålls för PRO-märken och små detaljer */
 .p4-pro,.gn-new,.pw-badge,.pp-badge{box-shadow:0 0 12px rgba(255,201,64,.5)}
 </style>
+<style id="grabit-clean">
+/* GRABIT clean, steg 1: ingen glöd, inga neonkanter, inget rutnät.
+   Ligger sist i <head> och vinner över neon-lagret. Ta bort hela blocket för att gå tillbaka.
+   :not(#gc) höjer specificiteten så att blocket slår de befintliga klassreglerna. */
+:not(#gc):not(#gc2), :not(#gc):not(#gc2)::before, :not(#gc):not(#gc2)::after { box-shadow: none !important; text-shadow: none !important; }
+html:not(#gc), body:not(#gc) { background-image: none !important; background-color: #0A0A0B !important; }
+html:not(#gc)::before, html:not(#gc)::after, body:not(#gc)::before, body:not(#gc)::after { background-image: none !important; }
+:is(.theme-hero, .card, .dt-card, .prem, .gexnews, .feat, .ams, .promo4, .hm-card, .mcase, .aibrief, .memberhub, .evt-panel, .t3-row, .rboard, .instbar, .dh, .ps-card):not(#gc) { background-image: none !important; }
+.stock:not(#gc)::before { background-image: none !important; }
+body :not(#gc):not(#gc2):not(svg):not(svg *) { border-color: rgba(255,255,255,0.08) !important; }
+:is(.p4-cta, .gex-unlock, .pw-btn, .to-btn, .mc-go, .mh-form button, .rb-cta, .ib-go):not(#gc):not(#gc2) { background: #FFC83D !important; color: #141414 !important; border-color: #FFC83D !important; }
+</style>
 </head>
 <body>
 <script>
