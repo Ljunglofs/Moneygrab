@@ -4203,7 +4203,7 @@ function macroWhen(e){
   if(!e.ts)return{date:e.date||"",time:e.time||"",d:null};
   var d=new Date(e.ts);if(isNaN(d))return{date:e.date||"",time:e.time||"",d:null};
   var nl=(navigator.language||"");var loc=(window.GRABIT_LANG==="en")?(/^en/i.test(nl)?nl:"en-GB"):"sv-SE";
-  return{date:d.toLocaleDateString(loc,{weekday:"short",day:"numeric",month:"short"}).replace(/\./g,""),time:d.toLocaleTimeString(loc,{hour:loc==="sv-SE"?"2-digit":"numeric",minute:"2-digit"}),d:d};
+  return{date:d.toLocaleDateString(loc,{weekday:"short",day:"numeric",month:"short"}).replace(/\./g,""),time:d.toLocaleTimeString(loc,{hour:/h1[12]/.test(new Intl.DateTimeFormat(loc,{hour:"numeric"}).resolvedOptions().hourCycle||"")?"numeric":"2-digit",minute:"2-digit"}),d:d};
 }
 function _miIn(d){
   var ms=d-Date.now();if(ms<=0)return"";var EN=(window.GRABIT_LANG==="en");
