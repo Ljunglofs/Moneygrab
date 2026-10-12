@@ -957,6 +957,7 @@ function _sv(){return document.documentElement.lang==="sv";}
 function _pct(v){if(v==null||isNaN(v))return"–";v=+v;return (v>=0?"+":"")+v.toFixed(1)+"%";}
 function _esc(t){return String(t==null?"":t).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
 var SC_DATA=null;
+function _thEN(s){var W={"Hälsa":"Health","Mjukvara":"Software","SaaS/Moln":"SaaS/Cloud","Fintech/Krypto":"Fintech/Crypto","Finans":"Finance","Energi":"Energy","Rymd":"Space","Kärnkraft":"Nuclear","Försvar":"Defense","Halvledare":"Semiconductors","Konsument":"Consumer","Industri":"Industrials","Fastigheter":"Real estate","Råvaror":"Commodities","Kvantdatorer":"Quantum","Detaljhandel":"Retail"};return W[s]||s;}
 function renderScreener(){
   var g=document.getElementById("sc-grid"),c=document.getElementById("sc-counts");if(!g)return;
   var sv=_sv(),i18=sv?1:0;
@@ -969,7 +970,7 @@ function renderScreener(){
     var top=SC_DATA.filter(function(r){return SC_GOOD.indexOf(r.label)>=0;}).sort(function(a,b){return (b.score10||0)-(a.score10||0)||(b.total||0)-(a.total||0);}).slice(0,6);
     g.innerHTML=top.map(function(r,i){var lock=i>=3,col=r.color||"#F5C030";
       return '<div class="sc-card'+(lock?' lock':'')+'"'+(lock?' data-lock="'+(sv?"🔒 Lås upp med PRO":"🔒 Unlock with PRO")+'" onclick="location.href=\'/?pw=1&go=1\'"':'')+'><div class="sc-in">'
-        +'<div class="sc-top"><div><div class="sc-tk">'+_esc(r.ticker)+'</div><div class="sc-th">'+_esc(r.theme||"")+'</div></div>'
+        +'<div class="sc-top"><div><div class="sc-tk">'+_esc(r.ticker)+'</div><div class="sc-th">'+_esc(_thEN(r.theme||""))+'</div></div>'
         +'<span class="sc-lb" style="color:'+col+'">'+_esc((SC_LB[r.label]||[r.label,r.label])[i18])+'</span></div>'
         +'<div class="sc-sc"><b>'+(r.score10||"–")+'</b><span>/10 GRABIT score</span></div>'
         +'<div class="sc-meta"><span>'+(sv?"I dag ":"Today ")+'<b class="'+((r.ret_1||0)>=0?"up":"dn")+'">'+_pct(r.ret_1)+'</b></span>'
