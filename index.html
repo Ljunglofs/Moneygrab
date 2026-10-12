@@ -1190,6 +1190,31 @@ body{background:transparent!important}
 .p4-pro,.gn-new,.pw-badge,.pp-badge{box-shadow:0 0 12px rgba(245,192,48,.5)}
 </style>
 <style id="grabit-clean">
+/* ===== Makropåverkan + analytikerrad (samma premiumstil: platt, tunn kant, guld/cyan/rött) ===== */
+#macronext{margin:0 0 12px}
+.mnext{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border:1px solid rgba(242,239,232,.08);border-radius:14px;background:#0B0E15}
+.mn-l{display:flex;flex-direction:column;gap:2px;min-width:0}
+.mn-k{font-size:10.5px;letter-spacing:.12em;color:#F5C030;font-weight:700}
+.mn-t{font-size:14px;font-weight:600;color:#F2EFE8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mn-w{font-size:12px;color:#94a3bb;font-variant-numeric:tabular-nums}
+.mn-r,.mi-row{display:flex;align-items:center;gap:6px;flex:none}
+.mi-k{font-size:10.5px;color:#94a3bb;letter-spacing:.06em;font-weight:600}
+.mi-dots{display:inline-flex;gap:3px;margin-right:6px}
+.mi-dots i{width:6px;height:6px;border-radius:50%;background:rgba(242,239,232,.14)}
+.mi-dots i.on{background:#F5C030}
+.mi-row{margin-top:6px}
+.mi-hint{margin-top:4px;font-size:11.5px;color:#94a3bb}
+.mi-hint b.up{color:#00E5FF}.mi-hint b.dn{color:#FF3B30}
+.anl-line{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;margin:10px 0 0;padding:11px 14px;border:1px solid rgba(242,239,232,.08);border-radius:14px;background:#0B0E15}
+.al-k{font-size:10.5px;letter-spacing:.12em;color:#F5C030;font-weight:700}
+.al-r{font-size:14px;font-weight:700}
+.al-r.up,.al-n em.up{color:#00E5FF}.al-r.dn,.al-n em.dn{color:#FF3B30}.al-r.neu{color:#F2EFE8}
+.al-n{font-size:12.5px;color:#94a3bb;font-variant-numeric:tabular-nums}
+.al-n em{font-style:normal;font-weight:700}
+.al-bar{display:flex;flex-basis:100%;height:4px;border-radius:2px;overflow:hidden;background:rgba(242,239,232,.06)}
+.al-bar i{display:block;height:100%}
+.al-bar i.up{background:#00E5FF}.al-bar i.neu{background:rgba(242,239,232,.28)}.al-bar i.dn{background:#FF3B30}
+
 /* GRABIT clean, steg 1: ingen glöd, inga neonkanter, inget rutnät.
    Ligger sist i <head> och vinner över neon-lagret. Ta bort hela blocket för att gå tillbaka.
    :not(#gc) höjer specificiteten så att blocket slår de befintliga klassreglerna. */
@@ -1665,6 +1690,11 @@ _I18N_EXACT["Ny nyhet"]="New headline";
 _I18N_EXACT["Nyhet"]="News";
 _I18N_EXACT["Lås upp med PRO →"]="Unlock with PRO →";
 _I18N_EXACT["Lås upp med PRO"]="Unlock with PRO";
+_I18N_EXACT["Starkt köp"]="Strong buy";
+_I18N_EXACT["Köp"]="Buy";
+_I18N_EXACT["Håll"]="Hold";
+_I18N_EXACT["Sälj"]="Sell";
+_I18N_EXACT["Starkt sälj"]="Strong sell";
 _I18N_EXACT["Visa"]="Show";
 _I18N_EXACT["Marknader"]="Markets";
 _I18N_EXACT["Politiker- & VD-köp · smart money"]="Politician & CEO buys · smart money";
@@ -1771,6 +1801,7 @@ else _i18nBoot();
       <div class="p4-cta">Starta 7 dagar gratis &#8594;</div>
     </div>
     <div class="instbar" id="instbar" style="display:none"><span class="ib-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M12 7v7M9 11l3 3 3-3"/><path d="M10.5 18.5h3"/></svg></span><div class="ib-tx"><b id="ib-t">Installera GRABIT som app</b><i id="ib-s">Egen ikon på hemskärmen · öppnas i helskärm · push-larm</i></div><button class="ib-go" onclick="installApp()" id="ib-go">Installera</button><button class="ib-x" onclick="dismissInstall()" aria-label="Stäng">&#10005;</button></div>
+    <div id="macronext" style="display:none"></div>
     <div class="card d3card prem gold" id="today3" style="display:none"></div>
     <div class="card topmv prem blue" id="top50" style="display:none"></div>
     <div id="dailyhub"></div>
@@ -2446,6 +2477,7 @@ function renderExtras(tkr,j,price){
   var _hasIns=!!(j&&j.insider&&j.insider.length);
   var iv=document.getElementById("st-insider");if(iv){if(isPro()){iv.innerHTML=insiderHTML(j&&j.insider);}else{iv.innerHTML='<div class="pro-gated" data-lock="PRO">'+(_hasIns?insiderHTML(j.insider):insiderTease())+'</div>';if(window.applyProLocks)applyProLocks(iv);}}
   var sm=document.getElementById("st-smart");if(sm){if(isPro()){sm.innerHTML=smartMoneyHTML(j&&j.insider);}else{sm.innerHTML='<div class="pro-gated" data-lock="PRO">'+(_hasIns?smartMoneyHTML(j.insider):smartMoneyTease())+'</div>';if(window.applyProLocks)applyProLocks(sm);}}
+  try{renderAnlLine(j&&j.analyst);}catch(e){}
   var a=document.getElementById("st-analyst");if(!a)return;
   var an=j&&j.analyst;
   a.innerHTML=analystHTML(an,price);
@@ -4142,19 +4174,87 @@ function flagSvg(country){
 function macroImpactColor(imp){
   if(imp==="High")return"var(--neg)";if(imp==="Medium")return"var(--gold2)";return"#7c8a9a";
 }
+/* ===== GRABIT: makropåverkan på NQ & guld + analytikerrad på aktiekortet ===== */
+/* Påverkan är generella samband för räntekänsliga tillgångar ("brukar"), ingen prognos. */
+var _MI_RULES=[
+  [/core pce|pce price|\bcpi\b|\bppi\b|inflation/i,3,3,["Högre än väntat brukar ge","Hotter than expected usually means"],"▼","▼"],
+  [/fomc|federal funds|fed chair|powell|interest rate decision|rate statement|press conference/i,3,3,["Hökaktigt brukar ge","Hawkish usually means"],"▼","▼"],
+  [/non-farm|nonfarm|payroll/i,3,2,["Starkare än väntat brukar ge","Stronger than expected usually means"],"▼","▼"],
+  [/unemployment rate/i,2,2,["Högre än väntat brukar ge","Higher than expected usually means"],"▲","▲"],
+  [/jobless claims|unemployment claims/i,2,1,["Högre än väntat brukar ge","Higher than expected usually means"],"▲","▲"],
+  [/\bgdp\b|retail sales|\bism\b|\bpmi\b|consumer confidence|sentiment/i,2,1,null,"",""]
+];
+function _miUS(e){return /🇺🇸|\bUSD\b|\bUS\b/.test(String(e.country||""));}
+function macroImpact(e){
+  if(!_miUS(e))return null;
+  for(var i=0;i<_MI_RULES.length;i++){var r=_MI_RULES[i];if(r[0].test(e.title||""))return{nq:r[1],gc:r[2],hint:r[3],dnq:r[4],dgc:r[5]};}
+  return e.impact==="High"?{nq:2,gc:2,hint:null}:{nq:1,gc:1,hint:null};
+}
+function _miDots(n){var s="";for(var i=1;i<=3;i++)s+='<i class="'+(i<=n?"on":"")+'"></i>';return '<span class="mi-dots">'+s+'</span>';}
+function _miArrow(a){return a?'<b class="'+(a==="▲"?"up":"dn")+'">'+a+'</b>':"";}
+function macroImpactHTML(e){
+  var m=macroImpact(e);if(!m)return"";var EN=(window.GRABIT_LANG==="en");
+  var h='<div class="mi-row"><span class="mi-k">NQ</span>'+_miDots(m.nq)+'<span class="mi-k">'+(EN?"Gold":"Guld")+'</span>'+_miDots(m.gc)+'</div>';
+  if(m.hint)h+='<div class="mi-hint">'+m.hint[EN?1:0]+': NQ '+_miArrow(m.dnq)+' · '+(EN?"Gold":"Guld")+' '+_miArrow(m.dgc)+'</div>';
+  return h;
+}
+/* Lokal tid: servern skickar ts (UTC); äldre cache saknar ts -> visa källans text. */
+function macroWhen(e){
+  if(!e.ts)return{date:e.date||"",time:e.time||"",d:null};
+  var d=new Date(e.ts);if(isNaN(d))return{date:e.date||"",time:e.time||"",d:null};
+  var nl=(navigator.language||"");var loc=(window.GRABIT_LANG==="en")?(/^en/i.test(nl)?nl:"en-GB"):"sv-SE";
+  return{date:d.toLocaleDateString(loc,{weekday:"short",day:"numeric",month:"short"}).replace(/\./g,""),time:d.toLocaleTimeString(loc,{hour:loc==="sv-SE"?"2-digit":"numeric",minute:"2-digit"}),d:d};
+}
+function _miIn(d){
+  var ms=d-Date.now();if(ms<=0)return"";var EN=(window.GRABIT_LANG==="en");
+  var h=Math.floor(ms/36e5),dd=Math.floor(h/24),hh=h%24,mm=Math.floor(ms%36e5/6e4);
+  if(dd>0)return (EN?"in ":"om ")+dd+" d "+hh+" h";if(h>0)return (EN?"in ":"om ")+h+" h "+mm+" min";return (EN?"in ":"om ")+mm+" min";
+}
+function renderMacroNext(rows){
+  if(rows)window._macroRows=rows;else rows=window._macroRows;
+  var el=document.getElementById("macronext");if(!el)return;var EN=(window.GRABIT_LANG==="en");
+  var now=Date.now(),pick=null;
+  for(var i=0;i<(rows||[]).length;i++){var e=rows[i];if(e.impact!=="High"||!_miUS(e))continue;var w=macroWhen(e);if(w.d&&w.d.getTime()<now-15*6e4)continue;pick={e:e,w:w};break;}
+  if(!pick){el.style.display="none";return;}
+  var e=pick.e,w=pick.w,m=macroImpact(e)||{nq:2,gc:2};
+  el.innerHTML='<div class="mnext"><div class="mn-l"><span class="mn-k">'+(EN?"NEXT MACRO":"NÄSTA MAKRO")+'</span>'
+    +'<span class="mn-t">'+String(e.title||"").replace(/</g,"&lt;")+'</span>'
+    +'<span class="mn-w">'+w.date+' '+w.time+(w.d?' · '+_miIn(w.d):'')+'</span></div>'
+    +'<div class="mn-r"><span class="mi-k">NQ</span>'+_miDots(m.nq)+'<span class="mi-k">'+(EN?"Gold":"Guld")+'</span>'+_miDots(m.gc)+'</div></div>';
+  el.style.display="";
+}
+/* Analytikerrad: en rad under dagens kurs. Fullt kort finns kvar längre ned. */
+function anlLineHTML(an){
+  if(!an||!an.consensus)return"";var EN=(window.GRABIT_LANG==="en");
+  var c=an.consensus,buy=c.strongBuy+c.buy,hold=c.hold,sell=c.sell+c.strongSell,tot=buy+hold+sell;if(!tot)return"";
+  var R={"Starkt köp":["Strong buy","up"],"Köp":["Buy","up"],"Håll":["Hold","neu"],"Sälj":["Sell","dn"],"Starkt sälj":["Strong sell","dn"]}[an.rating]||[an.rating||"","neu"];
+  return '<div class="anl-line"><span class="al-k">'+(EN?"ANALYSTS":"ANALYTIKER")+'</span>'
+    +'<b class="al-r '+R[1]+'">'+(EN?R[0]:an.rating)+'</b>'
+    +'<span class="al-n"><em class="up">'+buy+'</em> '+(EN?"buy":"köp")+' · '+hold+' '+(EN?"hold":"håll")+' · <em class="dn">'+sell+'</em> '+(EN?"sell":"sälj")+'</span>'
+    +'<span class="al-bar"><i class="up" style="width:'+(buy/tot*100).toFixed(1)+'%"></i><i class="neu" style="width:'+(hold/tot*100).toFixed(1)+'%"></i><i class="dn" style="width:'+(sell/tot*100).toFixed(1)+'%"></i></span></div>';
+}
+function renderAnlLine(an){
+  var px=document.querySelector("#st-body .st-price2");if(!px)return;
+  var el=document.getElementById("st-anl-line");
+  if(!el){el=document.createElement("div");el.id="st-anl-line";px.parentNode.insertBefore(el,px.nextSibling);}
+  el.innerHTML=anlLineHTML(an);el.style.display=el.innerHTML?"":"none";
+}
+setInterval(function(){if(window._macroRows)renderMacroNext();},60000);
 function macroRows(rows){
   var EN=(window.GRABIT_LANG==="en");
-  return rows.slice(0,6).map(function(e){
+  var _lastK="";
+  return rows.slice(0,8).map(function(e){
+    var w=macroWhen(e),_k=(e.ts||e.date+e.time)+"|"+e.country,_mi=(_k===_lastK)?"":macroImpactHTML(e);_lastK=_k;
     var imp=(e.impact==="High")?"high":(e.impact==="Medium"?"med":"");
     var impLbl=(e.impact==="High")?"HIGH IMPACT":(e.impact==="Medium"?"MEDIUM":"");
     var impPill=imp?'<span class="mev-imp '+imp+'">'+impLbl+'</span>':'';
     var est=e.forecast?'<span class="mev-v">'+(EN?"Est":"Prog")+'<b>'+String(e.forecast).replace(/</g,"&lt;")+'</b></span>':'';
     var prev=e.previous?'<span class="mev-v">'+(EN?"Prev":"Föreg")+'<b>'+String(e.previous).replace(/</g,"&lt;")+'</b></span>':'';
     var act=e.actual?'<span class="mev-v act">'+(EN?"Actual":"Utfall")+'<b>'+String(e.actual).replace(/</g,"&lt;")+'</b></span>':'';
-    return '<div class="mev"><div class="mev-dt"><b>'+String(e.date||"").toUpperCase()+'</b><span>'+(e.time||"")+'</span></div>'
+    return '<div class="mev"><div class="mev-dt"><b>'+String(w.date||"").toUpperCase()+'</b><span>'+(w.time||"")+'</span></div>'
       +'<div class="mev-body"><div class="mev-top"><span class="mev-flag">'+flagSvg(e.country)+'</span>'
       +'<span class="mev-nm">'+String(e.title||"").replace(/</g,"&lt;")+'</span></div>'
-      +'<div class="mev-meta">'+impPill+act+est+prev+'</div></div></div>';
+      +'<div class="mev-meta">'+impPill+act+est+prev+'</div>'+_mi+'</div></div>';
   }).join("");
 }
 function macroPanel(rows){
@@ -4206,7 +4306,7 @@ async function macroDirect(){
     return{date:d?d.toLocaleDateString("sv-SE",{day:"2-digit",month:"short"}):"",
       time:d?d.toLocaleTimeString("sv-SE",{hour:"2-digit",minute:"2-digit"}):"",
       country:_FF_FLAG[e.country]||e.country||"",title:e.title,impact:imp,
-      forecast:e.forecast||"",previous:e.previous||"",_s:d?d.getTime():9e15};
+      forecast:e.forecast||"",previous:e.previous||"",ts:d?d.toISOString():"",_s:d?d.getTime():9e15};
   }).filter(Boolean).sort(function(a,b){return a._s-b._s;});
 }
 async function loadMacro(){
@@ -4237,6 +4337,7 @@ async function loadMacro(){
     return;
   }
   el.innerHTML=macroPanel(rows);
+  try{renderMacroNext(rows);}catch(e){}
 }
 function _scanN(){var n=+window._scrTotal||((window._rows||[]).length+((window._mktInfo||{}).tickers||0));
   return n>=500?n:null;}
@@ -6314,19 +6415,19 @@ body.desk .pw-card{max-width:520px}
   box-shadow:0 0 38px -10px rgba(245,192,48,.7),inset 0 0 32px -14px rgba(245,192,48,.35)}
 .evt-panel.gold .evt-deco,.evt-panel.blue .evt-deco{color:#F5C030}
 .evt-panel.gold .evt-hex,.evt-panel.blue .evt-hex{color:#F5C030;filter:none}
-.evt-panel.gold .evt-ttl,.evt-panel.blue .evt-ttl{color:#D7B8FF;text-shadow:var(--glow-evt)}
-.evt-panel.gold .evt-pill,.evt-panel.blue .evt-pill{color:#D7B8FF;border:1px solid rgba(245,192,48,.5);background:rgba(245,192,48,.1)}
+.evt-panel.gold .evt-ttl,.evt-panel.blue .evt-ttl{color:#FBDF5B;text-shadow:var(--glow-evt)}
+.evt-panel.gold .evt-pill,.evt-panel.blue .evt-pill{color:#FBDF5B;border:1px solid rgba(245,192,48,.5);background:rgba(245,192,48,.1)}
 .evt-panel .evt-pill i{background:#F5C030;box-shadow:0 0 8px #F5C030}
 .evt-panel .evt-ai{border-color:rgba(245,192,48,.35);background:linear-gradient(100deg,rgba(245,192,48,.12),rgba(245,192,48,.02))}
-.evt-panel .evt-ai .eai-ic,.evt-panel .evt-ai .eai-tx b,.evt-panel .evt-ai .eai-go{color:#D7B8FF}
+.evt-panel .evt-ai .eai-ic,.evt-panel .evt-ai .eai-tx b,.evt-panel .evt-ai .eai-go{color:#FBDF5B}
 .evt-panel .fev{border-color:rgba(245,192,48,.16)}
-.fev-tk b{color:#D7B8FF}
+.fev-tk b{color:#FBDF5B}
 .fev-cat.approved{color:var(--pri);border-color:rgba(245,192,48,.45);background:rgba(245,192,48,.1);text-shadow:var(--glow-pri)}
-.fev-cat.nda,.fev-cat.phase,.fev-cat.reg{color:#D7B8FF;border-color:rgba(245,192,48,.45);background:rgba(245,192,48,.1)}
+.fev-cat.nda,.fev-cat.phase,.fev-cat.reg{color:#FBDF5B;border-color:rgba(245,192,48,.45);background:rgba(245,192,48,.1)}
 .fev-cat.crl{color:#FF4B4B;border-color:rgba(255,59,48,.5);background:rgba(255,59,48,.1);text-shadow:var(--glow-neg)}
-.fev-imp.high{color:#D7B8FF;text-shadow:var(--glow-evt)}
+.fev-imp.high{color:#FBDF5B;text-shadow:var(--glow-evt)}
 .fev-imp.high .dots i{box-shadow:0 0 6px #F5C030}
-.mev-imp.high{color:#D7B8FF !important;border-color:rgba(245,192,48,.55) !important;background:rgba(245,192,48,.12) !important;text-shadow:var(--glow-evt)}
+.mev-imp.high{color:#FBDF5B !important;border-color:rgba(245,192,48,.55) !important;background:rgba(245,192,48,.12) !important;text-shadow:var(--glow-evt)}
 .mev{border-color:rgba(245,192,48,.16) !important}
 .d3-tag.hi{color:#fff;background:linear-gradient(180deg,#F5C030,#F5C030);box-shadow:0 0 12px rgba(245,192,48,.6)}
 </style>
@@ -6901,7 +7002,7 @@ async function installApp(){
 .scan-note b{color:#c9d1dc;font-weight:700}
 .scan-line{display:flex;align-items:center;gap:6px;font-size:11.5px;color:#8a93a3;margin:2px 0 8px}
 .scan-line b{color:#e8eaed;font-variant-numeric:tabular-nums}
-.scan-dot{width:6px;height:6px;border-radius:50%;background:#2fd4a3;box-shadow:0 0 6px rgba(47,212,163,.7);flex:none}
+.scan-dot{width:6px;height:6px;border-radius:50%;background:#00E5FF;box-shadow:none;flex:none}
 .pw-trust{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 12px;font-size:11.5px;font-weight:700;color:#9fe9f7;margin:10px 0 8px}
 .pw-trust span{white-space:nowrap}
 .dh-fed{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;padding:8px 10px;border-radius:10px;margin-bottom:10px;
@@ -7113,7 +7214,7 @@ async function installApp(){
 .why-t{font-size:12px;font-weight:800;letter-spacing:.08em;color:#c9d1dc}
 .why-t b{color:#fff}
 .why-chg{font-size:13px;font-weight:800;padding:3px 8px;border-radius:8px;font-variant-numeric:tabular-nums}
-.why-chg.up{color:#2fd4a3;background:rgba(47,212,163,.1)}.why-chg.dn{color:#f0616d;background:rgba(240,97,109,.1)}
+.why-chg.up{color:#00E5FF;background:rgba(0,229,255,.1)}.why-chg.dn{color:#f0616d;background:rgba(240,97,109,.1)}
 .why-r{display:grid;grid-template-columns:22px 92px 1fr;gap:8px;align-items:start;padding:8px 0;border-top:1px solid #1a1f26;font-size:13px;line-height:1.4}
 .why-r:first-of-type{border-top:0}
 .why-r svg{width:16px;height:16px;margin-top:1px;stroke:#8a93a3;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}

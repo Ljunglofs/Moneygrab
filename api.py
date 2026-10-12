@@ -3146,7 +3146,8 @@ def _macro_events():
     _macro_cache_load()                               # läs disk-cache (överlever deploys)
     now_ts = time.time()
     # Färskt nog? (2h) -> använd cache direkt, spara anrop
-    if _MACRO_LAST_GOOD["events"] and now_ts - _MACRO_LAST_GOOD["ts"] < 7200:
+    if (_MACRO_LAST_GOOD["events"] and now_ts - _MACRO_LAST_GOOD["ts"] < 7200
+            and any(e.get("ts") for e in _MACRO_LAST_GOOD["events"])):  # gammal cache utan ts -> hämta om
         return _MACRO_LAST_GOOD["events"]
     raw, errs = None, []
     # 1) FMP economic calendar — stabil primärkälla (tillåter server-IP med nyckel).
@@ -3238,17 +3239,22 @@ def _macro_events():
             dt = _dt.datetime.fromisoformat(ts.replace("Z", "+00:00"))
             date_s = dt.strftime("%d %b")
             time_s = dt.strftime("%H:%M")
-            if dt.replace(tzinfo=None) < now - _dt.timedelta(hours=6):
+            # FMP/Finnhub skickar UTC utan offset, ForexFactory med offset (ET).
+            # ts = UTC -> appen visar tiden i varje användares egen tidszon.
+            utc = dt.replace(tzinfo=_dt.timezone.utc) if dt.tzinfo is None \
+                else dt.astimezone(_dt.timezone.utc)
+            if utc.replace(tzinfo=None) < now - _dt.timedelta(hours=6):
                 continue  # redan passerat
         except Exception:
             date_s, time_s = "", ""
-            dt = None
+            utc = None
         out.append({
             "date": date_s, "time": time_s,
+            "ts": utc.strftime("%Y-%m-%dT%H:%M:%SZ") if utc else "",
             "country": _FF_COUNTRY_FLAG.get(country, country),
             "title": title, "impact": impact,
             "forecast": e.get("forecast") or "", "previous": e.get("previous") or "",
-            "_sort": dt.isoformat() if dt else "9999",
+            "_sort": utc.isoformat() if utc else "9999",
         })
     out.sort(key=lambda x: x["_sort"])
     for e in out:
