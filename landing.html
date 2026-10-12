@@ -400,6 +400,8 @@ body :not(#gc):not(#gc2):not(svg):not(svg *) { border-color: rgba(242,239,232,0.
 .launch, .feat .new { display: none !important; }
 /* Siffror i rak linje, som i en terminal. */
 body:not(#gc) { font-variant-numeric: tabular-nums; }
+/* Positiva data är alltid cyan, även där accentfärgen användes. */
+.ch.up:not(#gc):not(#gc2) { color: #00E5FF !important; }
 </style>
 </head>
 <body>

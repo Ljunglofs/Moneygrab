@@ -1207,6 +1207,8 @@ nav.nav button.on:not(#gc):not(#gc2):not(#gc3) svg { color: #F5C030 !important; 
 .art-new, .gn-new, .p4-new, .d3-tag.live { display: none !important; }
 /* Siffror i rak linje, som i en terminal. */
 body:not(#gc) { font-variant-numeric: tabular-nums; }
+/* Positiva data är alltid cyan, även där accentfärgen användes. */
+:is(.amx-c.up, .hm-card.up .hm-pct):not(#gc):not(#gc2) { color: #00E5FF !important; }
 </style>
 </head>
 <body>
