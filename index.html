@@ -1202,7 +1202,7 @@ body :not(#gc):not(#gc2):not(svg):not(svg *) { border-color: rgba(242,239,232,0.
 :is(.p4-cta, .gex-unlock, .pw-btn, .to-btn, .mc-go, .mh-form button, .rb-cta, .ib-go):not(#gc):not(#gc2) { background: linear-gradient(180deg, #FBDF5B, #F1AE0B) !important; color: #05070D !important; border-color: #F5C030 !important; }
 /* Undantag: den aktiva fliken i menyn fÃ¥r ett svagt guldsken, sÃ¥ att man ser vilken sida som Ã¤r Ã¶ppen. */
 nav.nav button.on:not(#gc):not(#gc2):not(#gc3) { color: #F5C030 !important; text-shadow: 0 0 10px rgba(245,192,48,0.55) !important; }
-nav.nav button.on:not(#gc):not(#gc2):not(#gc3) svg { color: #F5C030 !important; filter:none!important; }
+nav.nav button.on:not(#gc):not(#gc2):not(#gc3) svg { color: #F5C030 !important; filter: drop-shadow(0 0 6px rgba(245,192,48,0.65)) !important; }
 /* Färre brickor: NEW/NOW bara där det betyder något. PRO behålls. */
 .art-new, .gn-new, .p4-new, .d3-tag.live { display: none !important; }
 /* Siffror i rak linje, som i en terminal. */
@@ -1656,6 +1656,11 @@ Object.assign(_I18N_EXACT,{"Snabbfakta":"Quick facts","Obs":"Note",
  "AI-texten kunde inte hämtas just nu – siffrorna ovan är live.":"The AI text couldn't be loaded right now – the numbers above are live.",
  "AI-analysen kunde inte hämtas just nu – servern kan vara i kallstart. Dra ner för att uppdatera.":"The AI analysis couldn't be loaded right now – the server may be starting up. Pull down to refresh."});
 _I18N_RULES.push([/^(Grabit score .*)$/, function(m){return m.replace(/\bidag\b/,"today").replace("rel.volym","rel.vol").replace(/från 52v-topp/,"from 52w high");}]);
+_I18N_EXACT["Setup bekräftad"]="Setup confirmed";
+_I18N_EXACT["Momentum ökar"]="Momentum rising";
+_I18N_EXACT["Ny tidig signal"]="New early signal";
+_I18N_EXACT["Ny nyhet"]="New headline";
+_I18N_EXACT["Nyhet"]="News";
 _I18N_EXACT["Visa"]="Show";
 _I18N_EXACT["Marknader"]="Markets";
 _I18N_EXACT["Politiker- & VD-köp · smart money"]="Politician & CEO buys · smart money";
@@ -1672,7 +1677,7 @@ _I18N_EXACT["POÄNG"]="SCORE";
   var re=new RegExp("(^|[^A-Za-zÅÄÖåäö])("+keys.join("|")+")(?=$|[^A-Za-zÅÄÖåäö])","g");
   _I18N_RULES.push([/^(\d+) insiderköp registrerade nyligen\.$/, function(m){return m.replace(/^(\d+) insiderköp registrerade nyligen\./,function(_,n){return n+(n==="1"?" insider buy":" insider buys")+" reported recently.";});}]);
   _I18N_RULES.push([/^(Stark volym|Stark trend|Toppsetup)$/, function(m){return {"Stark volym":"Strong volume","Stark trend":"Strong trend","Toppsetup":"Top setup"}[m];}]);
-  _I18N_RULES.push([/Rel\.volym|rel\.volym|Högre toppar och bottnar|Lägre toppar och bottnar|Blandad struktur|Stark struktur/, function(m){return m.replace(/[Rr]el\.volym/g,"Rel.vol").replace(/Högre toppar och bottnar/g,"Higher highs and lows").replace(/Lägre toppar och bottnar/g,"Lower highs and lows").replace(/Blandad struktur/g,"Mixed structure").replace(/Stark struktur/g,"Strong structure");}]);
+  _I18N_RULES.push([/[Rr]el\.volym|toppar och bottnar|Blandad struktur|Stark struktur|Tidigt mönster bildas|relativ styrka|stigande|Trend bekräftad|BLANDAD/, function(m){return m.replace(/[Rr]el\.volym/g,"Rel.vol").replace(/Högre toppar och bottnar/g,"Higher highs and lows").replace(/Lägre toppar och bottnar/g,"Lower highs and lows").replace(/Blandad struktur/g,"Mixed structure").replace(/Stark struktur/g,"Strong structure").replace(/Tidigt mönster bildas/g,"Early pattern forming").replace(/relativ styrka/g,"relative strength").replace(/stigande/g,"rising").replace(/Trend bekräftad/g,"Trend confirmed").replace(/BLANDAD/g,"MIXED").replace(/ snittet/g," average");}]);
   _I18N_RULES.push([re, function(m){return m.replace(re,function(_,p,w){return p+W[w];});}]);
 })();
 function _i18nTx(str){
