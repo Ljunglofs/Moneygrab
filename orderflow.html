@@ -59,6 +59,7 @@ h3{font-size:10.5px;letter-spacing:.12em;color:var(--gold);font-weight:700;margi
     <a class="logo" href="/">GR<b>A</b>BIT<span>ORDERFLOW</span></a>
     <div class="seg" id="inst"><button data-v="NQ" class="on">Nasdaq 100</button><button data-v="GC">Gold</button></div>
     <div class="seg" id="tf"><button data-v="1" class="on">1m</button><button data-v="5">5m</button><button data-v="15">15m</button></div>
+    <div class="seg" id="zoom"><button data-v="out" title="Zoom out">−</button><button data-v="in" title="Zoom in">+</button><button data-v="reset" title="Back to live">Reset</button></div>
     <div class="seg" id="view"><button data-v="chart" class="on">Chart</button><button data-v="fp">Footprint</button></div>
     <div class="seg" id="scale"><button data-v="spot" class="on">CFD / spot</button><button data-v="fut">Futures</button></div>
     <div class="live" id="live"><i></i><span>LIVE</span></div>
@@ -96,11 +97,11 @@ h3{font-size:10.5px;letter-spacing:.12em;color:var(--gold);font-weight:700;margi
 
 <script>
 const API=location.hostname==='localhost'&&location.port!=='8000'?'':'';
-const S={inst:'NQ',tf:1,scale:'spot',view:'chart',d:null,sc:null};
+const S={inst:'NQ',tf:1,scale:'spot',view:'chart',d:null,sc:null,nb:null,off:0,cols:null};
 const $=id=>document.getElementById(id);
 const C={bg:'#0A0D14',grid:'rgba(242,239,232,.05)',txt:'#F2EFE8',mut:'#8A93A6',gold:'#F5C030',cy:'#00E5FF',rd:'#FF3B30'};
 const tok=()=>{try{return localStorage.getItem('grabit_token')||''}catch(e){return ''}};
-function seg(id,key){$(id).onclick=e=>{const b=e.target.closest('button');if(!b)return;[...$(id).children].forEach(x=>x.classList.toggle('on',x===b));S[key]=key==='tf'?+b.dataset.v:b.dataset.v;load();};}
+function seg(id,key){$(id).onclick=e=>{const b=e.target.closest('button');if(!b)return;[...$(id).children].forEach(x=>x.classList.toggle('on',x===b));S[key]=key==='tf'?+b.dataset.v:b.dataset.v;if(key!=='scale'){S.nb=null;S.cols=null;S.off=0;}load();};}
 seg('inst','inst');seg('tf','tf');seg('scale','scale');seg('view','view');
 const fmtP=(v,inst)=>v==null||isNaN(v)?'–':v.toLocaleString('en-US',{minimumFractionDigits:inst==='GC'?1:2,maximumFractionDigits:inst==='GC'?1:2});
 const fmtN=(v,sign=true)=>{const a=Math.abs(v),s=sign?(v<0?'−':'+'):'';if(a>=1e6)return s+(a/1e6).toFixed(2)+'M';if(a>=1e3)return s+(a/1e3).toFixed(1)+'K';return s+a.toFixed(a<10?2:0);};
@@ -116,7 +117,9 @@ function drawChart(){
   const [x,W,H]=ctx($('chart'));const o=off();LBL.length=0;const EDGE={up:0,dn:0};
   const AX=74,cw=W-AX,top=16,bot=26,ch=H-top-bot;
   x.fillStyle=C.bg;x.fillRect(0,0,W,H);
-  const bw=Math.max(3,Math.min(9,(cw-170)/80)),n=Math.min(d.bars.length,Math.floor((cw-170)/(bw+2))),bars=d.bars.slice(-n);
+  const L=d.bars.length,avail=cw-170,defN=Math.floor(avail/11);
+  let n=Math.max(12,Math.min(L,S.nb||defN));S.off=Math.max(0,Math.min(S.off,L-n));
+  const bars=d.bars.slice(L-S.off-n,L-S.off),bw=Math.max(1,Math.min(24,avail/n-2));S.pxPerBar=bw+2;
   let lo=Math.min(...bars.map(b=>b.l)),hi=Math.max(...bars.map(b=>b.h));const span=hi-lo||1;
   const near=v=>v!=null&&v>lo-span*.6&&v<hi+span*.6;
   [...d.shelves.map(s=>s.px),...d.gex.map(g=>g.px),d.vwap].filter(near).forEach(v=>{lo=Math.min(lo,v);hi=Math.max(hi,v);});
@@ -164,7 +167,8 @@ function drawFootprint(){
   x.fillStyle=C.bg;x.fillRect(0,0,W,H);
   const fb=d.bars.filter(b=>b.fp&&b.fp.length);
   if(!fb.length){x.fillStyle=C.mut;x.font='13px Inter';x.textAlign='center';x.fillText('Footprint builds from live trades — waiting for data…',cw/2,H/2);S.sc=null;S.fpHit=[];return;}
-  const colW=64,n=Math.min(fb.length,Math.max(1,Math.floor((cw-8)/colW))),bars=fb.slice(-n);
+  const colW=Math.max(36,Math.min(150,S.cols||64)),n0=Math.max(1,Math.floor((cw-8)/colW));S.off=Math.max(0,Math.min(S.off,Math.max(0,fb.length-n0)));
+  const bars=fb.slice(Math.max(0,fb.length-S.off-n0),fb.length-S.off),n=bars.length;S.pxPerBar=colW;
   let lo=Math.min(...bars.map(b=>b.l)),hi=Math.max(...bars.map(b=>b.h));const pad=Math.max(bin,(hi-lo)*.05);lo-=pad;hi+=pad;
   if((hi-lo)/bin<30){const m=(hi+lo)/2;lo=m-15*bin;hi=m+15*bin;}
   S.sc={lo,hi,top,ch};const Y=v=>top+(hi-v)/(hi-lo)*ch,rh=Math.max(2,Math.abs(Y(0)-Y(bin))-1);
@@ -245,6 +249,24 @@ async function load(){
     if(j&&j.pro===false){$('lock').style.display='block';$('app').style.display='none';return;}
     $('lock').style.display='none';$('app').style.display='block';S.d=j;render();}catch(e){}
 }
+// ── Zoom och panorering ──
+function zoom(f){if(S.view==='fp'){S.cols=Math.max(36,Math.min(150,(S.cols||64)*f));}else{const L=S.d?S.d.bars.length:240;S.nb=Math.max(12,Math.min(L,Math.round((S.nb||Math.floor(($('chart').getBoundingClientRect().width-244)/11))/f)));}render();}
+$('zoom').onclick=e=>{const b=e.target.closest('button');if(!b)return;const v=b.dataset.v;if(v==='in')zoom(1.25);else if(v==='out')zoom(0.8);else{S.nb=null;S.cols=null;S.off=0;render();}};
+const cv=$('chart');
+cv.addEventListener('wheel',e=>{e.preventDefault();zoom(e.deltaY<0?1.15:0.87);},{passive:false});
+cv.addEventListener('dblclick',()=>{S.nb=null;S.cols=null;S.off=0;render();});
+let drag=null;
+cv.addEventListener('mousedown',e=>{drag={x:e.clientX,off:S.off};cv.style.cursor='grabbing';});
+addEventListener('mousemove',e=>{if(!drag)return;const dx=e.clientX-drag.x;S.off=Math.max(0,drag.off+Math.round(dx/(S.pxPerBar||10)));render();});
+addEventListener('mouseup',()=>{drag=null;cv.style.cursor='';});
+let t1=null,pinch=null;
+cv.addEventListener('touchstart',e=>{if(e.touches.length===1){t1={x:e.touches[0].clientX,off:S.off};pinch=null;}else if(e.touches.length===2){pinch=Math.abs(e.touches[0].clientX-e.touches[1].clientX);t1=null;}},{passive:true});
+cv.addEventListener('touchmove',e=>{if(t1&&e.touches.length===1){e.preventDefault();S.off=Math.max(0,t1.off+Math.round((e.touches[0].clientX-t1.x)/(S.pxPerBar||10)));render();}
+  else if(pinch&&e.touches.length===2){e.preventDefault();const d2=Math.abs(e.touches[0].clientX-e.touches[1].clientX);if(Math.abs(d2-pinch)>12){zoom(d2>pinch?1.12:0.89);pinch=d2;}}},{passive:false});
+cv.addEventListener('touchend',()=>{t1=null;pinch=null;});
+cv.style.cursor='grab';
+// nya bars medan man tittar bakåt ska inte flytta vyn
+let lastLen=0;const _render=render;render=function(){const L=S.d&&S.d.bars?S.d.bars.length:0;if(S.off>0&&lastLen&&L>lastLen)S.off+=L-lastLen;lastLen=L;_render();};
 load();setInterval(load,2000);addEventListener('resize',render);
 </script>
 </body>

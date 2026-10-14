@@ -452,7 +452,7 @@ def snapshot(key, tf=1, gex_data=None):
         "inst": key, "name": inst.cfg["name"], "cfd": inst.cfg["cfd"], "fut": inst.cfg["fut"],
         "source": inst.cfg["src_label"], "status": status, "price": price,
         "basis": round(basis, 2) if basis is not None else gex_meta.get("basis"),
-        "tf": tf, "bars": bars[-240:], "vwap": vwap, "cvd": cvd,
+        "tf": tf, "bars": bars[-480:], "vwap": vwap, "cvd": cvd,
         "profile": [{"px": k, "bv": round(b, 3), "sv": round(s, 3)} for k, (b, s) in prof],
         "poc": poc, "vah": vah, "val": val,
         "shelves": shelves, "bubbles": bub[-60:], "absorption": absorb,
