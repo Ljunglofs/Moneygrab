@@ -1815,6 +1815,14 @@ def app_img(name: str):
     return FileResponse(p, media_type=media, headers={"Cache-Control": "public, max-age=31536000, immutable"})
 
 
+# Orderflow-portalen — måste registreras före /{fname} nedan.
+@app.get("/orderflow", response_class=HTMLResponse)
+def orderflow_page():
+    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "orderflow.html")
+    with open(p, encoding="utf-8") as fh:
+        return HTMLResponse(fh.read(), headers={"Cache-Control": "no-cache"})
+
+
 @app.get("/{fname}")
 def static_asset(fname: str):
     media = _STATIC_FILES.get(fname)
@@ -5340,6 +5348,48 @@ def gex(token: str = ""):
             item.update(levels=lv, fut_price=g.get("fut_price"), string=g.get("string"))
         out.append(item)
     return {"generated": data.get("generated"), "pro": is_pro, "instruments": out}
+
+
+# =====================================================================
+#  ORDERFLOW-PORTALEN (/orderflow) — NQ och Guld, kräver PRO
+#  Motorn (orderflow_engine.py) körs i bakgrunden; datan lämnar bara
+#  servern mot giltig PRO-token. GEX kommer från samma källa som appen.
+# =====================================================================
+_OF_STARTED = {"v": False}
+
+
+def _of_start():
+    if _OF_STARTED["v"]:
+        return
+    _OF_STARTED["v"] = True
+    try:
+        import orderflow_engine as _OFE
+        _OFE.start()
+    except Exception as e:
+        print(f"Orderflow: kunde inte starta motorn: {e}")
+
+
+@app.on_event("startup")
+def _of_on_startup():
+    _of_start()
+
+
+@app.get("/api/of/{inst}")
+def orderflow_api(inst: str, tf: int = 1, token: str = ""):
+    try:
+        from billing_web import verify_token
+        is_pro = verify_token(token) is not None
+    except Exception:
+        is_pro = False
+    if not is_pro:
+        return {"pro": False}
+    _of_start()
+    import orderflow_engine as _OFE
+    snap = _OFE.snapshot(inst.upper(), tf if tf in (1, 5, 15) else 1, _gex_levels())
+    if snap is None:
+        return Response('{"error": "unknown instrument"}', status_code=404, media_type="application/json")
+    snap["pro"] = True
+    return snap
 
 
 @app.get("/api/daytrade")
