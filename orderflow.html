@@ -70,8 +70,8 @@ h3{font-size:10.5px;letter-spacing:.12em;color:var(--gold);font-weight:700;margi
   <div class="gexbar" id="gexbar"></div>
   <div class="main">
     <div class="card"><canvas id="chart"></canvas></div>
-    <div class="card dlt"><div class="ptitle">DELTA (BID / ASK)<b><span class="ask" id="dsell">–</span> &nbsp; <span class="bid" id="dbuy">–</span></b></div><canvas id="dprof"></canvas></div>
-    <div class="card vol"><div class="ptitle">TOTAL VOLUME<b>&nbsp;</b></div><canvas id="vprof"></canvas></div>
+    <div class="card dlt"><div class="ptitle">DELTA (BID / ASK)<b><span class="ask" id="dsell">–</span> &nbsp; <span class="bid" id="dbuy">–</span></b><b id="dnote" style="font-size:10px;color:var(--mut);font-weight:600;letter-spacing:.02em"></b></div><canvas id="dprof"></canvas></div>
+    <div class="card vol"><div class="ptitle">TOTAL VOLUME<b id="vnote" style="font-size:10px;color:var(--mut);font-weight:600;letter-spacing:.02em">session</b></div><canvas id="vprof"></canvas></div>
   </div>
 
   <div class="row2">
@@ -99,11 +99,11 @@ h3{font-size:10.5px;letter-spacing:.12em;color:var(--gold);font-weight:700;margi
 
 <script>
 const API=location.hostname==='localhost'&&location.port!=='8000'?'':'';
-const S={inst:'NQ',tf:1,scale:'spot',view:'chart',d:null,sc:null,nb:null,off:0,cols:null};
+const S={inst:'NQ',tf:1,scale:'spot',view:'chart',d:null,sc:null,nb:null,off:0,cols:null,ypan:0,yz:1};
 const $=id=>document.getElementById(id);
 const C={bg:'#0A0D14',grid:'rgba(242,239,232,.05)',txt:'#F2EFE8',mut:'#8A93A6',gold:'#F5C030',cy:'#00E5FF',rd:'#FF3B30'};
 const tok=()=>{try{return localStorage.getItem('grabit_token')||''}catch(e){return ''}};
-function seg(id,key){$(id).onclick=e=>{const b=e.target.closest('button');if(!b)return;[...$(id).children].forEach(x=>x.classList.toggle('on',x===b));S[key]=key==='tf'?+b.dataset.v:b.dataset.v;if(key!=='scale'){S.nb=null;S.cols=null;S.off=0;}load();};}
+function seg(id,key){$(id).onclick=e=>{const b=e.target.closest('button');if(!b)return;[...$(id).children].forEach(x=>x.classList.toggle('on',x===b));S[key]=key==='tf'?+b.dataset.v:b.dataset.v;if(key!=='scale'){S.nb=null;S.cols=null;S.off=0;S.ypan=0;S.yz=1;}load();};}
 seg('inst','inst');seg('tf','tf');seg('scale','scale');seg('view','view');
 const fmtP=(v,inst)=>v==null||isNaN(v)?'–':v.toLocaleString('en-US',{minimumFractionDigits:inst==='GC'?1:2,maximumFractionDigits:inst==='GC'?1:2});
 const fmtN=(v,sign=true)=>{const a=Math.abs(v),s=sign?(v<0?'−':'+'):'';if(a>=1e6)return s+(a/1e6).toFixed(2)+'M';if(a>=1e3)return s+(a/1e3).toFixed(1)+'K';return s+a.toFixed(a<10?2:0);};
@@ -125,7 +125,7 @@ function drawChart(){
   let lo=Math.min(...bars.map(b=>b.l)),hi=Math.max(...bars.map(b=>b.h));const span=hi-lo||1;
   const near=v=>v!=null&&v>lo-span*.6&&v<hi+span*.6;
   [...d.shelves.map(s=>s.px),...d.gex.map(g=>g.px),d.vwap].filter(near).forEach(v=>{lo=Math.min(lo,v);hi=Math.max(hi,v);});
-  const pad=(hi-lo)*.06;lo-=pad;hi+=pad;S.sc={lo,hi,top,ch};
+  const pad=(hi-lo)*.06;lo-=pad;hi+=pad;{const m=(hi+lo)/2,h=(hi-lo)/2*S.yz;lo=m-h+S.ypan;hi=m+h+S.ypan;}S.sc={lo,hi,top,ch};
   const Y=v=>top+(hi-v)/(hi-lo)*ch,X=i=>10+i*(bw+2)+bw/2;
   x.font='11px Inter';const step=niceStep((hi-lo)/9);
   for(let v=Math.ceil(lo/step)*step;v<=hi;v+=step){const y=Y(v);x.strokeStyle=C.grid;x.beginPath();x.moveTo(0,y);x.lineTo(cw,y);x.stroke();x.fillStyle=C.mut;x.textAlign='left';x.fillText(fmtP(v+o,d.inst),cw+8,y+4);}
@@ -144,6 +144,10 @@ function drawChart(){
   d.zones.forEach((z,i)=>{const pd=d.inst==='NQ'?3:.4,y1=Y(z.hi+pd),y2=Y(z.lo-pd);if(y2<top||y1>top+ch)return;
     x.fillStyle='rgba(245,192,48,.07)';x.fillRect(0,y1,cw,Math.max(6,y2-y1));x.strokeStyle='rgba(245,192,48,.6)';x.lineWidth=1;x.setLineDash([4,4]);x.strokeRect(.5,y1,cw-1,Math.max(6,y2-y1));x.setLineDash([]);
     x.fillStyle=C.gold;x.font='700 11px Inter';x.textAlign='left';x.fillText('★'+(i+1),8,y1+12);});
+  // Volymprofilens nivåer (från utförda affärer)
+  [['VAH',d.vah,'rgba(0,229,255,.55)'],['POC',d.poc,'rgba(245,192,48,.85)'],['VAL',d.val,'rgba(0,229,255,.55)']].forEach(([t,v,c])=>{if(v==null)return;const y=Y(v);if(y<top||y>top+ch)return;
+    x.strokeStyle=c;x.lineWidth=1;x.setLineDash([5,4]);x.beginPath();x.moveTo(0,y);x.lineTo(cw,y);x.stroke();x.setLineDash([]);
+    x.fillStyle=c;x.font='700 10.5px Inter';x.textAlign='left';x.fillText(t+' '+fmtP(v+o,d.inst),64,y-4);});
   // VWAP
   if(d.vwap){x.strokeStyle='#C9C6BE';x.lineWidth=1.2;x.beginPath();const y=Y(d.vwap);x.moveTo(0,y);x.lineTo(cw,y);x.stroke();
     x.fillStyle='rgba(10,13,20,.9)';x.strokeStyle='rgba(242,239,232,.25)';x.beginPath();x.roundRect(8,y-10,46,20,5);x.fill();x.stroke();x.fillStyle=C.txt;x.font='600 10.5px Inter';x.textAlign='center';x.fillText('VWAP',31,y+4);}
@@ -173,6 +177,7 @@ function drawFootprint(){
   const bars=fb.slice(Math.max(0,fb.length-S.off-n0),fb.length-S.off),n=bars.length;S.pxPerBar=colW;
   let lo=Math.min(...bars.map(b=>b.l)),hi=Math.max(...bars.map(b=>b.h));const pad=Math.max(bin,(hi-lo)*.05);lo-=pad;hi+=pad;
   if((hi-lo)/bin<30){const m=(hi+lo)/2;lo=m-15*bin;hi=m+15*bin;}
+  {const m=(hi+lo)/2,h=(hi-lo)/2*S.yz;lo=m-h+S.ypan;hi=m+h+S.ypan;}
   S.sc={lo,hi,top,ch};const Y=v=>top+(hi-v)/(hi-lo)*ch,rh=Math.max(2,Math.abs(Y(0)-Y(bin))-1);
   x.font='11px Inter';const step=niceStep((hi-lo)/9);
   for(let v=Math.ceil(lo/step)*step;v<=hi;v+=step){const y=Y(v);x.strokeStyle=C.grid;x.beginPath();x.moveTo(0,y);x.lineTo(cw,y);x.stroke();x.fillStyle=C.mut;x.textAlign='left';x.fillText(fmtP(v+o,d.inst),cw+8,y+4);}
@@ -217,11 +222,13 @@ function drawProfiles(){
   x.strokeStyle='rgba(242,239,232,.25)';x.beginPath();x.moveTo(mid,sc.top);x.lineTo(mid,sc.top+sc.ch);x.stroke();
   levels(x,W,Y,d);
   // Total volume
-  [x,W,H]=ctx($('vprof'));x.fillStyle=C.bg;x.fillRect(0,0,W,H);const mv=Math.max(...pv.map(p=>p.bv+p.sv),1e-9);
-  pv.forEach(p=>{const y=Y(p.px),v=p.bv+p.sv,inVA=d.val!=null&&d.vah!=null&&p.px>=d.val&&p.px<=d.vah,isPoc=d.poc!=null&&Math.abs(p.px-d.poc)<bin*2;
+  [x,W,H]=ctx($('vprof'));x.fillStyle=C.bg;x.fillRect(0,0,W,H);const mv=Math.max(...pv.map(p=>p.v??(p.bv+p.sv)),1e-9);
+  pv.forEach(p=>{const y=Y(p.px),v=(p.v??(p.bv+p.sv)),inVA=d.val!=null&&d.vah!=null&&p.px>=d.val&&p.px<=d.vah,isPoc=d.poc!=null&&Math.abs(p.px-d.poc)<bin*2;
     x.fillStyle=isPoc?'rgba(245,192,48,.95)':inVA?'rgba(201,198,190,.75)':'rgba(138,147,166,.45)';x.fillRect(4,y-rh/2,(W-10)*v/mv,rh);});
   levels(x,W,Y,d);
   const t=d.session;$('dsell').textContent=fmtN(-t.sell);$('dbuy').textContent=fmtN(t.buy);
+  $('vnote').textContent=d.profile_est?'session · incl. est.':'session';
+  $('dnote').textContent=(d.inst==='NQ'&&d.profile_est)?'live trades only':'';
 }
 function levels(x,W,Y,d){[['VAH',d.vah,C.cy],['POC',d.poc,C.gold],['VAL',d.val,C.cy]].forEach(([t,v,c])=>{if(v==null)return;const y=Y(v);x.strokeStyle=c;x.globalAlpha=.7;x.setLineDash([4,4]);x.beginPath();x.moveTo(0,y);x.lineTo(W,y);x.stroke();x.setLineDash([]);x.globalAlpha=1;x.fillStyle=c;x.font='700 10px Inter';x.textAlign='right';x.fillText(t,W-4,y-4);});}
 function spark(id,vals,colFn,kind){const [x,W,H]=ctx($(id));x.clearRect(0,0,W,H);if(!vals.length)return;const mn=Math.min(...vals,0),mx=Math.max(...vals,0),sp=mx-mn||1,Yv=v=>H-2-(v-mn)/sp*(H-4);
@@ -257,17 +264,17 @@ async function load(){
 }
 // ── Zoom och panorering ──
 function zoom(f){if(S.view==='fp'){S.cols=Math.max(36,Math.min(150,(S.cols||64)*f));}else{const L=S.d?S.d.bars.length:240;S.nb=Math.max(12,Math.min(L,Math.round((S.nb||Math.floor(($('chart').getBoundingClientRect().width-244)/11))/f)));}render();}
-$('zoom').onclick=e=>{const b=e.target.closest('button');if(!b)return;const v=b.dataset.v;if(v==='in')zoom(1.25);else if(v==='out')zoom(0.8);else{S.nb=null;S.cols=null;S.off=0;render();}};
+$('zoom').onclick=e=>{const b=e.target.closest('button');if(!b)return;const v=b.dataset.v;if(v==='in')zoom(1.25);else if(v==='out')zoom(0.8);else{S.nb=null;S.cols=null;S.off=0;S.ypan=0;S.yz=1;render();}};
 const cv=$('chart');
-cv.addEventListener('wheel',e=>{e.preventDefault();zoom(e.deltaY<0?1.15:0.87);},{passive:false});
-cv.addEventListener('dblclick',()=>{S.nb=null;S.cols=null;S.off=0;render();});
+cv.addEventListener('wheel',e=>{e.preventDefault();if(e.shiftKey){S.yz=Math.max(.2,Math.min(5,S.yz*(e.deltaY<0?.87:1.15)));render();}else zoom(e.deltaY<0?1.15:0.87);},{passive:false});
+cv.addEventListener('dblclick',()=>{S.nb=null;S.cols=null;S.off=0;S.ypan=0;S.yz=1;render();});
 let drag=null;
-cv.addEventListener('mousedown',e=>{drag={x:e.clientX,off:S.off};cv.style.cursor='grabbing';});
-addEventListener('mousemove',e=>{if(!drag)return;const dx=e.clientX-drag.x;S.off=Math.max(0,drag.off+Math.round(dx/(S.pxPerBar||10)));render();});
+cv.addEventListener('mousedown',e=>{e.preventDefault();drag={x:e.clientX,y:e.clientY,off:S.off,yp:S.ypan};cv.style.cursor='grabbing';});
+addEventListener('mousemove',e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;S.off=Math.max(0,drag.off+Math.round(dx/(S.pxPerBar||10)));if(S.sc)S.ypan=drag.yp+dy*(S.sc.hi-S.sc.lo)/S.sc.ch;render();});
 addEventListener('mouseup',()=>{drag=null;cv.style.cursor='';});
 let t1=null,pinch=null;
-cv.addEventListener('touchstart',e=>{if(e.touches.length===1){t1={x:e.touches[0].clientX,off:S.off};pinch=null;}else if(e.touches.length===2){pinch=Math.abs(e.touches[0].clientX-e.touches[1].clientX);t1=null;}},{passive:true});
-cv.addEventListener('touchmove',e=>{if(t1&&e.touches.length===1){e.preventDefault();S.off=Math.max(0,t1.off+Math.round((e.touches[0].clientX-t1.x)/(S.pxPerBar||10)));render();}
+cv.addEventListener('touchstart',e=>{if(e.touches.length===1){t1={x:e.touches[0].clientX,y:e.touches[0].clientY,off:S.off,yp:S.ypan};pinch=null;}else if(e.touches.length===2){pinch=Math.abs(e.touches[0].clientX-e.touches[1].clientX);t1=null;}},{passive:true});
+cv.addEventListener('touchmove',e=>{if(t1&&e.touches.length===1){e.preventDefault();S.off=Math.max(0,t1.off+Math.round((e.touches[0].clientX-t1.x)/(S.pxPerBar||10)));if(S.sc)S.ypan=t1.yp+(e.touches[0].clientY-t1.y)*(S.sc.hi-S.sc.lo)/S.sc.ch;render();}
   else if(pinch&&e.touches.length===2){e.preventDefault();const d2=Math.abs(e.touches[0].clientX-e.touches[1].clientX);if(Math.abs(d2-pinch)>12){zoom(d2>pinch?1.12:0.89);pinch=d2;}}},{passive:false});
 cv.addEventListener('touchend',()=>{t1=null;pinch=null;});
 cv.style.cursor='grab';

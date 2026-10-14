@@ -17,7 +17,9 @@ XAUUSD-CFD:er. Terminspriset (NQ/GC) = spot + basis och visas bredvid.
 När CME-data finns: lägg till en källa i SOURCES och peka instrumentet dit —
 inget annat behöver ändras.
 """
+import gzip
 import json
+import os
 import statistics
 import threading
 import time
@@ -69,6 +71,9 @@ class Inst:
         self.basis_t = 0
         self.status = "starting"
         self.live_from = None          # minut då live-affärerna började (före = historik)
+        self.real_mins = set()         # sessionens minuter som räknats från äkta affärer
+        self.prof_est = {}             # bin -> [köp, sälj, odelad] uppskattat ur 1-min-candles
+        self.pv_est = self.vol_est = 0.0
 
     # ── Affärer ───────────────────────────────────────────────────────────
     def _session_roll(self, t_ms):
@@ -77,6 +82,7 @@ class Inst:
         if day != self.sess_day:
             self.sess_day = day
             self.profile, self.pv, self.vol, self.cvd = {}, 0.0, 0.0, 0.0
+            self.real_mins, self.prof_est, self.pv_est, self.vol_est = set(), {}, 0.0, 0.0
 
     def add_event(self, t, px, side, size):
         """En aggressor-händelse (en taker-order, ev. över flera priser)."""
@@ -87,6 +93,7 @@ class Inst:
             m = t // 60000
             if self.live_from is None:
                 self.live_from = m
+            self.real_mins.add(m)
             c = self.candles.get(m)
             if c is None or c.get("hist"):
                 c = self.candles[m] = {"o": px, "h": px, "l": px, "c": px, "v": 0.0, "bv": 0.0, "sv": 0.0, "fp": {}}
@@ -262,21 +269,40 @@ def _backfill(inst):
     Guld (Binance-klines) har köp/säljvolym per candle -> delta och CVD bakåt.
     Nasdaq (Hyperliquid-candles) saknar uppdelningen -> bara pris och volym, ingen påhittad delta."""
     end = _now_ms()
+    sess0 = ((end // 1000 - 22 * 3600) // 86400 * 86400 + 22 * 3600) * 1000
+    start = min(sess0, end - KEEP_MIN * 60000)
     try:
         if inst.cfg["src"] == "bn":
-            kl = requests.get(BN + "klines", params={"symbol": inst.cfg["sym"], "interval": "1m", "limit": KEEP_MIN}, timeout=15).json()
+            kl = requests.get(BN + "klines", params={"symbol": inst.cfg["sym"], "interval": "1m", "startTime": start, "limit": 1500}, timeout=15).json()
             rows = [(int(k[0]) // 60000, float(k[1]), float(k[2]), float(k[3]), float(k[4]), float(k[5]), float(k[9])) for k in kl]
         else:
             cs = requests.post(HL_INFO, json={"type": "candleSnapshot", "req": {"coin": inst.cfg["coin"], "interval": "1m",
-                                "startTime": end - KEEP_MIN * 60000, "endTime": end}}, timeout=15).json()
+                                "startTime": start, "endTime": end}}, timeout=15).json()
             rows = [(int(c["t"]) // 60000, float(c["o"]), float(c["h"]), float(c["l"]), float(c["c"]), float(c["v"]), None) for c in cs]
     except Exception:
         return
     now_m = end // 60000
+    b = inst.cfg["bin"]
     with inst.lock:
+        inst._session_roll(end)
+        # Uppskattad sessionsprofil: candlens volym fördelas jämnt över dess prisspann.
+        # Köp/sälj-delning bara där börsen redovisar den (Binance taker-köp); annars odelad.
+        for m, o, h, l, c, v, bv in rows:
+            if m * 60000 < sess0 or m >= now_m or m in inst.real_mins or v <= 0:
+                continue
+            k0, k1 = round(l / b), round(h / b)
+            nb = max(1, k1 - k0 + 1)
+            for k in range(k0, k1 + 1):
+                e = inst.prof_est.setdefault(round(k * b, 6), [0.0, 0.0, 0.0])
+                if bv is not None:
+                    e[0] += bv / nb; e[1] += (v - bv) / nb
+                else:
+                    e[2] += v / nb
+            tp = (h + l + c) / 3
+            inst.pv_est += tp * v; inst.vol_est += v
         cvd = 0.0
         for m, o, h, l, c, v, bv in rows:
-            if m >= now_m or m in inst.candles:
+            if m >= now_m or m in inst.candles or m < now_m - KEEP_MIN:
                 continue
             if bv is not None:
                 cvd += bv - (v - bv)
@@ -288,6 +314,63 @@ def _backfill(inst):
             inst.price = rows[-1][4]
 
 
+_DATA_DIR = os.environ.get("DATA_DIR", ".")
+
+
+def _state_file(key):
+    return os.path.join(_DATA_DIR, "of_state_" + key + ".json.gz")
+
+
+def save_state(inst):
+    """Sparar äkta data (profil, candles med footprint, CVD, bubblor) så den överlever omstart."""
+    with inst.lock:
+        st = {"sess_day": inst.sess_day, "profile": {str(k): v for k, v in inst.profile.items()},
+              "pv": inst.pv, "vol": inst.vol, "cvd": inst.cvd, "real_mins": sorted(inst.real_mins),
+              "cvd_by_min": {str(k): v for k, v in inst.cvd_by_min.items()},
+              "candles": {str(m): dict({x: c[x] for x in ("o", "h", "l", "c", "v", "bv", "sv")},
+                                       fp={str(k): r for k, r in c["fp"].items()})
+                          for m, c in inst.candles.items() if not c.get("hist")},
+              "bubbles": list(inst.bubbles), "sizes": list(inst.sizes)[-1000:], "saved": time.time()}
+    try:
+        tmp = _state_file(inst.key) + ".tmp"
+        with gzip.open(tmp, "wt", encoding="utf-8") as f:
+            json.dump(st, f)
+        os.replace(tmp, _state_file(inst.key))
+    except Exception as e:
+        print("Orderflow: kunde inte spara " + inst.key + ": " + str(e))
+
+
+def load_state(inst):
+    try:
+        with gzip.open(_state_file(inst.key), "rt", encoding="utf-8") as f:
+            st = json.load(f)
+    except Exception:
+        return
+    now = _now_ms()
+    day = (now // 1000 - 22 * 3600) // 86400
+    with inst.lock:
+        for m, c in st.get("candles", {}).items():
+            m = int(m)
+            if m >= now // 60000 - KEEP_MIN:
+                c["fp"] = {float(k): r for k, r in c["fp"].items()}
+                inst.candles[m] = c
+        inst.cvd_by_min.update({int(k): v for k, v in st.get("cvd_by_min", {}).items()})
+        inst.bubbles.extend(tuple(b) for b in st.get("bubbles", []))
+        inst.sizes.extend(st.get("sizes", []))
+        if st.get("sess_day") == day:
+            inst.sess_day = day
+            inst.profile = {float(k): v for k, v in st.get("profile", {}).items()}
+            inst.pv, inst.vol, inst.cvd = st.get("pv", 0.0), st.get("vol", 0.0), st.get("cvd", 0.0)
+            inst.real_mins = set(st.get("real_mins", []))
+
+
+def _save_loop():
+    while True:
+        time.sleep(60)
+        for inst in STATE.values():
+            save_state(inst)
+
+
 _started = False
 
 
@@ -297,10 +380,12 @@ def start():
         return
     _started = True
     for k, inst in STATE.items():
+        load_state(inst)
         _backfill(inst)
         fn = _hl_ws_loop if inst.cfg["src"] == "hl" else _bn_loop
         threading.Thread(target=fn, args=(inst,), daemon=True, name=f"of-{k}").start()
     threading.Thread(target=_basis_loop, daemon=True, name="of-basis").start()
+    threading.Thread(target=_save_loop, daemon=True, name="of-save").start()
 
 
 # ── Utdata ────────────────────────────────────────────────────────────────
@@ -380,9 +465,12 @@ def snapshot(key, tf=1, gex_data=None):
         mins = sorted(inst.candles)
         cand = {m: dict(inst.candles[m]) for m in mins}
         profile = {k: list(v) for k, v in inst.profile.items()}
+        pest = {k: list(v) for k, v in inst.prof_est.items()}
+        pv_e, vol_e = inst.pv_est, inst.vol_est
         cvdm = dict(inst.cvd_by_min)
         bubbles = list(inst.bubbles)
-        price, vwap = inst.price, (inst.pv / inst.vol if inst.vol else None)
+        price = inst.price
+        vwap = (inst.pv + pv_e) / (inst.vol + vol_e) if (inst.vol + vol_e) else None
         cvd = inst.cvd
         status, basis = inst.status, inst.basis
     # candles i vald tidsram
@@ -415,15 +503,21 @@ def snapshot(key, tf=1, gex_data=None):
         if b["t"] in fpm:
             b["fp"] = fpm[b["t"]]
     # volymprofil (session): POC, VAH/VAL 70 %
-    prof = sorted(profile.items())
+    merged = {}
+    for k, (b_, s_) in profile.items():
+        merged[k] = [b_, s_, b_ + s_, 0.0]
+    for k, (eb, es, en) in pest.items():
+        r = merged.setdefault(k, [0.0, 0.0, 0.0, 0.0])
+        r[0] += eb; r[1] += es; r[2] += eb + es + en; r[3] += eb + es + en
+    prof = sorted(merged.items())
     poc = vah = val = None
     if prof:
-        tot = sum(b + s for _, (b, s) in prof)
-        poc_i = max(range(len(prof)), key=lambda i: sum(prof[i][1]))
-        lo = hi = poc_i; acc = sum(prof[poc_i][1])
+        tot = sum(r[2] for _, r in prof)
+        poc_i = max(range(len(prof)), key=lambda i: prof[i][1][2])
+        lo = hi = poc_i; acc = prof[poc_i][1][2]
         while acc < 0.7 * tot and (lo > 0 or hi < len(prof) - 1):
-            up = sum(prof[hi + 1][1]) if hi < len(prof) - 1 else -1
-            dn = sum(prof[lo - 1][1]) if lo > 0 else -1
+            up = prof[hi + 1][1][2] if hi < len(prof) - 1 else -1
+            dn = prof[lo - 1][1][2] if lo > 0 else -1
             if up >= dn:
                 hi += 1; acc += up
             else:
@@ -453,7 +547,9 @@ def snapshot(key, tf=1, gex_data=None):
         "source": inst.cfg["src_label"], "status": status, "price": price,
         "basis": round(basis, 2) if basis is not None else gex_meta.get("basis"),
         "tf": tf, "bars": bars[-480:], "vwap": vwap, "cvd": cvd,
-        "profile": [{"px": k, "bv": round(b, 3), "sv": round(s, 3)} for k, (b, s) in prof],
+        "profile": [{"px": k, "bv": round(r[0], 3), "sv": round(r[1], 3), "v": round(r[2], 3),
+                     "est": round(r[3] / r[2], 2) if r[2] else 0} for k, r in prof],
+        "profile_est": bool(pest),
         "poc": poc, "vah": vah, "val": val,
         "shelves": shelves, "bubbles": bub[-60:], "absorption": absorb,
         "gex": gex, "gex_meta": gex_meta, "zones": zones,
