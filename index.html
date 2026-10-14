@@ -1190,6 +1190,17 @@ body{background:transparent!important}
 .p4-pro,.gn-new,.pw-badge,.pp-badge{box-shadow:0 0 12px rgba(245,192,48,.5)}
 </style>
 <style id="grabit-clean">
+/* Orderflow-portalen: länk i sidomenyn på dator, inte i den fulla mobilmenyn */
+.nav button.of-link{display:none}
+body.desk .nav button.of-link{display:flex}
+/* ...och som box överst på Overview i mobilen */
+.of-box{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 12px;padding:14px 16px;border:1px solid rgba(245,192,48,.28);border-radius:14px;background:linear-gradient(135deg,rgba(245,192,48,.08),rgba(0,229,255,.04)) ,#0B0E15;text-decoration:none;color:#F2EFE8}
+.of-box .of-l{display:flex;flex-direction:column;gap:2px;min-width:0}
+.of-box .of-k{font-size:10.5px;letter-spacing:.12em;color:#F5C030;font-weight:700}
+.of-box .of-t{font-size:16px;font-weight:700}
+.of-box .of-s{font-size:12px;color:#94a3bb}
+.of-box .of-go{font-size:28px;line-height:1;color:#F5C030;flex:none}
+body.desk .of-box{display:none}
 /* ===== Makropåverkan + analytikerrad (samma premiumstil: platt, tunn kant, guld/cyan/rött) ===== */
 #macronext{margin:0 0 12px}
 .mnext{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border:1px solid rgba(242,239,232,.08);border-radius:14px;background:#0B0E15}
@@ -1801,6 +1812,7 @@ else _i18nBoot();
       <div class="p4-cta">Starta 7 dagar gratis &#8594;</div>
     </div>
     <div class="instbar" id="instbar" style="display:none"><span class="ib-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M12 7v7M9 11l3 3 3-3"/><path d="M10.5 18.5h3"/></svg></span><div class="ib-tx"><b id="ib-t">Installera GRABIT som app</b><i id="ib-s">Egen ikon på hemskärmen · öppnas i helskärm · push-larm</i></div><button class="ib-go" onclick="installApp()" id="ib-go">Installera</button><button class="ib-x" onclick="dismissInstall()" aria-label="Stäng">&#10005;</button></div>
+    <a class="of-box" href="/orderflow"><div class="of-l"><span class="of-k">ORDERFLOW · PRO</span><span class="of-t">Nasdaq 100 &amp; Gold</span><span class="of-s">Liquidity, aggression, footprint &amp; GEX — live</span></div><span class="of-go">&#8250;</span></a>
     <div id="macronext" style="display:none"></div>
     <div class="card d3card prem gold" id="today3" style="display:none"></div>
     <div class="card topmv prem blue" id="top50" style="display:none"></div>
@@ -1955,6 +1967,7 @@ else _i18nBoot();
 <nav class="nav">
   <button class="on" data-s="hem"><span class="gi">${I.home}</span>Översikt</button>
   <button data-s="daytrade"><span class="gi">${I.trend}</span>GEX</button>
+  <button class="of-link" onclick="event.stopImmediatePropagation();location.href='/orderflow'"><span class="gi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h9"/><path d="M4 12h14"/><path d="M4 18h6"/><circle cx="18" cy="6" r="2"/><circle cx="14" cy="18" r="2"/></svg></span>Orderflow</button>
   <button data-s="signal"><span class="gi">${I.signal}</span><span style="position:relative">Signaler<span class="badge">5</span></span></button>
   <button data-s="marknad"><span class="gi">${I.compass}</span>Research</button>
   <button data-s="portfolj"><span class="gi">${I.folio}</span>Portfölj</button>
