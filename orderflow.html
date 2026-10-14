@@ -13,7 +13,7 @@ html,body{background:var(--bg)}
 body{color:var(--txt);font:13px/1.4 Inter,system-ui,sans-serif;font-variant-numeric:tabular-nums}
 .wrap{max-width:1560px;margin:0 auto;padding:14px 16px 28px}
 header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
-.logo{font-weight:800;letter-spacing:.04em;font-size:19px;text-decoration:none;color:var(--txt)}.logo b{color:var(--gold)}.logo span{font-weight:600;color:var(--gold);margin-left:6px}
+.logo{display:flex;align-items:center;gap:10px;text-decoration:none}.logo .brand{height:34px;width:auto;display:block}.ofmark{font-size:11px;font-weight:700;letter-spacing:.22em;color:var(--gold);border-left:1px solid rgba(245,192,48,.35);padding-left:10px;line-height:18px}
 .seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel)}
 .seg button{background:none;border:0;color:var(--mut);padding:7px 13px;font:600 12.5px Inter;cursor:pointer}
 .seg button.on{background:rgba(245,192,48,.12);color:var(--gold)}
@@ -21,6 +21,7 @@ header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12p
 .live.off{color:var(--mut)}.live.off i{background:var(--mut)}
 .px{margin-left:auto;text-align:right}.px .p{font-size:24px;font-weight:700}.px .f{color:var(--mut);font-size:11.5px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;position:relative;overflow:hidden}
+.gexbar{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}.gexbar .g{display:flex;align-items:baseline;gap:8px;padding:7px 12px;border:1px solid rgba(245,192,48,.22);border-radius:10px;background:var(--panel);font-size:11px;color:var(--mut);font-weight:600;letter-spacing:.06em}.gexbar .g b{font-size:14px;color:var(--gold);letter-spacing:0}.gexbar .g em{font-style:normal;font-size:11px}.gexbar .rg{border-color:var(--line)}
 .main{display:grid;grid-template-columns:1fr 190px 150px;gap:10px}
 .main .card{height:600px}
 .ptitle{position:absolute;top:8px;left:0;right:0;text-align:center;font-size:10.5px;letter-spacing:.1em;color:var(--mut);font-weight:700;z-index:2}
@@ -53,10 +54,10 @@ h3{font-size:10.5px;letter-spacing:.12em;color:var(--gold);font-weight:700;margi
 </style>
 </head>
 <body>
-<div id="lock" class="card"><div class="logo">GR<b>A</b>BIT<span>ORDERFLOW</span></div><h2>PRO required</h2><p>Orderflow for Nasdaq 100 and Gold — liquidity shelves, aggression, footprint, CVD and GEX in one view — is part of GRABIT PRO.</p><a class="btn" href="/">Unlock PRO in the GRABIT app</a></div>
+<div id="lock" class="card"><div class="logo" style="justify-content:center"><img class="brand" src="/img/17a20c61266c.png" alt="GRABIT"><span class="ofmark">ORDERFLOW</span></div><h2>PRO required</h2><p>Orderflow for Nasdaq 100 and Gold — liquidity shelves, aggression, footprint, CVD and GEX in one view — is part of GRABIT PRO.</p><a class="btn" href="/">Unlock PRO in the GRABIT app</a></div>
 <div class="wrap" id="app" style="display:none">
   <header>
-    <a class="logo" href="/">GR<b>A</b>BIT<span>ORDERFLOW</span></a>
+    <a class="logo" href="/"><img class="brand" src="/img/17a20c61266c.png" alt="GRABIT"><span class="ofmark">ORDERFLOW</span></a>
     <div class="seg" id="inst"><button data-v="NQ" class="on">Nasdaq 100</button><button data-v="GC">Gold</button></div>
     <div class="seg" id="tf"><button data-v="1" class="on">1m</button><button data-v="5">5m</button><button data-v="15">15m</button></div>
     <div class="seg" id="zoom"><button data-v="out" title="Zoom out">−</button><button data-v="in" title="Zoom in">+</button><button data-v="reset" title="Back to live">Reset</button></div>
@@ -66,6 +67,7 @@ h3{font-size:10.5px;letter-spacing:.12em;color:var(--gold);font-weight:700;margi
     <div class="px"><div class="p" id="price">–</div><div class="f" id="pxsub">–</div></div>
   </header>
 
+  <div class="gexbar" id="gexbar"></div>
   <div class="main">
     <div class="card"><canvas id="chart"></canvas></div>
     <div class="card dlt"><div class="ptitle">DELTA (BID / ASK)<b><span class="ask" id="dsell">–</span> &nbsp; <span class="bid" id="dbuy">–</span></b></div><canvas id="dprof"></canvas></div>
@@ -232,6 +234,10 @@ function render(){
   $('pxsub').textContent=S.scale==='fut'?`${d.fut} futures ≈ spot ${fmtP(d.price,d.inst)} + basis ${d.basis??'–'}`:`${d.cfd} spot · ${d.fut} futures ≈ ${d.basis!=null?fmtP(d.price+d.basis,d.inst):'measuring basis…'}`;
   $('live').className='live'+(d.status==='live'?'':' off');$('live').querySelector('span').textContent=d.status==='live'?'LIVE':d.status.toUpperCase();
   drawChart();
+  const gm0=d.gex_meta||{},pxNow=d.price;
+  $('gexbar').innerHTML=(d.gex||[]).filter(g=>g.px!=null).map(g=>{const dist=g.px-pxNow,arr=dist>=0?'▲':'▼';return `<div class="g">${g.label.toUpperCase()}<b>${fmtP(g.px+o,d.inst)}</b><em style="color:${dist>=0?C.cy:C.rd}">${arr} ${fmtP(Math.abs(dist),d.inst)}</em></div>`;}).join('')
+    +(gm0.regime?`<div class="g rg">REGIME<b style="color:${gm0.regime==='negativ'?C.rd:C.cy}">${gm0.regime==='negativ'?'NEGATIVE':'POSITIVE'} GAMMA</b></div>`:'')
+    +(!(d.gex||[]).some(g=>g.px!=null)&&(d.gex||[]).length?`<div class="g rg">GEX<b style="color:var(--mut)">waiting for basis…</b></div>`:'');
   const zs=d.zones||[];$('zones').className=zs.length?'':'empty';
   $('zones').innerHTML=zs.length?zs.map((z,i)=>`<div class="zone"><div class="hd"><span>★${i+1} ${fmtP(z.lo+o,d.inst)}${z.hi-z.lo>.01?' – '+fmtP(z.hi+o,d.inst):''}</span><span class="${z.side}">${z.side==='bid'?'SUPPORT':'RESISTANCE'}</span></div><div class="sc">${z.score} independent sources</div><ul>${z.evidence.map(e=>`<li><span class="tag ${SRC[e.src]||''}">${e.src}</span>${e.text}</li>`).join('')}</ul></div>`).join(''):'No zone where independent sources converge right now. No zone is better than an invented one.';
   const bg=[...d.bubbles].sort((a,b)=>b.usd-a.usd).slice(0,5);$('bigs').className=bg.length?'':'empty';
