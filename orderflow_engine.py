@@ -29,10 +29,10 @@ import requests
 INSTR = {
     "NQ": {"name": "Nasdaq 100", "cfd": "US100", "fut": "NQ", "yf": "NQ=F",
            "src": "hl", "coin": "xyz:XYZ100", "src_label": "Hyperliquid US100 (index)",
-           "bin": 5.0, "book_sig": 4, "tol": 12.0, "min_bubble_usd": 150_000, "shelf_x": 1.8},
+           "bin": 5.0, "book_sig": 4, "tol": 12.0, "min_bubble_usd": 25_000, "shelf_x": 1.8, "bubble_pct": 0.99},
     "GC": {"name": "Gold", "cfd": "XAUUSD", "fut": "GC", "yf": "GC=F",
            "src": "bn", "sym": "XAUUSDT", "src_label": "Binance XAUUSDT (spot)",
-           "bin": 1.0, "book_sig": None, "tol": 2.0, "min_bubble_usd": 150_000, "shelf_x": 3.0},
+           "bin": 1.0, "book_sig": None, "tol": 2.0, "min_bubble_usd": 150_000, "shelf_x": 3.0, "bubble_pct": 0.995},
 }
 HL_INFO = "https://api.hyperliquid.xyz/info"
 HL_WS = "wss://api.hyperliquid.xyz/ws"
@@ -106,7 +106,7 @@ class Inst:
             self.price, self.last_trade_t = px, t
             self.sizes.append(usd)
             if len(self.sizes) > 200:
-                thr = max(sorted(self.sizes)[int(len(self.sizes) * 0.995)], self.cfg["min_bubble_usd"])
+                thr = max(sorted(self.sizes)[int(len(self.sizes) * self.cfg["bubble_pct"])], self.cfg["min_bubble_usd"])
                 if usd >= thr:
                     self.bubbles.append((t, px, side, size, usd))
 
@@ -397,6 +397,23 @@ def snapshot(key, tf=1, gex_data=None):
         else:
             bars.append({"t": g * 60, "o": c["o"], "h": c["h"], "l": c["l"], "c": c["c"], "v": c["v"],
                          "bv": c["bv"], "sv": c["sv"], "cvd": cvdm.get(m), "nodelta": bool(c.get("nodelta"))})
+    # footprint per candle (bara de senaste 40 — det är dem som visas i footprint-läget)
+    fpm = {}
+    for b in bars[-40:]:
+        g0 = b["t"] // 60
+        rows = {}
+        for m in range(g0, g0 + tf):
+            c = cand.get(m)
+            if not c:
+                continue
+            for k, (bv, sv) in c["fp"].items():
+                r = rows.setdefault(k, [0.0, 0.0])
+                r[0] += bv; r[1] += sv
+        if rows:
+            fpm[b["t"]] = [[k, round(v[0], 3), round(v[1], 3)] for k, v in sorted(rows.items())]
+    for b in bars[-40:]:
+        if b["t"] in fpm:
+            b["fp"] = fpm[b["t"]]
     # volymprofil (session): POC, VAH/VAL 70 %
     prof = sorted(profile.items())
     poc = vah = val = None

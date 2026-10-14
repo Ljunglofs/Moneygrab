@@ -59,6 +59,7 @@ h3{font-size:10.5px;letter-spacing:.12em;color:var(--gold);font-weight:700;margi
     <a class="logo" href="/">GR<b>A</b>BIT<span>ORDERFLOW</span></a>
     <div class="seg" id="inst"><button data-v="NQ" class="on">Nasdaq 100</button><button data-v="GC">Gold</button></div>
     <div class="seg" id="tf"><button data-v="1" class="on">1m</button><button data-v="5">5m</button><button data-v="15">15m</button></div>
+    <div class="seg" id="view"><button data-v="chart" class="on">Chart</button><button data-v="fp">Footprint</button></div>
     <div class="seg" id="scale"><button data-v="spot" class="on">CFD / spot</button><button data-v="fut">Futures</button></div>
     <div class="live" id="live"><i></i><span>LIVE</span></div>
     <div class="px"><div class="p" id="price">–</div><div class="f" id="pxsub">–</div></div>
@@ -82,6 +83,7 @@ h3{font-size:10.5px;letter-spacing:.12em;color:var(--gold);font-weight:700;margi
       <div><b class="dot" style="background:var(--cy)"></b>Buy aggression (market orders)</div>
       <div><b class="dot" style="background:var(--rd)"></b>Sell aggression (market orders)</div>
       <div><b style="background:#C9C6BE;height:2px"></b>VWAP</div>
+      <div><b style="background:var(--gold);height:2px"></b>Footprint: gold = candle POC, side bar = stacked imbalance</div>
     </div>
   </div>
 
@@ -94,12 +96,12 @@ h3{font-size:10.5px;letter-spacing:.12em;color:var(--gold);font-weight:700;margi
 
 <script>
 const API=location.hostname==='localhost'&&location.port!=='8000'?'':'';
-const S={inst:'NQ',tf:1,scale:'spot',d:null,sc:null};
+const S={inst:'NQ',tf:1,scale:'spot',view:'chart',d:null,sc:null};
 const $=id=>document.getElementById(id);
 const C={bg:'#0A0D14',grid:'rgba(242,239,232,.05)',txt:'#F2EFE8',mut:'#8A93A6',gold:'#F5C030',cy:'#00E5FF',rd:'#FF3B30'};
 const tok=()=>{try{return localStorage.getItem('grabit_token')||''}catch(e){return ''}};
 function seg(id,key){$(id).onclick=e=>{const b=e.target.closest('button');if(!b)return;[...$(id).children].forEach(x=>x.classList.toggle('on',x===b));S[key]=key==='tf'?+b.dataset.v:b.dataset.v;load();};}
-seg('inst','inst');seg('tf','tf');seg('scale','scale');
+seg('inst','inst');seg('tf','tf');seg('scale','scale');seg('view','view');
 const fmtP=(v,inst)=>v==null||isNaN(v)?'–':v.toLocaleString('en-US',{minimumFractionDigits:inst==='GC'?1:2,maximumFractionDigits:inst==='GC'?1:2});
 const fmtN=(v,sign=true)=>{const a=Math.abs(v),s=sign?(v<0?'−':'+'):'';if(a>=1e6)return s+(a/1e6).toFixed(2)+'M';if(a>=1e3)return s+(a/1e3).toFixed(1)+'K';return s+a.toFixed(a<10?2:0);};
 const fmtU=v=>v>=1e6?'$'+(v/1e6).toFixed(1)+'M':'$'+(v/1e3).toFixed(0)+'K';
@@ -110,6 +112,7 @@ const LBL=[];function lblY(y){let t=y;for(let k=0;k<8;k++){if(LBL.some(v=>Math.a
 
 function drawChart(){
   const d=S.d;if(!d||!d.bars||!d.bars.length)return;
+  if(S.view==='fp')return drawFootprint();
   const [x,W,H]=ctx($('chart'));const o=off();LBL.length=0;const EDGE={up:0,dn:0};
   const AX=74,cw=W-AX,top=16,bot=26,ch=H-top-bot;
   x.fillStyle=C.bg;x.fillRect(0,0,W,H);
@@ -153,6 +156,51 @@ function drawChart(){
   x.fillStyle=C.mut;x.font='10.5px Inter';x.textAlign='center';const every=Math.ceil(bars.length/7);for(let i=0;i<bars.length;i+=every){x.fillText(new Date(bars[i].t*1000).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}),X(i),H-8);}
   drawProfiles();
 }
+// Footprint, enkel: en stapel per prisnivå i varje candle (längd = volym, färg = vem som dominerade).
+// Markeras bara: candlens POC (guld) och staplade obalanser (3+ nivåer i rad). Siffror vid hover.
+function drawFootprint(){
+  const d=S.d;const [x,W,H]=ctx($('chart'));const o=off();
+  const AX=74,cw=W-AX,top=22,bot=26,ch=H-top-bot,bin=d.inst==='NQ'?5:1;
+  x.fillStyle=C.bg;x.fillRect(0,0,W,H);
+  const fb=d.bars.filter(b=>b.fp&&b.fp.length);
+  if(!fb.length){x.fillStyle=C.mut;x.font='13px Inter';x.textAlign='center';x.fillText('Footprint builds from live trades — waiting for data…',cw/2,H/2);S.sc=null;S.fpHit=[];return;}
+  const colW=64,n=Math.min(fb.length,Math.max(1,Math.floor((cw-8)/colW))),bars=fb.slice(-n);
+  let lo=Math.min(...bars.map(b=>b.l)),hi=Math.max(...bars.map(b=>b.h));const pad=Math.max(bin,(hi-lo)*.05);lo-=pad;hi+=pad;
+  if((hi-lo)/bin<30){const m=(hi+lo)/2;lo=m-15*bin;hi=m+15*bin;}
+  S.sc={lo,hi,top,ch};const Y=v=>top+(hi-v)/(hi-lo)*ch,rh=Math.max(2,Math.abs(Y(0)-Y(bin))-1);
+  x.font='11px Inter';const step=niceStep((hi-lo)/9);
+  for(let v=Math.ceil(lo/step)*step;v<=hi;v+=step){const y=Y(v);x.strokeStyle=C.grid;x.beginPath();x.moveTo(0,y);x.lineTo(cw,y);x.stroke();x.fillStyle=C.mut;x.textAlign='left';x.fillText(fmtP(v+o,d.inst),cw+8,y+4);}
+  if(d.vwap&&d.vwap>lo&&d.vwap<hi){const y=Y(d.vwap);x.strokeStyle='rgba(201,198,190,.5)';x.beginPath();x.moveTo(0,y);x.lineTo(cw,y);x.stroke();}
+  S.fpHit=[];
+  bars.forEach((b,i)=>{const x0=8+i*colW,bw=colW-14;const mxr=Math.max(...b.fp.map(r=>r[1]+r[2]),1e-9);
+    let poc=b.fp.reduce((a,r)=>r[1]+r[2]>a[1]+a[2]?r:a,b.fp[0])[0];
+    // staplade obalanser (diagonal, 300 %)
+    const mp=new Map(b.fp.map(r=>[r[0].toFixed(4),r]));const key=v=>v.toFixed(4);
+    let runB=[],runS=[];const stacks=[];
+    const flush=(run,side)=>{if(run.length>=3)stacks.push([side,Math.min(...run),Math.max(...run)]);};
+    [...b.fp].sort((p,q)=>p[0]-q[0]).forEach(([px,bv,sv])=>{const dn=mp.get(key(px-bin)),up=mp.get(key(px+bin));
+      const bi=dn&&bv>0&&bv>=3*Math.max(dn[2],1e-9),si=up&&sv>0&&sv>=3*Math.max(up[1],1e-9);
+      if(bi)runB.push(px);else{flush(runB,'B');runB=[];}if(si)runS.push(px);else{flush(runS,'S');runS=[];}});
+    flush(runB,'B');flush(runS,'S');
+    // candle (tunn) till vänster
+    const upc=b.c>=b.o;x.fillStyle=upc?C.cy:C.rd;x.fillRect(x0+1,Y(b.h),1,Math.max(1,Y(b.l)-Y(b.h)));x.fillRect(x0,Y(Math.max(b.o,b.c)),3,Math.max(1,Math.abs(Y(b.o)-Y(b.c))));
+    b.fp.forEach(([px,bv,sv])=>{const y=Y(px),v=bv+sv,L=Math.max(1,bw*v/mxr);
+      const col=bv>sv*1.5?'0,229,255':sv>bv*1.5?'255,59,48':'138,147,166';x.fillStyle=`rgba(${col},${.35+.55*v/mxr})`;x.fillRect(x0+7,y-rh/2,L,rh);
+      S.fpHit.push({x0:x0+7,x1:x0+7+bw,y0:y-rh/2,y1:y+rh/2,px,bv,sv});});
+    const yp=Y(poc);x.fillStyle=C.gold;x.fillRect(x0+5,yp-1,bw+4,2);
+    stacks.forEach(([sd,a,z])=>{x.fillStyle=sd==='B'?C.cy:C.rd;x.fillRect(x0+bw+9,Y(z)-rh/2,2.5,Y(a)-Y(z)+rh);});
+    const dlt=b.bv-b.sv,fv=v=>v>=1000?(v/1000).toFixed(1)+'K':v>=10?v.toFixed(0):v.toFixed(1);
+    x.font='700 10.5px Inter';x.textAlign='center';x.fillStyle=dlt>=0?C.cy:C.rd;x.fillText((dlt>=0?'+':'−')+fv(Math.abs(dlt)),x0+colW/2-3,H-8);
+    x.fillStyle=C.mut;x.font='10px Inter';x.fillText(new Date(b.t*1000).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}),x0+colW/2-3,14);});
+  const yp=Y(d.price);if(yp>top&&yp<top+ch){x.strokeStyle='rgba(0,229,255,.55)';x.setLineDash([3,3]);x.beginPath();x.moveTo(0,yp);x.lineTo(cw,yp);x.stroke();x.setLineDash([]);
+    x.fillStyle='rgba(0,229,255,.15)';x.strokeStyle=C.cy;x.beginPath();x.roundRect(cw+3,yp-11,AX-6,22,5);x.fill();x.stroke();x.fillStyle=C.cy;x.font='700 11.5px Inter';x.textAlign='left';x.fillText(fmtP(d.price+o,d.inst),cw+8,yp+4);}
+  if(S.hover){const h=S.hover,t=`${fmtP(h.px+o,d.inst)}   sell ${h.sv.toFixed(h.sv<10?2:0)}  ×  buy ${h.bv.toFixed(h.bv<10?2:0)}`;x.font='600 11px Inter';const tw=x.measureText(t).width+14;const tx=Math.min(h.mx+12,cw-tw-4),ty=Math.max(top,h.my-28);
+    x.fillStyle='rgba(5,7,13,.95)';x.strokeStyle='rgba(245,192,48,.5)';x.beginPath();x.roundRect(tx,ty,tw,22,6);x.fill();x.stroke();x.fillStyle=C.txt;x.textAlign='left';x.fillText(t,tx+7,ty+15);}
+  drawProfiles();
+}
+$('chart').addEventListener('mousemove',e=>{if(S.view!=='fp'||!S.fpHit)return;const r=e.target.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
+  const h=S.fpHit.find(q=>mx>=q.x0&&mx<=q.x1&&my>=q.y0&&my<=q.y1);S.hover=h?{...h,mx,my}:null;drawChart();});
+$('chart').addEventListener('mouseleave',()=>{S.hover=null;if(S.view==='fp')drawChart();});
 function drawProfiles(){
   const d=S.d,sc=S.sc;if(!d||!sc)return;const o=off();
   const Y=v=>sc.top+(sc.hi-v)/(sc.hi-sc.lo)*sc.ch;
