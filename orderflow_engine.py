@@ -24,6 +24,8 @@ import statistics
 import threading
 import time
 from collections import deque
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import requests
 
@@ -31,21 +33,39 @@ import requests
 INSTR = {
     "NQ": {"name": "Nasdaq 100", "cfd": "US100", "fut": "NQ", "yf": "NQ=F",
            "src": "hl", "coin": "xyz:XYZ100", "src_label": "Hyperliquid US100 (index)",
-           "bin": 5.0, "book_sig": 4, "tol": 12.0, "min_bubble_usd": 25_000, "shelf_x": 1.8, "bubble_pct": 0.99},
+           "bin": 1.0, "book_sig": 4, "book_bin": 10.0, "tol": 12.0, "min_bubble_usd": 25_000,
+           "shelf_x": 1.8, "bubble_pct": 0.99},
     "GC": {"name": "Gold", "cfd": "XAUUSD", "fut": "GC", "yf": "GC=F",
-           "src": "bn", "sym": "XAUUSDT", "src_label": "Binance XAUUSDT (spot)",
-           "bin": 1.0, "book_sig": None, "tol": 2.0, "min_bubble_usd": 150_000, "shelf_x": 3.0, "bubble_pct": 0.995},
+           "src": "hl", "coin": "xyz:GOLD", "src_label": "Hyperliquid GOLD (spot)",
+           "bin": 0.5, "book_sig": 4, "book_bin": 1.0, "tol": 2.0, "min_bubble_usd": 15_000,
+           "shelf_x": 2.5, "bubble_pct": 0.99},
 }
 HL_INFO = "https://api.hyperliquid.xyz/info"
 HL_WS = "wss://api.hyperliquid.xyz/ws"
 BN = "https://fapi.binance.com/fapi/v1/"
-KEEP_MIN = 8 * 60            # minuter som sparas (candles/footprint)
+KEEP_MIN = 24 * 60           # minuter som sparas (candles/footprint) — ett helt dygn
 BOOK_EVERY = 3.0             # sekunder mellan boksnapshots
 SHELF_WINDOW = 20 * 60       # sekunder som hyllans "beständighet" mäts över
 
 
 def _now_ms():
     return int(time.time() * 1000)
+
+
+_NY = ZoneInfo("America/New_York")
+
+
+def _sess_key(t_ms):
+    """CME-sessionen börjar 18:00 New York (följer sommar-/vintertid)."""
+    return (datetime.fromtimestamp(t_ms / 1000, _NY) + timedelta(hours=6)).date().toordinal()
+
+
+def _sess_start_ms(t_ms):
+    dt = datetime.fromtimestamp(t_ms / 1000, _NY)
+    st = dt.replace(hour=18, minute=0, second=0, microsecond=0)
+    if dt.hour < 18:
+        st -= timedelta(days=1)
+    return int(st.timestamp() * 1000)
 
 
 class Inst:
@@ -78,7 +98,7 @@ class Inst:
     # ── Affärer ───────────────────────────────────────────────────────────
     def _session_roll(self, t_ms):
         # Session = CME-dygnet, nollställs 18:00 New York ≈ 22:00 UTC
-        day = (t_ms // 1000 - 22 * 3600) // 86400
+        day = _sess_key(t_ms)
         if day != self.sess_day:
             self.sess_day = day
             self.profile, self.pv, self.vol, self.cvd = {}, 0.0, 0.0, 0.0
@@ -120,7 +140,7 @@ class Inst:
     # ── Orderbok ──────────────────────────────────────────────────────────
     def add_book(self, bids, asks):
         """bids/asks: [(px, size)], bästa först. Lagras som usd per prisbin."""
-        b = self.cfg["bin"] * (2 if self.key == "NQ" else 1)
+        b = self.cfg["book_bin"]
         snap = {}
         for side, lv in (("bid", bids), ("ask", asks)):
             for px, sz in lv:
@@ -269,7 +289,7 @@ def _backfill(inst):
     Guld (Binance-klines) har köp/säljvolym per candle -> delta och CVD bakåt.
     Nasdaq (Hyperliquid-candles) saknar uppdelningen -> bara pris och volym, ingen påhittad delta."""
     end = _now_ms()
-    sess0 = ((end // 1000 - 22 * 3600) // 86400 * 86400 + 22 * 3600) * 1000
+    sess0 = _sess_start_ms(end)
     start = min(sess0, end - KEEP_MIN * 60000)
     try:
         if inst.cfg["src"] == "bn":
@@ -324,7 +344,7 @@ def _state_file(key):
 def save_state(inst):
     """Sparar äkta data (profil, candles med footprint, CVD, bubblor) så den överlever omstart."""
     with inst.lock:
-        st = {"sess_day": inst.sess_day, "profile": {str(k): v for k, v in inst.profile.items()},
+        st = {"bin": inst.cfg["bin"], "sess_day": inst.sess_day, "profile": {str(k): v for k, v in inst.profile.items()},
               "pv": inst.pv, "vol": inst.vol, "cvd": inst.cvd, "real_mins": sorted(inst.real_mins),
               "cvd_by_min": {str(k): v for k, v in inst.cvd_by_min.items()},
               "candles": {str(m): dict({x: c[x] for x in ("o", "h", "l", "c", "v", "bv", "sv")},
@@ -347,7 +367,9 @@ def load_state(inst):
     except Exception:
         return
     now = _now_ms()
-    day = (now // 1000 - 22 * 3600) // 86400
+    day = _sess_key(now)
+    if st.get("bin") != inst.cfg["bin"]:
+        return
     with inst.lock:
         for m, c in st.get("candles", {}).items():
             m = int(m)
@@ -456,7 +478,7 @@ def _convergence(inst, price, shelves, gex, prof_lv, bubbles, absorb):
     return zones[:2]
 
 
-def snapshot(key, tf=1, gex_data=None):
+def snapshot(key, tf=1, gex_data=None, lite=False):
     inst = STATE.get(key)
     if inst is None:
         return None
@@ -515,13 +537,14 @@ def snapshot(key, tf=1, gex_data=None):
         tot = sum(r[2] for _, r in prof)
         poc_i = max(range(len(prof)), key=lambda i: prof[i][1][2])
         lo = hi = poc_i; acc = prof[poc_i][1][2]
-        while acc < 0.7 * tot and (lo > 0 or hi < len(prof) - 1):
-            up = prof[hi + 1][1][2] if hi < len(prof) - 1 else -1
-            dn = prof[lo - 1][1][2] if lo > 0 else -1
-            if up >= dn:
-                hi += 1; acc += up
+        n_ = len(prof)
+        while acc < 0.7 * tot and (lo > 0 or hi < n_ - 1):
+            up = sum(prof[i][1][2] for i in range(hi + 1, min(hi + 3, n_)))
+            dn = sum(prof[i][1][2] for i in range(max(lo - 2, 0), lo))
+            if hi < n_ - 1 and (up >= dn or lo == 0):
+                step = min(2, n_ - 1 - hi); hi += step; acc += up
             else:
-                lo -= 1; acc += dn
+                step = min(2, lo); lo -= step; acc += dn
         poc, vah, val = prof[poc_i][0], prof[hi][0], prof[lo][0]
     shelves = inst.shelves()
     gex, gex_meta = _gex_for(inst, gex_data)
@@ -546,8 +569,8 @@ def snapshot(key, tf=1, gex_data=None):
         "inst": key, "name": inst.cfg["name"], "cfd": inst.cfg["cfd"], "fut": inst.cfg["fut"],
         "source": inst.cfg["src_label"], "status": status, "price": price,
         "basis": round(basis, 2) if basis is not None else gex_meta.get("basis"),
-        "tf": tf, "bars": bars[-480:], "vwap": vwap, "cvd": cvd,
-        "profile": [{"px": k, "bv": round(r[0], 3), "sv": round(r[1], 3), "v": round(r[2], 3),
+        "tf": tf, "bars": bars[-3:] if lite else bars, "lite": bool(lite), "vwap": vwap, "cvd": cvd,
+        "profile": [] if lite else [{"px": k, "bv": round(r[0], 3), "sv": round(r[1], 3), "v": round(r[2], 3),
                      "est": round(r[3] / r[2], 2) if r[2] else 0} for k, r in prof],
         "profile_est": bool(pest),
         "poc": poc, "vah": vah, "val": val,

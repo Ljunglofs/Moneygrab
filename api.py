@@ -5375,7 +5375,7 @@ def _of_on_startup():
 
 
 @app.get("/api/of/{inst}")
-def orderflow_api(inst: str, tf: int = 1, token: str = ""):
+def orderflow_api(inst: str, tf: int = 1, token: str = "", lite: int = 0):
     try:
         from billing_web import verify_token
         is_pro = verify_token(token) is not None
@@ -5385,7 +5385,7 @@ def orderflow_api(inst: str, tf: int = 1, token: str = ""):
         return {"pro": False}
     _of_start()
     import orderflow_engine as _OFE
-    snap = _OFE.snapshot(inst.upper(), tf if tf in (1, 5, 15) else 1, _gex_levels())
+    snap = _OFE.snapshot(inst.upper(), tf if tf in (1, 5, 15) else 1, _gex_levels(), lite=bool(lite))
     if snap is None:
         return Response('{"error": "unknown instrument"}', status_code=404, media_type="application/json")
     snap["pro"] = True
