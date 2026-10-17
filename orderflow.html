@@ -28,8 +28,9 @@ header{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10p
 .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;position:relative;overflow:hidden}
 .main{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:10px}
 .chartcard{display:flex;flex-direction:column}
+#yax{position:absolute;right:0;top:0;width:78px;height:546px;cursor:ns-resize;touch-action:none;z-index:2}
 #chart{height:560px}#cvd{height:150px;border-top:1px solid var(--line)}
-canvas{display:block;width:100%;touch-action:none}
+canvas{display:block;width:100%;touch-action:pan-y}
 .lv{display:flex;flex-direction:column}
 .lvhd{display:flex;justify-content:space-between;align-items:center;padding:10px 12px 6px;gap:8px}
 h3{font-size:10px;letter-spacing:.13em;color:var(--mut);font-weight:700}
@@ -42,6 +43,7 @@ h3{font-size:10px;letter-spacing:.13em;color:var(--mut);font-weight:700}
 .lr.now{background:rgba(232,236,242,.03)}.lr .t{font-size:9.5px;color:var(--mut);margin-left:4px;letter-spacing:.04em}
 .lr.g-gex .n{color:var(--gex)}.lr.g-bid .n{color:var(--cy)}.lr.g-ask .n{color:var(--rd)}.lr.g-prof .n{color:var(--txt)}
 .pricerow{display:flex;justify-content:space-between;padding:4px 12px;font-size:11px;color:var(--cy);border-bottom:1px solid var(--line);background:rgba(25,211,240,.04)}
+.lvmore{display:none;background:none;border:0;border-top:1px solid var(--line);color:var(--cy);font-weight:600;font-size:12px;padding:9px;cursor:pointer;width:100%}
 .lvft{padding:8px 12px;font-size:10.5px;color:var(--mut);line-height:1.6;border-top:1px solid var(--line)}
 .q{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;vertical-align:0}
 .hint{color:var(--mut);font-size:11px;margin:6px 2px 0}
@@ -71,8 +73,10 @@ td{padding:5px 4px;border-bottom:1px solid var(--line)}th:not(:first-child),td:n
 @media(max-width:1000px){.main{grid-template-columns:1fr}.lv{max-height:420px}}
 @media(max-width:760px){
   .wrap{padding:9px 9px 22px}.logo .brand{height:26px}.px .p{font-size:19px}.px .f{font-size:10.5px}
-  .ctrls{order:3;width:100%;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}.ctrls::-webkit-scrollbar{display:none}
-  #chart{height:56vh;min-height:340px}#cvd{height:110px}
+  .ctrls{order:3;width:100%;gap:5px}.seg button{padding:7px 9px;font-size:12px}.sel{padding:6px 6px;font-size:11.5px}
+  #chart{height:58vh;min-height:360px}#cvd{height:96px}
+  .lr{padding:7px 12px;font-size:12.5px}
+  #bmin,#prof,#zoom button[data-v=in],#zoom button[data-v=out]{display:none}
   .bot{grid-template-columns:1fr 1fr;gap:8px}.ish,.zones,.legend{grid-column:1/-1}
 }
 </style>
@@ -97,7 +101,7 @@ td{padding:5px 4px;border-bottom:1px solid var(--line)}th:not(:first-child),td:n
   </header>
 
   <div class="main">
-    <div class="card chartcard"><canvas id="chart"></canvas><canvas id="cvd"></canvas></div>
+    <div class="card chartcard"><canvas id="chart"></canvas><div id="yax" title="Drag to stretch or compress · double-click = auto"></div><canvas id="cvd"></canvas></div>
     <div class="card lv">
       <div class="lvhd"><h3>LEVELS · PROBABILITY TO HIT</h3></div>
       <div class="lvctl">
@@ -105,7 +109,7 @@ td{padding:5px 4px;border-bottom:1px solid var(--line)}th:not(:first-child),td:n
         <div class="seg" id="sort"><button data-v="price">Price</button><button data-v="p">Prob</button><button data-v="dist">Dist</button></div>
       </div>
       <div class="lvlist" id="lvlist"><div class="lr"><span class="n">Collecting data…</span></div></div>
-      <div class="lvft" id="lvft">–</div>
+      <button class="lvmore" id="lvmore"></button><div class="lvft" id="lvft">–</div>
     </div>
   </div>
   <div class="hint" id="hint"></div>
@@ -192,10 +196,10 @@ function drawChart(){
   const d=S.d;if(!d||!d.bars||!d.bars.length)return;
   if(S.view==='fp')return drawFootprint();
   const [x,W,H]=ctx($('chart'));const o=off();LBL.length=0;const mob=mobile();
-  const PRW=mob?70:120,AX=mob?62:78,cw=W-AX-PRW,top=14,bot=24,ch=H-top-bot;
+  const PRW=mob?44:120,AX=mob?60:78,cw=W-AX-PRW,top=14,bot=24,ch=H-top-bot;
   x.fillStyle=C.bg;x.fillRect(0,0,W,H);
   const L=d.bars.length,avail=cw-(mob?20:40),defN=Math.max(20,Math.floor(avail/(mob?5:9)));
-  let n=Math.max(10,Math.min(L,S.nb||defN));S.off=Math.max(0,Math.min(S.off,L-n));
+  let n=Math.max(10,Math.min(L,S.nb||defN));S.nShown=n;S.off=Math.max(0,Math.min(S.off,L-n));
   const i0=L-S.off-n,bars=d.bars.slice(i0,L-S.off),bw=Math.max(1,Math.min(20,avail/n-2));S.pxPerBar=bw+2;
   const vws=vwapSeries(d.bars).slice(i0,L-S.off);
   let lo=Math.min(...bars.map(b=>b.l)),hi=Math.max(...bars.map(b=>b.h));const span=hi-lo||1;
@@ -287,7 +291,8 @@ function drawCVD(){const d=S.d,s=S.sc;const [x,W,H]=ctx($('cvd'));x.fillStyle=C.
   // Kontroll = vem som ligger före i sessionen (CVD:s tecken); riktningen senaste 30 staplarna visas som tillägg
   const ahead=cur>=0,same=(slope>=0)===ahead;
   const ctl=same?(ahead?'↑ BUYERS IN CONTROL':'↓ SELLERS IN CONTROL'):(ahead?'BUYERS AHEAD · SELLERS PUSHING BACK':'SELLERS AHEAD · BUYERS PUSHING BACK');
-  x.font=F(700,10.5);x.textAlign='center';x.fillStyle=same?(ahead?C.cy:C.rd):'#B9C2D0';x.fillText(ctl,s.cw/2,16);
+  const mobl=mobile(),ctl2=mobl?(same?(ahead?'↑ BUYERS':'↓ SELLERS'):(ahead?'BUYERS AHEAD · ↓':'SELLERS AHEAD · ↑')):ctl;
+  x.font=F(700,mobl?9.5:10.5);x.textAlign=mobl?'right':'center';x.fillStyle=same?(ahead?C.cy:C.rd):'#B9C2D0';x.fillText(ctl2,mobl?s.cw+s.PRW-4:s.cw/2,16);
   if(S.mouse&&S.mouse.x<s.cw+s.PRW){x.strokeStyle='rgba(232,236,242,.22)';x.setLineDash([3,3]);x.beginPath();x.moveTo(S.mouse.x,top);x.lineTo(S.mouse.x,H);x.stroke();x.setLineDash([]);}}
 
 // Footprint: en stapel per prisnivå i varje candle (längd = volym, färg = vem som dominerade)
@@ -337,7 +342,9 @@ function spark(id,vals,colFn,kind){const [x,W,H]=ctx($(id));x.clearRect(0,0,W,H)
 
 // Nivåkolumnen: namn, pris, avstånd, sannolikhet för vald horisont
 const GROUPCLS={gex:'g-gex',liquidity:'',profile:'g-prof'};
-function renderLevels(){const d=S.d,o=off();const lv=(d.levels||[]).map(l=>({...l,dist:l.px-d.price}));
+function renderLevels(){const d=S.d,o=off();let lv=(d.levels||[]).map(l=>({...l,dist:l.px-d.price}));
+  const many=mobile()&&lv.length>10;if(many&&!S.lvAll)lv=[...lv].sort((a,b)=>Math.abs(a.dist)-Math.abs(b.dist)).slice(0,10);
+  $('lvmore').style.display=many?'block':'none';$('lvmore').textContent=S.lvAll?'Show nearest 10':`Show all ${(d.levels||[]).length} levels`;
   if(!lv.length){$('lvlist').innerHTML='<div class="lr"><span class="n">Loading levels…</span></div>';$('lvft').textContent='–';return;}
   const by={price:(a,b)=>b.px-a.px,p:(a,b)=>(pOf(b)??-1)-(pOf(a)??-1),dist:(a,b)=>Math.abs(a.dist)-Math.abs(b.dist)}[S.sort];lv.sort(by);
   const row=l=>{const cls=l.kind==='bid'?'g-bid':l.kind==='ask'?'g-ask':GROUPCLS[l.group]||'';const p=pOf(l);
@@ -362,8 +369,8 @@ function render(){
      t=S.scale==='fut'?`${d.name} · ${d.fut} futures · CFD ≈ ${fmtP(d.price)}${diff}`:`${d.name} · ${d.cfd} CFD · ${d.fut} futures ≈ ${bs!=null?fmtP(d.price+bs):'–'}${diff}`;}
    $('pxsub').textContent=t;}
   $('live').className='live'+(d.status==='live'?'':' off');$('live').querySelector('span').textContent=d.status==='live'?'LIVE':String(d.status||'').toUpperCase();
-  $('hint').textContent=mobile()?'Pinch to zoom · drag to move · Reset goes back to live':'Scroll to zoom · drag to move in time and price · shift + scroll zooms price · double-click resets · hover a bubble for details';
-  drawChart();renderLevels();
+  $('hint').textContent=mobile()?'Swipe sideways to move in time · pinch sideways = time zoom, pinch up/down = price zoom · drag the price axis to stretch the chart · Reset goes back to live':'Scroll to zoom · drag to move · drag the price axis to stretch or compress, the time axis to widen bars · double-click an axis or the chart to reset · hover a bubble for details';
+  drawChart();placeYax();renderLevels();
   const bub=[...d.bubbles].sort((a,b)=>b.t-a.t).slice(0,9);
   $('ish').innerHTML=bub.length?bub.map(b=>`<tr><td>${hhmmss(b.t)}</td><td>${fmtP(b.px+o)}</td><td>${fmtU(b.usd)}</td><td class="${b.side==='B'?'bid':'ask'}">${b.side==='B'?'BUY':'SELL'}</td></tr>`).join(''):'<tr><td colspan="4" class="empty">No large prints in the last 3 hours.</td></tr>';
   const bg=[...d.bubbles].sort((a,b)=>b.usd-a.usd).slice(0,5);$('bigs').className=bg.length?'':'empty';
@@ -395,23 +402,48 @@ async function load(full){
 // ── Zoom, panorering, hårkors ──
 function zoom(f){if(S.view==='fp'){S.cols=Math.max(30,Math.min(160,(S.cols||64)*f));}else{const L=S.d?S.d.bars.length:240;const cur=S.nb||Math.floor(($('chart').getBoundingClientRect().width-240)/9);S.nb=Math.max(10,Math.min(L,Math.round(cur/f)));}render();}
 $('zoom').onclick=e=>{const b=e.target.closest('button');if(!b)return;const v=b.dataset.v;if(v==='in')zoom(1.25);else if(v==='out')zoom(0.8);else{resetView();render();}};
-const cv=$('chart');
-cv.addEventListener('wheel',e=>{e.preventDefault();if(e.shiftKey){S.yz=Math.max(.15,Math.min(6,S.yz*(e.deltaY<0?.87:1.15)));render();}else zoom(e.deltaY<0?1.15:0.87);},{passive:false});
+const cv=$('chart'),yax=$('yax');
+// Prisaxeln: dra upp/ner = sträck ut / tryck ihop grafen på höjden (som i TradingView). Dubbelklick = auto.
+function placeYax(){const s=S.sc;if(!s)return;yax.style.width=s.AX+'px';yax.style.height=(s.top+s.ch)+'px';}
+const clampN=v=>{const L=S.d?S.d.bars.length:240;return Math.max(10,Math.min(L,Math.round(v)));};
+cv.addEventListener('wheel',e=>{e.preventDefault();if(e.shiftKey){S.yz=Math.max(.05,Math.min(20,S.yz*(e.deltaY<0?.87:1.15)));render();}else zoom(e.deltaY<0?1.15:0.87);},{passive:false});
+yax.addEventListener('wheel',e=>{e.preventDefault();S.yz=Math.max(.05,Math.min(20,S.yz*(e.deltaY<0?.87:1.15)));redraw();},{passive:false});
 cv.addEventListener('dblclick',()=>{resetView();render();});
-let drag=null,raf=0;const redraw=()=>{if(raf)return;raf=requestAnimationFrame(()=>{raf=0;drawChart();});};
-cv.addEventListener('mousedown',e=>{e.preventDefault();drag={x:e.clientX,y:e.clientY,off:S.off,yp:S.ypan};cv.style.cursor='grabbing';});
-addEventListener('mousemove',e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;S.off=Math.max(0,drag.off+Math.round(dx/(S.pxPerBar||10)));if(S.sc)S.ypan=drag.yp+dy*(S.sc.hi-S.sc.lo)/S.sc.ch;redraw();});
+yax.addEventListener('dblclick',()=>{S.yz=1;S.ypan=0;redraw();});
+let drag=null,raf=0;const redraw=()=>{if(raf)return;raf=requestAnimationFrame(()=>{raf=0;drawChart();placeYax();});};
+const inXaxis=my=>S.sc&&my>S.sc.top+S.sc.ch;
+cv.addEventListener('mousedown',e=>{e.preventDefault();const r=cv.getBoundingClientRect(),my=e.clientY-r.top;
+  drag={mode:inXaxis(my)?'x':'pan',x:e.clientX,y:e.clientY,off:S.off,yp:S.ypan,n:S.nShown||S.nb||60,cols:S.cols||64};cv.style.cursor=drag.mode==='x'?'ew-resize':'grabbing';});
+yax.addEventListener('mousedown',e=>{e.preventDefault();drag={mode:'y',y:e.clientY,yz:S.yz};});
+addEventListener('mousemove',e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;
+  if(drag.mode==='y')S.yz=Math.max(.05,Math.min(20,drag.yz*Math.exp(dy*.006)));
+  else if(drag.mode==='x'){if(S.view==='fp')S.cols=Math.max(30,Math.min(160,drag.cols*Math.exp(dx*.006)));else S.nb=clampN(drag.n*Math.exp(-dx*.006));}
+  else{S.off=Math.max(0,drag.off+Math.round(dx/(S.pxPerBar||10)));if(S.sc)S.ypan=drag.yp+dy*(S.sc.hi-S.sc.lo)/S.sc.ch;}
+  redraw();});
 addEventListener('mouseup',()=>{drag=null;cv.style.cursor='crosshair';});
 cv.addEventListener('mousemove',e=>{const r=cv.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
+  if(!drag)cv.style.cursor=inXaxis(my)?'ew-resize':'crosshair';
   if(S.view==='fp'){if(!S.fpHit||drag)return;const h=S.fpHit.find(q=>mx>=q.x0&&mx<=q.x1&&my>=q.y0&&my<=q.y1);S.hover=h?{...h,mx,my}:null;redraw();return;}
   const hit=S.bubHit.filter(q=>Math.hypot(q.cx-mx,q.cy-my)<=q.r+2).sort((a,b)=>b.b.usd-a.b.usd)[0];S.mouse={x:mx,y:my,bub:hit||null};redraw();});
 cv.addEventListener('mouseleave',()=>{S.hover=null;S.mouse=null;redraw();});
+// Touch: ett finger i sidled = flytta i tiden (upp/ner scrollar sidan som vanligt),
+// två fingrar = zooma (isärdrag i sidled = tid, på höjden = pris), finger på prisaxeln = sträck ut på höjden.
 let t1=null,pinch=null;
-cv.addEventListener('touchstart',e=>{if(e.touches.length===1){t1={x:e.touches[0].clientX,y:e.touches[0].clientY,off:S.off,yp:S.ypan};pinch=null;}else if(e.touches.length===2){pinch=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);t1=null;}},{passive:true});
-cv.addEventListener('touchmove',e=>{if(t1&&e.touches.length===1){e.preventDefault();S.off=Math.max(0,t1.off+Math.round((e.touches[0].clientX-t1.x)/(S.pxPerBar||10)));if(S.sc)S.ypan=t1.yp+(e.touches[0].clientY-t1.y)*(S.sc.hi-S.sc.lo)/S.sc.ch;redraw();}
-  else if(pinch&&e.touches.length===2){e.preventDefault();const d2=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);if(Math.abs(d2-pinch)>10){zoom(d2>pinch?1.1:0.91);pinch=d2;}}},{passive:false});
+const sp=(a,b)=>({x:Math.abs(a.clientX-b.clientX),y:Math.abs(a.clientY-b.clientY)});
+cv.addEventListener('touchstart',e=>{if(e.touches.length===1){t1={x:e.touches[0].clientX,y:e.touches[0].clientY,off:S.off};pinch=null;}
+  else if(e.touches.length===2){pinch={...sp(e.touches[0],e.touches[1]),n:S.nShown||S.nb||60,yz:S.yz,cols:S.cols||64};t1=null;}},{passive:true});
+cv.addEventListener('touchmove',e=>{if(t1&&e.touches.length===1){const dx=e.touches[0].clientX-t1.x,dy=e.touches[0].clientY-t1.y;if(Math.abs(dx)<Math.abs(dy))return;
+    if(e.cancelable)e.preventDefault();S.off=Math.max(0,t1.off+Math.round(dx/(S.pxPerBar||10)));redraw();}
+  else if(pinch&&e.touches.length===2){if(e.cancelable)e.preventDefault();const q=sp(e.touches[0],e.touches[1]);
+    if(Math.abs(q.x-pinch.x)>=Math.abs(q.y-pinch.y)){const f=(q.x+20)/(pinch.x+20);if(S.view==='fp')S.cols=Math.max(30,Math.min(160,pinch.cols*f));else S.nb=clampN(pinch.n/f);}
+    else S.yz=Math.max(.05,Math.min(20,pinch.yz*(pinch.y+20)/(q.y+20)));redraw();}},{passive:false});
 cv.addEventListener('touchend',()=>{t1=null;pinch=null;});
+let ty=null;
+yax.addEventListener('touchstart',e=>{ty={y:e.touches[0].clientY,yz:S.yz};},{passive:true});
+yax.addEventListener('touchmove',e=>{if(!ty)return;e.preventDefault();S.yz=Math.max(.05,Math.min(20,ty.yz*Math.exp((e.touches[0].clientY-ty.y)*.008)));redraw();},{passive:false});
+yax.addEventListener('touchend',()=>{ty=null;});
 cv.style.cursor='crosshair';
+$('lvmore').onclick=()=>{S.lvAll=!S.lvAll;renderLevels();};
 load(true);setInterval(()=>load(false),2000);addEventListener('resize',render);
 </script>
 </body>
