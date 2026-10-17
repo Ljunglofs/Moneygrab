@@ -609,4 +609,20 @@ def register(app) -> None:
             _revoke_extras(obj.get("id"))
             handled = True
 
+        # En rad per händelse i serverloggen — bara typ och status, aldrig mejl, namn eller id:n.
+        try:
+            items = ((obj.get("items") or {}).get("data")) or []
+            interval = (((items[0].get("price") or {}).get("recurring") or {}).get("interval")) if items else None
+            parts = [etype]
+            if obj.get("status"):
+                parts.append("status=" + str(obj.get("status")))
+            if obj.get("payment_status"):
+                parts.append("betalning=" + str(obj.get("payment_status")))
+            if interval:
+                parts.append("plan=" + str(interval))
+            if obj.get("cancel_at_period_end"):
+                parts.append("avslutas_vid_periodens_slut")
+            print("[stripe-händelse] " + " · ".join(parts), flush=True)
+        except Exception:
+            pass
         return {"ok": True, "event": etype, "handled": handled}
