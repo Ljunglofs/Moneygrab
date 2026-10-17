@@ -1435,6 +1435,11 @@ var _I18N_EXACT = {
   "KÖP":"BUY",
   "AVVAKTA":"WAIT",
   "UNDVIK":"AVOID",
+  "STARKT LÄGE":"STRONG SETUP",
+  "SVAGT LÄGE":"WEAK SETUP",
+  "Nästa motstånd":"Next resistance",
+  "Motstånd 2":"Resistance 2",
+  "Ogiltigt under":"Invalid below",
   "LADDAR":"LOADING",
   "EJ TILLGÄNGLIG":"UNAVAILABLE",
   "Småbolag i tidig fas · volymexplosion":"Small caps, early phase · volume explosion",
@@ -1653,7 +1658,7 @@ var _I18N_RULES = [
   [/^Låg \$(.+)$/, "Low $$$1"],
   [/^Hög \$(.+)$/, "High $$$1"],
   [/^(\d+) köp · (\d+) sälj$/, "$1 buys · $2 sells"],
-  [/^Köp ([\s\S]+?)\s+·\s+Stop ([\s\S]+?)\s+·\s+Mål ([\s\S]+)$/, "Buy $1 · Stop $2 · Target $3"],
+  [/^Trigger-nivå ([\s\S]+?)\s+·\s+Ogiltigt under ([\s\S]+?)\s+·\s+Nästa motstånd ([\s\S]+)$/, "Trigger $1 · Invalid below $2 · Next resistance $3"],
   [/^(.+) – rapport$/, "$1 – earnings"],
   [/^Om (\d+) dgr$/, "In $1 days"],
   [/^(\d+) min sedan$/, "$1 min ago"],
@@ -2221,8 +2226,8 @@ function stockData(tkr,live){live=live||{};
     if(setupG!=="A"&&setupG!=="B")waitWhy.push(setupG==="—"?(EN?"setup not graded yet":"setup ej bedömd än"):(EN?"setup "+setupG:"setup "+setupG));
     if(fromHi!=null&&fromHi<-15)waitWhy.push(EN?Math.abs(fromHi)+"% below the high":Math.abs(fromHi)+" % under toppen");
   }
-  const verdict=score==null?"—":score>=7.5?(waitWhy.length?"AVVAKTA":"KÖP"):score>=6?"AVVAKTA":"UNDVIK";
-  const vcolor=verdict==="—"?"#7c8a9a":verdict==="KÖP"?"#00e5ff":verdict==="AVVAKTA"?"#19D3F0":"#FF3B30";
+  const verdict=score==null?"—":score>=7.5?(waitWhy.length?"AVVAKTA":"STARKT LÄGE"):score>=6?"AVVAKTA":"SVAGT LÄGE";
+  const vcolor=verdict==="—"?"#7c8a9a":verdict==="STARKT LÄGE"?"#00e5ff":verdict==="AVVAKTA"?"#19D3F0":"#FF3B30";
   const confirmedPx=en&&en.confirmed!=null?+(+en.confirmed).toFixed(2):null;
   const r2=v=>v!=null?+(+v).toFixed(2):null;
   const entryLo=en?r2(Math.min(en.aggressive,en.retest||en.aggressive)):null,entryHi=en?r2(en.aggressive):null;
@@ -2364,7 +2369,7 @@ function openStock(tkr){_curStock=tkr;const d=stockData(tkr,Object.assign({},_se
     <div id="st-insider" class="ins-list"><div class="anl-load">Laddar insider…</div></div>
     <div class="st-sec">Om bolaget</div>
     <div class="st-box about secgfx-wrap"><div class="secgfx" style="background-image:url('${IMGS.goldwave}')"></div><div class="ab-facts"><div><span>Sektor</span><b>${d.sector}</b></div><div><span>Marknad</span><b>${d.bors}</b></div><div><span>Land</span><b>${d.land} ${d.flag}</b></div></div><p class="blurb">${d.desc}</p></div>
-    <div class="verdict secgfx-wrap pro-gated" data-lock="${window.GRABIT_LANG==='en'?'Entry · Stop · Target':'Entry · Stop · Mål'}" style="border-color:${d.vcolor}66;background:linear-gradient(160deg,${d.vcolor}1f,#070708)"><div class="secgfx gverdict" style="background-image:url('${IMGS.verdict_chart}')"></div><div class="vd-top"><span class="vd-badge" style="background:${d.liveOk?d.vcolor:(d.liveFail?'#b3453f':'#7c8a9a')}">${d.liveOk?d.verdict:(d.liveFail?'EJ TILLGÄNGLIG':'LADDAR')}</span><span class="vd-hit">${d.liveOk&&d.rsRating!=null?'RS-rating <b style="color:'+d.vcolor+'">'+d.rsRating+'</b>':''}</span></div><div class="vd-line">${!d.liveOk?(d.liveFail?'Live-kursen gick inte att hämta just nu.':'Hämtar live-kurs… nivåer visas när riktig data laddats.'):(d.entryLo==null?'Nivåerna räknas…':d.verdict==='UNDVIK'?'Avvakta – ingen entry rekommenderas just nu.':d.verdict==='AVVAKTA'?((window.GRABIT_LANG==='en'?'Watch':'Bevaka')+(d.confirmedPx!=null?(window.GRABIT_LANG==='en'?' · buy only above ':' · köp först över ')+d.cur+d.confirmedPx:'')+'  ·  Stop '+d.cur+d.stop):'Köp '+d.cur+d.entryLo+(d.entryHi>d.entryLo?'–'+d.cur+d.entryHi:'')+'  ·  Stop '+d.cur+d.stop+'  ·  Mål '+d.cur+d.t2)}</div><div class="vd-sub">${!d.liveOk?(d.liveFail?'Grabit visar aldrig nivåer på uppskattad data. <b style="cursor:pointer;text-decoration:underline" onclick="event.stopPropagation();retryLive(\''+d.tkr+'\')">Försök igen</b>':'Grabit räknar entry, stop och mål på live-priset – aldrig på uppskattningar.'):(d.score>=7.5&&d.waitWhy.length?(window.GRABIT_LANG==='en'?'AI verdict: strong stock, but no buy setup yet ('+d.waitWhy.join(', ')+'). Wait for a base and a breakout on volume.':'AI-slutsats: stark aktie men inget köpläge än ('+d.waitWhy.join(', ')+'). Vänta på en bas och ett utbrott på volym.'):d.score>=7.5?(window.GRABIT_LANG==='en'?'AI verdict: strong setup with confirmed trend'+(d.rsRating>=70?' and high relative strength (RS '+d.rsRating+')':'')+'. R/R 1:'+(d.rr!=null?d.rr:'—')+' to target.':'AI-slutsats: stark setup med bekräftad trend'+(d.rsRating>=70?' och hög relativ styrka (RS '+d.rsRating+')':'')+'. R/R 1:'+(d.rr!=null?d.rr:'—')+' till mål.'):d.score>=6?'AI-slutsats: blandad bild – vänta på bekräftelse (volym + utbrott) innan entry.':'AI-slutsats: svag setup – hög risk. Undvik tills trend och volym förbättras.')}</div></div>
+    <div class="verdict secgfx-wrap pro-gated" data-lock="${window.GRABIT_LANG==='en'?'Trigger · Invalid below · Next resistance':'Trigger-nivå · Ogiltigt under · Nästa motstånd'}" style="border-color:${d.vcolor}66;background:linear-gradient(160deg,${d.vcolor}1f,#070708)"><div class="secgfx gverdict" style="background-image:url('${IMGS.verdict_chart}')"></div><div class="vd-top"><span class="vd-badge" style="background:${d.liveOk?d.vcolor:(d.liveFail?'#b3453f':'#7c8a9a')}">${d.liveOk?d.verdict:(d.liveFail?'EJ TILLGÄNGLIG':'LADDAR')}</span><span class="vd-hit">${d.liveOk&&d.rsRating!=null?'RS-rating <b style="color:'+d.vcolor+'">'+d.rsRating+'</b>':''}</span></div><div class="vd-line">${!d.liveOk?(d.liveFail?'Live-kursen gick inte att hämta just nu.':'Hämtar live-kurs… nivåer visas när riktig data laddats.'):(d.entryLo==null?'Nivåerna räknas…':d.verdict==='SVAGT LÄGE'?(window.GRABIT_LANG==='en'?'Weak technical setup – no trigger level right now.':'Svagt tekniskt läge – ingen trigger-nivå just nu.'):d.verdict==='AVVAKTA'?((window.GRABIT_LANG==='en'?'Watch':'Bevaka')+(d.confirmedPx!=null?(window.GRABIT_LANG==='en'?' · strong setup above ':' · starkt läge först över ')+d.cur+d.confirmedPx:'')+(window.GRABIT_LANG==='en'?'  ·  Invalid below ':'  ·  Ogiltigt under ')+d.cur+d.stop):'Trigger-nivå '+d.cur+d.entryLo+(d.entryHi>d.entryLo?'–'+d.cur+d.entryHi:'')+'  ·  Ogiltigt under '+d.cur+d.stop+'  ·  Nästa motstånd '+d.cur+d.t2)}</div><div class="vd-sub">${!d.liveOk?(d.liveFail?'Grabit visar aldrig nivåer på uppskattad data. <b style="cursor:pointer;text-decoration:underline" onclick="event.stopPropagation();retryLive(\''+d.tkr+'\')">Försök igen</b>':'Grabit räknar trigger-nivå, ogiltig-nivå och nästa motstånd på live-priset – aldrig på uppskattningar.'):(d.score>=7.5&&d.waitWhy.length?(window.GRABIT_LANG==='en'?'AI verdict: strong stock, but no strong technical setup yet ('+d.waitWhy.join(', ')+'). Wait for a base and a breakout on volume.':'AI-slutsats: stark aktie men inget starkt tekniskt läge än ('+d.waitWhy.join(', ')+'). Vänta på en bas och ett utbrott på volym.'):d.score>=7.5?(window.GRABIT_LANG==='en'?'AI verdict: strong setup with confirmed trend'+(d.rsRating>=70?' and high relative strength (RS '+d.rsRating+')':'')+'. R/R 1:'+(d.rr!=null?d.rr:'—')+' to next resistance.':'AI-slutsats: stark setup med bekräftad trend'+(d.rsRating>=70?' och hög relativ styrka (RS '+d.rsRating+')':'')+'. R/R 1:'+(d.rr!=null?d.rr:'—')+' till nästa motstånd.'):d.score>=6?'AI-slutsats: blandad bild – vänta på bekräftelse (volym + utbrott) vid trigger-nivån.':'AI-slutsats: svagt tekniskt läge – hög risk tills trend och volym förbättras.')}</div></div>
     <div class="st-sec">GRABIT Score</div>
     <div class="rings"${d.mom==null?' style="display:none"':''}>${ring(d.mom||0,"#19D3F0","Momentum",d.mom>=8?"Starkt":"Bra")}
       ${ring(d.sent||0,"#19D3F0","Sentiment",d.sent>=8?"Positivt":"Neutralt")}
@@ -2390,9 +2395,9 @@ function openStock(tkr){_curStock=tkr;const d=stockData(tkr,Object.assign({},_se
       <div class="er"><span class="k">Motstånd (1 ATR)</span><span class="v">${M(d.r2,d.cur)}</span></div></div>
     <div class="st-grid2">
       <div class="st-box exit2 pro-gated" data-lock="${window.GRABIT_LANG==='en'?'Exit plan':'Exit plan'}"><div class="k2" style="margin-bottom:6px">Exit plan</div>
-        <div class="er2"><span class="k">Mål 1</span><span class="v pos">${M(d.t1,d.cur)}</span></div>
-        <div class="er2"><span class="k">Mål 2</span><span class="v pos">${M(d.t2,d.cur)}</span></div>
-        <div class="er2"><span class="k">Stop</span><span class="v neg">${M(d.stop,d.cur)}</span></div>
+        <div class="er2"><span class="k">Nästa motstånd</span><span class="v pos">${M(d.t1,d.cur)}</span></div>
+        <div class="er2"><span class="k">Motstånd 2</span><span class="v pos">${M(d.t2,d.cur)}</span></div>
+        <div class="er2"><span class="k">Ogiltigt under</span><span class="v neg">${M(d.stop,d.cur)}</span></div>
         <div class="er2"><span class="k">R/R</span><span class="v">${d.rr!=null?"1 : "+d.rr:"\u2014"}</span></div>
         <div class="er2"><span class="k">Trailing</span><span class="v">${M(d.trail,d.cur)}</span></div></div>
       <div class="st-box hetta2"><div class="h">Hetta just nu</div>
@@ -3779,7 +3784,7 @@ function openMonthly(){const m=_MCASE; if(!m)return;
     ${secs}
     ${nyck?`<div class="nyck" style="margin-top:11px">${nyck}</div>`:""}
     <div class="mc-cardlink" onclick="closeMonthly();openStock('${m.ticker}')">
-      <div class="mc-cl-tx"><b>Se Grabits nivåer för ${m.ticker}</b><i>Entry, stopp &amp; mål, score, diagram, AI-analys, livegraf</i></div>
+      <div class="mc-cl-tx"><b>Se Grabits nivåer för ${m.ticker}</b><i>Trigger-nivå, ogiltig-nivå &amp; nästa motstånd, score, diagram, AI-analys, livegraf</i></div>
       <span class="mc-cl-arr">→</span></div>
     <div style="height:34px"></div>`;
   document.getElementById("mcdetail").classList.add("on");
@@ -4117,14 +4122,14 @@ async function loadStockChart(tkr){
   const lv=[];
   if(en&&en.stop!=null){
     // samma entry, stop och mål som köpkortet ovanför
-    lv.push({v:+en.stop,txt:EN?"STOP":"STOPP",c:"#FF4B4B"});
-    if(en.aggressive!=null)lv.push({v:+en.aggressive,txt:"ENTRY",c:"#19D3F0"});
-    if(en.t1!=null)lv.push({v:+en.t1,txt:EN?"T1":"MÅL 1",c:"#19D3F0"});
-    if(en.t2!=null)lv.push({v:+en.t2,txt:EN?"T2":"MÅL 2",c:"#19D3F0"});
+    lv.push({v:+en.stop,txt:EN?"INVALID":"OGILTIG",c:"#FF4B4B"});
+    if(en.aggressive!=null)lv.push({v:+en.aggressive,txt:"TRIGGER",c:"#19D3F0"});
+    if(en.t1!=null)lv.push({v:+en.t1,txt:EN?"R1":"MOTST. 1",c:"#19D3F0"});
+    if(en.t2!=null)lv.push({v:+en.t2,txt:EN?"R2":"MOTST. 2",c:"#19D3F0"});
   }else if(a){
     const stopp=(a.ob_support!=null?a.ob_support:a.atr_dn_1);
-    if(stopp!=null)lv.push({v:+stopp,txt:EN?"STOP":"STOPP",c:"#FF4B4B"});
-    if(a.last!=null)lv.push({v:+a.last,txt:"ENTRY",c:"#19D3F0"});
+    if(stopp!=null)lv.push({v:+stopp,txt:EN?"INVALID":"OGILTIG",c:"#FF4B4B"});
+    if(a.last!=null)lv.push({v:+a.last,txt:"TRIGGER",c:"#19D3F0"});
     if(a.atr_up_05!=null)lv.push({v:+a.atr_up_05,txt:"T1",c:"#19D3F0"});
     if(a.atr_up_1!=null)lv.push({v:+a.atr_up_1,txt:"T2",c:"#19D3F0"});
   }
@@ -4367,7 +4372,7 @@ function _fmtN(n){return String(n).replace(/\B(?=(\d{3})+(?!\d))/g,(window.GRABI
 function scanLine(){var n=_scanN();if(!n)return"";var EN=(window.GRABIT_LANG==="en");
   var b=(window._scrCounts||{}).bull;
   return '<div class="scan-line"><span class="scan-dot"></span>'+(EN?"Scanned today: ":"Skannat i dag: ")+'<b>'+_fmtN(n)+'</b>'+(EN?" stocks":" aktier")
-    +(b!=null?' \u2192 <b>'+b+'</b>'+(EN?" in buy zone":" i köpläge"):"")+'</div>';}
+    +(b!=null?' \u2192 <b>'+b+'</b>'+(EN?" in strong setup":" i starkt läge"):"")+'</div>';}
 document.addEventListener("DOMContentLoaded",function(){try{renderScanNote();}catch(e){}});
 function renderScanNote(){var el=document.getElementById("scan-note");if(!el)return;var n=_scanN(),EN=(window.GRABIT_LANG==="en");
   var N=n?_fmtN(n):(EN?"3,000+":"över 3\u00a0000");
@@ -4714,7 +4719,7 @@ async function loadTopOp(){
   /* Topp 3 A-lägen. Rankade på RS-rating minus setup — den enda rankningen
      som slog S&P i båda halvåren i backtestet (backtest/results/REPORT.md). */
   const row=(p,i)=>{const col=scoreColor((p.score||0)/10);
-    const lvl=p.entry!=null?`<div class="t3-lv"><span><i>ENTRY</i>${fmtPx(p.entry)}</span>${p.stopp!=null?`<span style="color:var(--neg)"><i>${EN?"STOP":"STOPP"}</i>${fmtPx(p.stopp)}</span>`:""}${p.target2!=null?`<span style="color:var(--pos)"><i>${EN?"TARGET":"MÅL"}</i>${fmtPx(p.target2)}</span>`:""}</div>`:"";
+    const lvl=p.entry!=null?`<div class="t3-lv"><span><i>${EN?"TRIGGER":"TRIGGER-NIVÅ"}</i>${fmtPx(p.entry)}</span>${p.stopp!=null?`<span style="color:var(--neg)"><i>${EN?"INVALID BELOW":"OGILTIGT UNDER"}</i>${fmtPx(p.stopp)}</span>`:""}${p.target2!=null?`<span style="color:var(--pos)"><i>${EN?"NEXT RESISTANCE":"NÄSTA MOTSTÅND"}</i>${fmtPx(p.target2)}</span>`:""}</div>`:"";
     const earn=p.earnings_in!=null&&p.earnings_in<=5?`<span class="t3-tag evt-tag">${EN?"Report":"Rapport"} ${p.earnings_in===0?(EN?"today":"idag"):(EN?"in ":"om ")+p.earnings_in+" d"}</span>`:"";
     return `<div class="t3-row${!pro&&i>0?" pro-gated":""}"${!pro&&i>0?' data-lock="PRO"':""} onclick="openStock('${p.ticker}')">
       <span class="t3-n">${i+1}</span>${lic(p.ticker,38,col)}
@@ -4735,7 +4740,7 @@ function renderBlueChips(bs){
   if(!bs.length){el.style.display="none";return;}
   el.style.display="";
   const row=(p,i)=>{const col=scoreColor((p.score||0)/10);
-    const lvl=p.entry!=null?`<div class="t3-lv"><span><i>ENTRY</i>${fmtPx(p.entry)}</span>${p.stopp!=null?`<span style="color:var(--neg)"><i>${EN?"STOP":"STOPP"}</i>${fmtPx(p.stopp)}</span>`:""}${p.target2!=null?`<span style="color:var(--pos)"><i>${EN?"TARGET":"MÅL"}</i>${fmtPx(p.target2)}</span>`:""}</div>`:"";
+    const lvl=p.entry!=null?`<div class="t3-lv"><span><i>${EN?"TRIGGER":"TRIGGER-NIVÅ"}</i>${fmtPx(p.entry)}</span>${p.stopp!=null?`<span style="color:var(--neg)"><i>${EN?"INVALID BELOW":"OGILTIGT UNDER"}</i>${fmtPx(p.stopp)}</span>`:""}${p.target2!=null?`<span style="color:var(--pos)"><i>${EN?"NEXT RESISTANCE":"NÄSTA MOTSTÅND"}</i>${fmtPx(p.target2)}</span>`:""}</div>`:"";
     const earn=p.earnings_in!=null&&p.earnings_in<=5?`<span class="t3-tag evt-tag">${EN?"Report":"Rapport"} ${p.earnings_in===0?(EN?"today":"idag"):(EN?"in ":"om ")+p.earnings_in+" d"}</span>`:"";
     return `<div class="t3-row${!pro&&i>0?" pro-gated":""}"${!pro&&i>0?' data-lock="PRO"':""} onclick="openStock('${p.ticker}')">
       <span class="t3-n">${i+1}</span>${lic(p.ticker,38,col)}
