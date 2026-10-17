@@ -4723,8 +4723,7 @@ async function loadTopOp(){
       <span class="t3-go">&#8594;</span></div>`;};
   el.innerHTML=`<div class="to-k">${EN?"Today's top 3 setups":"Dagens topp 3 lägen"}</div>
    <div class="t3-list">${ps.slice(0,3).map(row).join("")}</div>
-   <div class="to-disc">${EN?"Backtest Aug 2025–Aug 2026: A setups beat the S&P 500 by +2.2% on average over 10 days. Spread the risk — one pick alone varies a lot. Past results are no guarantee. Not financial advice."
-     :"Backtest aug 2025–aug 2026: A-lägena slog S&P 500 med +2,2 % i snitt på 10 dagar. Sprid risken — en enskild pick varierar mycket. Historik är ingen garanti. Inte finansiell rådgivning."}</div>`;
+   <div class="to-disc">${EN?"Not financial advice.":"Inte finansiell rådgivning."}</div>`;
   if(window.applyProLocks)applyProLocks(el);
 }
 /* Blue chips i rörelse: kända bolag (>= 10 mdr USD) med A- eller B-läge.
@@ -4745,8 +4744,7 @@ function renderBlueChips(bs){
       <span class="t3-go">&#8594;</span></div>`;};
   const body=`<div class="t3-list">${bs.slice(0,3).map(row).join("")}</div>`;
   el.innerHTML=`<div class="to-k">${EN?"Blue chips in play":"Blue chips i rörelse"}</div>${body}
-   <div class="to-disc">${EN?"Well-known companies (market cap over $10B) with an A or B setup today. Not financial advice."
-     :"Välkända bolag (börsvärde över 10 mdr USD) med A- eller B-läge idag. Inte finansiell rådgivning."}</div>`;
+   <div class="to-disc">${EN?"Not financial advice.":"Inte finansiell rådgivning."}</div>`;
   if(window.applyProLocks)applyProLocks(el);
 }
 async function loadWatchrow(){
