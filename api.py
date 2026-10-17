@@ -4865,6 +4865,13 @@ def ai_daily(lang: str = "sv"):
 def ai_news(ticker: str, lang: str = "sv", name: str = ""):
     """Svensk sammanfattning + stämpel av bolagets nyheter (kräver Alpaca-nycklar)."""
     tk = ticker.upper().strip()
+    nm = (name or "").strip()[:80]
+    if not nm:
+        # Appen känner inte alltid till namnet (t.ex. bolag som bara dykt upp i en lista)
+        try:
+            nm = next((x.get("name") for x in _local_lookup(tk) if str(x.get("symbol", "")).upper() == tk), "") or ""
+        except Exception:
+            nm = ""
     heads = []
     try:
         import os as _os
@@ -4875,25 +4882,32 @@ def ai_news(ticker: str, lang: str = "sv", name: str = ""):
             r = requests.get("https://data.alpaca.markets/v1beta1/news",
                              headers={"APCA-API-KEY-ID": k, "APCA-API-SECRET-KEY": s},
                              params={"symbols": tk, "limit": 6, "sort": "desc"}, timeout=4)
+            # Samlingsartiklar om många bolag ("stocks moving after hours: A, B, C…") hoppas
+            # över, om inte rubriken nämner just det här bolaget.
+            first = (nm.split()[0].lower() if nm else "")
             for n in (r.json().get("news") or []):
                 h = (n.get("headline") or "").strip()
-                if h:
+                syms = n.get("symbols") or []
+                about = tk.lower() in h.lower() or (len(first) > 2 and first in h.lower())
+                if h and (len(syms) <= 3 or about):
                     heads.append(h)
     except Exception:
         pass
     if not heads:
         return {"ticker": tk, "text": "", "sentiment": "", "headlines": []}
-    sysp = ("Du är Grabit. Sammanfatta nyhetsläget för aktien på svenska i 1-2 meningar: "
+    sysp = ("Du är nyhetsanalytiker i appen Grabit. Sammanfatta nyhetsläget för aktien på svenska i 1-2 meningar: "
             "vad hände och varför det kan röra kursen. Avsluta med EXAKT TVÅ rader:\n"
             "'Stämpel: Positivt' eller 'Stämpel: Negativt' eller 'Stämpel: Neutralt'\n"
             "'Kategori: X' där X är EN av: FDA, Kontrakt, Förvärv, Produktlansering, "
             "Rapport, Analytiker, Personal, Marknad, Övrigt — välj den som bäst matchar "
             "huvudnyheten. Tolka bara rubrikerna, hitta inte på. Rubrikerna är redan "
             "hämtade för just den här aktien — de kan nämna andra bolag eller bolagets "
-            "fulla namn i stället för tickern. Lita på tickern och bolagsnamnet du får.")
-    nm = (name or "").strip()[:80]
+            "fulla namn i stället för tickern. Lita på tickern och bolagsnamnet du får. "
+            "Om ingen rubrik handlar om bolaget: skriv bara 'Inga bolagsspecifika nyheter just nu.' "
+            "följt av 'Stämpel: Neutralt' och 'Kategori: Övrigt'. Ställ aldrig frågor tillbaka och "
+            "skriv aldrig om rubrikerna, datan eller hur du fick dem.")
     who = "%s (%s)" % (tk, nm) if nm else tk
-    txt = _ai_text("news:%s:%x" % (tk, hash(tuple(heads[:6])) & 0xffffff),
+    txt = _ai_text("news2:%s:%x" % (tk, hash(tuple(heads[:6])) & 0xffffff),
                    sysp, "Aktie %s. Rubriker:\n- %s" % (who, "\n- ".join(heads[:6])), 240, lang=lang)
     low = txt.lower()
     _st = _re.search(r"(?:stämpel|stamp|sentiment)\s*:\s*(\w+)", low)
