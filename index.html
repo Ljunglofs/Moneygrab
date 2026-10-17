@@ -1842,6 +1842,7 @@ else _i18nBoot();
     <div class="mcase" id="mcase" style="display:none" onclick="openMonthly()"></div>
     <div class="card radarcard prem gold" id="radar" style="display:none"></div>
     <div class="card topop prem gold" id="topop" style="display:none"></div>
+    <div class="card topop prem" id="bluechips" style="display:none"></div>
     <div class="card topmv prem blue" id="topmovers" style="display:none"></div>
     <div class="askbanner" onclick="openAI()" role="button" aria-label="Öppna Grabit AI"><img src="/img/653d1dd47798.jpg" alt="Ask Grabit – öppna chatten"></div>
     <div class="insflow" id="insflowbox" onclick="openInsiderFlow()" role="button" aria-label="Öppna Insider Flow">
@@ -4704,8 +4705,9 @@ async function loadToday3(){
 async function loadTopOp(){
   const el=document.getElementById("topop");if(!el)return;
   const B=CONFIG.API_BASE?CONFIG.API_BASE.replace(/\/$/,""):"";if(!B)return;
-  let ps=null;
-  try{const r=await fetch(B+"/api/topop",{cache:"no-store"});const j=await r.json();ps=(j&&j.picks)||(j&&j.pick?[j.pick]:null);}catch(e){}
+  let ps=null,tj=null;
+  try{const r=await fetch(B+"/api/topop",{cache:"no-store"});const j=await r.json();tj=j;ps=(j&&j.picks)||(j&&j.pick?[j.pick]:null);}catch(e){}
+  if(tj)renderBlueChips(tj.bluechips||[]);
   if(!ps||!ps.length){window._topTries=(window._topTries||0)+1;if(window._topTries<=5)setTimeout(loadTopOp,30000);return;}
   const EN=(window.GRABIT_LANG==="en"),pro=isPro();
   el.style.display="";
@@ -4723,6 +4725,29 @@ async function loadTopOp(){
    <div class="t3-list">${ps.slice(0,3).map(row).join("")}</div>
    <div class="to-disc">${EN?"Backtest Aug 2025–Aug 2026: A setups beat the S&P 500 by +2.2% on average over 10 days. Spread the risk — one pick alone varies a lot. Past results are no guarantee. Not financial advice."
      :"Backtest aug 2025–aug 2026: A-lägena slog S&P 500 med +2,2 % i snitt på 10 dagar. Sprid risken — en enskild pick varierar mycket. Historik är ingen garanti. Inte finansiell rådgivning."}</div>`;
+  if(window.applyProLocks)applyProLocks(el);
+}
+/* Blue chips i rörelse: kända bolag (>= 10 mdr USD) med A- eller B-läge.
+   Egen lista bredvid Topp 3. Finns inget riktigt köpläge visas det ärligt —
+   vi tvingar aldrig in ett blue chip bara för att fylla kortet. */
+function renderBlueChips(bs){
+  const el=document.getElementById("bluechips");if(!el)return;
+  const EN=(window.GRABIT_LANG==="en"),pro=isPro();
+  el.style.display="";
+  const row=(p,i)=>{const col=scoreColor((p.score||0)/10);
+    const lvl=p.entry!=null?`<div class="t3-lv"><span><i>ENTRY</i>${fmtPx(p.entry)}</span>${p.stopp!=null?`<span style="color:var(--neg)"><i>${EN?"STOP":"STOPP"}</i>${fmtPx(p.stopp)}</span>`:""}${p.target2!=null?`<span style="color:var(--pos)"><i>${EN?"TARGET":"MÅL"}</i>${fmtPx(p.target2)}</span>`:""}</div>`:"";
+    const earn=p.earnings_in!=null&&p.earnings_in<=5?`<span class="t3-tag evt-tag">${EN?"Report":"Rapport"} ${p.earnings_in===0?(EN?"today":"idag"):(EN?"in ":"om ")+p.earnings_in+" d"}</span>`:"";
+    return `<div class="t3-row${!pro&&i>0?" pro-gated":""}"${!pro&&i>0?' data-lock="PRO"':""} onclick="openStock('${p.ticker}')">
+      <span class="t3-n">${i+1}</span>${lic(p.ticker,38,col)}
+      <div class="t3-mid"><div class="t3-tk">${p.ticker}${tierBadge(p.tier)}</div><div class="t3-nm">${NAMES[p.ticker]||p.name||""}</div>
+        <div class="t3-tags"><span class="t3-tag">Blue chip</span>${p.label?`<span class="t3-tag">${p.label}</span>`:""}${p.rs_rating!=null?`<span class="t3-tag">RS ${p.rs_rating}</span>`:""}${earn}</div>${lvl}</div>
+      <span class="t3-go">&#8594;</span></div>`;};
+  const body=bs.length?`<div class="t3-list">${bs.slice(0,3).map(row).join("")}</div>`
+    :`<div class="to-disc" style="margin-top:6px">${EN?"No well-known company has a real buy setup right now. We never force one in just to fill the list."
+      :"Inget välkänt bolag har ett riktigt köpläge just nu. Vi tvingar aldrig in ett bara för att fylla listan."}</div>`;
+  el.innerHTML=`<div class="to-k">${EN?"Blue chips in play":"Blue chips i rörelse"}</div>${body}
+   <div class="to-disc">${EN?"Well-known companies (market cap over $10B) with an A or B setup today. Not financial advice."
+     :"Välkända bolag (börsvärde över 10 mdr USD) med A- eller B-läge idag. Inte finansiell rådgivning."}</div>`;
   if(window.applyProLocks)applyProLocks(el);
 }
 async function loadWatchrow(){

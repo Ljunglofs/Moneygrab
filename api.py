@@ -5902,17 +5902,36 @@ def _rank_picks(rows, regime=None):
     return sorted(rows, key=lambda r: (order.get(r.get("tier"), 3), -_topop_rank(r)))
 
 
+# "Blue chips i rörelse": kända bolag (börsvärde >= 10 mdr USD) med riktiga köplägen.
+# Egen lista bredvid Topp 3, så att de roliga småbolagsfallen inte trängs undan — och
+# inget blue chip tvingas in utan ett A- eller B-läge.
+_BLUE_MIN_MUSD = float(os.environ.get("BLUECHIP_MIN_MUSD", "10000"))
+
+
+def _bluechips(bull, reg, exclude):
+    big = [r for r in bull if float(r.get("mcap_musd") or 0) >= _BLUE_MIN_MUSD]
+    ranked = [r for r in _rank_picks(big, reg) if r.get("tier") in ("A", "B") and r.get("ticker") not in exclude]
+    out = []
+    for r in _mix_markets(ranked, min(len(ranked), 6))[:3]:
+        o = _opp_of(r)
+        o["tier"] = r.get("tier")
+        o["size"] = _size_of(r)
+        o["mcap_musd"] = r.get("mcap_musd")
+        out.append(o)
+    return out
+
+
 @app.get("/api/topop")
 def topop():
     scanned = scan_universe(None)
     reg = _market_regime()
     # Visa ALLTID dagens bästa läge — men bara A-lägen får kallas A+.
-    rank = _rank_picks([r for r in scanned
-                        if str(r.get("label")) in _BULL_LABELS], reg)
+    bull = [r for r in scanned if str(r.get("label")) in _BULL_LABELS]
+    rank = _rank_picks(bull, reg)
     if not rank:
         rank = _rank_picks(scanned, reg)
     if not rank:
-        return {"pick": None, "regim": reg}
+        return {"pick": None, "regim": reg, "bluechips": _bluechips(bull, reg, set())}
     # USA-fokus även här (mixen behåller tier-ordningen, den hoppar bara
     # över utländska bolag när kvoten är fylld).
     rank = _mix_markets(rank, min(len(rank), 12))
@@ -5925,7 +5944,8 @@ def topop():
         o["size"] = _size_of(r)
         o["mcap_musd"] = r.get("mcap_musd")
         picks.append(o)
-    return {"pick": picks[0], "picks": picks, "regim": reg}
+    return {"pick": picks[0], "picks": picks, "regim": reg,
+            "bluechips": _bluechips(bull, reg, {p.get("ticker") for p in picks})}
 
 
 # =====================================================================
