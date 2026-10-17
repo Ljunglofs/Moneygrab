@@ -4909,7 +4909,10 @@ def ai_news(ticker: str, lang: str = "sv", name: str = ""):
     who = "%s (%s)" % (tk, nm) if nm else tk
     txt = _ai_text("news2:%s:%x" % (tk, hash(tuple(heads[:6])) & 0xffffff),
                    sysp, "Aktie %s. Rubriker:\n- %s" % (who, "\n- ".join(heads[:6])), 240, lang=lang)
-    low = txt.lower()
+    low = (txt or "").lower()
+    # Inga bolagsnyheter -> ingenting alls i appen (rutan döljs när texten är tom)
+    if not low.strip() or "inga bolagsspecifika" in low or "no company-specific" in low:
+        return {"ticker": tk, "text": "", "sentiment": "", "headlines": [], "category": ""}
     _st = _re.search(r"(?:stämpel|stamp|sentiment)\s*:\s*(\w+)", low)
     _sw = _st.group(1) if _st else low
     senti = "pos" if "positiv" in _sw else "neg" if "negativ" in _sw else "neu" if "neutral" in _sw else ""
