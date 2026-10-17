@@ -4733,6 +4733,7 @@ async function loadTopOp(){
 function renderBlueChips(bs){
   const el=document.getElementById("bluechips");if(!el)return;
   const EN=(window.GRABIT_LANG==="en"),pro=isPro();
+  if(!bs.length){el.style.display="none";return;}
   el.style.display="";
   const row=(p,i)=>{const col=scoreColor((p.score||0)/10);
     const lvl=p.entry!=null?`<div class="t3-lv"><span><i>ENTRY</i>${fmtPx(p.entry)}</span>${p.stopp!=null?`<span style="color:var(--neg)"><i>${EN?"STOP":"STOPP"}</i>${fmtPx(p.stopp)}</span>`:""}${p.target2!=null?`<span style="color:var(--pos)"><i>${EN?"TARGET":"MÅL"}</i>${fmtPx(p.target2)}</span>`:""}</div>`:"";
@@ -4742,9 +4743,7 @@ function renderBlueChips(bs){
       <div class="t3-mid"><div class="t3-tk">${p.ticker}${tierBadge(p.tier)}</div><div class="t3-nm">${NAMES[p.ticker]||p.name||""}</div>
         <div class="t3-tags"><span class="t3-tag">Blue chip</span>${p.label?`<span class="t3-tag">${p.label}</span>`:""}${p.rs_rating!=null?`<span class="t3-tag">RS ${p.rs_rating}</span>`:""}${earn}</div>${lvl}</div>
       <span class="t3-go">&#8594;</span></div>`;};
-  const body=bs.length?`<div class="t3-list">${bs.slice(0,3).map(row).join("")}</div>`
-    :`<div class="to-disc" style="margin-top:6px">${EN?"No well-known company has a real buy setup right now. We never force one in just to fill the list."
-      :"Inget välkänt bolag har ett riktigt köpläge just nu. Vi tvingar aldrig in ett bara för att fylla listan."}</div>`;
+  const body=`<div class="t3-list">${bs.slice(0,3).map(row).join("")}</div>`;
   el.innerHTML=`<div class="to-k">${EN?"Blue chips in play":"Blue chips i rörelse"}</div>${body}
    <div class="to-disc">${EN?"Well-known companies (market cap over $10B) with an A or B setup today. Not financial advice."
      :"Välkända bolag (börsvärde över 10 mdr USD) med A- eller B-läge idag. Inte finansiell rådgivning."}</div>`;

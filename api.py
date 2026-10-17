@@ -5947,6 +5947,17 @@ _BLUE_MIN_MUSD = float(os.environ.get("BLUECHIP_MIN_MUSD", "10000"))
 
 
 def _bluechips(bull, reg, exclude):
+    # Kandidater vars börsvärde ännu inte räknats om till USD kontrolleras direkt
+    # (högst 10 per anrop, resultatet sparas) så att kortet inte står tomt under omräkningen.
+    todo = [r for r in _rank_picks([r for r in bull if not r.get("mcap_ok") and float(r.get("mcap_musd") or 0) >= _BLUE_MIN_MUSD], reg)]
+    for r in todo[:10]:
+        tk = r.get("ticker")
+        try:
+            mc = _fh_market_cap(tk)
+            _MCAP[tk] = [mc, time.time(), 1]
+            r["mcap_musd"], r["mcap_ok"] = mc, mc is not None
+        except Exception:
+            pass
     big = [r for r in bull if r.get("mcap_ok") and float(r.get("mcap_musd") or 0) >= _BLUE_MIN_MUSD]
     ranked = [r for r in _rank_picks(big, reg) if r.get("tier") in ("A", "B") and r.get("ticker") not in exclude]
     out = []
