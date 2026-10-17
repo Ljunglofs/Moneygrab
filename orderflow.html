@@ -162,7 +162,9 @@ const pct=v=>(v>=0?'+':'−')+Math.abs(v).toFixed(1)+'%';
 const fmtU=v=>v>=1e6?'$'+(v/1e6).toFixed(2)+'M':'$'+(v/1e3).toFixed(0)+'K';
 const hhmm=t=>new Date(t*1000).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
 const hhmmss=t=>new Date(t*1000).toLocaleTimeString('en-GB');
-const off=()=>S.inst!=='BTC'&&S.scale==='fut'&&S.d&&S.d.basis!=null?S.d.basis:0;
+// NQ/GC: valbart futures (+basis) eller spot. BTC: alltid spotindex (perp + uppmätt skillnad mot index)
+// NQ/GC: futures = källpris + basis. BTC: perpetual = källpris, spot = perp + basis (basis = spot − perp)
+const off=()=>!S.d||S.d.basis==null?0:S.inst==='BTC'?(S.scale==='spot'?S.d.basis:0):(S.scale==='fut'?S.d.basis:0);
 function ctx(c){const r=c.getBoundingClientRect(),dpr=devicePixelRatio||1;c.width=Math.max(1,r.width*dpr);c.height=Math.max(1,r.height*dpr);const x=c.getContext('2d');x.setTransform(dpr,0,0,dpr,0,0);return [x,r.width,r.height];}
 function niceStep(r){const p=Math.pow(10,Math.floor(Math.log10(r)));const m=r/p;return (m<1.5?1:m<3?2:m<7?5:10)*p;}
 const LBL=[];function lblY(y,gap=13){let t=y;for(let k=0;k<10;k++){if(LBL.some(v=>Math.abs(v-t)<gap))t+=gap;else break;}LBL.push(t);return t;}
@@ -352,8 +354,13 @@ function render(){
   const d=S.d;if(!d)return;const o=off();
   const L=d.bars?d.bars.length:0;if(S.off>0&&lastLen&&L>lastLen)S.off+=L-lastLen;lastLen=L;
   $('price').textContent=fmtP(d.price+o);
-  $('scale').style.display=d.inst==='BTC'?'none':'';
-  $('pxsub').textContent=d.inst==='BTC'?'Bitcoin':S.scale==='fut'?`${d.name} · ${d.fut} futures`:`${d.name} · ${d.cfd}`;
+  {const b=$('scale').children;b[0].textContent=d.inst==='BTC'?'Perpetual':'Futures';b[1].textContent=d.inst==='BTC'?'Spot':'CFD / spot';}
+  {const bs=d.basis,fx=v=>(v>=0?'+':'−')+fmtP(Math.abs(v));let t;
+   if(d.inst==='BTC'){const pr=-(bs||0),pp=bs!=null?(pr/(d.price+bs)*100):null;const diff=bs!=null?` (perp ${fx(pr)} / ${pp>=0?'+':'−'}${Math.abs(pp).toFixed(2)}% vs spot)`:' (measuring difference…)';
+     t=S.scale==='spot'?`Bitcoin spot index · perpetual ≈ ${fmtP(d.price)}${diff}`:`Bitcoin perpetual · spot ≈ ${bs!=null?fmtP(d.price+bs):'–'}${diff}`;}
+   else{const diff=bs!=null?` (futures ${fx(bs)} vs CFD)`:' (measuring difference…)';
+     t=S.scale==='fut'?`${d.name} · ${d.fut} futures · CFD ≈ ${fmtP(d.price)}${diff}`:`${d.name} · ${d.cfd} CFD · ${d.fut} futures ≈ ${bs!=null?fmtP(d.price+bs):'–'}${diff}`;}
+   $('pxsub').textContent=t;}
   $('live').className='live'+(d.status==='live'?'':' off');$('live').querySelector('span').textContent=d.status==='live'?'LIVE':String(d.status||'').toUpperCase();
   $('hint').textContent=mobile()?'Pinch to zoom · drag to move · Reset goes back to live':'Scroll to zoom · drag to move in time and price · shift + scroll zooms price · double-click resets · hover a bubble for details';
   drawChart();renderLevels();
