@@ -620,6 +620,47 @@ def _mcap_of(ticker):
     return v[0] if v else None
 
 
+def _mcap_checked(ticker):
+    """True när börsvärdet är omräknat till USD (poster från före valutarättningen saknar märket)."""
+    v = _MCAP.get(ticker)
+    return bool(v and len(v) >= 3 and v[0] is not None)
+
+
+# Finnhub anger börsvärdet i bolagets egen valuta (t.ex. COP för Ecopetrol, ZAR för Sasol).
+# Allt räknas om till USD; går kursen inte att få blir börsvärdet okänt i stället för fel.
+_FX = {}
+
+
+def _fx_to_usd(cur):
+    cur = (cur or "USD").upper()
+    if cur == "USD":
+        return 1.0
+    v = _FX.get(cur)
+    if v and time.time() - v[1] < 43200:
+        return v[0]
+    try:
+        import yfinance as yf
+        h = yf.Ticker(f"{cur}USD=X").history(period="5d")
+        rate = float(h["Close"].dropna().iloc[-1])
+        if rate > 0:
+            _FX[cur] = (rate, time.time())
+            return rate
+    except Exception:
+        pass
+    return None
+
+
+def _mcap_usd(profile):
+    mc = (profile or {}).get("marketCapitalization")
+    if mc in (None, "", 0):
+        return None
+    try:
+        fx = _fx_to_usd(profile.get("currency"))
+        return round(float(mc) * fx, 1) if fx else None
+    except Exception:
+        return None
+
+
 def _mcap_loop():
     """Fyller börsvärden för USA-bolagen, ett anrop var 3:e sekund."""
     if not os.getenv("FINNHUB_API_KEY", ""):
@@ -630,17 +671,13 @@ def _mcap_loop():
         # Universumet först, sedan resten av marknaden i omsättningsordning.
         mkt = [r["ticker"] for r in sorted(_MKT["rows"], key=lambda r: -float(r.get("dollar_vol") or 0))][:2500]
         todo = [t for t in list(dict.fromkeys([t for t in ALL_TICKERS if _market_of(t) == "US"] + mkt))
-                if t not in _MCAP or now - _MCAP[t][1] > _MCAP_TTL]
+                if t not in _MCAP or now - _MCAP[t][1] > _MCAP_TTL or len(_MCAP[t]) < 3]
         if not todo:
             time.sleep(3600)
             continue
         for i, t in enumerate(todo):
             j = _finnhub("/stock/profile2", {"symbol": t}) or {}
-            mc = j.get("marketCapitalization")
-            try:
-                _MCAP[t] = [round(float(mc), 1) if mc not in (None, "", 0) else None, time.time()]
-            except Exception:
-                _MCAP[t] = [None, time.time()]
+            _MCAP[t] = [_mcap_usd(j), time.time(), 1]
             if i % 25 == 24:
                 _mcap_save()
             time.sleep(3)
@@ -658,6 +695,7 @@ def _enrich_rows(rows):
         r["earnings_in"] = _earnings_in(t, emap)
         r["earnings_date"] = emap.get((t or "").upper())
         r["mcap_musd"] = _mcap_of(t)
+        r["mcap_ok"] = _mcap_checked(t)
 
 
 # ---- Hela USA-marknaden (Polygon, dagsdata) --------------------------
@@ -1882,7 +1920,7 @@ def _fh_market_cap(ticker):
     if k in _FH_CACHE:
         return _FH_CACHE[k]
     j = _finnhub("/stock/profile2", {"symbol": ticker})
-    mc = (j or {}).get("marketCapitalization")
+    mc = _mcap_usd(j)
     _FH_CACHE[k] = mc
     return mc
 
@@ -5909,7 +5947,7 @@ _BLUE_MIN_MUSD = float(os.environ.get("BLUECHIP_MIN_MUSD", "10000"))
 
 
 def _bluechips(bull, reg, exclude):
-    big = [r for r in bull if float(r.get("mcap_musd") or 0) >= _BLUE_MIN_MUSD]
+    big = [r for r in bull if r.get("mcap_ok") and float(r.get("mcap_musd") or 0) >= _BLUE_MIN_MUSD]
     ranked = [r for r in _rank_picks(big, reg) if r.get("tier") in ("A", "B") and r.get("ticker") not in exclude]
     out = []
     for r in _mix_markets(ranked, min(len(ranked), 6))[:3]:
