@@ -5367,6 +5367,11 @@ def _of_start():
         _OFE.start()
     except Exception as e:
         print(f"Orderflow: kunde inte starta motorn: {e}")
+    try:
+        import of_levels as _OFL
+        _OFL.warm()
+    except Exception as e:
+        print(f"Orderflow: kunde inte starta nivå-/sannolikhetsmodulen: {e}")
 
 
 @app.on_event("startup")
@@ -5388,6 +5393,12 @@ def orderflow_api(inst: str, tf: int = 1, token: str = "", lite: int = 0):
     snap = _OFE.snapshot(inst.upper(), tf if tf in (1, 5, 15) else 1, _gex_levels(), lite=bool(lite))
     if snap is None:
         return Response('{"error": "unknown instrument"}', status_code=404, media_type="application/json")
+    if not lite:
+        try:
+            import of_levels as _OFL
+            snap = _OFL.augment(snap)
+        except Exception as e:
+            print(f"Orderflow: nivåer/sannolikhet misslyckades: {e}")
     snap["pro"] = True
     return snap
 
