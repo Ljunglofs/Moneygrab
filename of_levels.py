@@ -22,7 +22,7 @@ import requests
 
 HL_INFO = "https://api.hyperliquid.xyz/info"
 NY = ZoneInfo("America/New_York")
-COIN = {"NQ": ("xyz:XYZ100", 1.0), "GC": ("xyz:GOLD", 0.5)}
+COIN = {"NQ": ("xyz:XYZ100", 1.0), "GC": ("xyz:GOLD", 0.5), "BTC": ("BTC", 10.0)}
 HORIZONS = {"15m": 3, "30m": 6, "60m": 12, "close": None}   # i 5m-bars; close = till 17:00 New York
 Z_GRID = (0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0, 4.0)
 Z_EDGES = (0.375, 0.625, 0.875, 1.125, 1.375, 1.75, 2.25, 2.75, 3.5)
@@ -104,7 +104,7 @@ def _profile(bars, row):
             "rows": [{"px": k, "v": round(m[k], 3)} for k in ks]}
 
 
-FINE = {"NQ": 0.25, "GC": 0.1}
+FINE = {"NQ": 0.25, "GC": 0.1, "BTC": 5.0}
 MAX_ROWS = 900
 
 
@@ -164,7 +164,7 @@ def _feats(z, mom, vwz):
     return np.column_stack([np.ones_like(z), z, z * z, mom, vwz])
 
 
-def _samples(bars):
+def _samples(bars, cme=True):
     """Bygger (z, mom, vwz, hit, sessionsindex) per horisont från 5m-bars."""
     n = len(bars)
     if n < SIG_N + 20:
@@ -195,7 +195,7 @@ def _samples(bars):
         for i in range(SIG_N, n - 1):
             if not sig[i] or np.isnan(sig[i]):
                 continue
-            if _closed(int(T[i])):
+            if cme and _closed(int(T[i])):
                 continue
             k = k0 if k0 else _bars_to_close(int(T[i]))
             if k < 1 or i + k >= n:
@@ -216,8 +216,8 @@ def _samples(bars):
     return out
 
 
-def _fit(bars):
-    S = _samples(bars)
+def _fit(bars, cme=True):
+    S = _samples(bars, cme)
     if not S:
         return None
     model = {}
@@ -283,7 +283,7 @@ def _refresh(inst):
             c["bars"] = bars
             c["t"] = time.time()
         if bars and time.time() - c["fit_t"] > REFIT_S:
-            mdl = _fit(bars[:-1])          # sista (pågående) baren utesluts
+            mdl = _fit(bars[:-1], cme=inst != "BTC")   # sista (pågående) baren utesluts; BTC handlas även helger
             if mdl:
                 c["model"] = mdl
                 c["fit_t"] = time.time()
@@ -406,6 +406,24 @@ def augment(snap):
             meta[hz] = {"quality": "n/a"}
     snap["prob_meta"] = {"horizons": meta, "sigma_5m": round(sig, 3) if sig else None,
                          "fitted": int(c["fit_t"]) or None, "source": "Hyperliquid 5m candles, %d days" % HIST_DAYS}
+    # relativ volym: sessionens volym hittills mot snittet för de 5 senaste sessionerna vid samma tid
+    rvol = None
+    if hist:
+        days = _sessions(hist)
+        prev_keys = [k for k in sorted(days) if k < td][-5:]
+        now_t = hist[-1][0]
+        cur = [b for b in days.get(td, [])]
+        if cur and prev_keys:
+            el = now_t - cur[0][0]
+            refs = []
+            for k in prev_keys:
+                db = days[k]
+                if len(db) > 20:
+                    refs.append(sum(b[5] for b in db if b[0] - db[0][0] <= el))
+            ref = sum(refs) / len(refs) if refs else 0
+            if ref > 0:
+                rvol = round(sum(b[5] for b in cur) / ref, 3)
+    snap["rvol"] = rvol
     # sessionens profil i fin upplösning för visning (POC/VAH/VAL kommer fortfarande från motorn)
     sf = _fine_profile([(b["h"], b["l"], b["v"]) for b in sess], FINE[inst], va=False)
     if sf:
@@ -414,6 +432,6 @@ def augment(snap):
     return snap
 
 
-def warm(insts=("NQ", "GC")):
+def warm(insts=("NQ", "GC", "BTC")):
     for i in insts:
         _ensure(i)

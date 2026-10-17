@@ -78,13 +78,13 @@ td{padding:5px 4px;border-bottom:1px solid var(--line)}th:not(:first-child),td:n
 </style>
 </head>
 <body>
-<div id="lock" class="card"><div class="logo" style="justify-content:center"><img class="brand" src="/img/17a20c61266c.png" alt="GRABIT"><span class="ofmark">ORDERFLOW</span></div><h2>PRO required</h2><p>Orderflow for Nasdaq 100 and Gold — liquidity shelves, aggression, footprint, CVD, GEX and level probabilities in one view — is part of GRABIT PRO.</p><a class="btn" href="/">Unlock PRO in the GRABIT app</a></div>
+<div id="lock" class="card"><div class="logo" style="justify-content:center"><img class="brand" src="/img/17a20c61266c.png" alt="GRABIT"><span class="ofmark">ORDERFLOW</span></div><h2>PRO required</h2><p>Orderflow for Nasdaq 100, Gold and Bitcoin — liquidity shelves, aggression, footprint, CVD, GEX and level probabilities in one view — is part of GRABIT PRO.</p><a class="btn" href="/">Unlock PRO in the GRABIT app</a></div>
 <div class="wrap" id="app" style="display:none">
   <header>
     <a class="logo" href="/"><img class="brand" src="/img/17a20c61266c.png" alt="GRABIT"><span class="ofmark">ORDERFLOW</span></a>
     <div class="px"><div class="p" id="price">–</div><div class="f" id="pxsub">–</div></div>
     <div class="ctrls">
-      <div class="seg" id="inst"><button data-v="NQ">Nasdaq 100</button><button data-v="GC">Gold</button></div>
+      <div class="seg" id="inst"><button data-v="NQ">Nasdaq 100</button><button data-v="GC">Gold</button><button data-v="BTC">Bitcoin</button></div>
       <div class="seg" id="tf"><button data-v="1">1m</button><button data-v="5">5m</button><button data-v="15">15m</button></div>
       <div class="seg" id="view"><button data-v="chart">Chart</button><button data-v="fp">Footprint</button></div>
       <div class="seg" id="prof"><button data-v="session">Session</button><button data-v="previous">Previous</button><button data-v="composite">Composite</button></div>
@@ -111,10 +111,10 @@ td{padding:5px 4px;border-bottom:1px solid var(--line)}th:not(:first-child),td:n
   <div class="hint" id="hint"></div>
 
   <div class="bot">
-    <div class="card box ish"><h3>ISH · INSTITUTIONAL SCALING (LARGE PRINTS)</h3><table><thead><tr><th>TIME</th><th>PRICE</th><th>SIZE</th><th>VALUE</th><th>SIDE</th></tr></thead><tbody id="ish"></tbody></table><div class="sub" style="margin-top:6px">Executed aggressive market orders (trades), not resting limit orders.</div></div>
+    <div class="card box ish"><h3>ISH · INSTITUTIONAL SCALING (LARGE PRINTS)</h3><table><thead><tr><th>TIME</th><th>PRICE</th><th>VALUE</th><th>SIDE</th></tr></thead><tbody id="ish"></tbody></table><div class="sub" style="margin-top:6px">Executed aggressive market orders (trades), not resting limit orders.</div></div>
     <div class="card box"><h3>BUY / SELL AGGRESSION</h3><div class="big" id="bsv">–</div><div class="bs"><i id="bsb" style="background:var(--cy)"></i><i id="bss" style="background:var(--rd)"></i></div><div class="sub" id="bsp">–</div></div>
-    <div class="card box"><h3>DELTA · SESSION</h3><div class="big" id="dv">–</div><canvas class="mini" id="dc"></canvas></div>
-    <div class="card box"><h3>VOLUME · SESSION</h3><div class="big" id="vv">–</div><canvas class="mini" id="vc"></canvas></div>
+    <div class="card box"><h3>DELTA · LAST 60 MIN</h3><div class="big" id="dv">–</div><canvas class="mini" id="dc"></canvas></div>
+    <div class="card box"><h3>VOLUME · VS NORMAL</h3><div class="big" id="vv">–</div><canvas class="mini" id="vc"></canvas></div>
     <div class="card box"><h3>CVD · SESSION</h3><div class="big" id="cvdv">–</div><canvas class="mini" id="cvdc"></canvas></div>
     <div class="card box legend"><h3>LEGEND</h3>
       <div class="li"><b style="height:6px;background:linear-gradient(90deg,transparent,rgba(25,211,240,.6))"></b>Buy liquidity shelf (limit orders)</div>
@@ -147,7 +147,7 @@ const S={inst:PREF.inst||'NQ',tf:PREF.tf||1,scale:PREF.scale||'fut',view:PREF.vi
   d:null,sc:null,nb:null,off:0,cols:null,ypan:0,yz:1,mouse:null,bubHit:[]};
 const savePref=()=>{try{localStorage.setItem('of_prefs',JSON.stringify({inst:S.inst,tf:S.tf,scale:S.scale,view:S.view,prof:S.prof,bub:S.bub,bmin:S.bmin,hz:S.hz,sort:S.sort}))}catch(e){}};
 const mobile=()=>innerWidth<=760;
-const BIN=()=>S.inst==='NQ'?1:0.5;
+const BIN=()=>S.inst==='NQ'?1:S.inst==='BTC'?10:0.5;
 function resetView(){S.nb=null;S.cols=null;S.off=0;S.ypan=0;S.yz=1;}
 const RELOAD=new Set(['inst','tf']);
 function seg(id,key){const el=$(id);[...el.children].forEach(x=>x.classList.toggle('on',String(S[key])===x.dataset.v));
@@ -155,13 +155,14 @@ function seg(id,key){const el=$(id);[...el.children].forEach(x=>x.classList.togg
     if(RELOAD.has(key)){resetView();load(true);}else{if(key==='view')resetView();render();}};}
 ['inst','tf','view','prof','bub','scale','hz','sort'].forEach(k=>seg(k==='bub'?'bub':k,k));
 $('bmin').value=String(S.bmin);$('bmin').onchange=e=>{S.bmin=+e.target.value;savePref();render();};
-const dec=()=>S.inst==='GC'?1:2;
+const dec=()=>S.inst==='GC'?1:S.inst==='BTC'?0:2;
 const fmtP=v=>v==null||isNaN(v)?'–':v.toLocaleString('en-US',{minimumFractionDigits:dec(),maximumFractionDigits:dec()});
 const fmtN=(v,sign=true)=>{const a=Math.abs(v),s=sign?(v<0?'−':'+'):'';if(a>=1e6)return s+(a/1e6).toFixed(2)+'M';if(a>=1e3)return s+(a/1e3).toFixed(1)+'K';return s+a.toFixed(a<10?2:0);};
+const pct=v=>(v>=0?'+':'−')+Math.abs(v).toFixed(1)+'%';
 const fmtU=v=>v>=1e6?'$'+(v/1e6).toFixed(2)+'M':'$'+(v/1e3).toFixed(0)+'K';
 const hhmm=t=>new Date(t*1000).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
 const hhmmss=t=>new Date(t*1000).toLocaleTimeString('en-GB');
-const off=()=>S.scale==='fut'&&S.d&&S.d.basis!=null?S.d.basis:0;
+const off=()=>S.inst!=='BTC'&&S.scale==='fut'&&S.d&&S.d.basis!=null?S.d.basis:0;
 function ctx(c){const r=c.getBoundingClientRect(),dpr=devicePixelRatio||1;c.width=Math.max(1,r.width*dpr);c.height=Math.max(1,r.height*dpr);const x=c.getContext('2d');x.setTransform(dpr,0,0,dpr,0,0);return [x,r.width,r.height];}
 function niceStep(r){const p=Math.pow(10,Math.floor(Math.log10(r)));const m=r/p;return (m<1.5?1:m<3?2:m<7?5:10)*p;}
 const LBL=[];function lblY(y,gap=13){let t=y;for(let k=0;k<10;k++){if(LBL.some(v=>Math.abs(v-t)<gap))t+=gap;else break;}LBL.push(t);return t;}
@@ -221,7 +222,7 @@ function drawChart(){
     const name=bid?(i===0?'BUY LIQUIDITY / BUY SHELF':'BID SHELF'):(i===0?'SELL SHELF / SELL LIQUIDITY':'ASK SHELF');const ly=lblY(y-6);
     x.font=F(700,mob?10:11);x.textAlign='left';x.fillStyle=bid?C.cy:C.rd;x.globalAlpha=i===0?1:.75;x.fillText(mob?name.split(' / ')[0]:`${name} · ${fmtU(s.avg_usd)}`,12,ly);x.globalAlpha=1;probTag(s.px,ly,bid?C.cy:C.rd);});
   // Konvergenszoner — svag yta, ingen ram
-  (d.zones||[]).forEach((z,i)=>{const pd=d.inst==='NQ'?2:.3,y1=Y(z.hi+pd),y2=Y(z.lo-pd);if(y2<top||y1>top+ch)return;const g=x.createLinearGradient(0,0,cw,0);g.addColorStop(0,'rgba(232,236,242,0)');g.addColorStop(1,'rgba(232,236,242,.07)');
+  (d.zones||[]).forEach((z,i)=>{const pd=d.inst==='NQ'?2:d.inst==='BTC'?30:.3,y1=Y(z.hi+pd),y2=Y(z.lo-pd);if(y2<top||y1>top+ch)return;const g=x.createLinearGradient(0,0,cw,0);g.addColorStop(0,'rgba(232,236,242,0)');g.addColorStop(1,'rgba(232,236,242,.07)');
     x.fillStyle=g;x.fillRect(0,y1,cw,Math.max(4,y2-y1));x.fillStyle='rgba(232,236,242,.8)';x.font=F(700,10.5);x.textAlign='right';x.fillText('★'+(i+1),cw-10,y1+11);});
   // Sessions- och gårdagsnivåer — tunna gråblå linjer, liten etikett vid prisaxeln
   (d.levels||[]).filter(l=>l.group==='session'||l.group==='prev').forEach(l=>{const y=Y(l.px);if(!inY(y))return;x.strokeStyle='rgba(112,136,168,.5)';x.lineWidth=1;x.setLineDash(l.group==='prev'?[1,3]:[4,4]);x.beginPath();x.moveTo(0,y);x.lineTo(cw+PRW,y);x.stroke();x.setLineDash([]);
@@ -263,8 +264,8 @@ function crosshair(x){const m=S.mouse,s=S.sc,d=S.d;if(!m||!s||m.y<s.top||m.y>s.t
   const v=s.hi-(m.y-s.top)/s.ch*(s.hi-s.lo);x.fillStyle='#1B212B';x.beginPath();x.roundRect(s.cw+s.PRW+2,m.y-10,s.AX-4,20,4);x.fill();x.fillStyle=C.txt;x.font=F(600,11);x.textAlign='left';x.fillText(fmtP(v+o),s.cw+s.PRW+7,m.y+4);
   const i=Math.round((m.x-8-s.bw/2)/(s.bw+2));const b=s.bars[Math.max(0,Math.min(s.bars.length-1,i))];
   if(b){const t=new Date(b.t*1000).toLocaleString('en-GB',{weekday:'short',hour:'2-digit',minute:'2-digit'});x.font=F(600,10.5);const tw=x.measureText(t).width+12;x.fillStyle='#1B212B';x.beginPath();x.roundRect(m.x-tw/2,s.H-20,tw,17,4);x.fill();x.fillStyle=C.txt;x.textAlign='center';x.fillText(t,m.x,s.H-8);
-    if(!m.bub){const dl=b.bv-b.sv,txt=`O ${fmtP(b.o+o)}  H ${fmtP(b.h+o)}  L ${fmtP(b.l+o)}  C ${fmtP(b.c+o)}  Δ ${fmtN(dl)}`;x.font=F(500,11);x.textAlign='left';x.fillStyle=C.mut;x.fillText(txt,12,s.top+10);}}
-  if(m.bub){const b=m.bub.b,lines=[`${b.side==='B'?'AGGRESSIVE BUY':'AGGRESSIVE SELL'} · Market`,`${hhmmss(b.t)}  ·  ${fmtP(b.px+o)}`,`Size ${b.size.toLocaleString('en-US')} · ${fmtU(b.usd)}`];
+    if(!m.bub){const dl=b.bv-b.sv,txt=`O ${fmtP(b.o+o)}  H ${fmtP(b.h+o)}  L ${fmtP(b.l+o)}  C ${fmtP(b.c+o)}  Δ ${pct((b.bv+b.sv)?dl/(b.bv+b.sv)*100:0)}`;x.font=F(500,11);x.textAlign='left';x.fillStyle=C.mut;x.fillText(txt,12,s.top+10);}}
+  if(m.bub){const b=m.bub.b,lines=[`${b.side==='B'?'AGGRESSIVE BUY':'AGGRESSIVE SELL'} · Market`,`${hhmmss(b.t)}  ·  ${fmtP(b.px+o)}`,`Value ${fmtU(b.usd)}`];
     x.font=F(600,11.5);const tw=Math.max(...lines.map(l=>x.measureText(l).width))+18,tx=Math.min(m.x+14,s.cw-tw),ty=Math.max(s.top,m.y-62);
     x.fillStyle='rgba(8,10,15,.96)';x.strokeStyle=b.side==='B'?'rgba(25,211,240,.5)':'rgba(229,72,77,.5)';x.beginPath();x.roundRect(tx,ty,tw,56,6);x.fill();x.stroke();
     lines.forEach((l,k)=>{x.fillStyle=k===0?(b.side==='B'?C.cy:C.rd):C.txt;x.textAlign='left';x.fillText(l,tx+9,ty+17+k*16);});}}
@@ -272,13 +273,19 @@ function crosshair(x){const m=S.mouse,s=S.sc,d=S.d;if(!m||!s||m.y<s.top||m.y>s.t
 // CVD-panel — samma tidsaxel som grafen
 function drawCVD(){const d=S.d,s=S.sc;const [x,W,H]=ctx($('cvd'));x.fillStyle=C.bg;x.fillRect(0,0,W,H);if(!s)return;
   const bars=s.bars,vals=bars.map(b=>b.cvd);const ok=vals.filter(v=>v!=null);if(!ok.length){x.fillStyle=C.mut;x.font=F(500,12);x.fillText('CVD builds from live trades…',12,24);return;}
-  const top=26,bot=8,hh=H-top-bot,mn=Math.min(...ok,0),mx=Math.max(...ok,0),sp=mx-mn||1,Yc=v=>top+(mx-v)/sp*hh,y0=Yc(0);
-  x.strokeStyle='rgba(232,236,242,.18)';x.beginPath();x.moveTo(0,y0);x.lineTo(s.cw+s.PRW,y0);x.stroke();
+  // Nollan får alltid lite luft ovan/under, så mittlinjen syns även när CVD bara ligger på ena sidan
+  const top=26,bot=8,hh=H-top-bot,r0=Math.max(...ok.map(Math.abs),1e-9),mn=Math.min(...ok,-r0*.12),mx=Math.max(...ok,r0*.12),sp=mx-mn||1,Yc=v=>top+(mx-v)/sp*hh,y0=Yc(0);
+  x.strokeStyle='rgba(232,236,242,.55)';x.lineWidth=1;x.beginPath();x.moveTo(0,Math.round(y0)+.5);x.lineTo(s.cw+s.PRW,Math.round(y0)+.5);x.stroke();
+  x.font=F(700,10);x.fillStyle='rgba(232,236,242,.75)';x.textAlign='left';x.fillText('0',s.cw+s.PRW+7,y0+4);
+  x.fillStyle=C.cy;x.fillText('+',s.cw+s.PRW+7,top+8);x.fillStyle=C.rd;x.fillText('−',s.cw+s.PRW+7,H-bot);
   vals.forEach((v,i)=>{if(v==null)return;const cx=s.X(i),y=Yc(v);x.fillStyle=v>=0?'rgba(25,211,240,.55)':'rgba(229,72,77,.55)';x.fillRect(cx-s.bw/2,Math.min(y,y0),s.bw,Math.max(1,Math.abs(y-y0)));});
-  x.font=F(500,10);x.fillStyle=C.mut;x.textAlign='left';[mx,0,mn].forEach(v=>x.fillText(fmtN(v,v!==0),s.cw+s.PRW+7,Yc(v)+4));
-  const cur=d.cvd,last=ok.slice(-30),slope=last.length>1?last[last.length-1]-last[0]:0;
-  x.font=F(700,10.5);x.fillStyle=C.mut;x.fillText('CVD DELTA',12,16);x.font=F(700,13);x.fillStyle=cur>=0?C.cy:C.rd;x.fillText(fmtN(cur),84,17);
-  x.font=F(700,10.5);x.textAlign='center';x.fillStyle=slope>=0?C.cy:C.rd;x.fillText(slope>=0?'↑ BUYERS IN CONTROL':'↓ SELLERS IN CONTROL',s.cw/2,16);
+  x.strokeStyle='rgba(232,236,242,.55)';x.lineWidth=1;x.beginPath();x.moveTo(0,Math.round(y0)+.5);x.lineTo(s.cw+s.PRW,Math.round(y0)+.5);x.stroke();
+    const cur=d.cvd,last=ok.slice(-30),slope=last.length>1?last[last.length-1]-last[0]:0;
+  x.font=F(700,10.5);x.fillStyle=C.mut;x.fillText('CVD DELTA',12,16);const cp=d.session.volume?d.session.delta/d.session.volume*100:0;x.font=F(700,13);x.fillStyle=cur>=0?C.cy:C.rd;x.fillText(pct(cp),84,17);
+  // Kontroll = vem som ligger före i sessionen (CVD:s tecken); riktningen senaste 30 staplarna visas som tillägg
+  const ahead=cur>=0,same=(slope>=0)===ahead;
+  const ctl=same?(ahead?'↑ BUYERS IN CONTROL':'↓ SELLERS IN CONTROL'):(ahead?'BUYERS AHEAD · SELLERS PUSHING BACK':'SELLERS AHEAD · BUYERS PUSHING BACK');
+  x.font=F(700,10.5);x.textAlign='center';x.fillStyle=same?(ahead?C.cy:C.rd):'#B9C2D0';x.fillText(ctl,s.cw/2,16);
   if(S.mouse&&S.mouse.x<s.cw+s.PRW){x.strokeStyle='rgba(232,236,242,.22)';x.setLineDash([3,3]);x.beginPath();x.moveTo(S.mouse.x,top);x.lineTo(S.mouse.x,H);x.stroke();x.setLineDash([]);}}
 
 // Footprint: en stapel per prisnivå i varje candle (längd = volym, färg = vem som dominerade)
@@ -313,11 +320,11 @@ function drawFootprint(){
     const yP=Y(poc);x.fillStyle=C.rd;x.fillRect(x0+5,yP-.75,bw+4,1.5);
     stacks.forEach(([sd,a,z])=>{x.fillStyle=sd==='B'?C.cy:C.rd;x.fillRect(x0+bw+9,Y(z)-rh/2,2.5,Y(a)-Y(z)+rh);});
     const dlt=b.bv-b.sv,fv=v=>v>=1000?(v/1000).toFixed(1)+'K':v>=10?v.toFixed(0):v.toFixed(1);
-    x.font=F(700,10.5);x.textAlign='center';x.fillStyle=dlt>=0?C.cy:C.rd;x.fillText((dlt>=0?'+':'−')+fv(Math.abs(dlt)),x0+colW/2-3,H-8);
+    x.font=F(700,10.5);x.textAlign='center';x.fillStyle=dlt>=0?C.cy:C.rd;x.fillText(pct((b.bv+b.sv)?dlt/(b.bv+b.sv)*100:0),x0+colW/2-3,H-8);
     x.fillStyle=C.mut;x.font=F(500,10);x.fillText(hhmm(b.t),x0+colW/2-3,14);});
   const yp=Y(d.price);if(yp>top&&yp<top+ch){x.strokeStyle='rgba(25,211,240,.45)';x.setLineDash([2,3]);x.beginPath();x.moveTo(0,yp);x.lineTo(cw,yp);x.stroke();x.setLineDash([]);
     x.fillStyle=C.cy;x.beginPath();x.roundRect(cw+2,yp-10,AX-4,20,4);x.fill();x.fillStyle='#05070D';x.font=F(700,11);x.textAlign='left';x.fillText(fmtP(d.price+o),cw+6,yp+4);}
-  if(S.hover){const h=S.hover,t=`${fmtP(h.px+o)}   sell ${h.sv.toFixed(h.sv<10?2:0)}  ×  buy ${h.bv.toFixed(h.bv<10?2:0)}`;x.font=F(600,11.5);const tw=x.measureText(t).width+14;const tx=Math.min(h.mx+12,cw-tw-4),ty=Math.max(top,h.my-28);
+  if(S.hover){const h=S.hover,t=`${fmtP(h.px+o)}   buy ${Math.round(h.bv/((h.bv+h.sv)||1)*100)}%  ·  sell ${Math.round(h.sv/((h.bv+h.sv)||1)*100)}%`;x.font=F(600,11.5);const tw=x.measureText(t).width+14;const tx=Math.min(h.mx+12,cw-tw-4),ty=Math.max(top,h.my-28);
     x.fillStyle='rgba(8,10,15,.96)';x.strokeStyle='rgba(232,236,242,.2)';x.beginPath();x.roundRect(tx,ty,tw,22,6);x.fill();x.stroke();x.fillStyle=C.txt;x.textAlign='left';x.fillText(t,tx+7,ty+15);}
   drawCVD();
 }
@@ -345,23 +352,25 @@ function render(){
   const d=S.d;if(!d)return;const o=off();
   const L=d.bars?d.bars.length:0;if(S.off>0&&lastLen&&L>lastLen)S.off+=L-lastLen;lastLen=L;
   $('price').textContent=fmtP(d.price+o);
-  $('pxsub').textContent=S.scale==='fut'?`${d.fut} futures · ${d.cfd} spot ${fmtP(d.price)} + basis ${d.basis??'–'}`:`${d.cfd} spot · ${d.fut} ≈ ${d.basis!=null?fmtP(d.price+d.basis):'measuring basis…'}`;
+  $('scale').style.display=d.inst==='BTC'?'none':'';
+  $('pxsub').textContent=d.inst==='BTC'?'Bitcoin':S.scale==='fut'?`${d.name} · ${d.fut} futures`:`${d.name} · ${d.cfd}`;
   $('live').className='live'+(d.status==='live'?'':' off');$('live').querySelector('span').textContent=d.status==='live'?'LIVE':String(d.status||'').toUpperCase();
   $('hint').textContent=mobile()?'Pinch to zoom · drag to move · Reset goes back to live':'Scroll to zoom · drag to move in time and price · shift + scroll zooms price · double-click resets · hover a bubble for details';
   drawChart();renderLevels();
   const bub=[...d.bubbles].sort((a,b)=>b.t-a.t).slice(0,9);
-  $('ish').innerHTML=bub.length?bub.map(b=>`<tr><td>${hhmmss(b.t)}</td><td>${fmtP(b.px+o)}</td><td>${b.size.toLocaleString('en-US')}</td><td>${fmtU(b.usd)}</td><td class="${b.side==='B'?'bid':'ask'}">${b.side==='B'?'BUY':'SELL'}</td></tr>`).join(''):'<tr><td colspan="5" class="empty">No large prints in the last 3 hours.</td></tr>';
+  $('ish').innerHTML=bub.length?bub.map(b=>`<tr><td>${hhmmss(b.t)}</td><td>${fmtP(b.px+o)}</td><td>${fmtU(b.usd)}</td><td class="${b.side==='B'?'bid':'ask'}">${b.side==='B'?'BUY':'SELL'}</td></tr>`).join(''):'<tr><td colspan="4" class="empty">No large prints in the last 3 hours.</td></tr>';
   const bg=[...d.bubbles].sort((a,b)=>b.usd-a.usd).slice(0,5);$('bigs').className=bg.length?'':'empty';
   $('bigs').innerHTML=bg.length?bg.map(b=>`<div class="agg"><span class="${b.side==='B'?'bid':'ask'}">› ${b.side==='B'?'BUY':'SELL'} ${fmtU(b.usd)}</span><span>${fmtP(b.px+o)} · ${hhmm(b.t)}</span></div>`).join(''):'No unusually large orders yet.';
   const zs=d.zones||[];$('zones').className=zs.length?'':'empty';
   $('zones').innerHTML=zs.length?zs.map((z,i)=>`<div class="zrow"><span class="r">★ ${fmtP(z.lo+o)}${z.hi-z.lo>.01?' – '+fmtP(z.hi+o):''}</span><div class="tags">${z.evidence.map(e=>`<span class="tag ${SRC[e.src]||''}" title="${e.text.replace(/"/g,'')}">${e.src==='Volume'?e.text:e.src==='GEX (options)'?e.text.replace(/ \(weak\)/,''):e.src==='Orderbook'?(z.side==='bid'?'Buy shelf':'Sell shelf'):e.text.split(' (')[0]}</span>`).join('')}<span class="tag">${z.score} sources</span></div><span class="${z.side}" style="font-weight:700;font-size:11px;letter-spacing:.08em">${z.side==='bid'?'SUPPORT':'RESISTANCE'}</span></div>`).join(''):'No zone where independent sources converge right now. No zone is better than an invented one.';
-  const cv=d.bars.filter(b=>b.cvd!=null).map(b=>b.cvd);$('cvdv').textContent=fmtN(d.cvd);$('cvdv').style.color=d.cvd>=0?C.cy:C.rd;spark('cvdc',cv.slice(-400),v=>v>=0?C.cy:C.rd);
-  const ds=d.bars.filter(b=>!b.nodelta).slice(-60).map(b=>b.bv-b.sv);$('dv').textContent=fmtN(d.session.delta);$('dv').style.color=d.session.delta>=0?C.cy:C.rd;spark('dc',ds,v=>v>=0?'rgba(25,211,240,.8)':'rgba(229,72,77,.8)','bar');
-  $('vv').textContent=fmtN(d.session.volume,false);spark('vc',d.bars.slice(-60).map(b=>b.v),()=>`rgba(${C.prof},.75)`,'bar');
+  const cv=d.bars.filter(b=>b.cvd!=null).map(b=>b.cvd),cvp=d.session.volume?d.session.delta/d.session.volume*100:0;$('cvdv').textContent=pct(cvp);$('cvdv').style.color=cvp>=0?C.cy:C.rd;spark('cvdc',cv.slice(-400),v=>v>=0?C.cy:C.rd);
+  const hb=d.bars.filter(b=>!b.nodelta).slice(-Math.max(1,Math.round(60/d.tf))),hbv=hb.reduce((a,b)=>a+b.bv+b.sv,0),hdp=hbv?hb.reduce((a,b)=>a+b.bv-b.sv,0)/hbv*100:0;
+  const ds=d.bars.filter(b=>!b.nodelta).slice(-60).map(b=>(b.bv+b.sv)?(b.bv-b.sv)/(b.bv+b.sv)*100:0);$('dv').textContent=pct(hdp);$('dv').style.color=hdp>=0?C.cy:C.rd;spark('dc',ds,v=>v>=0?'rgba(25,211,240,.8)':'rgba(229,72,77,.8)','bar');
+  $('vv').textContent=d.rvol!=null?Math.round(d.rvol*100)+'%':'–';$('vv').style.color=d.rvol==null?C.mut:d.rvol>=1.2?C.txt:d.rvol<.8?C.mut:'#B9C2D0';spark('vc',d.bars.slice(-60).map(b=>b.v),()=>`rgba(${C.prof},.75)`,'bar');
   const t=d.session.buy+d.session.sell||1,bp=d.session.buy/t*100;
-  $('bsv').innerHTML=`<span class="bid">${fmtN(d.session.buy,false)}</span> <span style="color:var(--mut);font-weight:500">/</span> <span class="ask">${fmtN(d.session.sell,false)}</span>`;$('bsb').style.width=bp+'%';$('bss').style.width=(100-bp)+'%';$('bsp').textContent=`${bp.toFixed(0)}% buy · ${(100-bp).toFixed(0)}% sell (session, executed)`;
+  $('bsv').innerHTML=`<span class="bid">${bp.toFixed(0)}%</span> <span style="color:var(--mut);font-weight:500">/</span> <span class="ask">${(100-bp).toFixed(0)}%</span>`;$('bsb').style.width=bp+'%';$('bss').style.width=(100-bp)+'%';$('bsp').textContent='Aggressive buyers · sellers this session';
   const gm=d.gex_meta||{},pm=d.prob_meta||{};
-  $('src').innerHTML=`<b>Order book</b> (resting liquidity): ${d.sources.orderbook} · <b>Trades</b> (executed): ${d.sources.trades} · <b>GEX</b> (options): ${d.sources.gex}${gm.generated?', computed '+new Date(gm.generated).toLocaleString('en-GB',{weekday:'short',hour:'2-digit',minute:'2-digit'}):''}${gm.regime?` · regime: ${gm.regime==='negativ'?'negative':'positive'} gamma`:''}<br>Footprint, delta, CVD and volume profile are computed from executed trades on the source market. Futures (${d.fut}) = spot (${d.cfd}) + basis, so levels sit close to — but are not identical with — CME's own profile. Analysis only — not financial advice.`;
+  $('src').innerHTML=`<b>Liquidity shelves</b> = resting limit orders · <b>Bubbles, delta, CVD</b> = executed aggressive orders · <b>GEX</b> = options positioning${gm.generated?', computed '+new Date(gm.generated).toLocaleString('en-GB',{weekday:'short',hour:'2-digit',minute:'2-digit'}):''}${gm.regime?` · regime: ${gm.regime==='negativ'?'negative':'positive'} gamma`:''}<br>Analysis only — not financial advice.`;
 }
 // Fullt svar var 15:e sekund (profil, nivåer, sannolikheter), lätt svar varannan sekund (senaste bars)
 let lastFull=0,busy=false;

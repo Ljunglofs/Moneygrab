@@ -5368,6 +5368,11 @@ def _of_start():
     except Exception as e:
         print(f"Orderflow: kunde inte starta motorn: {e}")
     try:
+        import gex_btc as _GXB
+        _GXB.get()
+    except Exception as e:
+        print(f"Orderflow: kunde inte starta BTC-GEX: {e}")
+    try:
         import of_levels as _OFL
         _OFL.warm()
     except Exception as e:
@@ -5377,6 +5382,41 @@ def _of_start():
 @app.on_event("startup")
 def _of_on_startup():
     _of_start()
+
+
+_OF_SCALE = {"NQ": 7.31, "GC": 13.07, "BTC": 0.371}   # volymer skickas i egna enheter, inte börsens
+
+
+def _of_public(snap):
+    """Tar bort allt som avslöjar datakällan: källnamn, modellinfo och råa volymer.
+    Volymer skalas med en fast faktor per instrument (förhållanden och former behålls)."""
+    k = _OF_SCALE.get(snap.get("inst"), 1.0)
+    r = lambda v: round(v * k, 3) if isinstance(v, (int, float)) else v
+    for key in ("source", "sources"):
+        snap.pop(key, None)
+    hz = ((snap.get("prob_meta") or {}).get("horizons") or {})
+    snap["prob_meta"] = {"horizons": {h: {"quality": m.get("quality", "n/a")} for h, m in hz.items()}}
+    for b in snap.get("bars") or []:
+        for f in ("v", "bv", "sv", "cvd"):
+            if f in b:
+                b[f] = r(b[f])
+        if b.get("fp"):
+            b["fp"] = [[px, r(bv), r(sv)] for px, bv, sv in b["fp"]]
+    for p in snap.get("profile") or []:
+        for f in ("v", "bv", "sv"):
+            p[f] = r(p.get(f))
+    snap["cvd"] = r(snap.get("cvd"))
+    if snap.get("session"):
+        snap["session"] = {f: r(v) for f, v in snap["session"].items()}
+    for b in snap.get("bubbles") or []:
+        b.pop("size", None)
+    for p in (snap.get("profiles") or {}).values():
+        if p and p.get("rows"):
+            mx = max(x["v"] for x in p["rows"]) or 1
+            p["rows"] = [{"px": x["px"], "v": round(x["v"] / mx, 4)} for x in p["rows"]]
+    gm = snap.get("gex_meta") or {}
+    snap["gex_meta"] = {f: gm.get(f) for f in ("regime", "generated", "basis")}
+    return snap
 
 
 @app.get("/api/of/{inst}")
@@ -5390,7 +5430,12 @@ def orderflow_api(inst: str, tf: int = 1, token: str = "", lite: int = 0):
         return {"pro": False}
     _of_start()
     import orderflow_engine as _OFE
-    snap = _OFE.snapshot(inst.upper(), tf if tf in (1, 5, 15) else 1, _gex_levels(), lite=bool(lite))
+    if inst.upper() == "BTC":
+        import gex_btc as _GXB          # Bitcoin-GEX från Deribits optioner
+        gx = _GXB.get()
+    else:
+        gx = _gex_levels()
+    snap = _OFE.snapshot(inst.upper(), tf if tf in (1, 5, 15) else 1, gx, lite=bool(lite))
     if snap is None:
         return Response('{"error": "unknown instrument"}', status_code=404, media_type="application/json")
     if not lite:
@@ -5399,6 +5444,7 @@ def orderflow_api(inst: str, tf: int = 1, token: str = "", lite: int = 0):
             snap = _OFL.augment(snap)
         except Exception as e:
             print(f"Orderflow: nivåer/sannolikhet misslyckades: {e}")
+    snap = _of_public(snap)
     snap["pro"] = True
     return snap
 

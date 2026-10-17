@@ -39,6 +39,12 @@ INSTR = {
            "src": "hl", "coin": "xyz:GOLD", "src_label": "Hyperliquid GOLD (spot)",
            "bin": 0.5, "book_sig": 4, "book_bin": 1.0, "tol": 2.0, "min_bubble_usd": 15_000,
            "shelf_x": 2.5, "bubble_pct": 0.99},
+    # Bitcoin: Hyperliquids BTC-perp (djupast bok). Basis mot Yahoos BTC-USD ≈ index, så att
+    # Deribit-GEX (indexpris) hamnar rätt på perp-priset.
+    "BTC": {"name": "Bitcoin", "cfd": "BTCUSD", "fut": "BTC", "yf": "BTC-USD",
+            "src": "hl", "coin": "BTC", "src_label": "Hyperliquid BTC perp",
+            "bin": 10.0, "book_sig": 3, "book_bin": 100.0, "tol": 150.0, "min_bubble_usd": 250_000,
+            "shelf_x": 2.0, "bubble_pct": 0.99},
 }
 HL_INFO = "https://api.hyperliquid.xyz/info"
 HL_WS = "wss://api.hyperliquid.xyz/ws"
