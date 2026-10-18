@@ -5428,6 +5428,11 @@ def _of_start():
     except Exception as e:
         print(f"Orderflow: hfacit kunde inte starta: {e}")
     try:
+        import gex_live as _GL           # NQ/GC-GEX räknad på servern
+        _GL.get("NQ")
+    except Exception as e:
+        print(f"Orderflow: kunde inte starta gex_live: {e}")
+    try:
         import gex_btc as _GXB
         _GXB.get()
     except Exception as e:
@@ -5479,6 +5484,39 @@ def _of_public(snap):
     return snap
 
 
+_OF_RATIO = {}
+
+
+def _of_gex_live(inst, live_px):
+    """GEX räknad på servern (gex_live) i motorns indataformat. Nivåerna översätts till
+    orderflödets pris med kvoten källpris/underliggande vid CBOE:s prisstämpel."""
+    try:
+        import gex_live as _GL
+        import orderflow_engine as _OFE
+        r = _GL.get(inst)
+        if not r:
+            return None
+        key = (inst, r["t_ms"])
+        ratio = _OF_RATIO.get(key)
+        if ratio is None:
+            p = _GL.source_price_at(inst, r["t_ms"])
+            if not p:
+                return None
+            ratio = _OF_RATIO[key] = p / r["spot"]
+        B = getattr(_OFE.STATE.get(inst), "basis", None)
+        lv = {"call": r["call_wall"], "put": r["put_wall"], "flip": r["flip"]}
+        out = {"inst": inst, "regime": r["regime"], "basis": B or 0.0}
+        for typ, name in (("call", "call_wall"), ("put", "put_wall"), ("flip", "zero_gamma")):
+            if lv[typ] is not None:
+                px = round(lv[typ] * ratio, 2)
+                live_px[typ] = px
+                out[name] = round(px + (B or 0.0), 2)
+        return {"generated": r["generated"], "levels": [out]}
+    except Exception as e:
+        print(f"Orderflow: gex_live misslyckades: {e}")
+        return None
+
+
 @app.get("/api/of/{inst}")
 def orderflow_api(inst: str, tf: int = 1, token: str = "", lite: int = 0):
     try:
@@ -5490,14 +5528,18 @@ def orderflow_api(inst: str, tf: int = 1, token: str = "", lite: int = 0):
         return {"pro": False}
     _of_start()
     import orderflow_engine as _OFE
+    live_px = {}
     if inst.upper() == "BTC":
         import gex_btc as _GXB          # Bitcoin-GEX från Deribits optioner
         gx = _GXB.get()
     else:
-        gx = _gex_levels()
+        gx = _of_gex_live(inst.upper(), live_px) or _gex_levels()   # serverns egen GEX, GitHub-filen som reserv
     snap = _OFE.snapshot(inst.upper(), tf if tf in (1, 5, 15) else 1, gx, lite=bool(lite))
     if snap is None:
         return Response('{"error": "unknown instrument"}', status_code=404, media_type="application/json")
+    for g in snap.get("gex") or []:     # saknar motorn basis visas nivån ändå (redan i orderflödets pris)
+        if g.get("px") is None and g.get("type") in live_px:
+            g["px"] = live_px[g["type"]]
     if not lite:
         try:
             import of_levels as _OFL
