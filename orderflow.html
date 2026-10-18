@@ -113,9 +113,9 @@ td{padding:5px 4px;border-bottom:1px solid var(--line)}th:not(:first-child),td:n
   <div class="main">
     <div class="card chartcard"><div class="fsbar" id="fsbar"></div><canvas id="chart"></canvas><div id="yax" title="Drag to stretch or compress · double-click = auto"></div><canvas id="cvd"></canvas></div>
     <div class="card lv">
-      <div class="lvhd" title="Volatility-adjusted probabilities, calibrated on historical intraday data and tested on data the model has not seen. A statistical aid, not a signal."><h3><span class="qe">QUANT ENGINE</span> · PROBABILITY TO HIT</h3></div>
+      <div class="lvhd" title="Volatility-adjusted probabilities, calibrated on historical intraday data and tested on data the model has not seen. A statistical aid, not a signal."><h3><span class="qe">QUANT ENGINE</span> · CHANCE TO REACH</h3></div>
       <div class="lvctl">
-        <div class="seg" id="hz"><button data-v="15m">15m</button><button data-v="30m">30m</button><button data-v="60m">60m</button><button data-v="close">Session close</button></div>
+        <div class="seg" id="hz"><button data-v="15m">15 min</button><button data-v="30m">30 min</button><button data-v="60m">1 h</button><button data-v="close">Today</button></div>
         <div class="seg" id="sort"><button data-v="price">Price</button><button data-v="p">Prob</button><button data-v="dist">Dist</button></div>
       </div>
       <div class="lvlist" id="lvlist"><div class="lr"><span class="n">Collecting data…</span></div></div>
@@ -202,6 +202,7 @@ function curProfile(){const d=S.d,p=(d.profiles||{})[S.prof],lab={session:'Sessi
   if(p)return {rows:p.rows,step:p.step,poc:p.poc,vah:p.vah,val:p.val,label:lab};
   if(S.prof==='session')return {rows:d.profile||[],poc:d.poc,vah:d.vah,val:d.val,label:lab};
   return {rows:[],label:'not available yet'};}
+const HZS={'15m':'15 min','30m':'30 min','60m':'1 h',close:'today'};
 const pOf=L=>L&&L.p?L.p[S.hz]:undefined;
 const pTxt=p=>p==null?'N/A':p<.01?'<1%':p>.99?'>99%':Math.round(p*100)+'%';
 function soft(x,y,h,w,rgb,a){const g=x.createLinearGradient(0,0,w,0);g.addColorStop(0,`rgba(${rgb},0)`);g.addColorStop(.35,`rgba(${rgb},${a*.45})`);g.addColorStop(1,`rgba(${rgb},${a})`);
@@ -239,7 +240,10 @@ function drawChart(){
   for(let v=Math.ceil(lo/step)*step;v<=hi;v+=step){const y=Y(v);x.strokeStyle=C.grid;x.lineWidth=1;x.beginPath();x.moveTo(0,y);x.lineTo(cw+PRW,y);x.stroke();x.fillStyle=C.mut;x.textAlign='left';x.fillText(fmtP(v+o),cw+PRW+7,y+4);}
   const ticks=timeTicks(bars,sp,mob);ticks.forEach(([j])=>{const xx=X(j);if(xx<0||xx>cw)return;x.strokeStyle=C.grid;x.beginPath();x.moveTo(xx,top);x.lineTo(xx,top+ch);x.stroke();});
   const lvBy=nm=>(d.levels||[]).find(l=>l.name===nm);
-  const probTag=(px,yy,col)=>{const L0=(d.levels||[]).find(l=>Math.abs(l.px-px)<1e-6);const p=pOf(L0);if(p==null)return;x.font=F(600,11);x.textAlign='right';x.fillStyle=col;x.fillText(`${pTxt(p)} to ${fmtP(px+o)}`,cw-10,yy);};
+  // "2% chance · 30 min" — under 20 % tonad, 20–60 % vit, över 60 % i nivåns färg
+  const probTag=(px,yy,col)=>{const L0=(d.levels||[]).find(l=>Math.abs(l.px-px)<1e-6);const p=pOf(L0);if(p==null)return;
+    x.font=F(p>=.6?700:600,11);x.textAlign='right';x.globalAlpha=p<.2?.5:1;x.fillStyle=p>=.6?col:p>=.2?C.txt:C.mut;
+    x.fillText(`${pTxt(p)} chance · ${HZS[S.hz]}`,cw-10,yy);x.globalAlpha=1;};
   // Optionsnivåer: Call/Put Wall som mjuka lila band, övriga GEX som tunna streckade linjer
   d.gex.forEach(g=>{if(g.px==null)return;const y=Y(g.px);if(!inY(y))return;const wall=/wall/i.test(g.label);
     if(wall){soft(x,y,mob?10:14,cw,RGB.gex,.55);x.strokeStyle='rgba(165,124,255,.55)';x.lineWidth=1;x.beginPath();x.moveTo(0,y);x.lineTo(cw,y);x.stroke();
@@ -379,11 +383,11 @@ function renderLevels(){const d=S.d,o=off();let lv=(d.levels||[]).map(l=>({...l,
   if(!lv.length){$('lvlist').innerHTML='<div class="lr"><span class="n">Loading levels…</span></div>';$('lvft').textContent='–';return;}
   const by={price:(a,b)=>b.px-a.px,p:(a,b)=>(pOf(b)??-1)-(pOf(a)??-1),dist:(a,b)=>Math.abs(a.dist)-Math.abs(b.dist)}[S.sort];lv.sort(by);
   const row=l=>{const cls=l.kind==='bid'?'g-bid':l.kind==='ask'?'g-ask':GROUPCLS[l.group]||'';const p=pOf(l);
-    return `<div class="lr ${cls}"><span class="n">${l.name}${l.touched?'<span class="t">TOUCHED</span>':''}</span><span class="v">${fmtP(l.px+o)}</span><span class="d">${l.dist>=0?'+':'−'}${fmtP(Math.abs(l.dist)).replace(/\.0+$/,'')}</span><span class="pp" style="color:${p==null?C.mut:p>=.6?C.txt:p>=.3?'#B9C2D0':C.mut}">${pTxt(p)}</span></div>`;};
+    return `<div class="lr ${cls}"><span class="n">${l.name}${l.touched?'<span class="t">TOUCHED</span>':''}</span><span class="v">${fmtP(l.px+o)}</span><span class="d">${l.dist>=0?'+':'−'}${fmtP(Math.abs(l.dist)).replace(/\.0+$/,'')}</span><span class="pp" style="color:${p==null?C.mut:p>=.6?C.cy:p>=.2?C.txt:C.mut}">${pTxt(p)}</span></div>`;};
   let html='';if(S.sort==='price'){const up=lv.filter(l=>l.dist>=0),dn=lv.filter(l=>l.dist<0);html=up.map(row).join('')+`<div class="pricerow"><span>PRICE</span><span>${fmtP(d.price+o)}</span></div>`+dn.map(row).join('');}else html=lv.map(row).join('');
   $('lvlist').innerHTML=html;
   const pm=(d.prob_meta||{}).horizons||{},m=pm[S.hz]||{},hzName={'15m':'next 15 minutes','30m':'next 30 minutes','60m':'next 60 minutes',close:'before session close (17:00 New York)'}[S.hz];
-  $('lvft').innerHTML=m.quality&&m.quality!=='n/a'?`Chance that price touches the level within the ${hzName.replace(/^next /,'next ')}.`
+  $('lvft').innerHTML=m.quality&&m.quality!=='n/a'?(S.hz==='close'?'Chance that price reaches the level before today\'s close.':`Chance that price reaches the level within ${HZS[S.hz]}.`)
     :`Probabilities are loading…`;}
 
 const SRC={Orderbook:'ob','GEX (options)':'gx',Volume:'',Trades:''};
