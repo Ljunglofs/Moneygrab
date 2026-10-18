@@ -161,7 +161,7 @@ const S={inst:PREF.inst||'NQ',tf:PREF.tf||1,scale:PREF.scale||'fut',view:PREF.vi
 const savePref=()=>{try{localStorage.setItem('of_prefs',JSON.stringify({inst:S.inst,tf:S.tf,scale:S.scale,view:S.view,prof:S.prof,bub:S.bub,bmin:S.bmin,hz:S.hz,sort:S.sort}))}catch(e){}};
 const mobile=()=>innerWidth<=760;
 const BIN=()=>S.inst==='NQ'?1:S.inst==='BTC'?10:0.5;
-function resetView(){S.sp=null;S.ro=0;S.pr=null;S.cols=null;S.off=0;}
+function resetView(){S.sp=null;S.ro=0;S.pr=null;S.cols=null;S.off=0;S.yz=1;S.ypan=0;}
 const RELOAD=new Set(['inst','tf']);
 function seg(id,key){const el=$(id);[...el.children].forEach(x=>x.classList.toggle('on',String(S[key])===x.dataset.v));
   el.onclick=e=>{const b=e.target.closest('button');if(!b)return;[...el.children].forEach(x=>x.classList.toggle('on',x===b));S[key]=key==='tf'?+b.dataset.v:b.dataset.v;savePref();
@@ -452,7 +452,7 @@ function zoomAt(f,mx){if(S.view==='fp'){S.cols=Math.max(30,Math.min(160,(S.cols|
   S.sp=sp1;S.ro=s.L-1-idx-(s.xR-m)/sp1;redraw();}
 function zoom(f){zoomAt(f,null);}
 function manualPrice(){if(!S.pr&&S.sc)S.pr={lo:S.sc.lo,hi:S.sc.hi};}
-function scalePrice(f,base){manualPrice();if(!S.pr)return;const b=base||S.pr,m=(b.lo+b.hi)/2,h=(b.hi-b.lo)/2*f;S.pr={lo:m-h,hi:m+h};}
+function scalePrice(f,base){if(S.view==='fp'){S.yz=Math.max(.05,Math.min(20,(S.yz||1)*f));return;}manualPrice();if(!S.pr)return;const b=base||S.pr,m=(b.lo+b.hi)/2,h=(b.hi-b.lo)/2*f;S.pr={lo:m-h,hi:m+h};}
 // Fullskärm: riktig fullskärm där det stöds, annars hela fönstret (iPhone)
 function toggleFs(){const el=document.querySelector('.chartcard');
   if(el.classList.contains('fsx')){el.classList.remove('fsx');document.body.style.overflow='';if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});setTimeout(render,50);return;}
@@ -483,13 +483,14 @@ cv.addEventListener('dblclick',()=>{resetView();render();});
 yax.addEventListener('dblclick',()=>{S.pr=null;redraw();});
 const inXaxis=my=>S.sc&&my>S.sc.top+S.sc.ch;
 cv.addEventListener('mousedown',e=>{e.preventDefault();cancelAnimationFrame(glide);const r=cv.getBoundingClientRect(),my=e.clientY-r.top;
-  drag={mode:inXaxis(my)?'x':'pan',x:e.clientX,y:e.clientY,ro:S.ro||0,off:S.off,sp:S.pxPerBar||9,cols:S.cols||64,pr:S.pr?{...S.pr}:null,trail:[[performance.now(),e.clientX]]};
+  drag={mode:inXaxis(my)?'x':'pan',x:e.clientX,y:e.clientY,yp:S.ypan||0,ro:S.ro||0,off:S.off,sp:S.pxPerBar||9,cols:S.cols||64,pr:S.pr?{...S.pr}:null,trail:[[performance.now(),e.clientX]]};
   cv.style.cursor=drag.mode==='x'?'ew-resize':'grabbing';});
-yax.addEventListener('mousedown',e=>{e.preventDefault();manualPrice();if(S.pr)drag={mode:'y',y:e.clientY,pr:{...S.pr}};});
+yax.addEventListener('mousedown',e=>{e.preventDefault();if(S.view==='fp'){drag={mode:'yfp',y:e.clientY,yz:S.yz||1};return;}manualPrice();if(S.pr)drag={mode:'y',y:e.clientY,pr:{...S.pr}};});
 addEventListener('mousemove',e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;
-  if(drag.mode==='y')scalePrice(Math.exp(dy*.006),drag.pr);
+  if(drag.mode==='yfp')S.yz=Math.max(.05,Math.min(20,drag.yz*Math.exp(dy*.006)));
+  else if(drag.mode==='y')scalePrice(Math.exp(dy*.006),drag.pr);
   else if(drag.mode==='x'){if(S.view==='fp')S.cols=Math.max(30,Math.min(160,drag.cols*Math.exp(dx*.006)));else S.sp=Math.max(1,Math.min(40,drag.sp*Math.exp(dx*.006)));}
-  else if(S.view==='fp'){S.off=Math.max(0,drag.off+Math.round(dx/(S.pxPerBar||10)));}
+  else if(S.view==='fp'){S.off=Math.max(0,drag.off+Math.round(dx/(S.pxPerBar||10)));if(S.sc)S.ypan=drag.yp+dy*(S.sc.hi-S.sc.lo)/S.sc.ch;}
   else{S.ro=drag.ro+dx/drag.sp;drag.trail.push([performance.now(),e.clientX]);if(drag.trail.length>6)drag.trail.shift();
     if(!drag.pr&&Math.abs(dy)>8){manualPrice();if(S.pr){drag.pr={...S.pr};drag.y=e.clientY;}}
     if(drag.pr&&S.sc){const k=(drag.pr.hi-drag.pr.lo)/S.sc.ch*(e.clientY-drag.y);S.pr={lo:drag.pr.lo+k,hi:drag.pr.hi+k};}}
