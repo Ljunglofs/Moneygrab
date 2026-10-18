@@ -5423,6 +5423,11 @@ def _of_start():
     except Exception as e:
         print(f"Orderflow: kunde inte starta motorn: {e}")
     try:
+        import of_facit as _OFF          # internt hyll-facit, syns inte i appen
+        _OFF.start()
+    except Exception as e:
+        print(f"Orderflow: hfacit kunde inte starta: {e}")
+    try:
         import gex_btc as _GXB
         _GXB.get()
     except Exception as e:

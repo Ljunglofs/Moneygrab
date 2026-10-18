@@ -24,6 +24,7 @@ header{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10p
 .sel{background:var(--panel);border:1px solid var(--line);border-radius:8px;color:var(--mut);font-size:12px;font-weight:600;padding:6px 8px;cursor:pointer}
 .live{display:flex;align-items:center;gap:6px;font-weight:700;font-size:11.5px;color:var(--cy);flex:none}.live i{width:7px;height:7px;border-radius:50%;background:var(--cy)}
 .live.off{color:var(--mut)}.live.off i{background:var(--mut)}
+.cme{display:none;font-size:11px;font-weight:700;letter-spacing:.04em;color:#E8C46A;border:1px solid rgba(232,196,106,.35);background:rgba(232,196,106,.07);border-radius:7px;padding:4px 8px;flex:none;white-space:nowrap}
 .px{margin-left:auto;text-align:right}.px .p{font-size:24px;font-weight:700;line-height:1.1}.px .f{color:var(--mut);font-size:11.5px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;position:relative;overflow:hidden}
 .main{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:10px}
@@ -97,6 +98,7 @@ td{padding:5px 4px;border-bottom:1px solid var(--line)}th:not(:first-child),td:n
       <div class="seg" id="scale"><button data-v="fut">Futures</button><button data-v="spot">CFD / spot</button></div>
       <div class="seg" id="zoom"><button data-v="out" title="Zoom out">−</button><button data-v="in" title="Zoom in">+</button><button data-v="reset" title="Back to live">Reset</button></div>
       <div class="live" id="live"><i></i><span>LIVE</span></div>
+      <div class="cme" id="cme"></div>
     </div>
   </header>
 
@@ -168,6 +170,9 @@ const hhmm=t=>new Date(t*1000).toLocaleTimeString('en-GB',{hour:'2-digit',minute
 const hhmmss=t=>new Date(t*1000).toLocaleTimeString('en-GB');
 // NQ/GC: valbart futures (+basis) eller spot. BTC: alltid spotindex (perp + uppmätt skillnad mot index)
 // NQ/GC: futures = källpris + basis. BTC: perpetual = källpris, spot = perp + basis (basis = spot − perp)
+function cmeState(){const p=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',weekday:'short',hour:'2-digit',hour12:false}).formatToParts(new Date());
+  const wd=p.find(x=>x.type==='weekday').value,h=+p.find(x=>x.type==='hour').value%24;
+  if(wd==='Sat'||(wd==='Fri'&&h>=17)||(wd==='Sun'&&h<18))return 'weekend';if(h===17)return 'break';return null;}
 const off=()=>!S.d||S.d.basis==null?0:S.inst==='BTC'?(S.scale==='spot'?S.d.basis:0):(S.scale==='fut'?S.d.basis:0);
 function ctx(c){const r=c.getBoundingClientRect(),dpr=devicePixelRatio||1;c.width=Math.max(1,r.width*dpr);c.height=Math.max(1,r.height*dpr);const x=c.getContext('2d');x.setTransform(dpr,0,0,dpr,0,0);return [x,r.width,r.height];}
 function niceStep(r){const p=Math.pow(10,Math.floor(Math.log10(r)));const m=r/p;return (m<1.5?1:m<3?2:m<7?5:10)*p;}
@@ -362,11 +367,16 @@ function render(){
   const L=d.bars?d.bars.length:0;if(S.off>0&&lastLen&&L>lastLen)S.off+=L-lastLen;lastLen=L;
   $('price').textContent=fmtP(d.price+o);
   {const b=$('scale').children;b[0].textContent=d.inst==='BTC'?'Perpetual':'Futures';b[1].textContent=d.inst==='BTC'?'Spot':'CFD / spot';}
+  // CME stängt (NQ/GC): fre 17:00 – sön 18:00 New York, plus den dagliga pausen 17–18.
+  // Då handlas källan fritt (helgmarknad) och futures-priset är bara en uppskattning.
+  const cme=cmeState();{const el=$('cme');if(d.inst!=='BTC'&&cme){el.style.display='block';
+    el.textContent=cme==='weekend'?'CME CLOSED · WEEKEND MARKET':'CME DAILY BREAK';
+    el.title=cme==='weekend'?'Futures are closed until Sunday 18:00 New York. Prices now come from weekend trading and the futures price is estimated from the last measured difference.':'Futures pause 17:00–18:00 New York. The futures price is estimated until they reopen.';}else el.style.display='none';}
   {const bs=d.basis,fx=v=>(v>=0?'+':'−')+fmtP(Math.abs(v));let t;
    if(d.inst==='BTC'){const pr=-(bs||0),pp=bs!=null?(pr/(d.price+bs)*100):null;const diff=bs!=null?` (perp ${fx(pr)} / ${pp>=0?'+':'−'}${Math.abs(pp).toFixed(2)}% vs spot)`:' (measuring difference…)';
      t=S.scale==='spot'?`Bitcoin spot index · perpetual ≈ ${fmtP(d.price)}${diff}`:`Bitcoin perpetual · spot ≈ ${bs!=null?fmtP(d.price+bs):'–'}${diff}`;}
    else{const diff=bs!=null?` (futures ${fx(bs)} vs CFD)`:' (measuring difference…)';
-     t=S.scale==='fut'?`${d.name} · ${d.fut} futures · CFD ≈ ${fmtP(d.price)}${diff}`:`${d.name} · ${d.cfd} CFD · ${d.fut} futures ≈ ${bs!=null?fmtP(d.price+bs):'–'}${diff}`;}
+     t=S.scale==='fut'?`${d.name} · ${d.fut} futures${cme?' (estimated — CME closed)':''} · CFD ≈ ${fmtP(d.price)}${diff}`:`${d.name} · ${d.cfd} CFD · ${d.fut} futures ≈ ${bs!=null?fmtP(d.price+bs):'–'}${diff}`;}
    $('pxsub').textContent=t;}
   $('live').className='live'+(d.status==='live'?'':' off');$('live').querySelector('span').textContent=d.status==='live'?'LIVE':String(d.status||'').toUpperCase();
   $('hint').textContent=mobile()?'Swipe sideways to move in time · pinch sideways = time zoom, pinch up/down = price zoom · drag the price axis to stretch the chart · Reset goes back to live':'Scroll to zoom · drag to move · drag the price axis to stretch or compress, the time axis to widen bars · double-click an axis or the chart to reset · hover a bubble for details';
