@@ -5517,6 +5517,21 @@ def _of_gex_live(inst, live_px):
         return None
 
 
+@app.get("/api/of/{inst}/hist")
+def orderflow_hist(inst: str, tf: int = 15, token: str = ""):
+    """Äldre staplar för grafen (pris + volym i egna enheter). Kräver PRO."""
+    try:
+        from billing_web import verify_token
+        if verify_token(token) is None:
+            return {"pro": False}
+    except Exception:
+        return {"pro": False}
+    import of_levels as _OFL
+    k = _OF_SCALE.get(inst.upper(), 1.0)
+    bars = _OFL.history(inst.upper(), tf)
+    return {"tf": tf, "bars": [dict(b, v=round(b["v"] * k, 3)) for b in bars]}
+
+
 @app.get("/api/of/{inst}")
 def orderflow_api(inst: str, tf: int = 1, token: str = "", lite: int = 0):
     try:
@@ -5534,7 +5549,7 @@ def orderflow_api(inst: str, tf: int = 1, token: str = "", lite: int = 0):
         gx = _GXB.get()
     else:
         gx = _of_gex_live(inst.upper(), live_px) or _gex_levels()   # serverns egen GEX, GitHub-filen som reserv
-    snap = _OFE.snapshot(inst.upper(), tf if tf in (1, 5, 15) else 1, gx, lite=bool(lite))
+    snap = _OFE.snapshot(inst.upper(), tf if tf in (1, 5, 15) else (15 if tf > 15 else 1), gx, lite=bool(lite))
     if snap is None:
         return Response('{"error": "unknown instrument"}', status_code=404, media_type="application/json")
     for g in snap.get("gex") or []:     # saknar motorn basis visas nivån ändå (redan i orderflödets pris)

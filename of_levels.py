@@ -432,6 +432,32 @@ def augment(snap):
     return snap
 
 
+# ── Historik för grafen (äldre staplar än motorns dygn) ───────────────────
+_HIVL = {1: "1m", 5: "5m", 15: "15m", 60: "1h", 240: "4h", 1440: "1d"}
+_HC = {}
+
+
+def history(inst, tf):
+    """Upp till 5000 staplar bakåt i vald tidsram (pris och volym, ingen köp/sälj-uppdelning)."""
+    if inst not in COIN or tf not in _HIVL:
+        return []
+    key = (inst, tf)
+    c = _HC.get(key)
+    if c and time.time() - c[0] < 60:
+        return c[1]
+    now = int(time.time() * 1000)
+    span = tf * 60000 * 5000
+    try:
+        cs = requests.post(HL_INFO, json={"type": "candleSnapshot", "req": {
+            "coin": COIN[inst][0], "interval": _HIVL[tf], "startTime": now - span, "endTime": now}}, timeout=20).json()
+        out = [{"t": int(x["t"]) // 1000, "o": float(x["o"]), "h": float(x["h"]), "l": float(x["l"]),
+                "c": float(x["c"]), "v": float(x["v"])} for x in cs or []]
+    except Exception:
+        out = c[1] if c else []
+    _HC[key] = (time.time(), out)
+    return out
+
+
 def warm(insts=("NQ", "GC", "BTC")):
     for i in insts:
         _ensure(i)
