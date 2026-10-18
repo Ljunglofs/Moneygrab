@@ -184,12 +184,15 @@ function cmeState(){const p=new Intl.DateTimeFormat('en-US',{timeZone:'America/N
 const off=()=>!S.d||S.d.basis==null?0:S.inst==='BTC'?(S.scale==='spot'?S.d.basis:0):(S.scale==='fut'?S.d.basis:0);
 function ctx(c){const r=c.getBoundingClientRect(),dpr=devicePixelRatio||1;c.width=Math.max(1,r.width*dpr);c.height=Math.max(1,r.height*dpr);const x=c.getContext('2d');x.setTransform(dpr,0,0,dpr,0,0);return [x,r.width,r.height];}
 function niceStep(r){const p=Math.pow(10,Math.floor(Math.log10(r)));const m=r/p;return (m<1.5?1:m<3?2:m<7?5:10)*p;}
-const LBL=[];function lblY(y,gap=13){let t=y;for(let k=0;k<10;k++){if(LBL.some(v=>Math.abs(v-t)<gap))t+=gap;else break;}LBL.push(t);return t;}
+const LBL=[];function lblY(y,gap=13){for(const t of [y,y+gap,y-gap]){if(!LBL.some(v=>Math.abs(v-t)<gap)){LBL.push(t);return t;}}return null;}
 // CME-handelsdag (ny dag 18:00 New York) — för VWAP-ankaret
-const nyH=t=>+new Date(t*1000).toLocaleString('en-US',{timeZone:'America/New_York',hour:'2-digit',hour12:false})%24;
-const nyD=t=>new Date(t*1000).toLocaleDateString('en-US',{timeZone:'America/New_York'});
-const tday=t=>nyH(t)>=18?nyD(t+86400):nyD(t);
+const _NYO=new Map(),_NYF=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',hour12:false,year:'numeric',month:'numeric',day:'numeric',hour:'numeric',minute:'numeric'});
+function nyOff(t){const k=Math.floor(t/43200);let o=_NYO.get(k);if(o===undefined){const p=Object.fromEntries(_NYF.formatToParts(new Date(t*1000)).map(x=>[x.type,x.value]));
+  o=Date.UTC(+p.year,+p.month-1,+p.day,+p.hour%24,+p.minute)/1000-Math.floor(t/60)*60;_NYO.set(k,o);}return o;}
+const tday=t=>{const n=t+nyOff(t),d=Math.floor(n/86400);return ((n-d*86400)/3600)>=18?d+1:d;};
 // VWAP och ±1σ-band, ankrat vid sessionsstart
+let _vwK=null,_vwV=null;
+function vwapCached(all){const l=all[all.length-1],k=all.length+':'+all[0].t+':'+l.t+':'+l.c+':'+l.v;if(k!==_vwK){_vwK=k;_vwV=vwapSeries(all);}return _vwV;}
 function vwapSeries(bars){let pv=0,v=0,pv2=0,day=null;return bars.map(b=>{const td=tday(b.t);if(td!==day){day=td;pv=v=pv2=0;}const p=(b.h+b.l+b.c)/3;pv+=p*b.v;v+=b.v;pv2+=p*p*b.v;
   if(!v)return null;const m=pv/v,sd=Math.sqrt(Math.max(0,pv2/v-m*m));return [m,m+sd,m-sd];});}
 function aggRows(rows,lo,hi,ch,minPx,step){const bin=step||BIN(),pxBin=ch/((hi-lo)/bin),k=Math.max(1,Math.ceil(minPx/pxBin)),bk=bin*k,m=new Map();
@@ -220,13 +223,13 @@ function drawChart(){
   const bars=all.slice(iA,iB+1),bw=Math.max(1,Math.min(24,sp*.72));S.pxPerBar=sp;
   const X=j=>xOf(iA+j);
   if(iA<=2&&S.ro>0)loadHist();
-  const vws=S.tf>=1440?bars.map(()=>null):vwapSeries(all).slice(iA,iB+1);
+  const vws=S.tf>60?bars.map(()=>null):vwapCached(all).slice(iA,iB+1);
   let lo,hi;
   if(S.pr){lo=S.pr.lo;hi=S.pr.hi;}
   else{const vis=bars.filter((b,j)=>X(j)>-sp&&X(j)<cw+sp);const bb=vis.length?vis:bars;
     lo=Math.min(...bb.map(b=>b.l));hi=Math.max(...bb.map(b=>b.h));const span=hi-lo||1;
     const near=v=>v!=null&&v>lo-span*.5&&v<hi+span*.5;
-    [...d.shelves.slice(0,4).map(s=>s.px),...d.gex.filter(g=>/wall/i.test(g.label)).map(g=>g.px),d.vwap].filter(near).forEach(v=>{lo=Math.min(lo,v);hi=Math.max(hi,v);});
+    [...(S.tf<=15?d.shelves.slice(0,4).map(s=>s.px):[]),...d.gex.filter(g=>/wall/i.test(g.label)).map(g=>g.px),S.tf<=60?d.vwap:null].filter(near).forEach(v=>{lo=Math.min(lo,v);hi=Math.max(hi,v);});
     const pad=(hi-lo)*.06||1;lo-=pad;hi+=pad;}
   const Y=v=>top+(hi-v)/(hi-lo)*ch;
   S.sc={lo,hi,top,ch,cw,PRW,AX,W,H,bars,X,Y,bw,sp,xR,L,iA};
@@ -240,23 +243,24 @@ function drawChart(){
   // Optionsnivåer: Call/Put Wall som mjuka lila band, övriga GEX som tunna streckade linjer
   d.gex.forEach(g=>{if(g.px==null)return;const y=Y(g.px);if(!inY(y))return;const wall=/wall/i.test(g.label);
     if(wall){soft(x,y,mob?10:14,cw,RGB.gex,.55);x.strokeStyle='rgba(165,124,255,.55)';x.lineWidth=1;x.beginPath();x.moveTo(0,y);x.lineTo(cw,y);x.stroke();
-      const ly=lblY(y-6);x.font=F(700,mob?10:11);x.textAlign='left';x.fillStyle=C.gex;x.fillText(g.label.toUpperCase().replace(' (WEAK)',''),12,ly);probTag(g.px,ly,C.gex);}
+      const ly=lblY(y-6);if(ly!=null){x.font=F(700,mob?10:11);x.textAlign='left';x.fillStyle=C.gex;x.fillText(g.label.toUpperCase().replace(' (WEAK)',''),12,ly);probTag(g.px,ly,C.gex);}}
     else{x.strokeStyle='rgba(165,124,255,.45)';x.setLineDash([2,4]);x.beginPath();x.moveTo(0,y);x.lineTo(cw,y);x.stroke();x.setLineDash([]);
-      if(!mob){x.font=F(500,10);x.textAlign='left';x.fillStyle='rgba(165,124,255,.8)';x.fillText(g.label,12,lblY(y-4));}}});
+      const l2=mob?null:lblY(y-4);if(l2!=null){x.font=F(500,10);x.textAlign='left';x.fillStyle='rgba(165,124,255,.8)';x.fillText(g.label,12,l2);}}});
   // Likviditetshyllor (orderboken) — mjuka gradientband utan ramar
-  const bids=d.shelves.filter(s=>s.side==='bid').slice(0,2),asks=d.shelves.filter(s=>s.side==='ask').slice(0,2);
+  const intra=S.tf<=15;
+  const bids=intra?d.shelves.filter(s=>s.side==='bid').slice(0,2):[],asks=intra?d.shelves.filter(s=>s.side==='ask').slice(0,2):[];
   [...asks.map((s,i)=>[s,i]),...bids.map((s,i)=>[s,i])].forEach(([s,i])=>{const y=Y(s.px);if(!inY(y))return;const bid=s.side==='bid',rgb=bid?RGB.cy:RGB.rd,a=(i===0?.5:.28)*(.6+.4*s.persist/100);
     soft(x,y,mob?10:16,cw,rgb,a);x.strokeStyle=`rgba(${rgb},${i===0?.55:.3})`;x.lineWidth=1;x.beginPath();x.moveTo(cw*.15,y);x.lineTo(cw,y);x.stroke();
     const name=bid?(i===0?'BUY LIQUIDITY / BUY SHELF':'BID SHELF'):(i===0?'SELL SHELF / SELL LIQUIDITY':'ASK SHELF');const ly=lblY(y-6);
-    x.font=F(700,mob?10:11);x.textAlign='left';x.fillStyle=bid?C.cy:C.rd;x.globalAlpha=i===0?1:.75;x.fillText(mob?name.split(' / ')[0]:`${name} · ${fmtU(s.avg_usd)}`,12,ly);x.globalAlpha=1;probTag(s.px,ly,bid?C.cy:C.rd);});
+    if(ly==null)return;x.font=F(700,mob?10:11);x.textAlign='left';x.fillStyle=bid?C.cy:C.rd;x.globalAlpha=i===0?1:.75;x.fillText(mob?name.split(' / ')[0]:`${name} · ${fmtU(s.avg_usd)}`,12,ly);x.globalAlpha=1;probTag(s.px,ly,bid?C.cy:C.rd);});
   // Konvergenszoner — svag yta, ingen ram
-  (d.zones||[]).forEach((z,i)=>{const pd=d.inst==='NQ'?2:d.inst==='BTC'?30:.3,y1=Y(z.hi+pd),y2=Y(z.lo-pd);if(y2<top||y1>top+ch)return;const g=x.createLinearGradient(0,0,cw,0);g.addColorStop(0,'rgba(232,236,242,0)');g.addColorStop(1,'rgba(232,236,242,.07)');
+  (intra?d.zones||[]:[]).forEach((z,i)=>{const pd=d.inst==='NQ'?2:d.inst==='BTC'?30:.3,y1=Y(z.hi+pd),y2=Y(z.lo-pd);if(y2<top||y1>top+ch)return;const g=x.createLinearGradient(0,0,cw,0);g.addColorStop(0,'rgba(232,236,242,0)');g.addColorStop(1,'rgba(232,236,242,.07)');
     x.fillStyle=g;x.fillRect(0,y1,cw,Math.max(4,y2-y1));x.fillStyle='rgba(232,236,242,.8)';x.font=F(700,10.5);x.textAlign='right';x.fillText('★'+(i+1),cw-10,y1+11);});
   // Sessions- och gårdagsnivåer — tunna gråblå linjer, liten etikett vid prisaxeln
-  (d.levels||[]).filter(l=>l.group==='session'||l.group==='prev').forEach(l=>{const y=Y(l.px);if(!inY(y))return;x.strokeStyle='rgba(112,136,168,.5)';x.lineWidth=1;x.setLineDash(l.group==='prev'?[1,3]:[4,4]);x.beginPath();x.moveTo(0,y);x.lineTo(cw+PRW,y);x.stroke();x.setLineDash([]);
-    if(!mob){x.font=F(500,10);x.textAlign='right';x.fillStyle=C.hist;x.fillText(`${l.name} ${fmtP(l.px+o)}${l.touched?' · touched':''}`,cw+PRW-4,lblY(y-3,12));}});
+  (intra?d.levels||[]:[]).filter(l=>l.group==='session'||l.group==='prev').forEach(l=>{const y=Y(l.px);if(!inY(y))return;x.strokeStyle='rgba(112,136,168,.5)';x.lineWidth=1;x.setLineDash(l.group==='prev'?[1,3]:[4,4]);x.beginPath();x.moveTo(0,y);x.lineTo(cw+PRW,y);x.stroke();x.setLineDash([]);
+    const l3=mob?null:lblY(y-3,12);if(l3!=null){x.font=F(500,10);x.textAlign='right';x.fillStyle=C.hist;x.fillText(`${l.name} ${fmtP(l.px+o)}${l.touched?' · touched':''}`,cw+PRW-4,l3);}});
   // Volymprofil längs högerkanten (före prisaxeln)
-  const pr=curProfile();
+  const pr=intra?curProfile():{rows:[]};
   // Hårfina rader som i TradingView: en linje per rad (rader slås ihop så att de ligger minst 2 px isär)
   if(pr.rows&&pr.rows.length){const {rows,bk}=aggRows(pr.rows,lo,hi,ch,2,pr.step);const mv=Math.max(...rows.map(r=>r.v),1e-9),rowPx=Math.abs(Y(0)-Y(bk)),rh=Math.max(1,Math.min(2,rowPx*.5));
     rows.forEach(r=>{const y=Y(r.px);if(y<top-rh||y>top+ch+rh)return;const inVA=pr.val!=null&&pr.vah!=null&&r.px>=pr.val&&r.px<=pr.vah;
@@ -268,12 +272,14 @@ function drawChart(){
   // VWAP (vit) och band (två gråvita nyanser, streckade)
   const line=(k,col,w,dash)=>{x.strokeStyle=col;x.lineWidth=w;x.setLineDash(dash);x.beginPath();let st=false;vws.forEach((v,i)=>{if(!v){st=false;return;}const y=Y(v[k]);st?x.lineTo(X(i),y):x.moveTo(X(i),y);st=true;});x.stroke();x.setLineDash([]);};
   line(1,'rgba(229,72,77,.85)',1.4,[6,4]);line(2,'rgba(229,72,77,.85)',1.4,[6,4]);line(0,C.vw,2.2,[]);
-  const lv=vws[vws.length-1];if(lv&&!mob){x.font=F(600,10);x.textAlign='left';[[0,'VWAP',C.vw]].forEach(([k,t,c])=>{const y=Y(lv[k]);if(inY(y)){x.fillStyle=c;x.fillText(t,12,lblY(y-5));}});}
+  const lv=vws[vws.length-1];if(lv&&!mob){x.font=F(600,10);x.textAlign='left';[[0,'VWAP',C.vw]].forEach(([k,t,c])=>{const y=Y(lv[k]);const l4=inY(y)?lblY(y-5):null;if(l4!=null){x.fillStyle=c;x.fillText(t,12,l4);}});}
   // Candles
-  bars.forEach((b,i)=>{if(X(i)<-bw||X(i)>cw+bw)return;const c=b.c>=b.o?C.cy:C.rd;x.strokeStyle=c;x.fillStyle=c;x.lineWidth=1;const cx=Math.round(X(i))+.5;x.beginPath();x.moveTo(cx,Y(b.h));x.lineTo(cx,Y(b.l));x.stroke();const y1=Y(Math.max(b.o,b.c)),y2=Y(Math.min(b.o,b.c));x.fillRect(cx-bw/2,y1,bw,Math.max(1,y2-y1));});
+  for(const up of [true,false]){x.strokeStyle=x.fillStyle=up?C.cy:C.rd;x.lineWidth=1;x.beginPath();
+    bars.forEach((b,i)=>{if((b.c>=b.o)!==up)return;const xx=X(i);if(xx<-bw||xx>cw+bw)return;const cx=Math.round(xx)+.5;x.moveTo(cx,Y(b.h));x.lineTo(cx,Y(b.l));});x.stroke();
+    bars.forEach((b,i)=>{if((b.c>=b.o)!==up)return;const xx=X(i);if(xx<-bw||xx>cw+bw)return;const cx=Math.round(xx)+.5,y1=Y(Math.max(b.o,b.c)),y2=Y(Math.min(b.o,b.c));x.fillRect(cx-bw/2,y1,bw,Math.max(1,y2-y1));});}
   // Aggression Bubbles — faktiska aggressiva affärer, storlek ∝ √ordervärde
   S.bubHit=[];
-  if(S.bub==='on'){const tfs=S.tf*60,bb=d.bubbles.filter(b=>b.usd>=S.bmin),mx=Math.max(...bb.map(b=>b.usd),1);
+  if(S.bub==='on'&&intra){const tfs=S.tf*60,bb=d.bubbles.filter(b=>b.usd>=S.bmin),mx=Math.max(...bb.map(b=>b.usd),1);
     bb.forEach(b=>{const i=barAt(bars,b.t,tfs);if(i<0||X(i)<0||X(i)>cw)return;const r=3+(mob?8:11)*Math.sqrt(b.usd/mx),rgb=b.side==='B'?RGB.cy:RGB.rd,cx=X(i),cy=Y(b.px);if(!inY(cy))return;
       x.save();x.shadowColor=`rgba(${rgb},.55)`;x.shadowBlur=8;x.fillStyle=`rgba(${rgb},.32)`;x.beginPath();x.arc(cx,cy,r,0,7);x.fill();x.restore();
       x.strokeStyle=`rgba(${rgb},.75)`;x.lineWidth=1;x.beginPath();x.arc(cx,cy,r,0,7);x.stroke();x.fillStyle=`rgba(${rgb},.95)`;x.beginPath();x.arc(cx,cy,Math.max(1.5,r*.28),0,7);x.fill();
@@ -418,18 +424,22 @@ let lastFull=0,busy=false;
 async function load(full){
   if(busy)return;busy=true;
   try{const wantFull=full||!S.d||Date.now()-lastFull>15000;
-    const r=await fetch(`/api/of/${S.inst}?tf=${S.tf}&lite=${wantFull||S.tf>15?0:1}&token=${encodeURIComponent(tok())}`,{cache:'no-store'});const j=await r.json();
+    const r=await fetch(`/api/of/${S.inst}?tf=${S.tf}&lite=${wantFull?0:1}&token=${encodeURIComponent(tok())}`,{cache:'no-store'});const j=await r.json();
     if(j&&j.pro===false){$('lock').style.display='block';$('app').style.display='none';return;}
     $('lock').style.display='none';$('app').style.display='block';
     if(!S.hist||S.hist.key!==S.inst+':'+S.tf||Date.now()-S.hist.at>60000)loadHist(true);
-    if(wantFull||S.tf>15||!S.d||S.d.inst!==j.inst||S.d.tf!==j.tf){S.d=j;lastFull=Date.now();}
+    if(wantFull||!S.d||S.d.inst!==j.inst){S.d=j;lastFull=Date.now();}
     else{const bars=S.d.bars;j.bars.forEach(b=>{const k=bars.findIndex(x=>x.t===b.t);if(k>=0)bars[k]=Object.assign(bars[k],b);else if(!bars.length||b.t>bars[bars.length-1].t)bars.push(b);});
       const keep={bars,profile:S.d.profile,profile_est:S.d.profile_est,levels:S.d.levels,prob_meta:S.d.prob_meta,profiles:S.d.profiles};S.d=Object.assign(j,keep);}
     render();}catch(e){}finally{busy=false;}
 }
 // ── Navigering som i TradingView ──
 // Staplar: motorns live-staplar (med delta/CVD) + äldre staplar från historiken bakåt.
-function allBars(){const d=S.d;if(!d)return [];const h=S.hist&&S.hist.key===S.inst+':'+S.tf?S.hist.bars:[];
+let _abK=null,_abV=[];
+function allBars(){const d=S.d;if(!d)return [];const hh=S.hist&&S.hist.key===S.inst+':'+S.tf?S.hist.bars:null,lb=d.bars[d.bars.length-1];
+  const k=S.inst+S.tf+':'+(hh?hh.length+':'+S.hist.at:0)+':'+d.bars.length+':'+(lb?lb.t+':'+lb.c+':'+lb.v:'')+':'+d.price;
+  if(k===_abK)return _abV;_abK=k;_abV=allBarsRaw();return _abV;}
+function allBarsRaw(){const d=S.d;if(!d)return [];const h=S.hist&&S.hist.key===S.inst+':'+S.tf?S.hist.bars:[];
   if(S.tf>15){if(!h.length)return d.bars;const last=h[h.length-1];
     if(last&&d.price){last.c=d.price;last.h=Math.max(last.h,d.price);last.l=Math.min(last.l,d.price);}return h;}
   const first=d.bars.length?d.bars[0].t:Infinity;return h.filter(b=>b.t<first).concat(d.bars);}
