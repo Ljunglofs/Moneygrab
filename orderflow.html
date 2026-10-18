@@ -157,7 +157,7 @@ const RGB={cy:'25,211,240',rd:'229,72,77',gex:'165,124,255'};
 const $=id=>document.getElementById(id);
 const tok=()=>{try{return localStorage.getItem('grabit_token')||''}catch(e){return ''}};
 const PREF=(()=>{try{return JSON.parse(localStorage.getItem('of_prefs')||'{}')}catch(e){return {}}})();
-const S={inst:PREF.inst||'NQ',tf:PREF.tf||1,scale:PREF.scale||'fut',view:PREF.view||'chart',prof:PREF.prof||'session',bub:PREF.bub||'on',bmin:PREF.bmin||0,hz:PREF.hz||'30m',sort:PREF.sort||'price',
+const S={inst:PREF.inst||'NQ',tf:PREF.tf||5,scale:PREF.scale||'fut',view:PREF.view||'chart',prof:PREF.prof||'session',bub:PREF.bub||'on',bmin:PREF.bmin||0,hz:PREF.hz||'30m',sort:PREF.sort||'price',
   d:null,sc:null,nb:null,off:0,cols:null,ypan:0,yz:1,mouse:null,bubHit:[]};
 const savePref=()=>{try{localStorage.setItem('of_prefs',JSON.stringify({inst:S.inst,tf:S.tf,scale:S.scale,view:S.view,prof:S.prof,bub:S.bub,bmin:S.bmin,hz:S.hz,sort:S.sort}))}catch(e){}};
 const mobile=()=>innerWidth<=760;
@@ -265,9 +265,12 @@ function drawChart(){
   if(pr.rows&&pr.rows.length){const {rows,bk}=aggRows(pr.rows,lo,hi,ch,2,pr.step);const mv=Math.max(...rows.map(r=>r.v),1e-9),rowPx=Math.abs(Y(0)-Y(bk)),rh=Math.max(1,Math.min(2,rowPx*.5));
     rows.forEach(r=>{const y=Y(r.px);if(y<top-rh||y>top+ch+rh)return;const inVA=pr.val!=null&&pr.vah!=null&&r.px>=pr.val&&r.px<=pr.vah;
       x.fillStyle=`rgba(${C.prof},${inVA?.8:.38})`;const w=(PRW-6)*r.v/mv;x.fillRect(cw+PRW-w,Math.round(y-rh/2),w,rh);});
-    [['VAH',pr.vah],['VAL',pr.val],['POC',pr.poc]].forEach(([t,v])=>{if(v==null)return;const y=Y(v);if(!inY(y))return;const poc=t==='POC';
-      x.strokeStyle=poc?'rgba(229,72,77,.8)':'rgba(154,166,184,.55)';x.lineWidth=poc?1.3:1;x.setLineDash(poc?[]:[5,4]);x.beginPath();x.moveTo(0,y);x.lineTo(cw+PRW,y);x.stroke();x.setLineDash([]);
-      x.font=F(700,10);x.textAlign='left';x.fillStyle=poc?C.rd:'#9AA6B8';x.fillText(`${t} ${fmtP(v+o)}`,cw+4,y-3);});
+    // POC (röd) och VAH/VAL (vita): kort tydlig linje ut till vänster från profilen, etikett i början av linjen
+    const px0=cw-(mob?36:72);
+    [['VAH',pr.vah],['VAL',pr.val],['POC',pr.poc]].forEach(([t,v])=>{if(v==null)return;const y=Math.round(Y(v))+.5;if(!inY(y))return;const poc=t==='POC',col=poc?C.rd:'#F2F4F7';
+      x.strokeStyle=col;x.lineWidth=poc?2:1.5;x.beginPath();x.moveTo(px0,y);x.lineTo(cw+PRW,y);x.stroke();
+      x.font=F(700,mob?9.5:10.5);x.textAlign='right';const tx=mob?t:`${t} ${fmtP(v+o)}`,tw=x.measureText(tx).width;
+      x.fillStyle='rgba(12,15,21,.88)';x.fillRect(px0-tw-10,y-8,tw+8,16);x.fillStyle=col;x.fillText(tx,px0-6,y+4);});
     x.font=F(600,9.5);x.textAlign='right';x.fillStyle=C.mut;x.fillText(pr.label.toUpperCase(),cw+PRW-4,top+10);}
   // VWAP (vit) och band (två gråvita nyanser, streckade)
   const line=(k,col,w,dash)=>{x.strokeStyle=col;x.lineWidth=w;x.setLineDash(dash);x.beginPath();let st=false;vws.forEach((v,i)=>{if(!v){st=false;return;}const y=Y(v[k]);st?x.lineTo(X(i),y):x.moveTo(X(i),y);st=true;});x.stroke();x.setLineDash([]);};
