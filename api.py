@@ -2091,10 +2091,11 @@ def _congress_flow():
                 "usd_num": _amount_mid(t.get("amount", "")),
                 "days_ago": da, "url": t.get("link") or ""}
 
-    for path, chamber in (("/api/v4/senate-trading-rss-feed", "SENATE"),
-                          ("/api/v4/senate-disclosure-rss-feed", "HOUSE")):
+    # FMP:s gamla v4-adresser är stängda för nya konton (403 "Legacy Endpoint").
+    for path, chamber in (("/stable/senate-latest", "SENATE"),
+                          ("/stable/house-latest", "HOUSE")):
         for page in (0, 1):
-            j = _fmp(path, {"page": page})
+            j = _fmp(path, {"page": page, "limit": 100})
             if not isinstance(j, list) or not j:
                 break
             for t in j:
@@ -2211,9 +2212,8 @@ def _fmp_insider_flow():
     out = []
     # FMP har flyttat sina endpoints; v4-flödet svarar tomt/403 på nyare
     # nycklar. Prova i tur och ordning tills en väg ger rader.
-    _paths = [("/api/v4/insider-trading-rss-feed", lambda p: {"page": p}),
-              ("/stable/insider-trading-latest", lambda p: {"page": p}),
-              ("/api/v4/insider-trading", lambda p: {"page": p})]
+    _paths = [("/stable/insider-trading/latest", lambda p: {"page": p, "limit": 100}),
+              ("/stable/insider-trading/search", lambda p: {"page": p, "limit": 100})]
     src = None
     for path, mk in _paths:
         probe = _fmp(path, mk(0))
@@ -3201,7 +3201,7 @@ def _macro_events():
     if fmp_key:
         try:
             today = _dt.date.today()
-            r = requests.get("https://financialmodelingprep.com/api/v3/economic_calendar",
+            r = requests.get("https://financialmodelingprep.com/stable/economic-calendar",
                              params={"from": today.isoformat(),
                                      "to": (today + _dt.timedelta(days=8)).isoformat(),
                                      "apikey": fmp_key}, timeout=12)
