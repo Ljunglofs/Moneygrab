@@ -237,8 +237,8 @@ function drawChart(){
   const inY=y=>y>=top&&y<=top+ch;
   // rutnät + prisaxel
   x.font=F(500,11);const step=niceStep((hi-lo)/9);
-  for(let v=Math.ceil(lo/step)*step;v<=hi;v+=step){const y=Y(v);x.strokeStyle=C.grid;x.lineWidth=1;x.beginPath();x.moveTo(0,y);x.lineTo(cw+PRW,y);x.stroke();x.fillStyle=C.mut;x.textAlign='left';x.fillText(fmtP(v+o),cw+PRW+7,y+4);}
-  const ticks=timeTicks(bars,sp,mob);ticks.forEach(([j])=>{const xx=X(j);if(xx<0||xx>cw)return;x.strokeStyle=C.grid;x.beginPath();x.moveTo(xx,top);x.lineTo(xx,top+ch);x.stroke();});
+  for(let v=Math.ceil(lo/step)*step;v<=hi;v+=step){const y=Y(v);x.fillStyle=C.mut;x.textAlign='left';x.fillText(fmtP(v+o),cw+PRW+7,y+4);}
+  const ticks=timeTicks(bars,sp,mob);   // inget rutnät — bara etiketter på axlarna
   const lvBy=nm=>(d.levels||[]).find(l=>l.name===nm);
   // "2% chance · 30 min" — under 20 % tonad, 20–60 % vit, över 60 % i nivåns färg
   const probTag=(px,yy,col)=>{const L0=(d.levels||[]).find(l=>Math.abs(l.px-px)<1e-6);const p=pOf(L0);if(p==null)return;
@@ -257,9 +257,10 @@ function drawChart(){
     soft(x,y,mob?10:16,cw,rgb,a);x.strokeStyle=`rgba(${rgb},${i===0?.55:.3})`;x.lineWidth=1;x.beginPath();x.moveTo(cw*.15,y);x.lineTo(cw,y);x.stroke();
     const name=bid?(i===0?'BUY LIQUIDITY / BUY SHELF':'BID SHELF'):(i===0?'SELL SHELF / SELL LIQUIDITY':'ASK SHELF');const ly=lblY(y-6);
     if(ly==null)return;x.font=F(700,mob?10:11);x.textAlign='left';x.fillStyle=bid?C.cy:C.rd;x.globalAlpha=i===0?1:.75;x.fillText(mob?name.split(' / ')[0]:`${name} · ${fmtU(s.avg_usd)}`,12,ly);x.globalAlpha=1;probTag(s.px,ly,bid?C.cy:C.rd);});
-  // Konvergenszoner — svag yta, ingen ram
-  (intra?d.zones||[]:[]).forEach((z,i)=>{const pd=d.inst==='NQ'?2:d.inst==='BTC'?30:.3,y1=Y(z.hi+pd),y2=Y(z.lo-pd);if(y2<top||y1>top+ch)return;const g=x.createLinearGradient(0,0,cw,0);g.addColorStop(0,'rgba(232,236,242,0)');g.addColorStop(1,'rgba(232,236,242,.07)');
-    x.fillStyle=g;x.fillRect(0,y1,cw,Math.max(4,y2-y1));x.fillStyle='rgba(232,236,242,.8)';x.font=F(700,10.5);x.textAlign='right';x.fillText('★'+(i+1),cw-10,y1+11);});
+  // Konvergenszoner — bara tunna streckade kanter till höger och ★, ingen grå yta
+  (intra?d.zones||[]:[]).forEach((z,i)=>{const pd=d.inst==='NQ'?2:d.inst==='BTC'?30:.3,y1=Y(z.hi+pd),y2=Y(z.lo-pd);if(y2<top||y1>top+ch)return;
+    x.strokeStyle='rgba(232,236,242,.28)';x.lineWidth=1;x.setLineDash([3,4]);x.beginPath();x.moveTo(cw*.55,Math.round(y1)+.5);x.lineTo(cw,Math.round(y1)+.5);x.moveTo(cw*.55,Math.round(y2)+.5);x.lineTo(cw,Math.round(y2)+.5);x.stroke();x.setLineDash([]);
+    x.fillStyle='rgba(232,236,242,.8)';x.font=F(700,10.5);x.textAlign='right';x.fillText('★'+(i+1),cw-10,y1-3);});
   // Sessions- och gårdagsnivåer — tunna gråblå linjer, liten etikett vid prisaxeln
   (intra?d.levels||[]:[]).filter(l=>l.group==='session'||l.group==='prev').forEach(l=>{const y=Y(l.px);if(!inY(y))return;x.strokeStyle='rgba(112,136,168,.5)';x.lineWidth=1;x.setLineDash(l.group==='prev'?[1,3]:[4,4]);x.beginPath();x.moveTo(0,y);x.lineTo(cw+PRW,y);x.stroke();x.setLineDash([]);
     const l3=mob?null:lblY(y-3,12);if(l3!=null){x.font=F(500,10);x.textAlign='right';x.fillStyle=C.hist;x.fillText(`${l.name} ${fmtP(l.px+o)}${l.touched?' · touched':''}`,cw+PRW-4,l3);}});
@@ -346,7 +347,7 @@ function drawFootprint(){
   S.sc={lo,hi,top,ch,cw,PRW:0,AX,W,H,bars,X:i=>8+i*colW+colW/2,Y,bw:colW-14};
   const k=Math.max(1,Math.ceil(9/(ch/((hi-lo)/bin)))),bk=bin*k,rh=Math.max(2,Math.abs(Y(0)-Y(bk))-1);
   x.font=F(500,11);const step=niceStep((hi-lo)/9);
-  for(let v=Math.ceil(lo/step)*step;v<=hi;v+=step){const y=Y(v);x.strokeStyle=C.grid;x.beginPath();x.moveTo(0,y);x.lineTo(cw,y);x.stroke();x.fillStyle=C.mut;x.textAlign='left';x.fillText(fmtP(v+o),cw+6,y+4);}
+  for(let v=Math.ceil(lo/step)*step;v<=hi;v+=step){const y=Y(v);x.fillStyle=C.mut;x.textAlign='left';x.fillText(fmtP(v+o),cw+6,y+4);}
   if(d.poc!=null&&d.poc>lo&&d.poc<hi){const y=Y(d.poc);x.strokeStyle='rgba(229,72,77,.6)';x.beginPath();x.moveTo(0,y);x.lineTo(cw,y);x.stroke();}
   S.fpHit=[];
   bars.forEach((b,i)=>{const x0=8+i*colW,bw=colW-14;const m=new Map();
