@@ -42,6 +42,7 @@ canvas{display:block;width:100%;touch-action:pan-y}
 .lv{display:flex;flex-direction:column}
 .lvhd{display:flex;justify-content:space-between;align-items:center;padding:10px 12px 6px;gap:8px}
 h3{font-size:10px;letter-spacing:.13em;color:var(--mut);font-weight:700}
+.qe{color:var(--cy);letter-spacing:.16em}
 .lvctl{display:flex;gap:6px;padding:0 12px 8px;flex-wrap:wrap}
 .lvctl .seg button{padding:4px 8px;font-size:11px}
 .lvlist{flex:1;overflow-y:auto;scrollbar-width:thin;border-top:1px solid var(--line)}
@@ -112,7 +113,7 @@ td{padding:5px 4px;border-bottom:1px solid var(--line)}th:not(:first-child),td:n
   <div class="main">
     <div class="card chartcard"><div class="fsbar" id="fsbar"></div><canvas id="chart"></canvas><div id="yax" title="Drag to stretch or compress · double-click = auto"></div><canvas id="cvd"></canvas></div>
     <div class="card lv">
-      <div class="lvhd"><h3>LEVELS · PROBABILITY TO HIT</h3></div>
+      <div class="lvhd" title="Volatility-adjusted probabilities, calibrated on historical intraday data and tested on data the model has not seen. A statistical aid, not a signal."><h3><span class="qe">QUANT ENGINE</span> · PROBABILITY TO HIT</h3></div>
       <div class="lvctl">
         <div class="seg" id="hz"><button data-v="15m">15m</button><button data-v="30m">30m</button><button data-v="60m">60m</button><button data-v="close">Session close</button></div>
         <div class="seg" id="sort"><button data-v="price">Price</button><button data-v="p">Prob</button><button data-v="dist">Dist</button></div>
