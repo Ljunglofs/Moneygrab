@@ -2094,8 +2094,8 @@ def _congress_flow():
     # FMP:s gamla v4-adresser är stängda för nya konton (403 "Legacy Endpoint").
     for path, chamber in (("/stable/senate-latest", "SENATE"),
                           ("/stable/house-latest", "HOUSE")):
-        for page in (0, 1):
-            j = _fmp(path, {"page": page, "limit": 100})
+        for page in (0,):                     # gratisnivån: bara sida 0, högst 25 rader
+            j = _fmp(path, {"page": page, "limit": 25})
             if not isinstance(j, list) or not j:
                 break
             for t in j:
@@ -2212,8 +2212,8 @@ def _fmp_insider_flow():
     out = []
     # FMP har flyttat sina endpoints; v4-flödet svarar tomt/403 på nyare
     # nycklar. Prova i tur och ordning tills en väg ger rader.
-    _paths = [("/stable/insider-trading/latest", lambda p: {"page": p, "limit": 100}),
-              ("/stable/insider-trading/search", lambda p: {"page": p, "limit": 100})]
+    _paths = [("/stable/insider-trading/latest", lambda p: {"page": 0, "limit": 25}),
+              ("/stable/insider-trading/search", lambda p: {"page": 0, "limit": 25})]
     src = None
     for path, mk in _paths:
         probe = _fmp(path, mk(0))
@@ -2223,7 +2223,7 @@ def _fmp_insider_flow():
     if not src:
         return []
     path, mk, first = src
-    for page in (0, 1):
+    for page in (0,):                         # gratisnivån: bara första sidan
         j = first if page == 0 else _fmp(path, mk(page))
         if not isinstance(j, list) or not j:
             break
