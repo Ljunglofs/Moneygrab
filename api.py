@@ -5499,6 +5499,14 @@ def _of_gex_live(inst, live_px):
             B = float(r["fut_price"]) - float(r["src_px"])
         if B is None and r.get("basis") is not None:
             B = float(r["basis"])
+        # Ogiltiga väggar döljs: märkt svag, eller på fel sida om priset
+        # (Call Wall under priset / Put Wall över priset). Gamma Flip visas alltid.
+        r = dict(r)
+        fp = float(r.get("fut_price") or 0)
+        if r.get("call_wall") is not None and (r.get("call_wall_weak") or (fp and float(r["call_wall"]) <= fp)):
+            r["call_wall"] = None
+        if r.get("put_wall") is not None and (r.get("put_wall_weak") or (fp and float(r["put_wall"]) >= fp)):
+            r["put_wall"] = None
         if B is not None:
             for typ, name in (("call", "call_wall"), ("put", "put_wall"), ("flip", "zero_gamma")):
                 if r.get(name) is not None:
