@@ -216,6 +216,66 @@ def _samples(bars, cme=True):
     return out
 
 
+HOLD_R = {"NQ": 10.0, "GC": 3.0, "BTC": 150.0}     # reaktionsavstånd för håller/bryts
+
+
+def _hold_stats(bars, row, R, cme=True):
+    """Hur ofta nivåtyper har HÅLLIT när priset rörde dem (studs R innan R igenom),
+    jämfört med slumpnivåer på samma avstånd. Per typ: [håller, antal]."""
+    days = _sessions(bars)
+    keys = [k for k in sorted(days) if not cme or k.weekday() < 5]   # CME: helgsessioner räknas inte
+    stats, ctrl = {}, [0, 0]
+    rng = np.random.default_rng(7)
+
+    def test(level, seq):
+        above = seq[0][4] > level
+        touched = False
+        for b in seq[1:]:
+            if not touched:
+                if (above and b[3] <= level) or (not above and b[2] >= level):
+                    touched = True
+                else:
+                    continue
+            brk = (b[3] <= level - R) if above else (b[2] >= level + R)
+            hold = (b[2] >= level + R) if above else (b[3] <= level - R)
+            if brk:
+                return "break"
+            if hold:
+                return "hold"
+        return None
+
+    for i in range(1, len(keys)):
+        pb, cb = days[keys[i - 1]], days[keys[i]]
+        if len(pb) < 50 or len(cb) < 50:
+            continue
+        prof = _profile(pb, row) or {}
+        lv = {"prevH": (max(b[2] for b in pb), cb[0][0]), "prevL": (min(b[3] for b in pb), cb[0][0]),
+              "prevPOC": (prof.get("poc"), cb[0][0]), "prevVAH": (prof.get("vah"), cb[0][0]),
+              "prevVAL": (prof.get("val"), cb[0][0])}
+        asia = [b for b in cb if _ny(b[0]).hour >= 18 or _ny(b[0]).hour < 2]
+        lon = [b for b in cb if 2 <= _ny(b[0]).hour < 8]
+        if asia:
+            tr = asia[-1][0] + 300000
+            lv["asiaH"] = (max(b[2] for b in asia), tr); lv["asiaL"] = (min(b[3] for b in asia), tr)
+        if lon:
+            tr = lon[-1][0] + 300000
+            lv["lonH"] = (max(b[2] for b in lon), tr); lv["lonL"] = (min(b[3] for b in lon), tr)
+        for name, (px, t_ready) in lv.items():
+            if px is None:
+                continue
+            seq = [b for b in cb if b[0] >= t_ready]
+            if len(seq) < 3:
+                continue
+            res = test(px, seq)
+            if res:
+                st = stats.setdefault(name, [0, 0]); st[1] += 1; st[0] += res == "hold"
+            d = abs(px - seq[0][4]) * rng.uniform(0.5, 1.5)
+            rc = test(seq[0][4] + (d if px > seq[0][4] else -d), seq)
+            if rc:
+                ctrl[1] += 1; ctrl[0] += rc == "hold"
+    return {"types": stats, "baseline": ctrl}
+
+
 def _fit(bars, cme=True):
     S = _samples(bars, cme)
     if not S:
@@ -285,6 +345,10 @@ def _refresh(inst):
         if bars and time.time() - c["fit_t"] > REFIT_S:
             mdl = _fit(bars[:-1], cme=inst != "BTC")   # sista (pågående) baren utesluts; BTC handlas även helger
             if mdl:
+                try:
+                    mdl["hold"] = _hold_stats(bars[:-1], row, HOLD_R.get(inst, 1.0), cme=inst != "BTC")
+                except Exception as e:
+                    print(f"of_levels hold {inst}: {e}")
                 c["model"] = mdl
                 c["fit_t"] = time.time()
     except Exception as e:
@@ -300,6 +364,65 @@ def _ensure(inst):
             c["busy"] = True
             threading.Thread(target=_refresh, args=(inst,), daemon=True).start()
     return c
+
+
+# ── CME-profil för NQ/GC (1m futuresstaplar med volym, fördelad över stapelns spann) ──
+YF = {"NQ": "NQ=F", "GC": "GC=F"}
+_CME = {}
+
+
+def _cme_refresh(inst):
+    c = _CME[inst]
+    try:
+        import yfinance as yf
+        h = yf.Ticker(YF[inst]).history(period="5d", interval="1m")
+        rows = [(int(ts.timestamp() * 1000), float(r["High"]), float(r["Low"]), float(r["Close"]), float(r["Volume"]))
+                for ts, r in h.iterrows() if r["Volume"] == r["Volume"]]
+        if rows:
+            c["bars"] = rows
+            c["t"] = time.time()
+    except Exception as e:
+        print(f"of_levels cme {inst}: {e}")
+    finally:
+        c["busy"] = False
+
+
+def cme_bars(inst):
+    """CME-staplar (t_ms, high, low, close, volym) — uppdateras i bakgrunden varje minut."""
+    if inst not in YF:
+        return []
+    with _LOCK:
+        c = _CME.setdefault(inst, {"bars": [], "t": 0, "busy": False})
+        if not c["busy"] and time.time() - c["t"] > 60:
+            c["busy"] = True
+            threading.Thread(target=_cme_refresh, args=(inst,), daemon=True).start()
+    return c["bars"]
+
+
+def _cme_profiles(inst, td, B):
+    """Dagens och gårdagens profil ur CME-volymen, flyttad till orderflödets pris (− basis B)."""
+    cb = cme_bars(inst)
+    if not cb or B is None:
+        return None, None
+    by = {}
+    for b in cb:
+        by.setdefault(_tday(b[0]), []).append(b)
+
+    def prof(rows):
+        if not rows or len(rows) < 30:
+            return None
+        f = _fine_profile([(h, l, v) for t, h, l, c_, v in rows if v > 0], FINE[inst])
+        if not f:
+            return None
+        f["rows"] = [{"px": round(r["px"] - B, 4), "v": r["v"]} for r in f["rows"]]
+        for k in ("poc", "vah", "val"):
+            f[k] = round(f[k] - B, 2)
+        f["hi"] = round(max(h for t, h, l, c_, v in rows) - B, 2)
+        f["lo"] = round(min(l for t, h, l, c_, v in rows) - B, 2)
+        f["src"] = "cme"
+        return f
+    prev_keys = [k for k in sorted(by) if k < td and k.weekday() < 5]
+    return prof(by.get(td)), (prof(by[prev_keys[-1]]) if prev_keys else None)
 
 
 # ── tillägg till motorns snapshot ─────────────────────────────────────────
@@ -339,7 +462,7 @@ def augment(snap):
     prof_prev = prof_comp = None
     if hist:
         days = _sessions(hist)
-        prev_keys = [k for k in sorted(days) if k < td]
+        prev_keys = [k for k in sorted(days) if k < td and (inst == "BTC" or k.weekday() < 5)]
         if prev_keys:
             pb = days[prev_keys[-1]]
             add("Yesterday's High", max(b[2] for b in pb), "prev", "prev")
@@ -356,6 +479,19 @@ def augment(snap):
                 fp.update({k: prof_prev[k] for k in ("poc", "vah", "val")})
             prof_prev = fp or prof_prev
 
+    cme_sess = cme_prev = None
+    if inst in YF:
+        cme_sess, cme_prev = _cme_profiles(inst, td, snap.get("basis"))
+        if cme_sess:
+            snap["poc"], snap["vah"], snap["val"] = cme_sess["poc"], cme_sess["vah"], cme_sess["val"]
+        if cme_prev:
+            prof_prev = cme_prev
+            for L0 in lv:
+                k_ = {"Yesterday's POC": "poc", "Yesterday's VAH": "vah", "Yesterday's VAL": "val",
+                      "Yesterday's High": "hi", "Yesterday's Low": "lo"}.get(L0["name"])
+                if k_:
+                    L0["px"] = round(cme_prev[k_], 2)
+    snap["profile_src"] = "cme" if cme_sess else "flow"
     add("POC", snap.get("poc"), "profile", "profile")
     add("VAH", snap.get("vah"), "profile", "profile")
     add("VAL", snap.get("val"), "profile", "profile")
@@ -394,6 +530,31 @@ def augment(snap):
             p = _predict(mdl.get(hz), z, mom, vwz)
             if p is not None:
                 L["p"][hz] = round(p, 3)
+    HT = {"Yesterday's High": "prevH", "Yesterday's Low": "prevL", "Yesterday's POC": "prevPOC",
+          "Yesterday's VAH": "prevVAH", "Yesterday's VAL": "prevVAL", "Asia High": "asiaH", "Asia Low": "asiaL",
+          "London High": "lonH", "London Low": "lonL"}
+    hs = (mdl or {}).get("hold") or {}
+    for L0 in lv:
+        st = (hs.get("types") or {}).get(HT.get(L0["name"], ""))
+        if st and st[1] >= 5:
+            L0["hold"] = [round(st[0] / st[1], 3), st[1]]
+    bl = hs.get("baseline") or [0, 0]
+    snap["hold_base"] = [round(bl[0] / bl[1], 3), bl[1]] if bl[1] else None
+    # sannolikhetskurva: P(nå) för valfritt avstånd uppåt/nedåt, i steg om 0,1 sigma*sqrt(k)
+    curve = {}
+    if mdl and sig:
+        for hz, k0 in HORIZONS.items():
+            k = k0 or k_close
+            sc = sig * math.sqrt(k)
+            if sc <= 0 or not (mdl.get(hz) or {}).get("ok"):
+                continue
+            row_ = {"sc": round(sc, 4)}
+            for side, dr in (("up", 1), ("dn", -1)):
+                mom = float(np.sign(price - p30)) * dr
+                vwz = max(-3.0, min(3.0, dr * (price - vwap) / sc))
+                row_[side] = [round(_predict(mdl[hz], z / 10, mom, vwz) or 0, 4) for z in range(0, 61)]
+            curve[hz] = row_
+    snap["pcurve"] = curve
     snap["levels"] = lv
     meta = {}
     for hz in HORIZONS:
@@ -410,7 +571,7 @@ def augment(snap):
     rvol = None
     if hist:
         days = _sessions(hist)
-        prev_keys = [k for k in sorted(days) if k < td][-5:]
+        prev_keys = [k for k in sorted(days) if k < td and (inst == "BTC" or k.weekday() < 5)][-5:]
         now_t = hist[-1][0]
         cur = [b for b in days.get(td, [])]
         if cur and prev_keys:
@@ -425,8 +586,8 @@ def augment(snap):
                 rvol = round(sum(b[5] for b in cur) / ref, 3)
     snap["rvol"] = rvol
     # sessionens profil i fin upplösning för visning (POC/VAH/VAL kommer fortfarande från motorn)
-    sf = _fine_profile([(b["h"], b["l"], b["v"]) for b in sess], FINE[inst], va=False)
-    if sf:
+    sf = cme_sess or _fine_profile([(b["h"], b["l"], b["v"]) for b in sess], FINE[inst], va=False)
+    if sf and not cme_sess:
         sf.update({"poc": snap.get("poc"), "vah": snap.get("vah"), "val": snap.get("val")})
     snap["profiles"] = {"session": sf, "previous": prof_prev, "composite": prof_comp}
     return snap
