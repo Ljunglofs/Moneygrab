@@ -5484,34 +5484,26 @@ def _of_public(snap):
     return snap
 
 
-_OF_RATIO = {}
-
-
 def _of_gex_live(inst, live_px):
-    """GEX räknad på servern (gex_live) i motorns indataformat. Nivåerna översätts till
-    orderflödets pris med kvoten källpris/underliggande vid CBOE:s prisstämpel."""
+    """Serverns GEX (gex_live = samma kod som pipelinen/TradingView-indikatorn) i motorns
+    indataformat. Nivåerna är futures-priser; saknar motorn basis översätts de med
+    skillnaden futures − orderflödets pris vid beräkningstillfället."""
     try:
         import gex_live as _GL
         import orderflow_engine as _OFE
         r = _GL.get(inst)
         if not r:
             return None
-        key = (inst, r["t_ms"])
-        ratio = _OF_RATIO.get(key)
-        if ratio is None:
-            p = _GL.source_price_at(inst, r["t_ms"])
-            if not p:
-                return None
-            ratio = _OF_RATIO[key] = p / r["spot"]
         B = getattr(_OFE.STATE.get(inst), "basis", None)
-        lv = {"call": r["call_wall"], "put": r["put_wall"], "flip": r["flip"]}
-        out = {"inst": inst, "regime": r["regime"], "basis": B or 0.0}
-        for typ, name in (("call", "call_wall"), ("put", "put_wall"), ("flip", "zero_gamma")):
-            if lv[typ] is not None:
-                px = round(lv[typ] * ratio, 2)
-                live_px[typ] = px
-                out[name] = round(px + (B or 0.0), 2)
-        return {"generated": r["generated"], "levels": [out]}
+        if B is None and r.get("src_px"):
+            B = float(r["fut_price"]) - float(r["src_px"])
+        if B is None and r.get("basis") is not None:
+            B = float(r["basis"])
+        if B is not None:
+            for typ, name in (("call", "call_wall"), ("put", "put_wall"), ("flip", "zero_gamma")):
+                if r.get(name) is not None:
+                    live_px[typ] = round(float(r[name]) - B, 2)
+        return {"generated": r.get("generated"), "levels": [r]}
     except Exception as e:
         print(f"Orderflow: gex_live misslyckades: {e}")
         return None

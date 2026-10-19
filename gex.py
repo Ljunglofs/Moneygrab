@@ -1,0 +1,715 @@
+"""
+GEX  ·  gex.py
+---------------
+Gamma-exponering (dealer GEX) per strike från optionskedjor, översatt till
+futures-nivåer. QQQ -> NQ, GLD -> GC.
+
+Varför ETF-optioner: NQ har inget gratis optionsflöde, men QQQ (och NDX-
+positionering via QQQ) styr samma dealers. Nivåerna översätts med live-kvoten
+futures/ETF (NQ/QQQ ≈ 41, GC/GLD ≈ 10.9) som räknas fram vid varje uppdatering.
+
+Modell (SpotGamma-stil, standardantagande dealers long calls / short puts):
+    GEX_strike = Σ  Γ(S, K, T, σ) · OI · 100 · S² · 0,01      (calls +, puts −)
+    Call wall  = strike med störst positiv GEX      (tak / magnet uppåt)
+    Put wall   = strike med störst negativ GEX      (golv / stödzon)
+    Zero gamma = spotnivå där nettoprofilen byter tecken
+                 över zero gamma: dealers dämpar (mean reversion, fade kanterna)
+                 under zero gamma: dealers förstärker (trend, bredare stopp)
+
+Open interest uppdateras en gång per dygn -> ingen realtidsdata behövs.
+
+Källor (GEX_SOURCE=auto|cboe|yahoo, auto är förval):
+  cboe   CBOE:s egen fördröjda kedja, ett anrop per underliggande, hela kedjan
+         med open interest, IV och greker. Ingen nyckel behövs.
+  yahoo  yfinance. Reserv — Yahoo svarar tidvis med open interest på bara en
+         handfull strikes, vilket ger nonsensväggar.
+Cache 30 min, senaste lyckade sparas på disk.
+"""
+import json
+import math
+import os
+import re
+import time
+import threading
+from datetime import datetime, timezone
+
+DATA_DIR = os.environ.get("DATA_DIR", ".")
+CACHE_FILE = os.path.join(DATA_DIR, "desk_gex.json")
+CACHE_SEC = int(os.environ.get("GEX_CACHE_SEC", "1800"))
+RISK_FREE = 0.04
+N_EXPIRIES = int(os.environ.get("GEX_EXPIRIES", "4"))    # närmaste expiries (0DTE + veckor + månad)
+# Flippen räknas på en kortare uppsättning än väggarna. Se kommentaren i
+# gex_from_chain: en kvartalsförfall tre dagar bort flyttar nollgammanivån
+# hundratals punkter och kan vända regimen, trots att den dagshandel flippen
+# ska beskriva styrs av gamman som förfaller närmast.
+FLIP_EXPIRIES = int(os.environ.get("GEX_FLIP_EXPIRIES", "3"))
+NEAR_PCT = float(os.environ.get("GEX_NEAR_PCT", "0.05"))   # HGEX och G+/G- inom 5 % av priset
+ATM_TRIES = int(os.environ.get("GEX_ATM_TRIES", "7"))      # strikes att prova för ATM-IV/straddle
+# En vägg är bara värd att handla på om den vinner övertygande över nästa
+# strike på samma sida. Den 22 september låg guldets två tyngsta callstrikes
+# (410 och 414) båda på 0,01 miljarder — då är "väggen" en slant, och vilken
+# som vinner avgörs av brus i open interest. Grannstrikes inom WALL_ZONE_PCT
+# räknas inte som konkurrenter: de är samma vägg, bara utspridd.
+WALL_MIN_MARGIN = float(os.environ.get("GEX_WALL_MIN_MARGIN", "1.5"))
+WALL_ZONE_PCT = float(os.environ.get("GEX_WALL_ZONE_PCT", "0.005"))
+
+# NQ räknas på NDX-indexoptionerna: samma underliggande som futuren, strikes var
+# tionde punkt i stället för var 41:e, och ingen ETF-kvot som kan bli fel. QQQ
+# finns kvar som reserv (GEX_NQ_SOURCE=qqq tvingar fram den).
+NQ_SOURCE = os.environ.get("GEX_NQ_SOURCE", "ndx").lower()
+UNDERLYING = {"NQ": "_NDX" if NQ_SOURCE == "ndx" else "QQQ", "GC": "GLD"}
+FALLBACK_UNDERLYING = {"NQ": "QQQ"}
+INDEX_SYMS = {"_NDX", "_SPX", "_RUT"}          # index: futures = index + basis, ingen kvot
+REF_SYM = {"_NDX": "^NDX", "_SPX": "^SPX", "_RUT": "^RUT"}
+SOURCE = os.environ.get("GEX_SOURCE", "auto").lower()
+CBOE_URL = "https://cdn.cboe.com/api/global/delayed_quotes/options/{}.json"
+MIN_OI_ROWS = int(os.environ.get("GEX_MIN_OI_ROWS", "40"))   # färre än så = halv kedja, prova nästa källa
+_OPT_RE = re.compile(r"(\d{6})([CP])(\d{8})$")
+SPOT_TOL = float(os.environ.get("GEX_SPOT_TOL", "0.01"))   # kedjans spot får avvika 1 % från referenskursen
+
+_lock = threading.Lock()
+_cache = {}      # inst -> {"t": epoch, "data": {...}}
+
+
+def _norm_pdf(x):
+    return math.exp(-0.5 * x * x) / math.sqrt(2 * math.pi)
+
+
+def bs_gamma(S, K, T, sigma):
+    if S <= 0 or K <= 0 or T <= 0 or sigma <= 0:
+        return 0.0
+    d1 = (math.log(S / K) + (RISK_FREE + 0.5 * sigma * sigma) * T) / (sigma * math.sqrt(T))
+    return _norm_pdf(d1) / (S * sigma * math.sqrt(T))
+
+
+def _years_to(expiry_str, now=None):
+    """Optioner löper ut vid 16:00 ET ~ 20:00 UTC. Minst 1 timme kvar (0DTE-skydd)."""
+    now = now or datetime.now(timezone.utc)
+    y, m, d = (int(x) for x in expiry_str.split("-"))
+    exp = datetime(y, m, d, 20, 0, tzinfo=timezone.utc)
+    secs = max((exp - now).total_seconds(), 3600)
+    return secs / (365 * 24 * 3600)
+
+
+def gex_from_chain(spot, rows, now=None):
+    """rows: iterable av dict(strike, oi, iv, type in {'C','P'}, expiry 'YYYY-MM-DD').
+    Returnerar per-strike-tabell och nyckelnivåer (i UNDERLIGGANDES pris)."""
+    per_strike = {}
+    near_strike = {}
+    legs = []
+    # Flippen räknas bara på de närmaste expirierna (FLIP_EXPIRIES).
+    flip_exps = sorted({r["expiry"] for r in rows if float(r.get("oi") or 0) > 0})[:FLIP_EXPIRIES]
+    for r in rows:
+        K = float(r["strike"]); oi = float(r.get("oi") or 0)
+        if oi <= 0 or K <= 0:
+            continue
+        iv = float(r.get("iv") or 0)
+        if not (0.01 < iv < 5):
+            iv = 0.20
+        T = _years_to(r["expiry"], now)
+        sign = 1.0 if r["type"] == "C" else -1.0
+        g = bs_gamma(spot, K, T, iv) * oi * 100 * spot * spot * 0.01 * sign
+        per_strike[K] = per_strike.get(K, 0.0) + g
+        legs.append((K, oi, iv, T, sign, r["expiry"]))
+        if r["expiry"] in flip_exps:
+            near_strike[K] = near_strike.get(K, 0.0) + g
+    if not per_strike:
+        return None
+
+    strikes = sorted(per_strike)
+    net = sum(per_strike.values())
+    call_wall = max(strikes, key=lambda k: per_strike[k])
+    put_wall = min(strikes, key=lambda k: per_strike[k])
+
+    # Zero gamma: nettoprofil när spot flyttas ±10 %.
+    #
+    # Räknas på de närmaste expirierna, inte på hela uppsättningen. Den 15
+    # september låg kvartalsförfallet den 18:e som fjärde expiry, och att ta
+    # med det flyttade nollgamman 293 NDX-punkter nedåt — från strax ovanför
+    # priset till en bit under, alltså från negativ till positiv regim. Samma
+    # sak i guld (394,4 -> 388,0 i GLD). Med de tre närmaste expirierna hamnar
+    # flippen 80 punkter från betaltjänstens nivå på NQ och 2 dollar på guld,
+    # och regimen blir densamma som deras. Väggarna räknas fortfarande på hela
+    # uppsättningen — de träffar deras nivåer först när kvartalen är med.
+    def _zero(ls, S0):
+        def net_at(S):
+            return sum(bs_gamma(S, K, T, iv) * oi * 100 * S * S * 0.01 * sign
+                       for K, oi, iv, T, sign, _e in ls)
+        grid = [S0 * (0.90 + 0.005 * i) for i in range(41)]
+        vals = [net_at(S) for S in grid]
+        # Profilen kan korsa noll flera gånger. Ta den korsning som ligger närmast
+        # priset — annars kan flippen hamna långt under spot samtidigt som nettot
+        # vid spot är negativt, alltså en flipp som säger emot regimen.
+        zs = []
+        for i in range(1, len(grid)):
+            a, b = vals[i - 1], vals[i]
+            if a < 0 <= b or a > 0 >= b:
+                zs.append(grid[i - 1] + (grid[i] - grid[i - 1]) * (0 - a) / (b - a) if b != a else grid[i])
+        return min(zs, key=lambda z: abs(z - S0)) if zs else None
+
+    near_legs = [l for l in legs if l[5] in flip_exps]
+    zero_all = _zero(legs, spot)
+    # Korsar den korta profilen inte noll inom ±10 % faller vi tillbaka på hela
+    # kedjan hellre än att lämna flippen tom.
+    zero = _zero(near_legs, spot) or zero_all
+    net_near = sum(near_strike.values())
+
+    # Stödnivåerna (HGEX, G+/G-) ska gå att handla på i dag. En strike 7 %
+    # under priset kan bära enorm gamma — NDX 27000 den 15 september — utan att
+    # betyda något för dagens rörelse, och på diagrammet blir den bara en linje
+    # långt utanför bild. Därför väljs de bland strikes inom NEAR_PCT av priset.
+    # Väggarna själva får ligga var som helst; de säger var strukturen tar slut.
+    def _margin(wall, sign):
+        """Hur övertygande vinner väggen över närmaste konkurrent på samma sida?
+        Returnerar kvoten mellan väggens gamma och den tyngsta rivalen utanför
+        väggens egen zon. Under WALL_MIN_MARGIN är väggen inte värd att lita på."""
+        if wall is None:
+            return None
+        best = abs(per_strike.get(wall, 0.0))
+        if best <= 0:
+            return None
+        rivals = [abs(g) for k, g in per_strike.items()
+                  if g * sign > 0 and abs(k / wall - 1) > WALL_ZONE_PCT]
+        rival = max(rivals) if rivals else 0.0
+        return best / rival if rival > 0 else float("inf")
+
+    cw_margin = _margin(call_wall, 1.0)
+    pw_margin = _margin(put_wall, -1.0)
+
+    near = [k for k in strikes if abs(k / spot - 1) <= NEAR_PCT] or strikes
+    top = sorted(near, key=lambda k: -abs(per_strike[k]))[:7]
+    hgex = top[0] if top else None
+    gpos = [k for k in sorted(near, key=lambda k: -per_strike[k]) if per_strike[k] > 0 and k != call_wall][:3]
+    gneg = [k for k in sorted(near, key=lambda k: per_strike[k]) if per_strike[k] < 0 and k != put_wall][:3]
+
+    # --- Närmaste expiry: 0DTE-väggar, max pain, ATM-straddle (expected move), IV ---
+    rows = list(rows)
+    exps = sorted({r["expiry"] for r in rows if r.get("oi")})
+    near = exps[0] if exps else None
+    nr = [r for r in rows if r["expiry"] == near and float(r.get("oi") or 0) > 0]
+    ps0 = {}
+    for r in nr:
+        K = float(r["strike"]); T = _years_to(near, now)
+        iv = float(r.get("iv") or 0); iv = iv if 0.01 < iv < 5 else 0.20
+        sign = 1.0 if r["type"] == "C" else -1.0
+        ps0[K] = ps0.get(K, 0.0) + bs_gamma(spot, K, T, iv) * float(r["oi"]) * 100 * spot * spot * 0.01 * sign
+    cw0 = max(ps0, key=lambda k: ps0[k]) if ps0 else None
+    pw0 = min(ps0, key=lambda k: ps0[k]) if ps0 else None
+
+    mpain = None
+    if nr:
+        ks0 = sorted({float(r["strike"]) for r in nr})
+        def pain(S):
+            return sum((max(0.0, S - float(r["strike"])) if r["type"] == "C" else max(0.0, float(r["strike"]) - S)) * float(r["oi"]) for r in nr)
+        mpain = min(ks0, key=pain)
+
+    def _mid(r):
+        b, a = float(r.get("bid") or 0), float(r.get("ask") or 0)
+        if b > 0 and a > 0:
+            return (a + b) / 2
+        return float(r.get("last") or 0) or None
+    em = iv_atm = None
+    em_src = None
+    if nr:
+        # Gå utåt från pengarna tills en strike har brukbar IV på båda benen.
+        # Att bara titta på den allra närmaste striken är för skört: den 17
+        # september saknade NDX:s ATM-strike IV i CBOE:s fil, och då föll hela
+        # NQ bort på sanity-kontrollen trots att kedjan hade 1485 rader med
+        # öppen balans och väggarna var helt i sin ordning.
+        ks = sorted({float(r["strike"]) for r in nr}, key=lambda k: abs(k - spot))[:ATM_TRIES]
+        T_near = _years_to(near, now)
+        cand_iv, straddle = [], None
+        for atm in ks:
+            c = [r for r in nr if r["type"] == "C" and float(r["strike"]) == atm]
+            pu = [r for r in nr if r["type"] == "P" and float(r["strike"]) == atm]
+            if not (c and pu):
+                continue
+            ivs = [float(r.get("iv") or 0) for r in (c[0], pu[0]) if 0.01 < float(r.get("iv") or 0) < 5]
+            if ivs:
+                cand_iv.append(sum(ivs) / len(ivs))
+            # Levande straddle (bid OCH ask > 0 på båda benen) — närmast pengarna vinner.
+            if straddle is None and all(float(r.get("bid") or 0) > 0 and float(r.get("ask") or 0) > 0
+                                        for r in (c[0], pu[0])):
+                straddle = _mid(c[0]) + _mid(pu[0])
+        # Medianen av grannarnas IV, inte den första bästa: skevheten gör att en
+        # enstaka strike kan ligga långt över de omkringliggande, och EM-bandet
+        # blir då för brett. Medianen tål både en tom och en extrem strike.
+        if cand_iv:
+            cand_iv.sort()
+            iv_atm = cand_iv[len(cand_iv) // 2]
+        # 1σ till expiry ur ATM-IV — robust även när Yahoo saknar bid/ask (helger, kvällar)
+        if iv_atm:
+            em, em_src = spot * iv_atm * math.sqrt(T_near), "iv"
+        if straddle is not None:
+            em_str = 0.85 * straddle                          # 1σ ≈ 0,85 × ATM-straddle
+            if em is None or 0.5 * em <= em_str <= 1.5 * em:
+                em, em_src = em_str, "straddle"
+    iv_1d = spot * iv_atm * math.sqrt(1 / 252) if iv_atm else None
+
+    return {
+        # Regimen läses ur samma uppsättning som flippen, annars kan de säga
+        # emot varandra: nettot över hela kedjan kan vara positivt medan den
+        # gamma som faktiskt förfaller i veckan är negativ.
+        "spot": spot, "net_gex": net_near, "net_gex_all": net,
+        "regime": "positiv" if net_near > 0 else "negativ",
+        "call_wall": call_wall, "put_wall": put_wall, "zero_gamma": zero,
+        "call_wall_margin": cw_margin, "put_wall_margin": pw_margin,
+        "call_wall_weak": bool(cw_margin is not None and cw_margin < WALL_MIN_MARGIN),
+        "put_wall_weak": bool(pw_margin is not None and pw_margin < WALL_MIN_MARGIN),
+        "zero_gamma_all": zero_all, "flip_expiries": flip_exps,
+        "top": [{"strike": k, "gex": per_strike[k]} for k in sorted(top)],
+        "n_strikes": len(strikes),
+        "hgex": hgex, "gpos": gpos, "gneg": gneg,
+        "near_expiry": near, "call_wall_0": cw0, "put_wall_0": pw0,
+        "max_pain": mpain, "em_straddle": em, "em_src": em_src, "iv_atm": iv_atm, "iv_1d": iv_1d,
+        # Flip långt från spot = putdominerad kedja (typiskt QQQ) -> regimen är osäker
+        "flip_uncertain": bool(zero is not None and abs(zero / spot - 1) > 0.02),
+        # Normalt gäller: pris över flip = positiv gamma. I en putdominerad kedja
+        # kan profilen vända tillbaka och bli negativ ovanför flippen. Då ljuger
+        # tumregeln, och det ska synas i meddelandet.
+        "flip_inverted": bool(zero is not None and ((net_near < 0 and spot > zero) or (net_near > 0 and spot < zero))),
+    }
+
+
+def _fetch_chain(underlying, n_exp=N_EXPIRIES):
+    import yfinance as yf
+    t = yf.Ticker(underlying)
+    spot = None
+    try:
+        spot = float(t.fast_info.get("last_price") or 0) or None
+    except Exception:
+        pass
+    exps = list(t.options or [])[:n_exp]
+    rows = []
+    got = []          # expiries som faktiskt gav data — Yahoo tappar enstaka anrop
+    for e in exps:
+        ch = None
+        for attempt in range(3):
+            try:
+                ch = t.option_chain(e)
+                break
+            except Exception as ex:
+                print(f"[gex] {underlying} {e}: {type(ex).__name__} — försök {attempt + 1}/3")
+                time.sleep(1.5 * (attempt + 1))
+        if ch is None:
+            continue
+        got.append(e)
+        def _n(v):
+            try:
+                v = float(v)
+                return 0.0 if v != v else v          # NaN -> 0
+            except Exception:
+                return 0.0
+        for typ, df in (("C", ch.calls), ("P", ch.puts)):
+            for _, r in df.iterrows():
+                rows.append({"strike": _n(r.get("strike")), "oi": _n(r.get("openInterest")),
+                             "iv": _n(r.get("impliedVolatility")), "type": typ, "expiry": e,
+                             "bid": _n(r.get("bid")), "ask": _n(r.get("ask")), "last": _n(r.get("lastPrice"))})
+    if spot is None and rows:
+        # fallback: ATM ~ strike med högst total OI nära mitten
+        ks = sorted({float(r["strike"]) for r in rows})
+        spot = ks[len(ks) // 2]
+    return spot, rows, got
+
+
+def _fetch_chain_cboe(underlying, n_exp=N_EXPIRIES):
+    """CBOE:s fördröjda kedja. Symbolen är ROOT+YYMMDD+C/P+strike*1000."""
+    import requests
+    r = requests.get(CBOE_URL.format(underlying.upper()), timeout=30,
+                     headers={"User-Agent": "grabit-gex/1.0"})
+    r.raise_for_status()
+    d = r.json().get("data") or {}
+    spot = float(d.get("current_price") or 0) or None
+    today = datetime.now(timezone.utc).date().isoformat()
+    by_exp = {}
+    for o in d.get("options") or []:
+        m = _OPT_RE.search(o.get("option") or "")
+        if not m:
+            continue
+        ymd, typ, strike = m.group(1), m.group(2), int(m.group(3)) / 1000.0
+        exp = f"20{ymd[:2]}-{ymd[2:4]}-{ymd[4:]}"
+        if exp < today or strike <= 0:
+            continue
+        def _n(v):
+            try:
+                v = float(v)
+                return 0.0 if v != v else v
+            except (TypeError, ValueError):
+                return 0.0
+        by_exp.setdefault(exp, []).append(
+            {"strike": strike, "oi": _n(o.get("open_interest")), "iv": _n(o.get("iv")),
+             "type": typ, "expiry": exp, "bid": _n(o.get("bid")), "ask": _n(o.get("ask")),
+             "last": _n(o.get("last_trade_price"))})
+    exps = sorted(by_exp)[:n_exp]
+    return spot, [row for e in exps for row in by_exp[e]], exps
+
+
+def _fetch_any(underlying):
+    """Hämtar kedjan från första källan som ger något användbart.
+    Returnerar (spot, rows, expiries, källa)."""
+    # Indexkedjor finns bara hos CBOE — yfinance kan inte slå upp "_NDX".
+    order = ("cboe",) if is_index(underlying) else {"cboe": ("cboe",), "yahoo": ("yahoo",)}.get(SOURCE, ("cboe", "yahoo"))
+    last = (None, [], [])
+    for src in order:
+        try:
+            spot, rows, exps = (_fetch_chain_cboe if src == "cboe" else _fetch_chain)(underlying)
+        except Exception as e:
+            print(f"[gex] {underlying}: {src} misslyckades — {type(e).__name__}: {e}")
+            continue
+        n_oi = sum(1 for r in rows if (r.get("oi") or 0) > 0)
+        print(f"[gex] {underlying}: {src} gav {len(rows)} rader, {n_oi} med OI, "
+              f"expiries {', '.join(exps[:4]) or '-'}")
+        if n_oi >= MIN_OI_ROWS:
+            return spot, rows, exps, src
+        if rows and not last[1]:
+            last = (spot, rows, exps)
+    # inget dög: lämna tillbaka det bästa vi ändå fick, sanity-kontrollen tar det
+    return last[0], last[1], last[2], "ingen"
+
+
+def is_index(underlying):
+    return underlying in INDEX_SYMS
+
+
+def _ref_spot(underlying):
+    """Oberoende ETF-kurs (senaste 5-minutersbaren) att stämma av kedjans spot mot.
+    Kedjans egen kurs kan vara dagar gammal — då hamnar både kvoten futures/ETF
+    och gammaprofilens centrering fel, och alla nivåer med dem."""
+    try:
+        import yfinance as yf
+        h = yf.Ticker(REF_SYM.get(underlying, underlying)).history(period="1d", interval="5m")
+        if h is not None and len(h):
+            return float(h["Close"].iloc[-1])
+    except Exception as e:
+        print(f"[gex] {underlying}: referenskurs misslyckades — {type(e).__name__}: {e}")
+    return None
+
+
+def _checked_spot(underlying, spot, src):
+    """Kedjans spot om den håller, annars referenskursen. (spot, varifrån)."""
+    ref = _ref_spot(underlying)
+    if spot and ref and abs(spot / ref - 1) > SPOT_TOL:
+        print(f"[gex] {underlying}: {src}-kursen {spot} avviker "
+              f"{abs(spot / ref - 1) * 100:.1f} % från senaste 5m-baren {ref} — använder baren")
+        return ref, "5m-bar"
+    if not spot:
+        return ref, "5m-bar"
+    return spot, src
+
+
+def _mid_price(r):
+    b, a = float(r.get("bid") or 0), float(r.get("ask") or 0)
+    if b > 0 and a > 0:
+        return (a + b) / 2
+    return float(r.get("last") or 0) or None
+
+
+def forward_from_chain(rows, expiry, hint=None):
+    """Terminspriset kedjan själv prisar in, via put-call-paritet: F = K + C − P.
+
+    Index som NDX kvoteras inte alltid live i de fria flödena — den 15 september
+    stod kursen stilla på 29114 medan futuren gick 29390 -> 29426 mitt under
+    öppen handel, vilket gav en basis på 312 punkter i stället för ett fyrtiotal.
+    Optionerna vet bättre: står call och put lika vid en strike är den striken
+    terminspriset. Det kräver ingen indexkurs alls.
+    """
+    calls, puts = {}, {}
+    for r in rows:
+        if r.get("expiry") != expiry:
+            continue
+        m = _mid_price(r)
+        if not m:
+            continue
+        (calls if r["type"] == "C" else puts)[float(r["strike"])] = m
+    common = sorted(set(calls) & set(puts))
+    if hint:
+        common = sorted(common, key=lambda k: abs(k - hint))[:80]
+    if not common:
+        return None
+    # ATM = där call och put står närmast varandra. Medianen av de fem bästa
+    # tål en enskild skev kvot.
+    best = sorted(common, key=lambda k: abs(calls[k] - puts[k]))[:5]
+    fwds = sorted(k + calls[k] - puts[k] for k in best)
+    return fwds[len(fwds) // 2] if fwds else None
+
+
+def _load_disk():
+    try:
+        with open(CACHE_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _save_disk(all_data):
+    try:
+        os.makedirs(os.path.dirname(CACHE_FILE) or ".", exist_ok=True)
+        tmp = CACHE_FILE + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(all_data, f)
+        os.replace(tmp, CACHE_FILE)
+    except Exception as e:
+        print("[gex] kunde inte spara cache:", e)
+
+
+# ---- Basis: futures minus index -------------------------------------------
+# Terminen prisas som index plus ränta minus utdelning fram till kontraktets
+# förfall: F - S = S * (r - q) * T. För NQ i slutet av september, med
+# decemberkontraktet 84 dagar bort, är det ungefär +230 punkter — alltid
+# positivt så länge räntan är högre än utdelningen.
+#
+# Den 24 september sparades ändå basisen -174,75: optionskedjan från CBOE
+# bar fortfarande gårdagens stängningskurser när den lästes 10:07 ET, och
+# futuren hade hunnit falla. Alla NQ-nivåer hamnade drygt 350 punkter för
+# lågt — Call Wall under priset. En uppmätt basis används därför bara om den
+# ligger nära det teoretiska värdet; annars används det teoretiska.
+NDX_DIV_YIELD = float(os.environ.get("GEX_NDX_DIV", "0.007"))
+BASIS_TOL_PCT = float(os.environ.get("GEX_BASIS_TOL_PCT", "0.004"))   # 0,4 % ~ 120 NQ-punkter
+ROLL_DAYS = int(os.environ.get("GEX_ROLL_DAYS", "8"))                 # CME rullar ~8 dagar före förfall
+
+
+def _third_friday(y, m):
+    from datetime import date
+    first = date(y, m, 1)
+    return date(y, m, 1 + (4 - first.weekday()) % 7 + 14)
+
+
+def _quarterly_expiries(today, n=3):
+    """De n närmaste kvartalsförfallen (mars/juni/sep/dec, tredje fredagen) från today."""
+    out, y, m = [], today.year, today.month
+    while len(out) < n:
+        if m in (3, 6, 9, 12):
+            e = _third_friday(y, m)
+            if e >= today:
+                out.append(e)
+        m += 1
+        if m > 12:
+            m, y = 1, y + 1
+    return out
+
+
+def front_expiry(today=None):
+    """Kontraktet en kontinuerlig NQ-serie följer: närmaste kvartal, men nästa
+    när det är mindre än ROLL_DAYS kvar (då har volymen rullat)."""
+    today = today or datetime.now(timezone.utc).date()
+    ex = _quarterly_expiries(today, 2)
+    return ex[1] if (ex[0] - today).days < ROLL_DAYS else ex[0]
+
+
+def carry_basis(index_px, today=None, expiry=None):
+    """Teoretisk basis F - S för NQ mot NDX, i indexpunkter."""
+    today = today or datetime.now(timezone.utc).date()
+    expiry = expiry or front_expiry(today)
+    T = max((expiry - today).days, 0) / 365.0
+    return index_px * (RISK_FREE - NDX_DIV_YIELD) * T
+
+
+def basis_ok(basis, index_px, today=None):
+    """Är en uppmätt basis rimlig? Den jämförs mot både det närmaste och nästa
+    kvartalskontraktet, så att rullveckan inte fäller en korrekt mätning."""
+    if basis is None or not index_px:
+        return False
+    today = today or datetime.now(timezone.utc).date()
+    tol = BASIS_TOL_PCT * index_px
+    return any(abs(basis - carry_basis(index_px, today, e)) <= tol
+               for e in _quarterly_expiries(today, 2))
+
+
+def pick_basis(measured, index_px, today=None):
+    """(basis, källa): den uppmätta om den håller, annars den teoretiska."""
+    if measured is not None and basis_ok(measured, index_px, today):
+        return measured, "live"
+    cb = carry_basis(index_px, today)
+    if measured is not None:
+        print(f"[gex] basis {measured:.1f} orimlig (teoretisk {cb:.1f}) — använder teoretisk")
+    return cb, "carry"
+
+
+def to_futures(levels, fut_price, etf_price, ratio=None, basis=None):
+    """Skala ETF-nivåer till futures. ratio=None ger live-kvoten fut/etf.
+    Utanför USA-börsens öppettider är ETF-kursen gårdagens stängning, och då
+    ska en kvot uppmätt medan båda handlades skickas in i stället — annars
+    följer väggarna med nattens rörelse i stället för att ligga still."""
+    if not levels or not fut_price or not (etf_price or ratio or basis is not None):
+        return None
+    # Index: futures = index + basis (additivt). ETF: futures = strike x kvot.
+    # sc() flyttar en PRISNIVÅ, sw() skalar ett AVSTÅND (expected move,
+    # IV-range). Ett avstånd är lika stort i index och futures, så i
+    # basis-läget ska det inte få basisen påslagen. Förut blev NQ:s expected
+    # move 199 + (-174,75) = 24 punkter den 25 september.
+    if basis is not None:
+        r = round(fut_price / etf_price, 4) if etf_price else None
+        def sc(x):
+            return round(x + basis, 2) if x is not None else None
+        def sw(x):
+            return round(x, 2) if x is not None else None
+    else:
+        r = ratio if ratio else fut_price / etf_price
+        def sc(x):
+            return round(x * r, 2) if x is not None else None
+        sw = sc
+    return {
+        "ratio": (round(r, 4) if r else None), "basis": (round(basis, 2) if basis is not None else None),
+        "fut_price": fut_price, "etf_price": etf_price,
+        "net_gex": levels["net_gex"], "net_gex_all": levels.get("net_gex_all"),
+        "regime": levels["regime"],
+        "call_wall": sc(levels["call_wall"]), "put_wall": sc(levels["put_wall"]),
+        "call_wall_margin": levels.get("call_wall_margin"),
+        "put_wall_margin": levels.get("put_wall_margin"),
+        "call_wall_weak": levels.get("call_wall_weak", False),
+        "put_wall_weak": levels.get("put_wall_weak", False),
+        "zero_gamma": sc(levels["zero_gamma"]), "zero_gamma_all": sc(levels.get("zero_gamma_all")),
+        "flip_expiries": levels.get("flip_expiries"),
+        "top": [{"level": sc(t["strike"]), "strike": t["strike"], "gex": t["gex"]} for t in levels["top"]],
+        "hgex": sc(levels.get("hgex")), "gpos": [sc(k) for k in levels.get("gpos", [])],
+        "gneg": [sc(k) for k in levels.get("gneg", [])],
+        "call_wall_0": sc(levels.get("call_wall_0")), "put_wall_0": sc(levels.get("put_wall_0")),
+        "max_pain": sc(levels.get("max_pain")), "em": sw(levels.get("em_straddle")),
+        "iv_1d": sw(levels.get("iv_1d")), "near_expiry": levels.get("near_expiry"),
+        "em_src": levels.get("em_src"), "flip_uncertain": levels.get("flip_uncertain", False),
+        "flip_inverted": levels.get("flip_inverted", False),
+    }
+
+
+def get_gex(inst, fut_price=None, force=False, prefer=None):
+    """Huvudingång. inst 'NQ'|'GC'. Returnerar dict med ETF-nivåer + futures-nivåer
+    (om fut_price ges) eller None. Aldrig exception utåt."""
+    und = UNDERLYING.get(inst)
+    if not und:
+        return None
+    cands = [und] + ([FALLBACK_UNDERLYING[inst]] if inst in FALLBACK_UNDERLYING
+                     and FALLBACK_UNDERLYING[inst] != und else [])
+    if prefer and prefer in cands:
+        cands = [prefer] + [c for c in cands if c != prefer]
+    with _lock:
+        c = _cache.get(inst)
+        if c and not force and not prefer and time.time() - c["t"] < CACHE_SEC:
+            data = c["data"]
+        else:
+            data = None
+            for cand in cands:
+                try:
+                    spot, rows, exps, src = _fetch_any(cand)
+                    spot, spot_src = _checked_spot(cand, spot, src)
+                    if is_index(cand) and exps and rows:
+                        fwd = forward_from_chain(rows, exps[0], hint=spot)
+                        if fwd and (not spot or abs(fwd / spot - 1) < 0.10):
+                            print(f"[gex] {cand}: terminspris ur put-call-paritet {fwd:.1f} "
+                                  f"(kvoterat index {spot})")
+                            spot, spot_src = fwd, "put-call-paritet"
+                    lv = gex_from_chain(spot, rows) if (rows and spot) else None
+                    if lv:
+                        data = {"underlying": cand, "expiries": exps,
+                                "updated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                                "levels": lv, "stale": False, "source": src, "spot_source": spot_src,
+                                "mapping": "basis" if is_index(cand) else "ratio"}
+                        break
+                    print(f"[gex] {cand}: ingen nivåtabell — provar nästa underliggande")
+                except Exception as e:
+                    print(f"[gex] {cand}: {type(e).__name__}: {e}")
+            if data:
+                _cache[inst] = {"t": time.time(), "data": data}
+                disk = _load_disk(); disk[inst] = data; _save_disk(disk)
+            else:
+                data = (c or {}).get("data") or _load_disk().get(inst)
+                if data:
+                    data = dict(data); data["stale"] = True
+                    _cache[inst] = {"t": time.time() - CACHE_SEC + 300, "data": data}   # försök igen om 5 min
+    if not data:
+        return None
+    out = dict(data)
+    if fut_price:
+        sp = data["levels"]["spot"]
+        if data.get("mapping") == "basis":
+            b, bsrc = pick_basis(fut_price - sp, sp)
+            out["futures"] = to_futures(data["levels"], fut_price, sp, basis=b)
+            if out["futures"]:
+                out["futures"]["basis_src"] = bsrc
+        else:
+            out["futures"] = to_futures(data["levels"], fut_price, sp)
+    return out
+
+
+def gex_text(inst, g):
+    if not g:
+        return f"GEX {inst}: ingen data (Yahoo nåddes inte, ingen cache)."
+    lv = g["levels"]; f = g.get("futures")
+    name = {"NQ": "NQ (via QQQ)", "GC": "GC (via GLD)"}.get(inst, inst)
+    bn = lv["net_gex"] / 1e9
+    lines = [f"\U0001F9F2 <b>GAMMA · {name}</b>" + (" ⚠ gammal data" if g.get("stale") else ""),
+             f"Regim: <b>{lv['regime']}</b> (netto {bn:+.2f} mdr USD/1 % i de närmaste expirierna) — "
+             + ("dealers dämpar: fade kanterna, mean reversion" if lv["net_gex"] > 0
+                else "dealers förstärker: trendläge, bredare stopp")]
+    if f and f.get("flip_uncertain"):
+        lines.append("⚠ Flip ligger >2 % från priset — putdominerad kedja, läs regimen med skepsis.")
+    if f:
+        lines.append(f"Call wall: <b>{f['call_wall']}</b> · Put wall: <b>{f['put_wall']}</b>"
+                     + (f" · Zero gamma: <b>{f['zero_gamma']}</b>" if f["zero_gamma"] else ""))
+        lines.append("Största strikes: " + ", ".join(f"{t['level']:.0f}" for t in f["top"]))
+        lines.append(f"<i>{g['underlying']} {lv['spot']:.2f} · kvot {f['ratio']} · exp {', '.join(g['expiries'][:3])}</i>")
+    else:
+        lines.append(f"{g['underlying']}: call wall {lv['call_wall']} · put wall {lv['put_wall']}"
+                     + (f" · zero gamma {lv['zero_gamma']:.2f}" if lv["zero_gamma"] else ""))
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------- TradingView-sträng
+TICK = {"NQ": 0.25, "GC": 0.10}
+
+
+def _fmt_px(x, tick):
+    x = round(x / tick) * tick
+    return f"{x:.2f}".rstrip("0").rstrip(".") if tick < 1 else f"{x:.0f}"
+
+
+def levels_string(inst, g, open_price=None, atr_daily=None, today=None):
+    """Bygger strängen till Pine-indikatorn 'GEX Daily Levels':
+       pris,etikett,typ;...  med typerna res/sup/res0/sup0/flip/hgex/mpain/gpos/gneg/
+       emh/eml/emb/ivh/ivl/opo/opu/opd. Etiketter utan komma/semikolon."""
+    if not g or not g.get("futures"):
+        return ""
+    f = g["futures"]; tick = TICK.get(inst, 0.25)
+    S = f["fut_price"]
+    parts = []
+    def add(px, label, kind):
+        if px is not None and px > 0:
+            parts.append(f"{_fmt_px(px, tick)},{label},{kind}")
+    # Svag vägg får typen resw/supw. Gamla indikatorversioner ritar okända
+    # typer prickade i dämpad färg — de går alltså inte sönder, de blir svaga.
+    add(f.get("call_wall"), "Call Wall", "resw" if f.get("call_wall_weak") else "res")
+    add(f.get("put_wall"), "Put Wall", "supw" if f.get("put_wall_weak") else "sup")
+    ne = f.get("near_expiry") or ""
+    tag0 = "0DTE" if (today and ne == str(today)) else (ne[5:] if ne else "near")
+    if f.get("call_wall_0") and f["call_wall_0"] != f.get("call_wall"):
+        add(f["call_wall_0"], f"Call Wall {tag0}", "res0")
+    if f.get("put_wall_0") and f["put_wall_0"] != f.get("put_wall"):
+        add(f["put_wall_0"], f"Put Wall {tag0}", "sup0")
+    add(f.get("zero_gamma"), "Gamma Flip", "flip")
+    if f.get("hgex") and f["hgex"] not in (f.get("call_wall"), f.get("put_wall")):
+        add(f["hgex"], "HGEX", "hgex")
+    add(f.get("max_pain"), f"Max Pain {tag0}", "mpain")
+    for i, k in enumerate(f.get("gpos", [])[:2], 1):
+        add(k, f"G+ {i}", "gpos")
+    for i, k in enumerate(f.get("gneg", [])[:2], 1):
+        add(k, f"G- {i}", "gneg")
+    em = f.get("em")
+    if em:
+        add(S + em, "EM+", "emh"); add(S - em, "EM-", "eml")
+        add(S + 0.5 * em, "EM +50%", "emb"); add(S - 0.5 * em, "EM -50%", "emb")
+    iv = f.get("iv_1d")
+    if iv:
+        add(S + iv, "1D High IV", "ivh"); add(S - iv, "1D Low IV", "ivl")
+    if open_price:
+        add(open_price, "Open", "opo")
+        if atr_daily:
+            for m in (0.5, 1.0):
+                add(open_price + m * atr_daily, f"O +{m:g} ATR", "opu")
+                add(open_price - m * atr_daily, f"O -{m:g} ATR", "opd")
+    return ";".join(parts)
+
+
+if __name__ == "__main__":
+    # python gex.py [nq|gc] -> samma utskrift som gex_cli.py
+    import sys
+    from gex_cli import main as _cli_main
+    _cli_main(sys.argv[1:])
