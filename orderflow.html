@@ -187,7 +187,7 @@ function seg(id,key){const el=$(id);[...el.children].forEach(x=>x.classList.togg
 ['inst','tf','view','prof','scale','hz','sort'].forEach(k=>seg(k,k));
 // Layers: slå av/på varje lager. Sparas i webbläsaren.
 const LAYERS=[['','ON THE CHART'],['bubbles','Aggression bubbles'],['shelves','Liquidity shelves'],['zones','Confluence zones'],['gex','GEX levels'],['levels','Session & yesterday levels'],
-  ['vwap','VWAP & bands'],['profile','Volume profile'],['plan','Daily plan zones'],['heat','Liquidity heatmap'],['','YOURS'],['draw','My drawings'],['trade','Trade check lines']];
+  ['vwap','VWAP & bands'],['profile','Volume profile'],['plan','Daily plan · A+/A zones'],['heat','Liquidity heatmap'],['','YOURS'],['draw','My drawings'],['trade','Trade check lines']];
 function renderLayers(){$('lyp').innerHTML=LAYERS.map(([k,n])=>k?`<label><input type="checkbox" data-k="${k}" ${S.L[k]?'checked':''}>${n}</label>`:`<div class="lyh">${n}</div>`).join('')
   +'<label style="margin-top:4px;border-top:1px solid var(--line);padding-top:8px"><span data-all="1" style="color:#19D3F0">Show all</span><span data-none="1" style="color:var(--mut);margin-left:auto">Clean chart</span></label>';}
 renderLayers();
@@ -306,6 +306,16 @@ function drawChart(){
     const lyz=lblY(y1-4);if(lyz!=null){x.font=F(700,mob?9.5:10.5);x.textAlign='right';x.fillStyle=i===0?'#DCCBFF':'rgba(220,203,255,.7)';
       x.fillText(`★${i+1} ${mob?'':(i===0?'STRONGEST ZONE · ':'ZONE 2 · ')}${z.side==='bid'?'SUPPORT':'RESISTANCE'}`,cw-10,lyz);}
     S.zoneHit.push({y1,y2,z,i});});
+  // Dagsplan: A+/A-zoner — svagt rött sken för SHORT över priset, cyan för LONG under. Bara högra delen av grafen.
+  S.planHit=[];
+  ((S.L.plan&&d.plan&&d.plan.zones)||[]).forEach(z=>{const y1=Y(z.hi),y2=Y(z.lo);if(y2<top||y1>top+ch)return;const sh=z.side==='short',rgb=sh?RGB.rd:RGB.cy,AP=z.grade==='A+';
+    const h=Math.max(6,y2-y1),x0=Math.max(cw*.62,Math.min(cw-120,xOf(L-1)-sp*12)),g=x.createLinearGradient(x0,0,cw,0);
+    g.addColorStop(0,`rgba(${rgb},${AP?.05:.03})`);g.addColorStop(1,`rgba(${rgb},${AP?.2:.12})`);
+    x.save();x.shadowColor=`rgba(${rgb},${AP?.35:.18})`;x.shadowBlur=AP?12:6;x.fillStyle=g;x.beginPath();x.roundRect(x0,y1,cw-x0,h,4);x.fill();x.restore();
+    x.strokeStyle=`rgba(${rgb},${AP?.5:.28})`;x.lineWidth=1;x.beginPath();x.roundRect(x0+.5,y1+.5,cw-x0-1,h-1,4);x.stroke();
+    const ly=lblY(sh?y1-4:y1+h+11);if(ly!=null){const pc=(z.reach||{}).close;x.font=F(700,mob?9.5:10.5);x.textAlign='left';x.fillStyle=sh?C.rd:C.cy;x.globalAlpha=AP?1:.8;
+      x.fillText(`${z.grade} ${sh?'SHORT':'LONG'} ZONE${mob||pc==null?'':' · '+pTxt(pc)+' reach today'}`,x0+6,ly);x.globalAlpha=1;}
+    S.planHit.push({y1,y2:y1+h,x0,z});});
   // Sessions- och gårdagsnivåer — tunna gråblå linjer, liten etikett vid prisaxeln
   (intra&&S.L.levels?d.levels||[]:[]).filter(l=>l.group==='session'||l.group==='prev').forEach(l=>{const y=Y(l.px);if(!inY(y))return;x.strokeStyle='rgba(112,136,168,.5)';x.lineWidth=1;x.setLineDash(l.group==='prev'?[1,3]:[4,4]);x.beginPath();x.moveTo(0,y);x.lineTo(cw+PRW,y);x.stroke();x.setLineDash([]);
     const l3=mob?null:lblY(y-3,12);if(l3!=null){x.font=F(500,10);x.textAlign='right';x.fillStyle=C.hist;x.fillText(`${l.name} ${fmtP(l.px+o)}${l.touched?' · touched':''}`,cw+PRW-4,l3);}});
@@ -391,6 +401,18 @@ function crosshair(x){const m=S.mouse,s=S.sc,d=S.d;if(!m||!s||m.y<s.top||m.y>s.t
   if(b){const t=new Date(b.t*1000).toLocaleString('en-GB',{weekday:'short',hour:'2-digit',minute:'2-digit'});x.font=F(600,10.5);const tw=x.measureText(t).width+12;x.fillStyle='#1B212B';x.beginPath();x.roundRect(m.x-tw/2,s.H-20,tw,17,4);x.fill();x.fillStyle=C.txt;x.textAlign='center';x.fillText(t,m.x,s.H-8);
     if(!m.bub){const dl=b.bv-b.sv,txt=`O ${fmtP(b.o+o)}  H ${fmtP(b.h+o)}  L ${fmtP(b.l+o)}  C ${fmtP(b.c+o)}  Δ ${pct((b.bv+b.sv)?dl/(b.bv+b.sv)*100:0)}`;x.font=F(500,11);x.textAlign='left';x.fillStyle=C.mut;x.fillText(txt,12,s.top+10);}}
   const zh=!m.bub&&S.view!=='fp'?(S.zoneHit||[]).find(q=>m.y>=q.y1-4&&m.y<=q.y2+4):null;
+  const ph=!m.bub&&!zh&&S.view!=='fp'?(S.planHit||[]).find(q=>m.y>=q.y1-3&&m.y<=q.y2+3&&m.x>=q.x0):null;
+  if(ph){const z=ph.z,sh=z.side==='short',r=z.reach||{},b=(S.d.hold_base||[.5])[0];
+    const lines=[`${z.grade} ${sh?'SHORT':'LONG'} ZONE · Daily plan`,`${fmtP(z.lo+o)} – ${fmtP(z.hi+o)}`,'WHY THIS ZONE',
+      `• Chance to reach: ${pTxt(r['60m'])} within 1 h · ${pTxt(r.close)} today`,
+      ...(z.hold?[`• Levels like these held ${Math.round(z.hold[0]*100)}% of ${z.hold[1]} touches (random levels: ${Math.round(b*100)}%)`]:[]),
+      `• ${z.sources.length} level${z.sources.length>1?'s':''} meet here: ${z.sources.slice(0,5).map(t=>t.replace(' (weak)','')).join(', ')}`,
+      ...(z.flow||[]).map(f=>'• '+f[0]),
+      `${z.grade==='A+'?'A+ = strongest: many independent sources, good hold history and reachable today.':'A = solid zone, fewer sources or weaker history.'}`,
+      'A zone to watch — not a buy/sell signal.'];
+    x.font=F(600,11.5);const tw=Math.max(...lines.map(l=>x.measureText(l).width))+20,th=lines.length*16+12,tx=Math.max(8,Math.min(m.x-tw-14,s.cw-tw)),ty=Math.max(s.top,Math.min(m.y+12,s.top+s.ch-th));
+    x.fillStyle='rgba(8,10,15,.96)';x.strokeStyle=sh?'rgba(229,72,77,.55)':'rgba(25,211,240,.55)';x.beginPath();x.roundRect(tx,ty,tw,th,7);x.fill();x.stroke();
+    lines.forEach((l,k)=>{x.fillStyle=k===0?(sh?C.rd:C.cy):k===2?C.mut:k>=lines.length-2?C.mut:C.txt;x.textAlign='left';x.fillText(l,tx+10,ty+19+k*16);});}
   if(zh){const z=zh.z,ev=z.evidence.map(e=>e.src==='Volume'?e.text:e.src==='GEX (options)'?e.text.replace(/ \(weak\)/,''):e.src==='Orderbook'?(z.side==='bid'?'Buy shelf':'Sell shelf'):e.text.split(' (')[0]);
     const lines=[`★${zh.i+1} ${zh.i===0?'Strongest confluence zone':'Confluence zone 2'} · ${z.side==='bid'?'Support':'Resistance'}`,
       `${fmtP(z.lo+o)}${z.hi-z.lo>.01?' – '+fmtP(z.hi+o):''}  ·  ${z.score} independent sources meet here`,...ev.slice(0,4).map(t=>'• '+t),
@@ -530,7 +552,7 @@ async function load(full){
     if(!S.hist||S.hist.key!==S.inst+':'+S.tf||Date.now()-S.hist.at>60000)loadHist(true);
     if(wantFull||!S.d||S.d.inst!==j.inst){S.d=j;lastFull=Date.now();}
     else{const bars=S.d.bars;j.bars.forEach(b=>{const k=bars.findIndex(x=>x.t===b.t);if(k>=0)bars[k]=Object.assign(bars[k],b);else if(!bars.length||b.t>bars[bars.length-1].t)bars.push(b);});
-      const keep={bars,profile:S.d.profile,profile_est:S.d.profile_est,levels:S.d.levels,prob_meta:S.d.prob_meta,profiles:S.d.profiles,pcurve:S.d.pcurve,hold_base:S.d.hold_base,profile_src:S.d.profile_src,poc:S.d.poc,vah:S.d.vah,val:S.d.val};S.d=Object.assign(j,keep);}
+      const keep={bars,profile:S.d.profile,profile_est:S.d.profile_est,levels:S.d.levels,prob_meta:S.d.prob_meta,profiles:S.d.profiles,pcurve:S.d.pcurve,hold_base:S.d.hold_base,plan:S.d.plan,profile_src:S.d.profile_src,poc:S.d.poc,vah:S.d.vah,val:S.d.val};S.d=Object.assign(j,keep);}
     render();}catch(e){}finally{busy=false;}
 }
 // ── Ankrade verktyg: Anchored VWAP och ankrad volymprofil (sparas per instrument) ──

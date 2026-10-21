@@ -5442,6 +5442,11 @@ def _of_start():
         _OFL.warm()
     except Exception as e:
         print(f"Orderflow: kunde inte starta nivå-/sannolikhetsmodulen: {e}")
+    try:
+        import of_plan as _OFP           # dagsplanen till Telegram 08:00 och 15:30
+        _OFP.start(lambda i: _of_snapshot(i, 5))
+    except Exception as e:
+        print(f"Orderflow: dagsplanens schemaläggare kunde inte starta: {e}")
 
 
 @app.on_event("startup")
@@ -5542,6 +5547,16 @@ def orderflow_api(inst: str, tf: int = 1, token: str = "", lite: int = 0):
     if not is_pro:
         return {"pro": False}
     _of_start()
+    snap = _of_snapshot(inst, tf, lite)
+    if snap is None:
+        return Response('{"error": "unknown instrument"}', status_code=404, media_type="application/json")
+    snap = _of_public(snap)
+    snap["pro"] = True
+    return snap
+
+
+def _of_snapshot(inst, tf=1, lite=0):
+    """Fullt snapshot (motor + GEX + nivåer + dagsplan), före _of_public."""
     import orderflow_engine as _OFE
     live_px = {}
     if inst.upper() == "BTC":
@@ -5551,7 +5566,7 @@ def orderflow_api(inst: str, tf: int = 1, token: str = "", lite: int = 0):
         gx = _of_gex_live(inst.upper(), live_px) or _gex_levels()   # serverns egen GEX, GitHub-filen som reserv
     snap = _OFE.snapshot(inst.upper(), tf if tf in (1, 5, 15) else (15 if tf > 15 else 1), gx, lite=bool(lite))
     if snap is None:
-        return Response('{"error": "unknown instrument"}', status_code=404, media_type="application/json")
+        return None
     for g in snap.get("gex") or []:     # saknar motorn basis visas nivån ändå (redan i orderflödets pris)
         if g.get("px") is None and g.get("type") in live_px:
             g["px"] = live_px[g["type"]]
@@ -5561,8 +5576,11 @@ def orderflow_api(inst: str, tf: int = 1, token: str = "", lite: int = 0):
             snap = _OFL.augment(snap)
         except Exception as e:
             print(f"Orderflow: nivåer/sannolikhet misslyckades: {e}")
-    snap = _of_public(snap)
-    snap["pro"] = True
+        try:
+            import of_plan as _OFP          # automatisk dagsplan (zoner LONG/SHORT)
+            snap["plan"] = _OFP.get(snap)
+        except Exception as e:
+            print(f"Orderflow: dagsplan misslyckades: {e}")
     return snap
 
 
