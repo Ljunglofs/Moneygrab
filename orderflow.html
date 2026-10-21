@@ -30,6 +30,9 @@ header{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10p
 .main{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:10px}
 .chartcard{display:flex;flex-direction:column}
 #yax{position:absolute;right:0;top:0;width:78px;height:546px;cursor:ns-resize;touch-action:none;z-index:2}
+.lyw{position:relative;flex:none}.lyp{display:none;position:absolute;top:34px;left:0;z-index:20;background:var(--panel2);border:1px solid var(--line2);border-radius:10px;padding:8px 10px;min-width:210px;box-shadow:0 10px 30px rgba(0,0,0,.45)}
+.lyp.open{display:block}.lyp label{display:flex;align-items:center;gap:8px;font-size:12.5px;padding:4px 2px;cursor:pointer;color:var(--txt)}.lyp label i{font-style:normal;color:var(--mut);font-size:11px;margin-left:auto}
+.lyp input{accent-color:#19D3F0}.lyp .lyh{font-size:9.5px;letter-spacing:.12em;color:var(--mut);font-weight:700;margin:4px 0 2px}
 .anch{position:absolute;left:10px;top:30px;z-index:3;display:flex;gap:6px;flex-wrap:wrap;max-width:60%}
 .chartcard:fullscreen .anch,.chartcard.fsx .anch{top:46px}
 .anch span{font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:6px;background:rgba(12,15,21,.85);border:1px solid var(--line2);color:var(--mut);display:flex;gap:6px;align-items:center}
@@ -97,6 +100,7 @@ td{padding:5px 4px;border-bottom:1px solid var(--line)}th:not(:first-child),td:n
   #chart{height:58vh;min-height:360px}#cvd{height:96px}
   .lr{padding:7px 12px;font-size:12.5px}
   #bmin,#prof,#zoom button[data-v=in],#zoom button[data-v=out]{display:none}
+  #tools button[data-t=box],#tools button[data-t=trend],#tools button[data-t=erase]{display:none}
   .bot{grid-template-columns:1fr 1fr;gap:8px}.ish,.zones,.legend{grid-column:1/-1}
 }
 </style>
@@ -112,10 +116,10 @@ td{padding:5px 4px;border-bottom:1px solid var(--line)}th:not(:first-child),td:n
       <div class="seg" id="tf"><button data-v="1">1m</button><button data-v="5">5m</button><button data-v="15">15m</button><button data-v="60">1h</button><button data-v="240">4h</button><button data-v="1440">1D</button></div>
       <div class="seg" id="view"><button data-v="chart">Chart</button><button data-v="fp">Footprint</button></div>
       <div class="seg" id="prof"><button data-v="session">Session</button><button data-v="previous">Previous</button><button data-v="composite">Composite</button></div>
-      <div class="seg" id="bub"><button data-v="on">Bubbles</button><button data-v="off">Off</button></div>
+      <div class="lyw"><button class="sel" id="lyb">Layers &#9662;</button><div class="lyp" id="lyp"></div></div>
       <select class="sel" id="bmin" title="Minimum bubble size"><option value="0">All sizes</option><option value="50000">≥ $50K</option><option value="100000">≥ $100K</option><option value="250000">≥ $250K</option><option value="500000">≥ $500K</option></select>
       <div class="seg" id="scale"><button data-v="fut">Futures</button><button data-v="spot">CFD / spot</button></div>
-      <div class="seg" id="tools"><button data-t="vwap" title="Click a candle to anchor a VWAP">+ Anchored VWAP</button><button data-t="vp" title="Click a candle to anchor a volume profile">+ Volume profile</button></div>
+      <div class="seg" id="tools"><button data-t="box" title="Draw a box (drag)">&#9634; Box</button><button data-t="trend" title="Draw a trend line (drag)">&#8725; Line</button><button data-t="hline" title="Horizontal line (click)">&#8212; H-line</button><button data-t="erase" title="Click a drawing to remove it">&#9003; Erase</button><button data-t="vwap" title="Click a candle to anchor a VWAP">+ Anchored VWAP</button><button data-t="vp" title="Click a candle to anchor a volume profile">+ Volume profile</button></div>
       <div class="seg" id="zoom"><button data-v="out" title="Zoom out">−</button><button data-v="in" title="Zoom in">+</button><button data-v="reset" title="Back to live">Reset</button><button data-v="fs" title="Fullscreen (F)">&#x26F6;</button></div>
       <div class="live" id="live"><i></i><span>LIVE</span></div>
       <div class="cme" id="cme"></div>
@@ -131,7 +135,7 @@ td{padding:5px 4px;border-bottom:1px solid var(--line)}th:not(:first-child),td:n
         <div class="seg" id="sort"><button data-v="price">Price</button><button data-v="p">Prob</button><button data-v="dist">Dist</button></div>
       </div>
       <div class="lr hdr"><span>LEVEL</span><span>PRICE</span><span>DIST</span><span title="Chance price reaches the level">REACH</span><span title="How often this kind of level stopped price before">HOLDS</span></div><div class="lvlist" id="lvlist"><div class="lr"><span class="n">Collecting data…</span></div></div>
-      <button class="lvmore" id="lvmore"></button><div class="tc"><h4>TRADE CHECK · CHANCE TO REACH</h4><div class="ti"><span style="color:var(--rd)">Stop</span><input id="tcStop" inputmode="decimal" placeholder="price"></div><div class="ti"><span style="color:var(--cy)">Target</span><input id="tcTgt" inputmode="decimal" placeholder="price"></div><div class="tr" style="color:var(--mut);font-size:9.5px;letter-spacing:.06em"><span></span><span>15 MIN</span><span>30 MIN</span><span>1 H</span><span>TODAY</span></div><div class="tr" id="tcS"><span>Stop</span><span>–</span><span>–</span><span>–</span><span>–</span></div><div class="tr" id="tcT"><span>Target</span><span>–</span><span>–</span><span>–</span><span>–</span></div></div><div class="lvft" id="lvft">–</div>
+      <button class="lvmore" id="lvmore"></button><div class="tc"><h4>TRADE CHECK · CHANCE TO REACH</h4><div class="ti"><span>Entry</span><input id="tcEnt" inputmode="decimal" placeholder="now"></div><div class="ti"><span style="color:var(--rd)">Stop</span><input id="tcStop" inputmode="decimal" placeholder="price"></div><div class="ti"><span style="color:var(--cy)">Target</span><input id="tcTgt" inputmode="decimal" placeholder="price"></div><div class="tr" style="color:var(--mut);font-size:9.5px;letter-spacing:.06em"><span></span><span>15 MIN</span><span>30 MIN</span><span>1 H</span><span>TODAY</span></div><div class="tr" id="tcS"><span>Stop</span><span>–</span><span>–</span><span>–</span><span>–</span></div><div class="tr" id="tcT"><span>Target</span><span>–</span><span>–</span><span>–</span><span>–</span></div></div><div class="lvft" id="lvft">–</div>
     </div>
   </div>
   <div class="hint" id="hint"></div>
@@ -169,9 +173,10 @@ const RGB={cy:'25,211,240',rd:'229,72,77',gex:'165,124,255'};
 const $=id=>document.getElementById(id);
 const tok=()=>{try{return localStorage.getItem('grabit_token')||''}catch(e){return ''}};
 const PREF=(()=>{try{return JSON.parse(localStorage.getItem('of_prefs')||'{}')}catch(e){return {}}})();
-const S={inst:PREF.inst||'NQ',tf:PREF.tf||5,scale:PREF.scale||'fut',view:PREF.view||'chart',prof:PREF.prof||'session',bub:PREF.bub||'on',bmin:PREF.bmin||0,hz:PREF.hz||'30m',sort:PREF.sort||'price',
+const LDEF={gex:1,shelves:1,zones:1,levels:1,profile:1,vwap:1,bubbles:1,plan:1,heat:1,draw:1,trade:1};
+const S={L:Object.assign({},LDEF,PREF.L||{}),inst:PREF.inst||'NQ',tf:PREF.tf||5,scale:PREF.scale||'fut',view:PREF.view||'chart',prof:PREF.prof||'session',bub:PREF.bub||'on',bmin:PREF.bmin||0,hz:PREF.hz||'30m',sort:PREF.sort||'price',
   d:null,sc:null,nb:null,off:0,cols:null,ypan:0,yz:1,mouse:null,bubHit:[]};
-const savePref=()=>{try{localStorage.setItem('of_prefs',JSON.stringify({inst:S.inst,tf:S.tf,scale:S.scale,view:S.view,prof:S.prof,bub:S.bub,bmin:S.bmin,hz:S.hz,sort:S.sort}))}catch(e){}};
+const savePref=()=>{try{localStorage.setItem('of_prefs',JSON.stringify({L:S.L,inst:S.inst,tf:S.tf,scale:S.scale,view:S.view,prof:S.prof,bub:S.bub,bmin:S.bmin,hz:S.hz,sort:S.sort}))}catch(e){}};
 const mobile=()=>innerWidth<=760;
 const BIN=()=>S.inst==='NQ'?1:S.inst==='BTC'?10:0.5;
 function resetView(){S.sp=null;S.ro=0;S.pr=null;S.cols=null;S.off=0;S.yz=1;S.ypan=0;}
@@ -179,7 +184,19 @@ const RELOAD=new Set(['inst','tf']);
 function seg(id,key){const el=$(id);[...el.children].forEach(x=>x.classList.toggle('on',String(S[key])===x.dataset.v));
   el.onclick=e=>{const b=e.target.closest('button');if(!b)return;[...el.children].forEach(x=>x.classList.toggle('on',x===b));S[key]=key==='tf'?+b.dataset.v:b.dataset.v;savePref();
     if(RELOAD.has(key)){resetView();load(true);}else{if(key==='view')resetView();render();}};}
-['inst','tf','view','prof','bub','scale','hz','sort'].forEach(k=>seg(k==='bub'?'bub':k,k));
+['inst','tf','view','prof','scale','hz','sort'].forEach(k=>seg(k,k));
+// Layers: slå av/på varje lager. Sparas i webbläsaren.
+const LAYERS=[['','ON THE CHART'],['bubbles','Aggression bubbles'],['shelves','Liquidity shelves'],['zones','Confluence zones'],['gex','GEX levels'],['levels','Session & yesterday levels'],
+  ['vwap','VWAP & bands'],['profile','Volume profile'],['plan','Daily plan zones'],['heat','Liquidity heatmap'],['','YOURS'],['draw','My drawings'],['trade','Trade check lines']];
+function renderLayers(){$('lyp').innerHTML=LAYERS.map(([k,n])=>k?`<label><input type="checkbox" data-k="${k}" ${S.L[k]?'checked':''}>${n}</label>`:`<div class="lyh">${n}</div>`).join('')
+  +'<label style="margin-top:4px;border-top:1px solid var(--line);padding-top:8px"><span data-all="1" style="color:#19D3F0">Show all</span><span data-none="1" style="color:var(--mut);margin-left:auto">Clean chart</span></label>';}
+renderLayers();
+$('lyb').onclick=e=>{e.stopPropagation();$('lyp').classList.toggle('open');};
+$('lyp').onclick=e=>{e.stopPropagation();const t=e.target;
+  if(t.dataset.all){Object.keys(LDEF).forEach(k=>S.L[k]=1);}else if(t.dataset.none){Object.keys(LDEF).forEach(k=>S.L[k]=0);S.L.profile=1;S.L.vwap=1;}
+  else if(t.dataset.k){S.L[t.dataset.k]=t.checked?1:0;}else return;
+  if(t.dataset.all||t.dataset.none)renderLayers();savePref();render();};
+document.addEventListener('click',()=>$('lyp').classList.remove('open'));
 $('bmin').value=String(S.bmin);$('bmin').onchange=e=>{S.bmin=+e.target.value;savePref();render();};
 const dec=()=>S.inst==='GC'?1:S.inst==='BTC'?0:2;
 const fmtP=v=>v==null||isNaN(v)?'–':v.toLocaleString('en-US',{minimumFractionDigits:dec(),maximumFractionDigits:dec()});
@@ -220,6 +237,9 @@ function holdCell(l){const h=l.hold,b=(S.d.hold_base||[.5])[0];if(!h)return '<sp
 // Chans att nå ett valfritt pris (visningspris), ur serverns sannolikhetskurva
 function pReach(dispPx,hz){const d=S.d;const c=d&&d.pcurve&&d.pcurve[hz];if(!c||dispPx==null||isNaN(dispPx))return null;const dist=(dispPx-off())-d.price,arr=dist>=0?c.up:c.dn;
   const z=Math.abs(dist)/c.sc*10;if(z>=60)return arr[60]*Math.exp(-((z/10)**2-36)/2);const i=Math.floor(z),f=z-i;return arr[i]+(arr[Math.min(60,i+1)]-arr[i])*f;}
+function tcVal(id){const v=parseFloat(($(id).value||'').replace(',','.'));return isNaN(v)?null:v;}
+function tcSave(){try{const A=JSON.parse(localStorage.getItem('of_tc')||'{}');A[S.inst]={e:$('tcEnt').value,s:$('tcStop').value,t:$('tcTgt').value};localStorage.setItem('of_tc',JSON.stringify(A));}catch(e){}}
+function tcLoad(){try{const A=JSON.parse(localStorage.getItem('of_tc')||'{}')[S.inst]||{};$('tcEnt').value=A.e||'';$('tcStop').value=A.s||'';$('tcTgt').value=A.t||'';}catch(e){}}
 function tradeCheck(){[['tcStop','tcS'],['tcTgt','tcT']].forEach(([inp,out])=>{const v=parseFloat(($(inp).value||'').replace(',','.'));const el=$(out);
   ['15m','30m','60m','close'].forEach((hz,k)=>{const p=isNaN(v)?null:pReach(v,hz);const sp=el.children[k+1];sp.textContent=p==null?'–':pTxt(p);sp.style.color=p==null?C.mut:p>=.6?(inp==='tcStop'?C.rd:C.cy):p>=.2?C.txt:C.mut;});});}
 const HZS={'15m':'15 min','30m':'30 min','60m':'1 h',close:'today'};
@@ -265,21 +285,21 @@ function drawChart(){
     x.font=F(p>=.6?700:600,11);x.textAlign='right';x.globalAlpha=p<.2?.5:1;x.fillStyle=p>=.6?col:p>=.2?C.txt:C.mut;
     x.fillText(`${pTxt(p)} chance · ${HZS[S.hz]}`,cw-10,yy);x.globalAlpha=1;};
   // Optionsnivåer: Call/Put Wall som mjuka lila band, övriga GEX som tunna streckade linjer
-  d.gex.forEach(g=>{if(g.px==null)return;const y=Y(g.px);if(!inY(y))return;const wall=/wall/i.test(g.label);
+  (S.L.gex?d.gex:[]).forEach(g=>{if(g.px==null)return;const y=Y(g.px);if(!inY(y))return;const wall=/wall/i.test(g.label);
     if(wall){soft(x,y,mob?10:14,cw,RGB.gex,.55);x.strokeStyle='rgba(165,124,255,.55)';x.lineWidth=1;x.beginPath();x.moveTo(0,y);x.lineTo(cw,y);x.stroke();
       const ly=lblY(y-6);if(ly!=null){x.font=F(700,mob?10:11);x.textAlign='left';x.fillStyle=C.gex;x.fillText(g.label.toUpperCase().replace(' (WEAK)',''),12,ly);probTag(g.px,ly,C.gex);}}
     else{x.strokeStyle='rgba(165,124,255,.45)';x.setLineDash([2,4]);x.beginPath();x.moveTo(0,y);x.lineTo(cw,y);x.stroke();x.setLineDash([]);
       const l2=mob?null:lblY(y-4);if(l2!=null){x.font=F(500,10);x.textAlign='left';x.fillStyle='rgba(165,124,255,.8)';x.fillText(g.label,12,l2);}}});
   // Likviditetshyllor (orderboken) — mjuka gradientband utan ramar
   const intra=S.tf<=15;
-  const bids=intra?d.shelves.filter(s=>s.side==='bid').slice(0,2):[],asks=intra?d.shelves.filter(s=>s.side==='ask').slice(0,2):[];
+  const shOn=intra&&S.L.shelves,bids=shOn?d.shelves.filter(s=>s.side==='bid').slice(0,2):[],asks=shOn?d.shelves.filter(s=>s.side==='ask').slice(0,2):[];
   [...asks.map((s,i)=>[s,i]),...bids.map((s,i)=>[s,i])].forEach(([s,i])=>{const y=Y(s.px);if(!inY(y))return;const bid=s.side==='bid',rgb=bid?RGB.cy:RGB.rd,a=(i===0?.5:.28)*(.6+.4*s.persist/100);
     soft(x,y,mob?10:16,cw,rgb,a);x.strokeStyle=`rgba(${rgb},${i===0?.55:.3})`;x.lineWidth=1;x.beginPath();x.moveTo(cw*.15,y);x.lineTo(cw,y);x.stroke();
     const name=bid?(i===0?'BUY LIQUIDITY / BUY SHELF':'BID SHELF'):(i===0?'SELL SHELF / SELL LIQUIDITY':'ASK SHELF');const ly=lblY(y-6);
     if(ly==null)return;x.font=F(700,mob?10:11);x.textAlign='left';x.fillStyle=bid?C.cy:C.rd;x.globalAlpha=i===0?1:.75;x.fillText(mob?name.split(' / ')[0]:`${name} · ${fmtU(s.avg_usd)}`,12,ly);x.globalAlpha=1;probTag(s.px,ly,bid?C.cy:C.rd);});
   // Konvergenszoner — mjukt lavendelsken: ★1 starkare, ★2 svagare. Hover ger förklaring.
   S.zoneHit=[];
-  (intra?d.zones||[]:[]).forEach((z,i)=>{const pd=d.inst==='NQ'?2:d.inst==='BTC'?30:.3,y1=Y(z.hi+pd),y2=Y(z.lo-pd);if(y2<top||y1>top+ch)return;
+  (intra&&S.L.zones?d.zones||[]:[]).forEach((z,i)=>{const pd=d.inst==='NQ'?2:d.inst==='BTC'?30:.3,y1=Y(z.hi+pd),y2=Y(z.lo-pd);if(y2<top||y1>top+ch)return;
     const h=Math.max(8,y2-y1),a=i===0?.30:.15,g=x.createLinearGradient(0,0,cw,0);
     g.addColorStop(0,'rgba(196,170,255,0)');g.addColorStop(.45,`rgba(196,170,255,${a*.45})`);g.addColorStop(1,`rgba(196,170,255,${a})`);
     x.save();x.shadowColor=`rgba(196,170,255,${i===0?.55:.3})`;x.shadowBlur=i===0?18:9;x.fillStyle=g;x.fillRect(0,y1,cw,h);x.restore();
@@ -287,10 +307,10 @@ function drawChart(){
       x.fillText(`★${i+1} ${mob?'':(i===0?'STRONGEST ZONE · ':'ZONE 2 · ')}${z.side==='bid'?'SUPPORT':'RESISTANCE'}`,cw-10,lyz);}
     S.zoneHit.push({y1,y2,z,i});});
   // Sessions- och gårdagsnivåer — tunna gråblå linjer, liten etikett vid prisaxeln
-  (intra?d.levels||[]:[]).filter(l=>l.group==='session'||l.group==='prev').forEach(l=>{const y=Y(l.px);if(!inY(y))return;x.strokeStyle='rgba(112,136,168,.5)';x.lineWidth=1;x.setLineDash(l.group==='prev'?[1,3]:[4,4]);x.beginPath();x.moveTo(0,y);x.lineTo(cw+PRW,y);x.stroke();x.setLineDash([]);
+  (intra&&S.L.levels?d.levels||[]:[]).filter(l=>l.group==='session'||l.group==='prev').forEach(l=>{const y=Y(l.px);if(!inY(y))return;x.strokeStyle='rgba(112,136,168,.5)';x.lineWidth=1;x.setLineDash(l.group==='prev'?[1,3]:[4,4]);x.beginPath();x.moveTo(0,y);x.lineTo(cw+PRW,y);x.stroke();x.setLineDash([]);
     const l3=mob?null:lblY(y-3,12);if(l3!=null){x.font=F(500,10);x.textAlign='right';x.fillStyle=C.hist;x.fillText(`${l.name} ${fmtP(l.px+o)}${l.touched?' · touched':''}`,cw+PRW-4,l3);}});
   // Volymprofil längs högerkanten (före prisaxeln)
-  const pr=curProfile();   // profilen följer alltid med längs högerkanten, oavsett tidsram
+  const pr=S.L.profile?curProfile():{rows:[]};   // profilen följer alltid med längs högerkanten, oavsett tidsram
   // Hårfina rader som i TradingView: en linje per rad (rader slås ihop så att de ligger minst 2 px isär)
   if(pr.rows&&pr.rows.length){const {rows,bk}=aggRows(pr.rows,lo,hi,ch,2,pr.step);const mv=Math.max(...rows.map(r=>r.v),1e-9),rowPx=Math.abs(Y(0)-Y(bk)),rh=Math.max(1,Math.min(2,rowPx*.5));
     rows.forEach(r=>{const y=Y(r.px);if(y<top-rh||y>top+ch+rh)return;const inVA=pr.val!=null&&pr.vah!=null&&r.px>=pr.val&&r.px<=pr.vah;
@@ -304,7 +324,7 @@ function drawChart(){
     x.font=F(600,9.5);x.textAlign='right';x.fillStyle=C.mut;x.fillText(pr.label.toUpperCase(),cw+PRW-4,top+10);}
   // VWAP (vit) och band (två gråvita nyanser, streckade)
   const line=(k,col,w,dash)=>{x.strokeStyle=col;x.lineWidth=w;x.setLineDash(dash);x.beginPath();let st=false;vws.forEach((v,i)=>{if(!v){st=false;return;}const y=Y(v[k]);st?x.lineTo(X(i),y):x.moveTo(X(i),y);st=true;});x.stroke();x.setLineDash([]);};
-  line(1,'rgba(229,72,77,.85)',1.4,[6,4]);line(2,'rgba(229,72,77,.85)',1.4,[6,4]);line(0,C.vw,2.2,[]);
+  if(S.L.vwap){line(1,'rgba(229,72,77,.85)',1.4,[6,4]);line(2,'rgba(229,72,77,.85)',1.4,[6,4]);line(0,C.vw,2.2,[]);}
   // Ankrad VWAP (gul) med ±1σ-band
   {const AV=anchOf(),idxT2=t=>{let a=0,b=L-1;while(a<b){const m=(a+b)>>1;if(all[m].t<t)a=m+1;else b=m;}return a;};
    AV.vwap.forEach(t=>{const i0=idxT2(t);if(i0>=L)return;let pv=0,vv=0,p2=0;const ser=[];
@@ -313,7 +333,7 @@ function drawChart(){
        ser.forEach(r=>{const xx=xOf(r[0]);if(xx<-sp||xx>cw+sp){st=false;return;}const y=Y(r[k]);st?x.lineTo(xx,y):x.moveTo(xx,y);st=true;});x.stroke();x.setLineDash([]);};
      drawK(2,'rgba(232,196,106,.45)',1,[4,4]);drawK(3,'rgba(232,196,106,.45)',1,[4,4]);drawK(1,'#E8C46A',1.8,[]);
      const last=ser[ser.length-1];if(last){const y=Y(last[1]);if(y>top&&y<top+ch&&!mob){x.font=F(600,10);x.textAlign='left';x.fillStyle='#E8C46A';x.fillText('AVWAP',Math.min(cw-40,xOf(last[0])+6),y-4);}}});}
-  const lv=vws[vws.length-1];if(lv&&!mob){x.font=F(600,10);x.textAlign='left';[[0,'VWAP',C.vw]].forEach(([k,t,c])=>{const y=Y(lv[k]);const l4=inY(y)?lblY(y-5):null;if(l4!=null){x.fillStyle=c;x.fillText(t,12,l4);}});}
+  const lv=vws[vws.length-1];if(lv&&!mob&&S.L.vwap){x.font=F(600,10);x.textAlign='left';[[0,'VWAP',C.vw]].forEach(([k,t,c])=>{const y=Y(lv[k]);const l4=inY(y)?lblY(y-5):null;if(l4!=null){x.fillStyle=c;x.fillText(t,12,l4);}});}
   // Ankrade verktyg (användarens egna): volymprofil från ett ljus och framåt
   const AN=anchOf(),idxT=t=>{let a=0,b=L-1;while(a<b){const m=(a+b)>>1;if(all[m].t<t)a=m+1;else b=m;}return a;};
   AN.vp.forEach(t=>{const i0=idxT(t);if(i0>=L)return;const P=avpCalc(all,i0,t);if(!P)return;const x0=xOf(i0)-sp/2;if(cw-x0<12)return;
@@ -326,9 +346,28 @@ function drawChart(){
   for(const up of [true,false]){x.strokeStyle=x.fillStyle=up?C.cy:C.rd;x.lineWidth=1;x.beginPath();
     bars.forEach((b,i)=>{if((b.c>=b.o)!==up)return;const xx=X(i);if(xx<-bw||xx>cw+bw)return;const cx=Math.round(xx)+.5;x.moveTo(cx,Y(b.h));x.lineTo(cx,Y(b.l));});x.stroke();
     bars.forEach((b,i)=>{if((b.c>=b.o)!==up)return;const xx=X(i);if(xx<-bw||xx>cw+bw)return;const cx=Math.round(xx)+.5,y1=Y(Math.max(b.o,b.c)),y2=Y(Math.min(b.o,b.c));x.fillRect(cx-bw/2,y1,bw,Math.max(1,y2-y1));});}
+  // Tid <-> x (även framåt i tiden, för ritningar som sträcker sig förbi sista stapeln)
+  const tfs0=S.tf*60,lastT=all[L-1].t,idxF=t=>{if(t>=lastT)return L-1+(t-lastT)/tfs0;let a=0,b=L-1;while(a<b){const m=(a+b)>>1;if(all[m].t<t)a=m+1;else b=m;}
+    return a>0&&all[a].t>t?a-1+(t-all[a-1].t)/Math.max(1,all[a].t-all[a-1].t):a;};
+  const xT=t=>xR-(L-1-idxF(t)-S.ro)*sp;
+  S.sc.tAt=mx=>{const gi=L-1-S.ro-(xR-mx)/sp;if(gi>=L-1)return Math.round(lastT+(gi-(L-1))*tfs0);const i=Math.max(0,Math.floor(gi));return Math.round(all[i].t+(gi-i)*tfs0);};
+  S.sc.xT=xT;
+  if(S.L.draw){const DR=[...drawsOf(),...(S.drawing?[S.drawing]:[])];
+    DR.forEach(g=>{x.lineWidth=1.5;x.strokeStyle='rgba(232,236,242,.85)';x.fillStyle='rgba(232,236,242,.07)';
+      if(g.type==='hline'){const y=Math.round(Y(g.p1))+.5;if(!inY(y))return;x.setLineDash([6,4]);x.beginPath();x.moveTo(0,y);x.lineTo(cw,y);x.stroke();x.setLineDash([]);
+        x.font=F(600,10);x.textAlign='left';x.fillStyle='rgba(232,236,242,.9)';x.fillText(fmtP(g.p1+o),cw-60,y-4);return;}
+      const x1=xT(g.t1),x2=xT(g.t2),y1=Y(g.p1),y2=Y(g.p2);
+      if(g.type==='box'){x.fillRect(Math.min(x1,x2),Math.min(y1,y2),Math.abs(x2-x1),Math.abs(y2-y1));x.strokeRect(Math.min(x1,x2)+.5,Math.min(y1,y2)+.5,Math.abs(x2-x1),Math.abs(y2-y1));}
+      else{x.beginPath();x.moveTo(x1,y1);x.lineTo(x2,y2);x.stroke();}});}
+  if(S.L.trade){const E=tcVal('tcEnt')??(d.price+o),St=tcVal('tcStop'),Tg=tcVal('tcTgt'),risk=St!=null?Math.abs(E-St):null;
+    [['ENTRY',E,'#E8ECF2'],['STOP',St,C.rd],['TARGET',Tg,C.cy]].forEach(([n,v,col])=>{if(v==null||(n==='ENTRY'&&St==null&&Tg==null))return;const y=Math.round(Y(v-o))+.5;if(!inY(y))return;
+      x.strokeStyle=col;x.lineWidth=1.3;x.setLineDash(n==='ENTRY'?[2,3]:[8,4]);x.beginPath();x.moveTo(0,y);x.lineTo(cw,y);x.stroke();x.setLineDash([]);
+      const rr=n==='TARGET'&&risk?` · ${(Math.abs(v-E)/risk).toFixed(1)}R`:n==='STOP'?' · 1R':'';const pa=n==='ENTRY'?null:pReach(v,'close');
+      const t=`${n} ${fmtP(v)}${rr}${pa!=null?` · ${pTxt(pa)} chance today`:''}`;x.font=F(700,10.5);const tw=x.measureText(t).width+12;
+      x.fillStyle='rgba(8,10,15,.9)';x.fillRect(10,y-9,tw,17);x.fillStyle=col;x.textAlign='left';x.fillText(t,16,y+4);});}
   // Aggression Bubbles — faktiska aggressiva affärer, storlek ∝ √ordervärde
   S.bubHit=[];
-  if(S.bub==='on'&&intra){const tfs=S.tf*60,bb=d.bubbles.filter(b=>b.usd>=S.bmin),mx=Math.max(...bb.map(b=>b.usd),1);
+  if(S.L.bubbles&&intra){const tfs=S.tf*60,bb=d.bubbles.filter(b=>b.usd>=S.bmin),mx=Math.max(...bb.map(b=>b.usd),1);
     bb.forEach(b=>{const i=barAt(bars,b.t,tfs);if(i<0||X(i)<0||X(i)>cw)return;const r=3+(mob?8:11)*Math.sqrt(b.usd/mx),rgb=b.side==='B'?RGB.cy:RGB.rd,cx=X(i),cy=Y(b.px);if(!inY(cy))return;
       x.save();x.shadowColor=`rgba(${rgb},.55)`;x.shadowBlur=8;x.fillStyle=`rgba(${rgb},.32)`;x.beginPath();x.arc(cx,cy,r,0,7);x.fill();x.restore();
       x.strokeStyle=`rgba(${rgb},.75)`;x.lineWidth=1;x.beginPath();x.arc(cx,cy,r,0,7);x.stroke();x.fillStyle=`rgba(${rgb},.95)`;x.beginPath();x.arc(cx,cy,Math.max(1.5,r*.28),0,7);x.fill();
@@ -464,7 +503,7 @@ function render(){
    $('pxsub').textContent=t;}
   $('live').className='live'+(d.status==='live'?'':' off');$('live').querySelector('span').textContent=d.status==='live'?'LIVE':String(d.status||'').toUpperCase();
   $('hint').textContent=mobile()?'Swipe sideways to move in time · pinch sideways = time zoom, up/down = price zoom · drag the price axis to stretch · Reset = back to live':'Scroll = zoom at the cursor · drag = move (it glides) · trackpad swipe = pan · drag the price axis to stretch, the time axis for bar width · double-click = auto · arrow keys · F = fullscreen';
-  drawChart();placeYax();renderLevels();if(S._anI!==S.inst){S._anI=S.inst;renderAnch();}
+  drawChart();placeYax();renderLevels();if(S._anI!==S.inst){S._anI=S.inst;renderAnch();tcLoad();tradeCheck();}
   const bub=[...d.bubbles].sort((a,b)=>b.t-a.t).slice(0,9);
   $('ish').innerHTML=bub.length?bub.map(b=>`<tr><td>${hhmmss(b.t)}</td><td>${fmtP(b.px+o)}</td><td>${fmtU(b.usd)}</td><td class="${b.side==='B'?'bid':'ask'}">${b.side==='B'?'BUY':'SELL'}</td></tr>`).join(''):'<tr><td colspan="4" class="empty">No large prints in the last 3 hours.</td></tr>';
   const bg=[...d.bubbles].sort((a,b)=>b.usd-a.usd).slice(0,5);$('bigs').className=bg.length?'':'empty';
@@ -496,6 +535,15 @@ async function load(full){
 }
 // ── Ankrade verktyg: Anchored VWAP och ankrad volymprofil (sparas per instrument) ──
 S.anch=(()=>{try{return JSON.parse(localStorage.getItem('of_anchors')||'{}')}catch(e){return {}}})();S.tool=null;
+S.draws=(()=>{try{return JSON.parse(localStorage.getItem('of_draw')||'{}')}catch(e){return {}}})();S.drawing=null;
+function drawsOf(){if(!S.draws[S.inst])S.draws[S.inst]=[];return S.draws[S.inst];}
+function saveDraws(){try{localStorage.setItem('of_draw',JSON.stringify(S.draws))}catch(e){}}
+function pxAt(my){const s=S.sc;return s.hi-(my-s.top)/s.ch*(s.hi-s.lo);}
+function hitDraw(mx,my){const s=S.sc,D=drawsOf();for(let i=D.length-1;i>=0;i--){const g=D[i];
+  if(g.type==='hline'){if(Math.abs(s.Y(g.p1)-my)<6)return i;continue;}
+  const x1=s.xT(g.t1),x2=s.xT(g.t2),y1=s.Y(g.p1),y2=s.Y(g.p2);
+  if(g.type==='box'){if(mx>=Math.min(x1,x2)-4&&mx<=Math.max(x1,x2)+4&&my>=Math.min(y1,y2)-4&&my<=Math.max(y1,y2)+4)return i;continue;}
+  const dx=x2-x1,dy=y2-y1,l2=dx*dx+dy*dy||1,u=Math.max(0,Math.min(1,((mx-x1)*dx+(my-y1)*dy)/l2));if(Math.hypot(x1+u*dx-mx,y1+u*dy-my)<6)return i;}return -1;}
 function anchOf(){if(!S.anch[S.inst])S.anch[S.inst]={vwap:[],vp:[]};return S.anch[S.inst];}
 function saveAnch(){try{localStorage.setItem('of_anchors',JSON.stringify(S.anch))}catch(e){}}
 const _avp=new Map();
@@ -511,9 +559,10 @@ function avpCalc(all,i0,t){const L=all.length,l=all[L-1],key=t+':'+S.tf+':'+L+':
 function renderAnch(){const A=anchOf(),fmt=t=>new Date(t*1000).toLocaleString('en-GB',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
   $('anch').innerHTML=[...A.vwap.map(t=>['vwap',t,'AVWAP','#E8C46A']),...A.vp.map(t=>['vp',t,'VP','#E8ECF2'])]
     .map(([k,t,n,c])=>`<span><b style="color:${c}">${n}</b>${fmt(t)}<i data-k="${k}" data-t="${t}" title="Remove">&#x2715;</i></span>`).join('')
-    +(S.tool?`<span style="color:#E8C46A">Click a candle to anchor ${S.tool==='vwap'?'the VWAP':'the volume profile'} · Esc = cancel</span>`:'');
+    +(S.tool?`<span style="color:#E8C46A">${{vwap:'Click a candle to anchor the VWAP',vp:'Click a candle to anchor the volume profile',box:'Drag to draw a box',trend:'Drag to draw a line',hline:'Click to place a horizontal line',erase:'Click a drawing to remove it · double-click Erase = remove all'}[S.tool]} · Esc = cancel</span>`:'');
   [...$('tools').children].forEach(b=>b.classList.toggle('on',b.dataset.t===S.tool));}
 $('anch').onclick=e=>{const i=e.target.closest('i');if(!i)return;const A=anchOf();A[i.dataset.k]=A[i.dataset.k].filter(t=>String(t)!==i.dataset.t);saveAnch();renderAnch();redraw();};
+$('tools').ondblclick=e=>{const b=e.target.closest('button');if(b&&b.dataset.t==='erase'&&drawsOf().length&&confirm('Remove all your drawings on this instrument?')){S.draws[S.inst]=[];saveDraws();S.tool=null;renderAnch();redraw();}};
 $('tools').onclick=e=>{const b=e.target.closest('button');if(!b)return;S.tool=S.tool===b.dataset.t?null:b.dataset.t;renderAnch();cv.style.cursor=S.tool?'copy':'crosshair';};
 function placeAnchor(mx){const s=S.sc;if(!s||!S.tool||S.view==='fp')return false;const i=Math.round((mx-s.X(0))/s.sp),b=s.bars[i];if(!b)return false;
   const A=anchOf(),k=S.tool;A[k]=A[k].filter(t=>t!==b.t);A[k].push(b.t);if(A[k].length>3)A[k].shift();saveAnch();S.tool=null;cv.style.cursor='crosshair';renderAnch();redraw();return true;}
@@ -578,7 +627,12 @@ cv.addEventListener('dblclick',()=>{resetView();render();});
 yax.addEventListener('dblclick',()=>{S.pr=null;redraw();});
 const inXaxis=my=>S.sc&&my>S.sc.top+S.sc.ch;
 cv.addEventListener('mousedown',e=>{e.preventDefault();cancelAnimationFrame(glide);const r=cv.getBoundingClientRect(),my=e.clientY-r.top;
-  if(S.tool&&placeAnchor(e.clientX-r.left))return;
+  const mx0=e.clientX-r.left;
+  if(S.tool&&S.view!=='fp'&&S.sc&&S.sc.tAt){const T=S.tool;
+    if(T==='erase'){const i=hitDraw(mx0,my);if(i>=0){drawsOf().splice(i,1);saveDraws();redraw();}return;}
+    if(T==='hline'){drawsOf().push({type:'hline',p1:pxAt(my)});saveDraws();S.tool=null;cv.style.cursor='crosshair';renderAnch();redraw();return;}
+    if(T==='box'||T==='trend'){const t=S.sc.tAt(mx0),p=pxAt(my);S.drawing={type:T,t1:t,p1:p,t2:t,p2:p};return;}}
+  if(S.tool&&placeAnchor(mx0))return;
   drag={mode:inXaxis(my)?'x':'pan',x:e.clientX,y:e.clientY,yp:S.ypan||0,ro:S.ro||0,off:S.off,sp:S.pxPerBar||9,cols:S.cols||64,pr:S.pr?{...S.pr}:null,trail:[[performance.now(),e.clientX]]};
   cv.style.cursor=drag.mode==='x'?'ew-resize':'grabbing';});
 yax.addEventListener('mousedown',e=>{e.preventDefault();if(S.view==='fp'){drag={mode:'yfp',y:e.clientY,yz:S.yz||1};return;}manualPrice();if(S.pr)drag={mode:'y',y:e.clientY,pr:{...S.pr}};});
@@ -591,9 +645,12 @@ addEventListener('mousemove',e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.
     if(!drag.pr&&Math.abs(dy)>8){manualPrice();if(S.pr){drag.pr={...S.pr};drag.y=e.clientY;}}
     if(drag.pr&&S.sc){const k=(drag.pr.hi-drag.pr.lo)/S.sc.ch*(e.clientY-drag.y);S.pr={lo:drag.pr.lo+k,hi:drag.pr.hi+k};}}
   redraw();});
-addEventListener('mouseup',()=>{if(drag&&drag.mode==='pan'&&S.view!=='fp'){const tr=drag.trail,a=tr[0],b=tr[tr.length-1],dt=b[0]-a[0];
+addEventListener('mouseup',()=>{if(S.drawing){const g=S.drawing;S.drawing=null;if(Math.abs(S.sc.xT(g.t2)-S.sc.xT(g.t1))>4||Math.abs(S.sc.Y(g.p2)-S.sc.Y(g.p1))>4){drawsOf().push(g);saveDraws();}
+    S.tool=null;cv.style.cursor='crosshair';renderAnch();redraw();return;}
+  if(drag&&drag.mode==='pan'&&S.view!=='fp'){const tr=drag.trail,a=tr[0],b=tr[tr.length-1],dt=b[0]-a[0];
     if(dt>0&&tr.length>2&&performance.now()-b[0]<60)startGlide((b[1]-a[1])/dt);}drag=null;cv.style.cursor='crosshair';});
 cv.addEventListener('mousemove',e=>{const r=cv.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
+  if(S.drawing&&S.sc.tAt){S.drawing.t2=S.sc.tAt(mx);S.drawing.p2=pxAt(my);redraw();return;}
   if(!drag)cv.style.cursor=inXaxis(my)?'ew-resize':'crosshair';
   if(S.view==='fp'){if(!S.fpHit||drag)return;const h=S.fpHit.find(q=>mx>=q.x0&&mx<=q.x1&&my>=q.y0&&my<=q.y1);S.hover=h?{...h,mx,my}:null;redraw();return;}
   const hit=S.bubHit.filter(q=>Math.hypot(q.cx-mx,q.cy-my)<=q.r+2).sort((a,b)=>b.b.usd-a.b.usd)[0];S.mouse={x:mx,y:my,bub:hit||null};redraw();});
@@ -625,7 +682,7 @@ yax.addEventListener('touchstart',e=>{manualPrice();if(S.pr)ty={y:e.touches[0].c
 yax.addEventListener('touchmove',e=>{if(!ty)return;e.preventDefault();scalePrice(Math.exp((e.touches[0].clientY-ty.y)*.008),ty.pr);redraw();},{passive:false});
 yax.addEventListener('touchend',()=>{ty=null;});
 cv.style.cursor='crosshair';
-$('tcStop').oninput=$('tcTgt').oninput=tradeCheck;
+$('tcEnt').oninput=$('tcStop').oninput=$('tcTgt').oninput=()=>{tcSave();tradeCheck();redraw();};
 $('lvmore').onclick=()=>{S.lvAll=!S.lvAll;renderLevels();};
 load(true);setInterval(()=>load(false),2000);addEventListener('resize',render);
 </script>
