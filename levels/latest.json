@@ -1,12 +1,12 @@
 {
-  "generated": "2026-10-22T12:52:41+02:00",
+  "generated": "2026-10-22T14:13:10+02:00",
   "levels": [
     {
       "inst": "NQ",
-      "fut_price": 29523.75,
+      "fut_price": 29513.5,
       "underlying": "_NDX",
       "etf_spot": 29787.0,
-      "ratio": 0.9912,
+      "ratio": 0.9908,
       "regime": "positiv",
       "expiries": [
         "2026-10-22",
@@ -24,15 +24,15 @@
       "n_strikes": 426,
       "call_wall": 30010.95,
       "put_wall": 29310.95,
-      "zero_gamma": 29985.24,
-      "zero_gamma_all": 29958.57,
+      "zero_gamma": 29992.52,
+      "zero_gamma_all": 29965.58,
       "flip_expiries": [
         "2026-10-22",
         "2026-10-23",
         "2026-10-26"
       ],
-      "call_wall_margin": 1.1202068761632382,
-      "put_wall_margin": 2.34626138374762,
+      "call_wall_margin": 1.2894120749668392,
+      "put_wall_margin": 2.072212178207209,
       "call_wall_weak": true,
       "put_wall_weak": false,
       "hgex": 30010.95,
@@ -46,12 +46,12 @@
       "flip_inverted": false,
       "walls_inverted": false,
       "open": 29984.0,
-      "atr_daily": 534.7857142857143,
-      "string": "30011,Call Wall,resw;29311,Put Wall,sup;30311,Call Wall 0DTE,res0;29941,Put Wall 0DTE,sup0;29985.25,Gamma Flip,flip;30041,Max Pain 0DTE,mpain;30311,G+ 1,gpos;29811,G+ 2,gpos;29941,G- 1,gneg;29511,G- 2,gneg;29766.25,EM+,emh;29281.25,EM-,eml;29645,EM +50%,emb;29402.5,EM -50%,emb;29954,1D High IV,ivh;29093.5,1D Low IV,ivl;29984,Open,opo;30251.5,O +0.5 ATR,opu;29716.5,O -0.5 ATR,opd;30518.75,O +1 ATR,opu;29449.25,O -1 ATR,opd"
+      "atr_daily": 534.7678571428571,
+      "string": "30011,Call Wall,resw;29311,Put Wall,sup;30311,Call Wall 0DTE,res0;29941,Put Wall 0DTE,sup0;29992.5,Gamma Flip,flip;30041,Max Pain 0DTE,mpain;30311,G+ 1,gpos;29811,G+ 2,gpos;29941,G- 1,gneg;29711,G- 2,gneg;29756,EM+,emh;29271,EM-,eml;29634.75,EM +50%,emb;29392.25,EM -50%,emb;29943.75,1D High IV,ivh;29083.25,1D Low IV,ivl;29984,Open,opo;30251.5,O +0.5 ATR,opu;29716.5,O -0.5 ATR,opd;30518.75,O +1 ATR,opu;29449.25,O -1 ATR,opd"
     },
     {
       "inst": "GC",
-      "fut_price": 4104.2998046875,
+      "fut_price": 4077.800048828125,
       "underlying": "GLD",
       "etf_spot": 378.92999267578125,
       "ratio": 10.9544,
@@ -72,15 +72,15 @@
       "n_strikes": 149,
       "call_wall": 4162.67,
       "put_wall": 4129.81,
-      "zero_gamma": 4136.78,
-      "zero_gamma_all": 4135.74,
+      "zero_gamma": 4137.12,
+      "zero_gamma_all": 4136.1,
       "flip_expiries": [
         "2026-10-22",
         "2026-10-23",
         "2026-10-26"
       ],
-      "call_wall_margin": 1.5571216124687666,
-      "put_wall_margin": 2.143011199473584,
+      "call_wall_margin": 1.6691071133304431,
+      "put_wall_margin": 2.321233230478077,
       "call_wall_weak": false,
       "put_wall_weak": false,
       "hgex": 4162.67,
@@ -94,8 +94,8 @@
       "flip_inverted": false,
       "walls_inverted": false,
       "open": 4159.0,
-      "atr_daily": 67.00709751674107,
-      "string": "4162.7,Call Wall,res;4129.8,Put Wall,sup;4151.7,Call Wall 0DTE,res0;4136.8,Gamma Flip,flip;4151.7,Max Pain 0DTE,mpain;4151.7,G+ 1,gpos;4217.4,G+ 2,gpos;4118.8,G- 1,gneg;4107.9,G- 2,gneg;4131.8,EM+,emh;4076.8,EM-,eml;4118.1,EM +50%,emb;4090.5,EM -50%,emb;4155,1D High IV,ivh;4053.6,1D Low IV,ivl;4159,Open,opo;4192.5,O +0.5 ATR,opu;4125.5,O -0.5 ATR,opd;4226,O +1 ATR,opu;4092,O -1 ATR,opd"
+      "atr_daily": 67.699951171875,
+      "string": "4162.7,Call Wall,res;4129.8,Put Wall,sup;4151.7,Call Wall 0DTE,res0;4137.1,Gamma Flip,flip;4151.7,Max Pain 0DTE,mpain;4151.7,G+ 1,gpos;4217.4,G+ 2,gpos;4118.8,G- 1,gneg;4140.8,G- 2,gneg;4105.3,EM+,emh;4050.3,EM-,eml;4091.6,EM +50%,emb;4064,EM -50%,emb;4128.5,1D High IV,ivh;4027.1,1D Low IV,ivl;4159,Open,opo;4192.8,O +0.5 ATR,opu;4125.2,O -0.5 ATR,opd;4226.7,O +1 ATR,opu;4091.3,O -1 ATR,opd"
     }
   ]
 }
