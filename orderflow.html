@@ -194,7 +194,7 @@ renderLayers();
 $('lyb').onclick=e=>{e.stopPropagation();$('lyp').classList.toggle('open');};
 $('lyp').onclick=e=>{e.stopPropagation();const t=e.target;
   if(t.dataset.all){Object.keys(LDEF).forEach(k=>S.L[k]=1);}else if(t.dataset.none){Object.keys(LDEF).forEach(k=>S.L[k]=0);S.L.profile=1;S.L.vwap=1;}
-  else if(t.dataset.k){S.L[t.dataset.k]=t.checked?1:0;}else return;
+  else if(t.dataset.k){S.L[t.dataset.k]=t.checked?1:0;if(t.dataset.k==='heat')loadHeat();}else return;
   if(t.dataset.all||t.dataset.none)renderLayers();savePref();render();};
 document.addEventListener('click',()=>$('lyp').classList.remove('open'));
 $('bmin').value=String(S.bmin);$('bmin').onchange=e=>{S.bmin=+e.target.value;savePref();render();};
@@ -249,6 +249,14 @@ function soft(x,y,h,w,rgb,a){const g=x.createLinearGradient(0,0,w,0);g.addColorS
   const v=x.createLinearGradient(0,y-h/2,0,y+h/2);x.save();x.fillStyle=g;x.globalAlpha=1;
   for(const [hh,al] of [[h,.35],[h*.55,.6],[h*.2,1]]){x.globalAlpha=al;x.fillRect(0,y-hh/2,w,hh);}x.restore();}
 
+// Färgskala för heatmapen (styrka 0–1)
+const _HC=[];for(let i=0;i<=20;i++){const v=i/20,st=[[0,30,60,140,.16],[.35,25,120,220,.3],[.65,25,211,240,.45],[1,255,232,150,.7]];let j=0;while(j<st.length-2&&v>st[j+1][0])j++;
+  const A=st[j],B=st[j+1],f=(v-A[0])/(B[0]-A[0]),l=(q)=>A[q]+(B[q]-A[q])*f;_HC.push(`rgba(${l(1)|0},${l(2)|0},${l(3)|0},${l(4).toFixed(3)})`);}
+const heatCol=v=>_HC[Math.max(0,Math.min(20,Math.round(v*20)))];
+let heatBusy=false;
+async function loadHeat(){if(heatBusy||!S.L.heat)return;const key=S.inst+':'+S.tf;if(S.heat&&S.heat.key===key&&Date.now()-S.heat.at<30000)return;heatBusy=true;
+  try{const r=await fetch(`/api/of/${S.inst}/heat?tf=${S.tf}&token=${encodeURIComponent(tok())}`,{cache:'no-store'});const j=await r.json();
+    if(j&&j.cols&&key===S.inst+':'+S.tf){S.heat={key,bin:j.bin,cols:j.cols,at:Date.now()};redraw();}}catch(e){}finally{heatBusy=false;}}
 function drawChart(){
   const d=S.d;if(!d||!d.bars||!d.bars.length)return;
   if(S.view==='fp')return drawFootprint();
@@ -279,6 +287,16 @@ function drawChart(){
   x.font=F(500,11);const step=niceStep((hi-lo)/9);
   for(let v=Math.ceil(lo/step)*step;v<=hi;v+=step){const y=Y(v);x.fillStyle=C.mut;x.textAlign='left';x.fillText(fmtP(v+o),cw+PRW+7,y+4);}
   const ticks=timeTicks(bars,sp,mob);   // inget rutnät — bara etiketter på axlarna
+  // Likviditets-heatmap bakom ljusen: vilande ordrar per pris över tid (mörkblått = lite, cyan = mycket, ljusgult = störst)
+  const HM=S.heat;if(S.L.heat&&HM&&HM.key===S.inst+':'+S.tf&&HM.cols.length&&S.view!=='fp'){const tfs=S.tf*60,bn=HM.bin||BIN(),cellH=Math.max(1,Math.abs(Y(0)-Y(bn)));
+    const tA=all[iA].t,tB=all[iB].t+tfs;let a=0,b=HM.cols.length;while(a<b){const m=(a+b)>>1;if(HM.cols[m][0]<tA)a=m+1;else b=m;}
+    x.save();x.beginPath();x.rect(0,top,cw,ch);x.clip();
+    for(let k=a;k<HM.cols.length&&HM.cols[k][0]<=tB;k++){const [t,row]=HM.cols[k],i=barAt(all,t,tfs);if(i<0)continue;const xc=xOf(i)-sp/2;
+      for(const [p,v] of row){const y=Y(p+bn/2);if(y>top+ch||y+cellH<top)continue;x.fillStyle=heatCol(v);x.fillRect(xc,y,sp+.5,cellH+.5);}}
+    // Orderboken just nu, svagt utdragen i ytan till höger om sista ljuset
+    const lc=HM.cols[HM.cols.length-1],xe=xOf(L-1)+sp/2;if(lc&&all[L-1].t-lc[0]<=tfs*2&&xe<cw){x.globalAlpha=.3;
+      for(const [p,v] of lc[1]){const y=Y(p+bn/2);if(y>top+ch||y+cellH<top)continue;x.fillStyle=heatCol(v);x.fillRect(xe,y,cw-xe,cellH+.5);}x.globalAlpha=1;}
+    x.restore();}
   const lvBy=nm=>(d.levels||[]).find(l=>l.name===nm);
   // "2% chance · 30 min" — under 20 % tonad, 20–60 % vit, över 60 % i nivåns färg
   const probTag=(px,yy,col)=>{const L0=(d.levels||[]).find(l=>Math.abs(l.px-px)<1e-6);const p=pOf(L0);if(p==null)return;
@@ -550,6 +568,7 @@ async function load(full){
     if(j&&j.pro===false){$('lock').style.display='block';$('app').style.display='none';return;}
     $('lock').style.display='none';$('app').style.display='block';
     if(!S.hist||S.hist.key!==S.inst+':'+S.tf||Date.now()-S.hist.at>60000)loadHist(true);
+    loadHeat();
     if(wantFull||!S.d||S.d.inst!==j.inst){S.d=j;lastFull=Date.now();}
     else{const bars=S.d.bars;j.bars.forEach(b=>{const k=bars.findIndex(x=>x.t===b.t);if(k>=0)bars[k]=Object.assign(bars[k],b);else if(!bars.length||b.t>bars[bars.length-1].t)bars.push(b);});
       const keep={bars,profile:S.d.profile,profile_est:S.d.profile_est,levels:S.d.levels,prob_meta:S.d.prob_meta,profiles:S.d.profiles,pcurve:S.d.pcurve,hold_base:S.d.hold_base,plan:S.d.plan,profile_src:S.d.profile_src,poc:S.d.poc,vah:S.d.vah,val:S.d.val};S.d=Object.assign(j,keep);}

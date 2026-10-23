@@ -5443,6 +5443,11 @@ def _of_start():
     except Exception as e:
         print(f"Orderflow: kunde inte starta nivå-/sannolikhetsmodulen: {e}")
     try:
+        import of_heat as _OFH           # likviditets-heatmap: orderboken över tid
+        _OFH.start()
+    except Exception as e:
+        print(f"Orderflow: heatmap kunde inte starta: {e}")
+    try:
         import of_plan as _OFP           # dagsplanen till Telegram 08:00 och 15:30
         _OFP.start(lambda i: _of_snapshot(i, 5))
     except Exception as e:
@@ -5535,6 +5540,20 @@ def orderflow_hist(inst: str, tf: int = 15, token: str = ""):
     k = _OF_SCALE.get(inst.upper(), 1.0)
     bars = _OFL.history(inst.upper(), tf)
     return {"tf": tf, "bars": [dict(b, v=round(b["v"] * k, 3)) for b in bars]}
+
+
+@app.get("/api/of/{inst}/heat")
+def orderflow_heat(inst: str, tf: int = 1, token: str = ""):
+    """Orderboken över tid (relativ styrka 0–1 per pris och stapel). Kräver PRO."""
+    try:
+        from billing_web import verify_token
+        if verify_token(token) is None:
+            return {"pro": False}
+    except Exception:
+        return {"pro": False}
+    _of_start()
+    import of_heat as _OFH
+    return _OFH.get(inst.upper(), tf)
 
 
 @app.get("/api/of/{inst}")
