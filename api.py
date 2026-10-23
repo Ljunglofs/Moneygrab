@@ -5351,8 +5351,8 @@ def _dt_all():
 #  GEX-NIVÅER (NQ + Guld) — PRO-låst på servern
 # =====================================================================
 # Nivåerna räknas av GitHub Actions (gex_daily.yml på main) tre gånger per
-# vardag och sparas i levels/latest.json. Repot är publikt, så appen läser
-# filen direkt därifrån i stället för att räkna optionskedjor själv.
+# vardag och sparas i levels/latest.json. Appen använder i första hand serverns egen
+# beräkning (gex_live); filen läses som reserv (GITHUB_TOKEN krävs om repot är privat).
 _GEX_URL = os.environ.get(
     "GEX_LEVELS_URL",
     "https://raw.githubusercontent.com/Ljunglofs/Moneygrab/main/levels/latest.json")
@@ -5366,8 +5366,26 @@ def _gex_levels():
     now = time.time()
     if _GEX_CACHE["data"] is not None and now - _GEX_CACHE["t"] < 120:
         return _GEX_CACHE["data"]
+    # Först serverns egen GEX (gex_live, samma kod som pipelinen, var 15:e min) — så appen
+    # inte är beroende av att GitHub-filen är publik eller uppdaterad. GitHub-filen är reserv.
     try:
-        r = _rq.get(_GEX_URL, timeout=8)
+        import gex_live as _GL
+        rows = []
+        for inst in ("NQ", "GC"):
+            r = _GL.get(inst)
+            if r:
+                r = {k: v for k, v in r.items() if k != "src_px"}
+                r.setdefault("inst", inst)
+                rows.append(r)
+        if len(rows) == 2:
+            _GEX_CACHE["data"] = {"generated": max(r.get("generated") or "" for r in rows), "levels": rows}
+            _GEX_CACHE["t"] = now
+            return _GEX_CACHE["data"]
+    except Exception as e:
+        print(f"GEX: gex_live misslyckades: {e}")
+    try:
+        tok = os.environ.get("GITHUB_TOKEN", "").strip()
+        r = _rq.get(_GEX_URL, timeout=8, headers={"Authorization": f"token {tok}"} if tok else None)
         r.raise_for_status()
         _GEX_CACHE["data"] = r.json()
         _GEX_CACHE["t"] = now
