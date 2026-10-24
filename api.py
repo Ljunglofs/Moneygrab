@@ -5599,6 +5599,17 @@ def _of_snapshot(inst, tf=1, lite=0):
     if inst.upper() == "BTC":
         import gex_btc as _GXB          # Bitcoin-GEX från Deribits optioner
         gx = _GXB.get()
+        if gx and gx.get("levels"):     # samma regel som NQ/GC: väggar på fel sida om priset döljs
+            rows = []
+            for r in gx["levels"]:
+                r = dict(r)
+                fp = float(r.get("fut_price") or 0)
+                if r.get("call_wall") is not None and fp and float(r["call_wall"]) <= fp:
+                    r["call_wall"] = None
+                if r.get("put_wall") is not None and fp and float(r["put_wall"]) >= fp:
+                    r["put_wall"] = None
+                rows.append(r)
+            gx = dict(gx, levels=rows)
     else:
         gx = _of_gex_live(inst.upper(), live_px) or _gex_levels()   # serverns egen GEX, GitHub-filen som reserv
     snap = _OFE.snapshot(inst.upper(), tf if tf in (1, 5, 15) else (15 if tf > 15 else 1), gx, lite=bool(lite))

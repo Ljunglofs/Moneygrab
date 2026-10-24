@@ -10,8 +10,8 @@ import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-TOL = {"NQ": 15.0, "GC": 3.5}      # nivåer närmare än så = samma zon (dagsplanen: bara NQ och guld)
-PAD = {"NQ": 3.0, "GC": 0.6}       # zonens kant utanför nivåerna
+TOL = {"NQ": 15.0, "GC": 3.5, "BTC": 250.0}      # nivåer närmare än så = samma zon
+PAD = {"NQ": 3.0, "GC": 0.6, "BTC": 40.0}       # zonens kant utanför nivåerna
 SKIP = {"Session High", "Session Low", "VWAP"}   # rörliga nivåer — inte grund för en plan
 _C = {}
 
@@ -124,7 +124,7 @@ def get(snap, max_age=600):
     if c and time.time() - c["generated"] < max_age:
         return c
     p = build(snap)
-    if p:
+    if p and snap.get("pcurve"):                      # cacha bara när sannolikhetsmodellen är klar
         _C[inst] = p
     return p or c
 
